@@ -14,12 +14,14 @@ public class HstCommanderApp
             Top = Application.Top;
         }
 
-        var Win = new Window($"Hst Commander")
+        var Win = new Window()
         {
+            
             X = 0,
             Y = 0,
             Width = Dim.Fill(),
             Height = Dim.Fill(),
+            Title = $"Hst Commander"
             //ColorScheme = colorScheme,
         };
         Top.Add(Win);

@@ -35,14 +35,7 @@ public class DiskDriveContainerProvider : IContainerProvider
 
     private IEntry CreateEntry(DriveInfo driveInfo)
     {
-        try
-        {
-            return new Entry(driveInfo.Name, EntryType.Container, driveInfo.TotalSize, DateTime.MinValue);
-        }
-        catch (Exception)
-        {
-            return new Entry(driveInfo.Name, EntryType.Container, 0, DateTime.MinValue);
-        }
+        return new Entry(driveInfo.Name, EntryType.Container);
     }
 
     private IEntry CreateEntry(DirectoryInfo directoryInfo)

@@ -1,18 +1,17 @@
-﻿namespace Hst.Commander.Console;
+﻿using System.Collections.Specialized;
+using System.Text;
+
+namespace Hst.Commander.Console;
 
 using System.Collections;
 using Plugins;
 using Terminal.Gui;
 
-public class EntryListDataSource : IListDataSource
+public class EntryListDataSource(IEnumerable<IEntry> entries) : IListDataSource
 {
-    private List<IEntry> entries;
-    
-    public EntryListDataSource(IEnumerable<IEntry> entries)
-    {
-        this.entries = entries.ToList();
-    }
-// 			private readonly int len;
+    private List<IEntry> entries = entries.ToList();
+
+    // 			private readonly int len;
 //
 // 			public List<Type> Scenarios { get; set; }
 //
@@ -91,6 +90,39 @@ public class EntryListDataSource : IListDataSource
         return false;
     }
 
+    public void Render(ListView listView, bool selected, int item, int col, int line, int width, int start = 0)
+    {
+        RenderUstr (listView, entries[item].Name, col, line, width, start);
+    }
+    
+    // A slightly adapted method from: https://github.com/gui-cs/Terminal.Gui/blob/fc1faba7452ccbdf49028ac49f0c9f0f42bbae91/Terminal.Gui/Views/ListView.cs#L433-L461
+    private void RenderUstr (View view, string ustr, int col, int line, int width, int start = 0)
+    {
+        var used = 0;
+        int index = start;
+
+        while (index < ustr.Length)
+        {
+            (Rune rune, int size) = ustr.DecodeRune (index, index - ustr.Length);
+            int count = rune.GetColumns ();
+
+            if (used + count >= width)
+            {
+                break;
+            }
+
+            view.AddRune (rune);
+            used += count;
+            index += size;
+        }
+
+        while (used < width)
+        {
+            view.AddRune ((Rune)' ');
+            used++;
+        }
+    }
+
     public void SetMark(int item, bool value)
     {
     }
@@ -102,9 +134,16 @@ public class EntryListDataSource : IListDataSource
 
     public int Count => entries.Count;
     public int Length => entries.Count;
+    public bool SuspendCollectionChangedEvent { get; set; }
+    public event NotifyCollectionChangedEventHandler? CollectionChanged;
 
     public void SetEntries(IEnumerable<IEntry> entries)
     {
         this.entries = entries.ToList();
+    }
+
+    public void Dispose()
+    {
+        
     }
 }

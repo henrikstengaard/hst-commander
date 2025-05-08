@@ -4,10 +4,10 @@ public class Entry : IEntry
 {
     public string Name { get; }
     public EntryType Type { get; }
-    public long Size { get; }
-    public DateTime Date { get; }
+    public long? Size { get; }
+    public DateTime? Date { get; }
 
-    public Entry(string name, EntryType type, long size, DateTime date)
+    public Entry(string name, EntryType type, long? size = null, DateTime? date = null)
     {
         Name = name;
         Type = type;

@@ -5,7 +5,7 @@ using System.Diagnostics;
 using Plugins;
 using Terminal.Gui;
 
-public class MainApp
+public sealed class MainWindow : Window
 {
     //public readonly Toplevel Top;
     private MenuBar _menu;
@@ -30,14 +30,16 @@ public class MainApp
     private NavigationContext rightContext;
 
     private DataTable leftDataTable;
+    private DataTableSource leftDataTableSource;
     private DataTable rightDataTable;
+    private DataTableSource rightDataTableSource;
 
     private Stack<string> leftLocations;
 
     private EntryListDataSource leftDataSource;
     private EntryListDataSource rightDataSource;
 
-    public MainApp()
+    public MainWindow()
     {
         var d = new DiskDriveContainerProvider();
 
@@ -47,7 +49,7 @@ public class MainApp
         rightContext = new NavigationContext();
         rightContext.Providers.Push(new Provider(d));
 
-        var colorScheme = Colors.Base;
+        var colorScheme = Colors.ColorSchemes["Base"];
 
         // var _leftPane = new FrameView("Left")
         // {
@@ -139,10 +141,14 @@ public class MainApp
         leftDataTable.Columns.Add(new DataColumn("Size", typeof(string)));
         leftDataTable.Columns.Add(new DataColumn("Date", typeof(string)));
 
+        leftDataTableSource = new DataTableSource(leftDataTable);
+
         rightDataTable = new DataTable();
         rightDataTable.Columns.Add(new DataColumn("Name", typeof(string)));
         rightDataTable.Columns.Add(new DataColumn("Size", typeof(string)));
         rightDataTable.Columns.Add(new DataColumn("Date", typeof(string)));
+
+        rightDataTableSource = new DataTableSource(rightDataTable);
 
         var label1 = new Label
         {
@@ -150,7 +156,8 @@ public class MainApp
             Y = 0,
             Width = Dim.Percent(50),
             Height = 1,
-            ColorScheme = colorScheme
+            ColorScheme = colorScheme,
+            Text = "Hst Commander"
         };
 
         var label2 = new Label
@@ -162,7 +169,7 @@ public class MainApp
             ColorScheme = colorScheme
         };
 
-        leftTable = new TableView(leftDataTable)
+        leftTable = new TableView(leftDataTableSource)
         {
             X = 0,
             Y = 1,
@@ -170,33 +177,32 @@ public class MainApp
             Height = Dim.Fill(),
             FullRowSelect = true,
             MultiSelect = true,
-            Style = new TableView.TableStyle
+            Style = new TableStyle
             {
                 AlwaysShowHeaders = true,
-                
                 ShowHorizontalHeaderOverline = false,
                 ShowHorizontalScrollIndicators = true,
                 SmoothHorizontalScrolling = true,
-                ColumnStyles = new Dictionary<DataColumn, TableView.ColumnStyle>
+                ColumnStyles = new Dictionary<int, ColumnStyle>
                 {
                     {
-                        leftDataTable.Columns["Name"], new TableView.ColumnStyle
+                        0, new ColumnStyle
                         {
-                            Alignment = TextAlignment.Left,
+                            Alignment = Alignment.Start,
                         }
                     },
                     {
-                        leftDataTable.Columns["Size"], new TableView.ColumnStyle
+                        1, new ColumnStyle
                         {
-                            Alignment = TextAlignment.Right,
+                            Alignment = Alignment.End,
                             MinWidth = 5,
                             MaxWidth = 5
                         }
                     },
                     {
-                        leftDataTable.Columns["Date"], new TableView.ColumnStyle
+                        2, new ColumnStyle
                         {
-                            Alignment = TextAlignment.Left,
+                            Alignment = Alignment.Start,
                             MinWidth = 10,
                             MaxWidth = 10
                         }
@@ -205,40 +211,39 @@ public class MainApp
             },
             ColorScheme = colorScheme
         };
-        leftTable.KeyDown += async args =>
+        leftTable.KeyDown += async (_, key) =>
         {
-            switch (args.KeyEvent.Key)
+            if (key == Key.Enter)
             {
-                case Key.Enter:
-                    if (leftTable.SelectedRow == 0 && leftContext.HasParent)
-                    {
-                        await this.Parent(leftTable, leftDataTable, leftContext);
-                        return;
-                    }
+                if (leftTable.SelectedRow == 0 && leftContext.HasParent)
+                {
+                    await Parent(leftTable, leftDataTable, leftContext);
+                    return;
+                }
 
-                    var row = leftDataTable.Rows[leftTable.SelectedRow];
-                    var name = row.ItemArray[0] as string ?? string.Empty;
-                    if (name.StartsWith("/"))
-                    {
-                        await this.Enter(leftTable, leftDataTable, leftContext, name.Substring(1), leftTable.SelectedRow);
-                        return;
-                    }
-                    
-                    Process.Start(new ProcessStartInfo
-                    {
-                        UseShellExecute = true,
-                        FileName = name.Substring(1),
-                        WorkingDirectory = leftContext.Providers.Peek().GetLocation().Path
-                    });
+                var row = leftDataTable.Rows[leftTable.SelectedRow];
+                var name = row.ItemArray[0] as string ?? string.Empty;
+                if (name.StartsWith("/"))
+                {
+                    await Enter(leftTable, leftDataTable, leftContext, name.Substring(1), leftTable.SelectedRow);
+                    return;
+                }
 
-                    break;
-                case Key.Backspace:
-                    await this.Parent(leftTable, leftDataTable, leftContext);
-                    break;
+                Process.Start(new ProcessStartInfo
+                {
+                    UseShellExecute = true,
+                    FileName = name.Substring(1),
+                    WorkingDirectory = leftContext.Providers.Peek().GetLocation().Path
+                });
+            }
+
+            if (key == Key.Backspace)
+            {
+                await Parent(leftTable, leftDataTable, leftContext);
             }
         };
 
-        rightTable = new TableView(rightDataTable)
+        rightTable = new TableView(rightDataTableSource)
         {
             X = Pos.Percent(50),
             Y = 1,
@@ -246,32 +251,32 @@ public class MainApp
             Height = Dim.Fill(),
             FullRowSelect = true,
             MultiSelect = true,
-            Style = new TableView.TableStyle
+            Style = new TableStyle
             {
                 AlwaysShowHeaders = true,
                 ShowHorizontalHeaderOverline = false,
                 ShowHorizontalScrollIndicators = true,
                 SmoothHorizontalScrolling = true,
-                ColumnStyles = new Dictionary<DataColumn, TableView.ColumnStyle>
+                ColumnStyles = new Dictionary<int, ColumnStyle>
                 {
                     {
-                        rightDataTable.Columns["Name"], new TableView.ColumnStyle
+                        0, new ColumnStyle
                         {
-                            Alignment = TextAlignment.Left
+                            Alignment = Alignment.Start
                         }
                     },
                     {
-                        rightDataTable.Columns["Size"], new TableView.ColumnStyle
+                        1, new ColumnStyle
                         {
-                            Alignment = TextAlignment.Right,
+                            Alignment = Alignment.End,
                             MinWidth = 5,
                             MaxWidth = 5
                         }
                     },
                     {
-                        rightDataTable.Columns["Date"], new TableView.ColumnStyle
+                        2, new ColumnStyle
                         {
-                            Alignment = TextAlignment.Left,
+                            Alignment = Alignment.Start,
                             MinWidth = 10,
                             MaxWidth = 10
                         }
@@ -280,74 +285,101 @@ public class MainApp
             },
             ColorScheme = colorScheme
         };
-        rightTable.KeyDown += async args =>
+        rightTable.KeyDown += async (_, key) =>
         {
-            switch (args.KeyEvent.Key)
+            if (key == Key.Enter)
             {
-                case Key.Enter:
-                    if (rightTable.SelectedRow == 0 && rightContext.HasParent)
-                    {
-                        await this.Parent(rightTable, rightDataTable, rightContext);
-                        return;
-                    }
+                if (rightTable.SelectedRow == 0 && rightContext.HasParent)
+                {
+                    await Parent(rightTable, rightDataTable, rightContext);
+                    return;
+                }
 
-                    var row = rightDataTable.Rows[rightTable.SelectedRow];
-                    var name = row.ItemArray[0] as string ?? string.Empty;
-                    if (name.StartsWith("/"))
-                    {
-                        await this.Enter(rightTable, rightDataTable, rightContext, name.Substring(1), rightTable.SelectedRow);
-                        return;
-                    }
+                var row = rightDataTable.Rows[rightTable.SelectedRow];
+                var name = row.ItemArray[0] as string ?? string.Empty;
+                if (name.StartsWith("/"))
+                {
+                    await Enter(rightTable, rightDataTable, rightContext, name.Substring(1), rightTable.SelectedRow);
+                    return;
+                }
                     
-                    // is file a known container?
-                    var path = rightContext.Providers.Peek().GetLocation().Path;
+                // is file a known container?
+                var path = rightContext.Providers.Peek().GetLocation().Path;
                     
-                    
-                    
-                    Process.Start(new ProcessStartInfo
-                    {
-                        UseShellExecute = true,
-                        FileName = name.Substring(1),
-                        WorkingDirectory = rightContext.Providers.Peek().GetLocation().Path
-                    });
-
-                    break;
-                case Key.Backspace:
-                    await this.Parent(rightTable, rightDataTable, rightContext);
-                    break;
+                Process.Start(new ProcessStartInfo
+                {
+                    UseShellExecute = true,
+                    FileName = name.Substring(1),
+                    WorkingDirectory = rightContext.Providers.Peek().GetLocation().Path
+                });
+            }
+            
+            if (key == Key.Backspace)
+            {
+                await Parent(rightTable, rightDataTable, rightContext);
             }
         };
 
+        Add(label1);
+        Add(leftTable);
+        Add(label2);
+        Add(rightTable);
+        
+        SetBorderStyle(LineStyle.None);
+        
+        Loaded += async (_, _) =>
+        {
+            await Refresh();
+        };
 
-        //window.Add(table);
+        this.KeyUp += (_, e) =>
+        {
+            if (e.KeyCode == (KeyCode.CtrlMask | KeyCode.G))
+            {
+                var tf = new TextField();
 
-        var top = Application.Top;
-// _top.KeyDown += KeyDownHandler;
-//top.Add (window);
-        top.Add(label1);
-        top.Add(leftTable);
-        top.Add(label2);
-        top.Add(rightTable);
-// _top.Add (_statusBar);
+                var ok = new Button
+                {
+                    Text = "OK"
+                };
+                
+                var dialog = new Dialog()
+                {
+                    Title = "Goto location",
+                    Text = "Enter location:",
+                    Buttons = [ok],
+                    ColorScheme = colorScheme
+                };
 
-        //Application.Run(top);
+                ok.Accepting += (sender, args) =>
+                {
+                    // close dialog
+                    Application.RequestStop();
+                    args.Cancel = true;
+                };
+                
+                dialog.Add(tf);
+                
+                //MessageBox.Query ("Message", "Question?", "Yes", "No");
+
+                Application.Run(dialog);
+                dialog.Dispose();
+            }
+        };
     }
 
     public void Adjust()
     {
-        Application.MainLoop.Invoke(() =>
-        {
-            var leftNameStyle = leftTable.Style.ColumnStyles[leftTable.Table.Columns["Name"]];
-            leftNameStyle.MinWidth = leftTable.Bounds.Width - 5 - 10 - 4;
-            leftNameStyle.MaxWidth = leftTable.Bounds.Width - 5 - 10 - 4;
+        var leftNameStyle = leftTable.Style.ColumnStyles[0];
+        // leftNameStyle.MinWidth = leftTable.Bounds.Width - 5 - 10 - 4;
+        // leftNameStyle.MaxWidth = leftTable.Bounds.Width - 5 - 10 - 4;
         
-            var rightNameStyle = rightTable.Style.ColumnStyles[rightTable.Table.Columns["Name"]];
-            rightNameStyle.MinWidth = rightTable.Bounds.Width - 5 - 10 - 4;
-            rightNameStyle.MaxWidth = rightTable.Bounds.Width - 5 - 10 - 4;
-        });
+        var rightNameStyle = rightTable.Style.ColumnStyles[0];
+        // rightNameStyle.MinWidth = rightTable.Bounds.Width - 5 - 10 - 4;
+        // rightNameStyle.MaxWidth = rightTable.Bounds.Width - 5 - 10 - 4;
     }
 
-    public async Task Enter(TableView table, DataTable dataTable, NavigationContext context, string path, int cursorPosition)
+    private async Task Enter(TableView table, DataTable dataTable, NavigationContext context, string path, int cursorPosition)
     {
         try
         {
@@ -363,7 +395,7 @@ public class MainApp
         }
     }
 
-    public async Task Parent(TableView table, DataTable dataTable, NavigationContext context)
+    private async Task Parent(TableView table, DataTable dataTable, NavigationContext context)
     {
         var prevLocation = context.Parent();
         var provider = context.Providers.Peek();
@@ -372,7 +404,7 @@ public class MainApp
         UpdateDataTable(table, dataTable, context, entries, prevLocation.CursorPosition);
     }
 
-    public async Task Refresh(TableView table, DataTable dataTable, NavigationContext context)
+    private async Task Refresh(TableView table, DataTable dataTable, NavigationContext context)
     {
         var provider = context.Providers.Peek();
         var location = provider.GetLocation();
@@ -380,7 +412,7 @@ public class MainApp
         UpdateDataTable(table, dataTable, context, entries, location.CursorPosition);
     }
 
-    public void UpdateDataTable(TableView tableView, DataTable dataTable, NavigationContext context,
+    private void UpdateDataTable(TableView tableView, DataTable dataTable, NavigationContext context,
         IEnumerable<IEntry> entries, int currentEntry)
     {
         dataTable.Clear();
@@ -399,51 +431,18 @@ public class MainApp
             var row = dataTable.NewRow();
             row[0] = string.Concat(entry.Type == EntryType.Container ? "/" : " ", entry.Name);
             row[1] = "";
-            row[2] = entry.Date.ToShortDateString();
+            row[2] = entry.Date?.ToShortDateString() ?? string.Empty;
             dataTable.Rows.Add(row);
         }
 
         tableView.SelectedRow = currentEntry;
 
-        Application.MainLoop.Invoke(tableView.SetNeedsDisplay);
+        SetNeedsLayout();
     }
 
-    public async Task Refresh()
+    private async Task Refresh()
     {
-        await this.Refresh(leftTable, leftDataTable, leftContext);
-        await this.Refresh(rightTable, rightDataTable, rightContext);
+        await Refresh(leftTable, leftDataTable, leftContext);
+        await Refresh(rightTable, rightDataTable, rightContext);
     }
-
-    // public Task Refresh()
-    // {
-    //     Application.MainLoop.Invoke(Action);
-    //     return Task.CompletedTask;
-    // }
-    //
-    // private async Task RefreshLeft()
-    // {
-    //     leftDataSource.SetEntries(await leftContext.Locations.Peek().Provider.GetEntries());
-    //     Application.MainLoop.Invoke(() =>
-    //     {
-    //         _leftEntryListView.SetNeedsDisplay();
-    //     });
-    // }
-    //
-    // private async Task RefreshRight()
-    // {
-    //     rightDataSource.SetEntries(await rightContext.Locations.Peek().Provider.GetEntries());
-    //     Application.MainLoop.Invoke(() =>
-    //     {
-    //         _rightEntryListView.SetNeedsDisplay();
-    //     });
-    // }
-    //
-    // private async void Action()
-    // {
-    //     leftDataSource.SetEntries(await leftContext.Locations.Peek().Provider.GetEntries());
-    //     rightDataSource.SetEntries(await rightContext.Locations.Peek().Provider.GetEntries());
-    //
-    //     _leftEntryListView.SetNeedsDisplay();
-    //     _rightEntryListView.SetNeedsDisplay();
-    // }
 }
