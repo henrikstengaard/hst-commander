@@ -66,4 +66,30 @@ public class GivenNestedVolumeWithTestVolume
         var cdDir1Entry = entries.FirstOrDefault(entry => entry.Name.Equals("iso9660-dir1") && entry.Type == EntryType.Container);
         Assert.Equal("iso9660-dir1", cdDir1Entry?.Name);
     }
+
+    [Fact]
+    public async Task When_ChangingToParentAtNestedVolumeRoot_Then_PreviousVolumeIsRestored()
+    {
+        var localVolume = new TestVolume();
+        localVolume.AddEntry([], new TestEntry("local-dir", EntryType.Container));
+        var volume = new NestedVolume(localVolume);
+        volume.PushVolume(new TestVolume());
+
+        await volume.ChangeDirectory([Paths.Parent]);
+
+        var entries = await volume.ListEntries().ToListAsync();
+        Assert.Single(entries);
+        Assert.Equal("local-dir", entries[0].Name);
+    }
+
+    [Fact]
+    public void When_EntryVolumeProviderIsAtRoot_Then_NestedVolumeReportsCurrentVolumeAtRoot()
+    {
+        var volume = new NestedVolume(new TestVolume());
+        volume.PushVolume(new EntryVolumeProvider(
+            new TestEntry("sample.iso", EntryType.Item),
+            new TestVolume()));
+
+        Assert.True(volume.CurrentVolumeIsAtRoot);
+    }
 }

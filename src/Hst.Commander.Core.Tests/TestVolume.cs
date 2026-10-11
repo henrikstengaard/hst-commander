@@ -9,7 +9,7 @@ namespace Hst.Commander.Core.Tests;
 public class TestVolume : IVolume
 {
     private readonly Dictionary<string, List<TestEntry>> entries = new();
-    private IList<string> currentPathComponents = new List<string>(10);
+    private IList<string> currentPathComponents = new List<string> { Paths.Root };
 
     public void AddEntry(string[] pathComponents, TestEntry entry)
     {
@@ -28,7 +28,11 @@ public class TestVolume : IVolume
     private static string CreatePath(IEnumerable<string> pathComponents)
     {
         var pathComponentsArray = pathComponents as string[] ?? pathComponents.ToArray();
-        return string.Join("|", pathComponentsArray.Length != 0 ? pathComponentsArray : [Paths.Root]);
+        var components = pathComponentsArray.Length == 0 ||
+                        !pathComponentsArray[0].Equals(Paths.Root, StringComparison.OrdinalIgnoreCase)
+            ? new[] { Paths.Root }.Concat(pathComponentsArray)
+            : pathComponentsArray;
+        return string.Join("|", components);
     }
 
     public async IAsyncEnumerable<IEntry> ListEntries([EnumeratorCancellation] CancellationToken cancellationToken =

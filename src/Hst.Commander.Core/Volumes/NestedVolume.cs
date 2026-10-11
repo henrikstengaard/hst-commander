@@ -33,11 +33,28 @@ public class NestedVolume(IVolume volume) : IVolume
         _currentVolume = _nestedVolumes.Last?.Value ?? new NullVolume();
     }
 
+    public bool CurrentVolumeIsAtRoot
+    {
+        get
+        {
+            if (_currentVolume is EntryVolumeProvider entryVolumeProvider)
+            {
+                return entryVolumeProvider.IsAtRoot;
+            }
+
+            var pathComponents = _currentVolume.CurrentPathComponents.ToArray();
+            return pathComponents.Length == 0 ||
+                   pathComponents.Length == 1 && pathComponents[0].Equals(Paths.Root, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
     /// <summary>
     /// Current path components of all nested volumes.
     /// </summary>
     public IEnumerable<string> CurrentPathComponents => _nestedVolumes
-        .SelectMany(p => p.CurrentPathComponents).ToList();
+        .SelectMany(p => p.CurrentPathComponents)
+        .Where(pathComponent => !pathComponent.Equals(Paths.Root, StringComparison.OrdinalIgnoreCase))
+        .ToList();
 
     /// <summary>
     /// List entries in current directory of the current volumes.
@@ -50,17 +67,7 @@ public class NestedVolume(IVolume volume) : IVolume
 
     public async Task ChangeDirectory(IEnumerable<string> pathComponents, CancellationToken cancellationToken = default)
     {
-        //
-        
-        var pathComponentsArray = pathComponents.ToArray();
-        if (pathComponentsArray.Length == 0)
-        {
-            return;
-        }
-        
-        var currentPathComponents = _currentVolume.CurrentPathComponents.ToArray();
-
-        foreach (var pathComponent in pathComponentsArray)
+        foreach (var pathComponent in pathComponents)
         {
             if (pathComponent.Equals(Paths.Root, StringComparison.OrdinalIgnoreCase))
             {
@@ -73,17 +80,18 @@ public class NestedVolume(IVolume volume) : IVolume
                 continue;
             }
             
-            if (pathComponent.Equals(Paths.Parent, StringComparison.OrdinalIgnoreCase) &&
-                currentPathComponents.Length > 0)
+            if (pathComponent.Equals(Paths.Parent, StringComparison.OrdinalIgnoreCase))
             {
-                if (!currentPathComponents.Any())
+                if (!CurrentVolumeIsAtRoot)
                 {
                     await _currentVolume.ChangeDirectory([pathComponent], cancellationToken);
                 }
-                else
+                else if (_nestedVolumes.Count > 1)
                 {
                     PopVolume();
                 }
+
+                continue;
             }
             
             await _currentVolume.ChangeDirectory([pathComponent], cancellationToken);

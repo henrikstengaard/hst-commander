@@ -64,11 +64,25 @@ public partial class Iso9660Volume(CDReader cdReader) : IVolume
 
     public Task ChangeDirectory(IEnumerable<string> pathComponents, CancellationToken cancellationToken = default)
     {
-        var pathComponentsArray = pathComponents as string[] ?? pathComponents.ToArray();
-
-        var changedPathComponents = pathComponentsArray.Length == 0 || pathComponentsArray[0].Equals(Paths.Root)
-            ? pathComponentsArray
-            : _currentPathComponents.Concat(pathComponentsArray).ToArray();
+        var changedPathComponents = _currentPathComponents.ToList();
+        foreach (var pathComponent in pathComponents)
+        {
+            if (pathComponent.Equals(Paths.Root, StringComparison.OrdinalIgnoreCase))
+            {
+                changedPathComponents.Clear();
+            }
+            else if (pathComponent.Equals(Paths.Parent, StringComparison.OrdinalIgnoreCase))
+            {
+                if (changedPathComponents.Count > 0)
+                {
+                    changedPathComponents.RemoveAt(changedPathComponents.Count - 1);
+                }
+            }
+            else
+            {
+                changedPathComponents.Add(pathComponent);
+            }
+        }
 
         var path = CreatePath(changedPathComponents);
         var directoryInfo = cdReader.GetDirectoryInfo(path);

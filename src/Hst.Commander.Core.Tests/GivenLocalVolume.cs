@@ -83,6 +83,42 @@ public class GivenLocalVolume
     }
 
     [Fact]
+    public async Task When_ChangeDirectoryToParent_Then_CurrentDirectoryIsChanged()
+    {
+        var localPath = Path.Combine($"local-{Guid.NewGuid()}", "dir1");
+
+        try
+        {
+            Directory.CreateDirectory(localPath);
+            var localVolume = new LocalVolume(localPath);
+
+            await localVolume.ChangeDirectory([Paths.Parent]);
+
+            Assert.Equal(Path.GetFullPath(Path.GetDirectoryName(localPath)!).Split(Path.DirectorySeparatorChar),
+                localVolume.CurrentPathComponents);
+        }
+        finally
+        {
+            var parentPath = Path.GetDirectoryName(localPath);
+            if (parentPath != null && Directory.Exists(parentPath))
+            {
+                Directory.Delete(parentPath, true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task When_ChangeDirectoryToParentAtFilesystemRoot_Then_DriveListIsShown()
+    {
+        var localVolume = new LocalVolume(Path.GetPathRoot(Environment.CurrentDirectory)!);
+
+        await localVolume.ChangeDirectory([Paths.Parent]);
+        var entries = await localVolume.ListEntries().ToListAsync();
+
+        Assert.NotEmpty(entries);
+    }
+
+    [Fact]
     public async Task When_OpenDirectoryEntry_Then_DirectoryIsChanged()
     {
         // arrange - create local volume with entries

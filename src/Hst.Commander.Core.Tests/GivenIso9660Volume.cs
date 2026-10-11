@@ -44,6 +44,18 @@ public class GivenIso9660Volume
     }
 
     [Fact]
+    public async Task When_ChangeDirectoryToParent_Then_CurrentDirectoryIsChanged()
+    {
+        await using var iso9660Stream = CreateIso9660WithDirectoriesAndFiles();
+        var iso9660Volume = new Iso9660Volume(new CDReader(iso9660Stream, true));
+        await iso9660Volume.ChangeDirectory(["dir1"]);
+
+        await iso9660Volume.ChangeDirectory([Paths.Parent]);
+
+        Assert.Equal([], iso9660Volume.CurrentPathComponents);
+    }
+
+    [Fact]
     public async Task When_OpenDirectoryEntry_Then_DirectoryIsChanged()
     {
         // arrange - create an iso9660 volume with entries

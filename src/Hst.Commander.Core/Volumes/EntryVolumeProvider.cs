@@ -14,6 +14,16 @@ public class EntryVolumeProvider(IEntry entry, IVolume volumeProvider) : IVolume
 
     public IEnumerable<string> CurrentPathComponents => new []{entry.Name}.Concat(volumeProvider.CurrentPathComponents);
 
+    public bool IsAtRoot
+    {
+        get
+        {
+            var pathComponents = volumeProvider.CurrentPathComponents.ToArray();
+            return pathComponents.Length == 0 ||
+                   pathComponents.Length == 1 && pathComponents[0].Equals(Paths.Root, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
     public IAsyncEnumerable<IEntry> ListEntries(CancellationToken cancellationToken = default) =>
         volumeProvider.ListEntries(cancellationToken);
 

@@ -5,7 +5,8 @@ namespace Hst.Commander.Core.Volumes;
 
 public class LocalVolume(string path) : IVolume
 {
-    private IList<string> _currentPathComponents = new List<string>(string.IsNullOrWhiteSpace(path) 
+    private string? _currentPath = string.IsNullOrWhiteSpace(path) ? null : Path.GetFullPath(path);
+    private IList<string> _currentPathComponents = new List<string>(string.IsNullOrWhiteSpace(path)
         ? []
         : Path.GetFullPath(path).Split(Path.DirectorySeparatorChar));
 
@@ -13,15 +14,12 @@ public class LocalVolume(string path) : IVolume
 
     public IEnumerable<string> CurrentPathComponents => _currentPathComponents;
 
-    private static string CreatePath(IEnumerable<string> pathComponents) => 
-        string.Join(Path.DirectorySeparatorChar, pathComponents);
-
     public async IAsyncEnumerable<IEntry> ListEntries([EnumeratorCancellation] CancellationToken cancellationToken =
         default)
     {
-        var entries = _currentPathComponents.Count == 0
+        var entries = _currentPath == null
             ? await GetDriveEntries()
-            : await GetDirectoryEntries(CreatePath(_currentPathComponents));
+            : await GetDirectoryEntries(_currentPath);
         
         foreach (var entry in entries)
         {
@@ -32,31 +30,35 @@ public class LocalVolume(string path) : IVolume
     public Task ChangeDirectory(IEnumerable<string> pathComponents, CancellationToken cancellationToken = default)
     {
         var pathComponentsArray = pathComponents as string[] ?? pathComponents.ToArray();
+        var currentPath = _currentPath;
         
         foreach (var pathComponent in pathComponentsArray)
         {
-            if (pathComponent.Equals(Paths.Root, StringComparison.OrdinalIgnoreCase) &&
-                _currentPathComponents.Count > 0)
+            if (pathComponent.Equals(Paths.Root, StringComparison.OrdinalIgnoreCase))
             {
-                _currentPathComponents = [];
+                currentPath = currentPath == null && Path.IsPathRooted(pathComponent) &&
+                              Directory.Exists(pathComponent)
+                    ? Path.GetFullPath(pathComponent)
+                    : null;
+                continue;
             }
             
-            if (pathComponent.Equals(Paths.Parent, StringComparison.OrdinalIgnoreCase) &&
-                _currentPathComponents.Count > 0)
+            if (pathComponent.Equals(Paths.Parent, StringComparison.OrdinalIgnoreCase))
             {
-                _currentPathComponents.RemoveAt(_currentPathComponents.Count - 1);
+                currentPath = currentPath == null ? null : Directory.GetParent(currentPath)?.FullName;
+                continue;
             }
             
-            var changedPathComponents = _currentPathComponents.Concat([pathComponent]).ToArray();
-            
-            var path = CreatePath(changedPathComponents);
+            var path = Path.GetFullPath(Path.Combine(currentPath ?? string.Empty, pathComponent));
             if (!Directory.Exists(path))
             {
                 throw new IOException($"Dir not found '{pathComponent}'");
             }
             
-            _currentPathComponents.Add(pathComponent);
+            currentPath = path;
         }
+
+        SetCurrentPath(currentPath);
         
         return Task.CompletedTask;
     }
@@ -70,7 +72,7 @@ public class LocalVolume(string path) : IVolume
     /// <exception cref="IOException"></exception>
     public Task ChangeContainer(string name, CancellationToken cancellationToken = default)
     {
-        var path = CreatePath(_currentPathComponents.Concat([name]));
+        var path = Path.GetFullPath(Path.Combine(_currentPath ?? string.Empty, name));
         var directoryInfo = new DirectoryInfo(path);
 
         if (!directoryInfo.Exists)
@@ -78,7 +80,7 @@ public class LocalVolume(string path) : IVolume
             throw new IOException("Container not found");
         }
 
-        _currentPathComponents.Add(name);
+        SetCurrentPath(path);
         
         return Task.CompletedTask;
     }
@@ -90,7 +92,8 @@ public class LocalVolume(string path) : IVolume
     /// <returns></returns>
     public Task ChangeRoot(CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        SetCurrentPath(null);
+        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -100,19 +103,20 @@ public class LocalVolume(string path) : IVolume
     /// <returns></returns>
     public Task ChangeParent(CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        return ChangeDirectory([Paths.Parent], cancellationToken);
     }
     
     public Task<IEntry> OpenEntry(string name, CancellationToken cancellationToken = default)
     {
-        var path = CreatePath(_currentPathComponents.Concat([name]));
+        var path = Path.Combine(_currentPath ?? string.Empty, name);
         var directoryInfo = new DirectoryInfo(path);
 
         if (directoryInfo.Exists)
         {
             var entry = CreateEntry(directoryInfo);
             
-            _currentPathComponents.Add(entry.Name);
+            _currentPath = directoryInfo.FullName;
+            _currentPathComponents = _currentPathComponents.Concat([entry.Name]).ToList();
             
             return Task.FromResult(entry);
         }
@@ -153,4 +157,12 @@ public class LocalVolume(string path) : IVolume
 
     private static IEntry CreateEntry(FileInfo fileInfo) => 
         new Entry(fileInfo.Name, EntryType.Item, fileInfo.Length, fileInfo.LastWriteTimeUtc);
+
+    private void SetCurrentPath(string? path)
+    {
+        _currentPath = path;
+        _currentPathComponents = path == null
+            ? []
+            : Path.GetFullPath(path).Split(Path.DirectorySeparatorChar);
+    }
 }

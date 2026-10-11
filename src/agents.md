@@ -68,10 +68,9 @@ Task<IEntry> OpenEntry(string name, CancellationToken cancellationToken = defaul
 ### Navigation Model
 
 Each UI pane has a `NavigationContext` that owns a `NestedVolume`. Browsing into a directory calls `ChangeDirectory` on the current volume. Browsing into a file that represents a mountable container (e.g., `.iso`) should:
-1. Call `OpenEntry` to get the `IEntry` (and its underlying stream).
-2. Construct the appropriate `IVolume` (e.g., `Iso9660Volume`).
-3. Wrap it in an `EntryVolumeProvider`.
-4. Call `nestedVolume.PushVolume(entryVolumeProvider)`.
+1. For local files, open the selected ISO by its path; `IEntry` currently provides metadata only, not a stream.
+2. Construct an `Iso9660Volume` over the open file stream.
+3. Wrap it in an `EntryVolumeProvider` and call `nestedVolume.PushVolume(entryVolumeProvider)`.
 
 Going up when at the root of a nested volume calls `PopVolume()`.
 
@@ -84,27 +83,18 @@ Going up when at the root of a nested volume calls `PopVolume()`.
 
 ---
 
-## Current WIP State (as of June 2026)
+## Current Status
 
-**Do not break the following areas — they are actively being refactored:**
-
-| File | Issue |
-|---|---|
-| `Hst.Commander.Console/MainWindow.cs:52` | Incomplete statement `leftContext.` — compilation error |
-| `Hst.Commander.Console/MainWindow.cs:55` | `new NavigationContext()` called without required `volume` argument |
-| `Hst.Commander.Console/MainWindow.cs:431` | `Parent()` method references undefined locals (`provider`, `prevLocation`) |
-| `Hst.Commander.Console/NavigationContext.cs:17` | `GetLocation()` throws `NotImplementedException` |
-| `Hst.Commander.Console/NavigationContext.cs:24` | Incomplete statement `_nestedVolume.` — compilation error; dead code below it |
-| `Hst.Commander.Core/Volumes/DiskImageVolume.cs` | All methods throw `NotImplementedException` — intentional stub |
-
-**What is working:**
-- The full volume abstraction layer (`IVolume`, `IEntry`, `EntryType`, `Paths`).
-- `LocalVolume`, `Iso9660Volume`, `NestedVolume`, `EntryVolumeProvider`, `NullVolume`.
+**Working:**
+- The .NET 9 Terminal.Gui v2 dual-pane browser, with per-pane navigation and current-directory startup.
+- Local drive/directory listing, parent navigation, and read-only browsing of local ISO images as nested volumes.
+- The volume abstraction layer and implementations: `LocalVolume`, `Iso9660Volume`, `NestedVolume`, `EntryVolumeProvider`, and `NullVolume`.
 - All unit tests in `Hst.Commander.Core.Tests`.
 
-**What is broken (do not ship as-is):**
-- `MainWindow.cs` and `NavigationContext.cs` do not compile.
-- The `Hst.Commander.Console` project as a whole does not build until these are fixed.
+**Not implemented:**
+- Copy, move, delete, and other file-management operations.
+- Opening ISO images located inside another ISO; the current `IEntry` contract does not expose file contents.
+- `DiskImageVolume` remains an intentional stub.
 
 ---
 
@@ -177,6 +167,9 @@ Key TUI patterns already in use:
 - Entry names are prefixed: `"/"` = container (directory/volume), `" "` = item (file).
 - `".."` is inserted as row 0 when `context.HasParent` is true.
 - Key bindings are attached via `tableView.KeyDown += async (_, key) => { ... }`.
+- Up/Down move the selected row within the active pane and accelerate while held; PageUp/PageDown move by one visible page and Home/End jump to the first/last entry.
+- The pane backgrounds use a Midnight Commander-inspired blue palette, with directories in white, files in gray, and the current row in black on gray in both panes.
+- Directory names have no slash prefix.
 - Window-level key bindings use `this.KeyUp`.
 - Dialogs: `new Dialog { Buttons = [okButton] }`, run with `Application.Run(dialog)`.
 
