@@ -1,0 +1,13 @@
+﻿using Hst.Commander.Extensions.Volume.Abstractions;
+
+namespace Hst.Commander.Core.Tests;
+
+public class TestEntry(string name, EntryType type, long? size = null, DateTime? date = null, byte[]? data = null)
+    : IEntry
+{
+    public string Name { get; } = name;
+    public EntryType Type { get; } = type;
+    public long? Size { get; } = size;
+    public DateTime? ModifiedDate { get; } = date;
+    public byte[]? Data { get; set; } = data;
+}
