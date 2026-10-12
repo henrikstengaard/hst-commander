@@ -164,10 +164,10 @@ The TUI uses **Terminal.Gui v2 pre-alpha** (`2.0.0-prealpha.1895`). The API surf
 
 Key TUI patterns already in use:
 - `TableView` with `DataTableSource` for the two panes.
-- Entry names are prefixed: `"/"` = container (directory/volume), `" "` = item (file).
+- The name column expands to the remaining pane width; size and modified-date columns use fixed widths when space permits and shrink on narrow panes so all three columns and separators stay within the pane. File sizes use compact B/KB/MB/GB units; long names are shortened with `~`, retaining up to the final three filename stem characters and the extension when it fits.
 - `".."` is inserted as row 0 when `context.HasParent` is true.
 - Key bindings are attached via `tableView.KeyDown += async (_, key) => { ... }`.
-- Up/Down move the selected row within the active pane and accelerate while held; PageUp/PageDown move by one visible page and Home/End jump to the first/last entry.
+- Up/Down move the selected row by one entry per key event; holding a key uses the OS/terminal's repeat rate. PageUp/PageDown move by one visible page and Home/End jump to the first/last entry.
 - The pane backgrounds use a Midnight Commander-inspired blue palette, with directories in white, files in gray, and the current row in black on gray in both panes.
 - Directory names have no slash prefix.
 - Window-level key bindings use `this.KeyUp`.

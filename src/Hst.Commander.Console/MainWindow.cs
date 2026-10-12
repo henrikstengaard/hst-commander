@@ -1,6 +1,5 @@
 using System.Data;
-using System.Diagnostics;
-using Hst.Commander.Core;
+using System.Globalization;
 using Hst.Commander.Extensions.Volume.Abstractions;
 using Terminal.Gui;
 using TuiAttribute = Terminal.Gui.Attribute;
@@ -9,32 +8,25 @@ namespace Hst.Commander.Console;
 
 public sealed class MainWindow : Window
 {
+    private const int SizeColumnWidth = 8;
+    private const int ModifiedColumnWidth = 16;
+    private const int ColumnCount = 3;
+
     private readonly Pane _leftPane;
     private readonly Pane _rightPane;
 
     public MainWindow(string initialPath)
     {
-        Title = "HST Commander - Enter opens, Backspace goes up, Tab switches panes, Ctrl+Q quits";
+        BorderStyle = LineStyle.None;
         X = 0;
         Y = 0;
         Width = Dim.Fill();
         Height = Dim.Fill();
 
-        _leftPane = CreatePane("Left", new NavigationContext(initialPath), 0);
-        _rightPane = CreatePane("Right", new NavigationContext(initialPath), 50);
+        _leftPane = CreatePane(new NavigationContext(initialPath), 0);
+        _rightPane = CreatePane(new NavigationContext(initialPath), 50);
 
-        var help = new Label
-        {
-            X = 0,
-            Y = Pos.AnchorEnd(),
-            Width = Dim.Fill(),
-            Text = "Up/Down: select (hold to accelerate)    PgUp/PgDn: page    Home/End: first/last    Enter: open    Backspace: parent    Tab: pane    Ctrl+Q: quit",
-            ColorScheme = CreateColorScheme(
-                new TuiAttribute(ColorName16.White, ColorName16.Blue),
-                new TuiAttribute(ColorName16.BrightYellow, ColorName16.Blue))
-        };
-
-        Add(_leftPane.View, _rightPane.View, help);
+        Add(_leftPane.View, _rightPane.View);
         ConfigurePaneKeys(_leftPane, _rightPane);
         ConfigurePaneKeys(_rightPane, _leftPane);
         Initialized += (_, _) => _leftPane.TableView.SetFocus();
@@ -52,33 +44,35 @@ public sealed class MainWindow : Window
         _rightPane.NavigationContext.Dispose();
     }
 
-    private static Pane CreatePane(string name, NavigationContext navigationContext, int xPercent)
+    private static Pane CreatePane(NavigationContext navigationContext, int xPercent)
     {
         var view = new View
         {
             X = Pos.Percent(xPercent),
             Y = 0,
             Width = Dim.Percent(50),
-            Height = Dim.Fill(1),
+            Height = Dim.Fill(),
             CanFocus = true
         };
-        var pathLabel = new Label
+        var pathBorder = new PathBorderView
         {
             X = 0,
             Y = 0,
             Width = Dim.Fill(),
-            Text = $"{name}: {navigationContext.CurrentPath}",
-            ColorScheme = CreateColorScheme(
-                new TuiAttribute(ColorName16.BrightYellow, ColorName16.Blue),
-                new TuiAttribute(ColorName16.BrightYellow, ColorName16.Blue))
+            Height = 1,
+            Path = navigationContext.CurrentPath,
+            BorderAttribute = new TuiAttribute(ColorName16.White, ColorName16.Blue),
+            PathAttribute = new TuiAttribute(ColorName16.BrightYellow, ColorName16.Blue),
+            ActivePathAttribute = new TuiAttribute(ColorName16.Black, ColorName16.Gray)
         };
-        var tableView = new TableView
+        var tableView = new EntryTableView
         {
             X = 0,
             Y = 1,
             Width = Dim.Fill(),
-            Height = Dim.Fill(),
+            Height = Dim.Fill(1),
             FullRowSelect = true,
+            MaxCellWidth = int.MaxValue,
             CellActivationKey = KeyCode.Enter,
             ColorScheme = CreateColorScheme(
                 new TuiAttribute(ColorName16.White, ColorName16.Blue),
@@ -87,14 +81,28 @@ public sealed class MainWindow : Window
                 new TuiAttribute(ColorName16.Black, ColorName16.BrightCyan))
         };
 
-        var pane = new Pane(name, navigationContext, view, pathLabel, tableView);
-        tableView.Style = new TableStyle
+        var bottomLine = new Label
         {
-            ShowVerticalCellLines = false,
-            RowColorGetter = args => GetRowColorScheme(pane, args.RowIndex)
+            X = 0,
+            Y = Pos.AnchorEnd(),
+            Width = Dim.Fill(),
+            ColorScheme = CreateColorScheme(
+                new TuiAttribute(ColorName16.White, ColorName16.Blue),
+                new TuiAttribute(ColorName16.White, ColorName16.Blue))
         };
 
-        view.Add(pathLabel, tableView);
+        var pane = new Pane(navigationContext, view, pathBorder, tableView, bottomLine);
+        tableView.Style = new TableStyle
+        {
+            ShowVerticalCellLines = true,
+            ShowHorizontalHeaderOverline = false,
+            AlwaysShowHeaders = true,
+            ExpandLastColumn = false,
+            RowColorGetter = args => GetRowColorScheme(pane, args.RowIndex)
+        };
+        tableView.FrameChanged += (_, _) => UpdatePaneColumns(pane);
+
+        view.Add(pathBorder, tableView, bottomLine);
 
         return pane;
     }
@@ -105,16 +113,10 @@ public sealed class MainWindow : Window
         pane.TableView.HasFocusChanged += (_, _) =>
         {
             pane.TableView.NeedsDraw = true;
+            pane.PathBorder.IsActive = pane.TableView.HasFocus;
+            pane.PathBorder.NeedsDraw = true;
         };
         pane.TableView.SelectedCellChanged += (_, _) => pane.TableView.NeedsDraw = true;
-        pane.TableView.KeyUp += (_, key) =>
-        {
-            if (key.KeyCode == pane.LastMovementKey)
-            {
-                pane.LastMovementKey = null;
-                pane.RepeatedKeyDowns = 0;
-            }
-        };
         pane.TableView.KeyDown += (_, key) =>
         {
             if (key.KeyCode == KeyCode.Tab)
@@ -124,39 +126,22 @@ public sealed class MainWindow : Window
             }
             else if (key.KeyCode == KeyCode.CursorUp || key.KeyCode == KeyCode.CursorDown)
             {
-                var now = Stopwatch.GetTimestamp();
-                var elapsed = Stopwatch.GetElapsedTime(pane.LastMovementAt, now);
-                pane.RepeatedKeyDowns = pane.LastMovementKey == key.KeyCode &&
-                                        elapsed <= TimeSpan.FromMilliseconds(250)
-                    ? pane.RepeatedKeyDowns + 1
-                    : 0;
-                pane.LastMovementKey = key.KeyCode;
-                pane.LastMovementAt = now;
-
-                var repeatExponent = Math.Min(3, pane.RepeatedKeyDowns / 2);
-                var movement = 1 << repeatExponent;
-                MoveSelection(pane, key.KeyCode == KeyCode.CursorUp ? -movement : movement);
+                MoveSelection(pane, key.KeyCode == KeyCode.CursorUp ? -1 : 1);
                 key.Handled = true;
             }
             else if (key.KeyCode == KeyCode.PageUp || key.KeyCode == KeyCode.PageDown)
             {
-                pane.LastMovementKey = null;
-                pane.RepeatedKeyDowns = 0;
                 MoveSelection(pane, GetPageSize(pane) * (key.KeyCode == KeyCode.PageUp ? -1 : 1));
                 key.Handled = true;
             }
             else if (key.KeyCode == KeyCode.Home || key.KeyCode == KeyCode.End)
             {
-                pane.LastMovementKey = null;
-                pane.RepeatedKeyDowns = 0;
                 MoveSelection(pane, key.KeyCode == KeyCode.Home ? 0 : pane.Entries.Count - 1,
                     key.KeyCode == KeyCode.Home || key.KeyCode == KeyCode.End);
                 key.Handled = true;
             }
             else if (key.KeyCode == KeyCode.Backspace)
             {
-                pane.LastMovementKey = null;
-                pane.RepeatedKeyDowns = 0;
                 key.Handled = true;
                 _ = RunNavigationAsync(pane, () => pane.NavigationContext.GoParentAsync());
             }
@@ -202,7 +187,8 @@ public sealed class MainWindow : Window
     private static async Task RefreshPaneAsync(Pane pane)
     {
         pane.Entries = await pane.NavigationContext.ListEntriesAsync();
-        pane.PathLabel.Text = $"{pane.Name}: {pane.NavigationContext.CurrentPath}";
+        pane.PathBorder.Path = pane.NavigationContext.CurrentPath;
+        pane.PathBorder.NeedsDraw = true;
 
         var table = new DataTable();
         table.Columns.Add("Name", typeof(string));
@@ -211,24 +197,134 @@ public sealed class MainWindow : Window
 
         foreach (var entry in pane.Entries)
         {
-            var displayName = entry.Name;
-            var size = entry.Size?.ToString("N0") ?? string.Empty;
+            var size = FormatSize(entry.Size);
             var modifiedDate = entry.ModifiedDate?.ToString("yyyy-MM-dd HH:mm") ?? string.Empty;
-            table.Rows.Add(displayName, size, modifiedDate);
+            table.Rows.Add(entry.Name, size, modifiedDate);
         }
 
         pane.TableView.Table = new DataTableSource(table);
+        pane.DataTable = table;
         if (pane.Entries.Count > 0)
         {
             pane.TableView.SelectedRow = Math.Clamp(pane.TableView.SelectedRow, 0, pane.Entries.Count - 1);
         }
+
+        UpdatePaneColumns(pane);
     }
 
-    private static int GetPageSize(Pane pane)
+    private static string FormatSize(long? size)
     {
-        var headerRows = pane.TableView.Style.ShowHeaders || pane.TableView.Style.AlwaysShowHeaders ? 1 : 0;
-        return Math.Max(1, pane.TableView.Viewport.Height - headerRows);
+        if (size == null)
+        {
+            return string.Empty;
+        }
+
+        var value = (double)size.Value;
+        var units = new[] { "B", "KB", "MB", "GB", "TB", "PB", "EB" };
+        var unitIndex = 0;
+        while (Math.Abs(value) >= 1024 && unitIndex < units.Length - 1)
+        {
+            value /= 1024;
+            unitIndex++;
+        }
+
+        var numberFormat = value % 1 == 0 ? "0" : "0.#";
+        return $"{value.ToString(numberFormat, CultureInfo.InvariantCulture)} {units[unitIndex]}";
     }
+
+    private static void UpdatePaneColumns(Pane pane)
+    {
+        var paneWidth = pane.TableView.Viewport.Width;
+        pane.TableView.SeparatorSymbol = paneWidth < 5 ? '\0' : ' ';
+        var widths = GetColumnWidths(paneWidth);
+        pane.TableView.Style.ColumnStyles = new Dictionary<int, ColumnStyle>
+        {
+            [0] = new() { MinWidth = widths.Name, MaxWidth = widths.Name },
+            [1] = new() { MinWidth = widths.Size, MaxWidth = widths.Size, Alignment = Alignment.End },
+            [2] = new() { MinWidth = widths.Modified, MaxWidth = widths.Modified }
+        };
+        pane.TableView.ColumnWidths = [widths.Name, widths.Size, widths.Modified];
+        pane.BottomLine.Text = CreateBottomLine(pane.TableView);
+        pane.PathBorder.Dividers = pane.TableView.GetDividerPositions();
+        pane.PathBorder.NeedsDraw = true;
+
+        if (pane.DataTable == null)
+        {
+            return;
+        }
+
+        for (var rowIndex = 0; rowIndex < pane.Entries.Count; rowIndex++)
+        {
+            pane.DataTable.Rows[rowIndex][0] = FormatEntryName(
+                pane.Entries[rowIndex].Name,
+                pane.Entries[rowIndex].Type,
+                widths.Name);
+        }
+        pane.TableView.NeedsDraw = true;
+    }
+
+    private static string CreateBottomLine(EntryTableView tableView)
+    {
+        var width = tableView.Viewport.Width;
+        if (width <= 0)
+        {
+            return string.Empty;
+        }
+
+        var line = new string(Glyphs.HLine.ToString()[0], width).ToCharArray();
+        var dividers = tableView.GetDividerPositions();
+        for (var index = 0; index < dividers.Count; index++)
+        {
+            if (dividers[index] < 0 || dividers[index] >= width)
+            {
+                continue;
+            }
+
+            var glyph = index == 0
+                ? Glyphs.LLCorner
+                : index == dividers.Count - 1 ? Glyphs.LRCorner : Glyphs.BottomTee;
+            line[dividers[index]] = glyph.ToString()[0];
+        }
+
+        return new string(line);
+    }
+
+    private static (int Name, int Size, int Modified) GetColumnWidths(int paneWidth)
+    {
+        // TableView reserves one leading cell for header lines and adds one cell of padding after every column
+        var availableWidth = Math.Max(3, paneWidth - 1 - ColumnCount);
+        var modifiedWidth = Math.Min(ModifiedColumnWidth, availableWidth - 2);
+        var sizeWidth = Math.Min(SizeColumnWidth, availableWidth - modifiedWidth - 1);
+        var nameWidth = Math.Max(1, availableWidth - sizeWidth - modifiedWidth);
+
+        return (nameWidth, sizeWidth, modifiedWidth);
+    }
+
+    private static string FormatEntryName(string name, EntryType type, int columnWidth)
+    {
+        if (name.Length <= columnWidth)
+        {
+            return name;
+        }
+
+        var extension = type == EntryType.Item ? Path.GetExtension(name) : string.Empty;
+        var stem = type == EntryType.Item ? Path.GetFileNameWithoutExtension(name) : name;
+        var tailLength = Math.Min(3, stem.Length);
+        var availableTailLength = Math.Max(0, columnWidth - extension.Length - 1);
+        tailLength = Math.Min(tailLength, availableTailLength);
+
+        if (extension.Length + tailLength + 1 > columnWidth)
+        {
+            extension = extension[..Math.Max(0, columnWidth - 1)];
+        }
+
+        var tail = tailLength == 0 ? string.Empty : stem[^tailLength..];
+        var suffix = tail + extension;
+        var prefixLength = Math.Max(0, columnWidth - suffix.Length - 1);
+        return $"{name[..prefixLength]}~{suffix}";
+    }
+
+    private static int GetPageSize(Pane pane) => pane.TableView.VisibleRows;
 
     private static void MoveSelection(Pane pane, int offset, bool absolute = false)
     {
@@ -279,20 +375,18 @@ public sealed class MainWindow : Window
         };
 
     private sealed class Pane(
-        string name,
         NavigationContext navigationContext,
         View view,
-        Label pathLabel,
-        TableView tableView)
+        PathBorderView pathBorder,
+        EntryTableView tableView,
+        Label bottomLine)
     {
-        public string Name { get; } = name;
         public NavigationContext NavigationContext { get; } = navigationContext;
         public View View { get; } = view;
-        public Label PathLabel { get; } = pathLabel;
-        public TableView TableView { get; } = tableView;
+        public PathBorderView PathBorder { get; } = pathBorder;
+        public EntryTableView TableView { get; } = tableView;
+        public Label BottomLine { get; } = bottomLine;
         public IReadOnlyList<IEntry> Entries { get; set; } = [];
-        public KeyCode? LastMovementKey { get; set; }
-        public long LastMovementAt { get; set; }
-        public int RepeatedKeyDowns { get; set; }
+        public DataTable? DataTable { get; set; }
     }
 }
