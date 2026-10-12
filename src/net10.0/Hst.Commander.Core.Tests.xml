@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Hst.Commander.Core.Tests</name>
+    </assembly>
+    <members>
+        <member name="T:Hst.Commander.Core.Tests.TestVolume">
+            <summary>
+            Test volume used to represent a volume with containers and items for unit tests.
+            </summary>
+        </member>
+    </members>
+</doc>

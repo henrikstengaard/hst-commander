@@ -1,0 +1,1139 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v10.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v10.0": {
+      "Hst.Commander.Core.Tests/1.0.0": {
+        "dependencies": {
+          "Hst.Commander.Core": "1.0.0",
+          "Hst.Commander.Extensions.Volume.Abstractions": "1.0.0",
+          "Microsoft.NET.Test.Sdk": "17.8.0",
+          "xunit": "2.5.3"
+        },
+        "runtime": {
+          "Hst.Commander.Core.Tests.dll": {}
+        }
+      },
+      "LTRData.DiscUtils/1.0.54": {
+        "dependencies": {
+          "LTRData.DiscUtils.BootConfig": "1.0.54",
+          "LTRData.DiscUtils.Btrfs": "1.0.54",
+          "LTRData.DiscUtils.Core": "1.0.54",
+          "LTRData.DiscUtils.Dmg": "1.0.54",
+          "LTRData.DiscUtils.Ext": "1.0.54",
+          "LTRData.DiscUtils.Fat": "1.0.54",
+          "LTRData.DiscUtils.HfsPlus": "1.0.54",
+          "LTRData.DiscUtils.Iscsi": "1.0.54",
+          "LTRData.DiscUtils.Iso9660": "1.0.54",
+          "LTRData.DiscUtils.Lvm": "1.0.54",
+          "LTRData.DiscUtils.Net": "1.0.54",
+          "LTRData.DiscUtils.Nfs": "1.0.54",
+          "LTRData.DiscUtils.Ntfs": "1.0.54",
+          "LTRData.DiscUtils.OpticalDiscSharing": "1.0.54",
+          "LTRData.DiscUtils.OpticalDisk": "1.0.54",
+          "LTRData.DiscUtils.Registry": "1.0.54",
+          "LTRData.DiscUtils.Sdi": "1.0.54",
+          "LTRData.DiscUtils.SquashFs": "1.0.54",
+          "LTRData.DiscUtils.Swap": "1.0.54",
+          "LTRData.DiscUtils.Udf": "1.0.54",
+          "LTRData.DiscUtils.Vdi": "1.0.54",
+          "LTRData.DiscUtils.Vhd": "1.0.54",
+          "LTRData.DiscUtils.Vhdx": "1.0.54",
+          "LTRData.DiscUtils.VirtualFileSystem": "1.0.54",
+          "LTRData.DiscUtils.Vmdk": "1.0.54",
+          "LTRData.DiscUtils.Wim": "1.0.54",
+          "LTRData.DiscUtils.Xfs": "1.0.54",
+          "LTRData.DiscUtils.Xva": "1.0.54"
+        },
+        "runtime": {
+          "lib/net9.0/DiscUtils.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.54.0"
+          }
+        }
+      },
+      "LTRData.DiscUtils.BootConfig/1.0.54": {
+        "dependencies": {
+          "LTRData.DiscUtils.Core": "1.0.54",
+          "LTRData.DiscUtils.Registry": "1.0.54"
+        },
+        "runtime": {
+          "lib/net9.0/DiscUtils.BootConfig.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.54.0"
+          }
+        }
+      },
+      "LTRData.DiscUtils.Btrfs/1.0.54": {
+        "dependencies": {
+          "LTRData.DiscUtils.Core": "1.0.54",
+          "LTRData.DiscUtils.Streams": "1.0.54",
+          "lzo.net": "0.0.6"
+        },
+        "runtime": {
+          "lib/net9.0/DiscUtils.Btrfs.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.54.0"
+          }
+        }
+      },
+      "LTRData.DiscUtils.Core/1.0.54": {
+        "dependencies": {
+          "LTRData.DiscUtils.Streams": "1.0.54"
+        },
+        "runtime": {
+          "lib/net9.0/DiscUtils.Core.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.54.0"
+          }
+        }
+      },
+      "LTRData.DiscUtils.Dmg/1.0.54": {
+        "dependencies": {
+          "LTRData.DiscUtils.Core": "1.0.54",
+          "lzfse-net": "1.0.15"
+        },
+        "runtime": {
+          "lib/net9.0/DiscUtils.Dmg.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.54.0"
+          }
+        }
+      },
+      "LTRData.DiscUtils.Ext/1.0.54": {
+        "dependencies": {
+          "LTRData.DiscUtils.Core": "1.0.54"
+        },
+        "runtime": {
+          "lib/net9.0/DiscUtils.Ext.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.54.0"
+          }
+        }
+      },
+      "LTRData.DiscUtils.Fat/1.0.54": {
+        "dependencies": {
+          "LTRData.DiscUtils.Core": "1.0.54"
+        },
+        "runtime": {
+          "lib/net9.0/DiscUtils.Fat.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.54.0"
+          }
+        }
+      },
+      "LTRData.DiscUtils.HfsPlus/1.0.54": {
+        "dependencies": {
+          "LTRData.DiscUtils.Core": "1.0.54"
+        },
+        "runtime": {
+          "lib/net9.0/DiscUtils.HfsPlus.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.54.0"
+          }
+        }
+      },
+      "LTRData.DiscUtils.Iscsi/1.0.54": {
+        "dependencies": {
+          "LTRData.DiscUtils.Core": "1.0.54"
+        },
+        "runtime": {
+          "lib/net9.0/DiscUtils.Iscsi.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.54.0"
+          }
+        }
+      },
+      "LTRData.DiscUtils.Iso9660/1.0.54": {
+        "dependencies": {
+          "LTRData.DiscUtils.Core": "1.0.54"
+        },
+        "runtime": {
+          "lib/net9.0/DiscUtils.Iso9660.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.54.0"
+          }
+        }
+      },
+      "LTRData.DiscUtils.Lvm/1.0.54": {
+        "dependencies": {
+          "LTRData.DiscUtils.Core": "1.0.54"
+        },
+        "runtime": {
+          "lib/net9.0/DiscUtils.Lvm.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.54.0"
+          }
+        }
+      },
+      "LTRData.DiscUtils.Net/1.0.54": {
+        "dependencies": {
+          "LTRData.DiscUtils.Core": "1.0.54"
+        },
+        "runtime": {
+          "lib/net9.0/DiscUtils.Net.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.54.0"
+          }
+        }
+      },
+      "LTRData.DiscUtils.Nfs/1.0.54": {
+        "dependencies": {
+          "LTRData.DiscUtils.Core": "1.0.54"
+        },
+        "runtime": {
+          "lib/net9.0/DiscUtils.Nfs.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.54.0"
+          }
+        }
+      },
+      "LTRData.DiscUtils.Ntfs/1.0.54": {
+        "dependencies": {
+          "LTRData.DiscUtils.Core": "1.0.54"
+        },
+        "runtime": {
+          "lib/net9.0/DiscUtils.Ntfs.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.54.0"
+          }
+        }
+      },
+      "LTRData.DiscUtils.OpticalDiscSharing/1.0.54": {
+        "dependencies": {
+          "LTRData.DiscUtils.Core": "1.0.54",
+          "LTRData.DiscUtils.Net": "1.0.54"
+        },
+        "runtime": {
+          "lib/net9.0/DiscUtils.OpticalDiscSharing.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.54.0"
+          }
+        }
+      },
+      "LTRData.DiscUtils.OpticalDisk/1.0.54": {
+        "dependencies": {
+          "LTRData.DiscUtils.Core": "1.0.54",
+          "LTRData.DiscUtils.Iso9660": "1.0.54",
+          "LTRData.DiscUtils.Udf": "1.0.54"
+        },
+        "runtime": {
+          "lib/net9.0/DiscUtils.OpticalDisk.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.54.0"
+          }
+        }
+      },
+      "LTRData.DiscUtils.Registry/1.0.54": {
+        "dependencies": {
+          "LTRData.DiscUtils.Core": "1.0.54",
+          "LTRData.DiscUtils.Streams": "1.0.54"
+        },
+        "runtime": {
+          "lib/net9.0/DiscUtils.Registry.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.54.0"
+          }
+        }
+      },
+      "LTRData.DiscUtils.Sdi/1.0.54": {
+        "dependencies": {
+          "LTRData.DiscUtils.Core": "1.0.54"
+        },
+        "runtime": {
+          "lib/net9.0/DiscUtils.Sdi.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.54.0"
+          }
+        }
+      },
+      "LTRData.DiscUtils.SquashFs/1.0.54": {
+        "dependencies": {
+          "LTRData.DiscUtils.Core": "1.0.54"
+        },
+        "runtime": {
+          "lib/net9.0/DiscUtils.SquashFs.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.54.0"
+          }
+        }
+      },
+      "LTRData.DiscUtils.Streams/1.0.54": {
+        "dependencies": {
+          "LTRData.Extensions": "1.0.18",
+          "Microsoft.Bcl.HashCode": "6.0.0"
+        },
+        "runtime": {
+          "lib/net9.0/DiscUtils.Streams.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.54.0"
+          }
+        }
+      },
+      "LTRData.DiscUtils.Swap/1.0.54": {
+        "dependencies": {
+          "LTRData.DiscUtils.Core": "1.0.54"
+        },
+        "runtime": {
+          "lib/net9.0/DiscUtils.Swap.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.54.0"
+          }
+        }
+      },
+      "LTRData.DiscUtils.Udf/1.0.54": {
+        "dependencies": {
+          "LTRData.DiscUtils.Core": "1.0.54",
+          "LTRData.DiscUtils.Iso9660": "1.0.54"
+        },
+        "runtime": {
+          "lib/net9.0/DiscUtils.Udf.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.54.0"
+          }
+        }
+      },
+      "LTRData.DiscUtils.Vdi/1.0.54": {
+        "dependencies": {
+          "LTRData.DiscUtils.Core": "1.0.54"
+        },
+        "runtime": {
+          "lib/net9.0/DiscUtils.Vdi.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.54.0"
+          }
+        }
+      },
+      "LTRData.DiscUtils.Vhd/1.0.54": {
+        "dependencies": {
+          "LTRData.DiscUtils.Core": "1.0.54"
+        },
+        "runtime": {
+          "lib/net9.0/DiscUtils.Vhd.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.54.0"
+          }
+        }
+      },
+      "LTRData.DiscUtils.Vhdx/1.0.54": {
+        "dependencies": {
+          "LTRData.DiscUtils.Core": "1.0.54"
+        },
+        "runtime": {
+          "lib/net9.0/DiscUtils.Vhdx.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.54.0"
+          }
+        }
+      },
+      "LTRData.DiscUtils.VirtualFileSystem/1.0.54": {
+        "dependencies": {
+          "LTRData.DiscUtils.Core": "1.0.54"
+        },
+        "runtime": {
+          "lib/net9.0/DiscUtils.VirtualFileSystem.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.54.0"
+          }
+        }
+      },
+      "LTRData.DiscUtils.Vmdk/1.0.54": {
+        "dependencies": {
+          "LTRData.DiscUtils.Core": "1.0.54"
+        },
+        "runtime": {
+          "lib/net9.0/DiscUtils.Vmdk.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.54.0"
+          }
+        }
+      },
+      "LTRData.DiscUtils.Wim/1.0.54": {
+        "dependencies": {
+          "LTRData.DiscUtils.Core": "1.0.54"
+        },
+        "runtime": {
+          "lib/net9.0/DiscUtils.Wim.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.54.0"
+          }
+        }
+      },
+      "LTRData.DiscUtils.Xfs/1.0.54": {
+        "dependencies": {
+          "LTRData.DiscUtils.Core": "1.0.54"
+        },
+        "runtime": {
+          "lib/net9.0/DiscUtils.Xfs.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.54.0"
+          }
+        }
+      },
+      "LTRData.DiscUtils.Xva/1.0.54": {
+        "dependencies": {
+          "LTRData.DiscUtils.Core": "1.0.54"
+        },
+        "runtime": {
+          "lib/net9.0/DiscUtils.Xva.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.54.0"
+          }
+        }
+      },
+      "LTRData.Extensions/1.0.18": {
+        "runtime": {
+          "lib/net9.0/LTRData.Extensions.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.18.0"
+          }
+        }
+      },
+      "lzfse-net/1.0.15": {
+        "runtime": {
+          "lib/netstandard2.0/lzfse-net.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.15.34350"
+          }
+        },
+        "runtimeTargets": {
+          "runtimes/linux-arm64/native/liblzfse.so": {
+            "rid": "linux-arm64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/linux-musl-x64/native/liblzfse.so": {
+            "rid": "linux-musl-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/linux-x64/native/liblzfse.so": {
+            "rid": "linux-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/osx-x64/native/liblzfse.dylib": {
+            "rid": "osx-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/win-x64/native/lzfse.dll": {
+            "rid": "win-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/win-x86/native/lzfse.dll": {
+            "rid": "win-x86",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          }
+        }
+      },
+      "lzo.net/0.0.6": {
+        "runtime": {
+          "lib/netstandard2.0/lzo.net.dll": {
+            "assemblyVersion": "0.0.6.0",
+            "fileVersion": "0.0.6.0"
+          }
+        }
+      },
+      "Microsoft.Bcl.HashCode/6.0.0": {
+        "runtime": {
+          "lib/net6.0/Microsoft.Bcl.HashCode.dll": {
+            "assemblyVersion": "6.0.0.0",
+            "fileVersion": "6.0.24.56208"
+          }
+        }
+      },
+      "Microsoft.CodeCoverage/17.8.0": {
+        "runtime": {
+          "lib/netcoreapp3.1/Microsoft.VisualStudio.CodeCoverage.Shim.dll": {
+            "assemblyVersion": "15.0.0.0",
+            "fileVersion": "17.800.623.45702"
+          }
+        }
+      },
+      "Microsoft.NET.Test.Sdk/17.8.0": {
+        "dependencies": {
+          "Microsoft.CodeCoverage": "17.8.0",
+          "Microsoft.TestPlatform.TestHost": "17.8.0"
+        }
+      },
+      "Microsoft.TestPlatform.ObjectModel/17.8.0": {
+        "dependencies": {
+          "NuGet.Frameworks": "6.5.0"
+        },
+        "runtime": {
+          "lib/netcoreapp3.1/Microsoft.TestPlatform.CoreUtilities.dll": {
+            "assemblyVersion": "15.0.0.0",
+            "fileVersion": "17.800.23.55801"
+          },
+          "lib/netcoreapp3.1/Microsoft.TestPlatform.PlatformAbstractions.dll": {
+            "assemblyVersion": "15.0.0.0",
+            "fileVersion": "17.800.23.55801"
+          },
+          "lib/netcoreapp3.1/Microsoft.VisualStudio.TestPlatform.ObjectModel.dll": {
+            "assemblyVersion": "15.0.0.0",
+            "fileVersion": "17.800.23.55801"
+          }
+        },
+        "resources": {
+          "lib/netcoreapp3.1/cs/Microsoft.TestPlatform.CoreUtilities.resources.dll": {
+            "locale": "cs"
+          },
+          "lib/netcoreapp3.1/cs/Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll": {
+            "locale": "cs"
+          },
+          "lib/netcoreapp3.1/de/Microsoft.TestPlatform.CoreUtilities.resources.dll": {
+            "locale": "de"
+          },
+          "lib/netcoreapp3.1/de/Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll": {
+            "locale": "de"
+          },
+          "lib/netcoreapp3.1/es/Microsoft.TestPlatform.CoreUtilities.resources.dll": {
+            "locale": "es"
+          },
+          "lib/netcoreapp3.1/es/Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll": {
+            "locale": "es"
+          },
+          "lib/netcoreapp3.1/fr/Microsoft.TestPlatform.CoreUtilities.resources.dll": {
+            "locale": "fr"
+          },
+          "lib/netcoreapp3.1/fr/Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll": {
+            "locale": "fr"
+          },
+          "lib/netcoreapp3.1/it/Microsoft.TestPlatform.CoreUtilities.resources.dll": {
+            "locale": "it"
+          },
+          "lib/netcoreapp3.1/it/Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll": {
+            "locale": "it"
+          },
+          "lib/netcoreapp3.1/ja/Microsoft.TestPlatform.CoreUtilities.resources.dll": {
+            "locale": "ja"
+          },
+          "lib/netcoreapp3.1/ja/Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll": {
+            "locale": "ja"
+          },
+          "lib/netcoreapp3.1/ko/Microsoft.TestPlatform.CoreUtilities.resources.dll": {
+            "locale": "ko"
+          },
+          "lib/netcoreapp3.1/ko/Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll": {
+            "locale": "ko"
+          },
+          "lib/netcoreapp3.1/pl/Microsoft.TestPlatform.CoreUtilities.resources.dll": {
+            "locale": "pl"
+          },
+          "lib/netcoreapp3.1/pl/Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll": {
+            "locale": "pl"
+          },
+          "lib/netcoreapp3.1/pt-BR/Microsoft.TestPlatform.CoreUtilities.resources.dll": {
+            "locale": "pt-BR"
+          },
+          "lib/netcoreapp3.1/pt-BR/Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll": {
+            "locale": "pt-BR"
+          },
+          "lib/netcoreapp3.1/ru/Microsoft.TestPlatform.CoreUtilities.resources.dll": {
+            "locale": "ru"
+          },
+          "lib/netcoreapp3.1/ru/Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll": {
+            "locale": "ru"
+          },
+          "lib/netcoreapp3.1/tr/Microsoft.TestPlatform.CoreUtilities.resources.dll": {
+            "locale": "tr"
+          },
+          "lib/netcoreapp3.1/tr/Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll": {
+            "locale": "tr"
+          },
+          "lib/netcoreapp3.1/zh-Hans/Microsoft.TestPlatform.CoreUtilities.resources.dll": {
+            "locale": "zh-Hans"
+          },
+          "lib/netcoreapp3.1/zh-Hans/Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll": {
+            "locale": "zh-Hans"
+          },
+          "lib/netcoreapp3.1/zh-Hant/Microsoft.TestPlatform.CoreUtilities.resources.dll": {
+            "locale": "zh-Hant"
+          },
+          "lib/netcoreapp3.1/zh-Hant/Microsoft.VisualStudio.TestPlatform.ObjectModel.resources.dll": {
+            "locale": "zh-Hant"
+          }
+        }
+      },
+      "Microsoft.TestPlatform.TestHost/17.8.0": {
+        "dependencies": {
+          "Microsoft.TestPlatform.ObjectModel": "17.8.0",
+          "Newtonsoft.Json": "13.0.1"
+        },
+        "runtime": {
+          "lib/netcoreapp3.1/Microsoft.TestPlatform.CommunicationUtilities.dll": {
+            "assemblyVersion": "15.0.0.0",
+            "fileVersion": "17.800.23.55801"
+          },
+          "lib/netcoreapp3.1/Microsoft.TestPlatform.CrossPlatEngine.dll": {
+            "assemblyVersion": "15.0.0.0",
+            "fileVersion": "17.800.23.55801"
+          },
+          "lib/netcoreapp3.1/Microsoft.TestPlatform.Utilities.dll": {
+            "assemblyVersion": "15.0.0.0",
+            "fileVersion": "17.800.23.55801"
+          },
+          "lib/netcoreapp3.1/Microsoft.VisualStudio.TestPlatform.Common.dll": {
+            "assemblyVersion": "15.0.0.0",
+            "fileVersion": "17.800.23.55801"
+          },
+          "lib/netcoreapp3.1/testhost.dll": {
+            "assemblyVersion": "15.0.0.0",
+            "fileVersion": "17.800.23.55801"
+          }
+        },
+        "resources": {
+          "lib/netcoreapp3.1/cs/Microsoft.TestPlatform.CommunicationUtilities.resources.dll": {
+            "locale": "cs"
+          },
+          "lib/netcoreapp3.1/cs/Microsoft.TestPlatform.CrossPlatEngine.resources.dll": {
+            "locale": "cs"
+          },
+          "lib/netcoreapp3.1/cs/Microsoft.VisualStudio.TestPlatform.Common.resources.dll": {
+            "locale": "cs"
+          },
+          "lib/netcoreapp3.1/de/Microsoft.TestPlatform.CommunicationUtilities.resources.dll": {
+            "locale": "de"
+          },
+          "lib/netcoreapp3.1/de/Microsoft.TestPlatform.CrossPlatEngine.resources.dll": {
+            "locale": "de"
+          },
+          "lib/netcoreapp3.1/de/Microsoft.VisualStudio.TestPlatform.Common.resources.dll": {
+            "locale": "de"
+          },
+          "lib/netcoreapp3.1/es/Microsoft.TestPlatform.CommunicationUtilities.resources.dll": {
+            "locale": "es"
+          },
+          "lib/netcoreapp3.1/es/Microsoft.TestPlatform.CrossPlatEngine.resources.dll": {
+            "locale": "es"
+          },
+          "lib/netcoreapp3.1/es/Microsoft.VisualStudio.TestPlatform.Common.resources.dll": {
+            "locale": "es"
+          },
+          "lib/netcoreapp3.1/fr/Microsoft.TestPlatform.CommunicationUtilities.resources.dll": {
+            "locale": "fr"
+          },
+          "lib/netcoreapp3.1/fr/Microsoft.TestPlatform.CrossPlatEngine.resources.dll": {
+            "locale": "fr"
+          },
+          "lib/netcoreapp3.1/fr/Microsoft.VisualStudio.TestPlatform.Common.resources.dll": {
+            "locale": "fr"
+          },
+          "lib/netcoreapp3.1/it/Microsoft.TestPlatform.CommunicationUtilities.resources.dll": {
+            "locale": "it"
+          },
+          "lib/netcoreapp3.1/it/Microsoft.TestPlatform.CrossPlatEngine.resources.dll": {
+            "locale": "it"
+          },
+          "lib/netcoreapp3.1/it/Microsoft.VisualStudio.TestPlatform.Common.resources.dll": {
+            "locale": "it"
+          },
+          "lib/netcoreapp3.1/ja/Microsoft.TestPlatform.CommunicationUtilities.resources.dll": {
+            "locale": "ja"
+          },
+          "lib/netcoreapp3.1/ja/Microsoft.TestPlatform.CrossPlatEngine.resources.dll": {
+            "locale": "ja"
+          },
+          "lib/netcoreapp3.1/ja/Microsoft.VisualStudio.TestPlatform.Common.resources.dll": {
+            "locale": "ja"
+          },
+          "lib/netcoreapp3.1/ko/Microsoft.TestPlatform.CommunicationUtilities.resources.dll": {
+            "locale": "ko"
+          },
+          "lib/netcoreapp3.1/ko/Microsoft.TestPlatform.CrossPlatEngine.resources.dll": {
+            "locale": "ko"
+          },
+          "lib/netcoreapp3.1/ko/Microsoft.VisualStudio.TestPlatform.Common.resources.dll": {
+            "locale": "ko"
+          },
+          "lib/netcoreapp3.1/pl/Microsoft.TestPlatform.CommunicationUtilities.resources.dll": {
+            "locale": "pl"
+          },
+          "lib/netcoreapp3.1/pl/Microsoft.TestPlatform.CrossPlatEngine.resources.dll": {
+            "locale": "pl"
+          },
+          "lib/netcoreapp3.1/pl/Microsoft.VisualStudio.TestPlatform.Common.resources.dll": {
+            "locale": "pl"
+          },
+          "lib/netcoreapp3.1/pt-BR/Microsoft.TestPlatform.CommunicationUtilities.resources.dll": {
+            "locale": "pt-BR"
+          },
+          "lib/netcoreapp3.1/pt-BR/Microsoft.TestPlatform.CrossPlatEngine.resources.dll": {
+            "locale": "pt-BR"
+          },
+          "lib/netcoreapp3.1/pt-BR/Microsoft.VisualStudio.TestPlatform.Common.resources.dll": {
+            "locale": "pt-BR"
+          },
+          "lib/netcoreapp3.1/ru/Microsoft.TestPlatform.CommunicationUtilities.resources.dll": {
+            "locale": "ru"
+          },
+          "lib/netcoreapp3.1/ru/Microsoft.TestPlatform.CrossPlatEngine.resources.dll": {
+            "locale": "ru"
+          },
+          "lib/netcoreapp3.1/ru/Microsoft.VisualStudio.TestPlatform.Common.resources.dll": {
+            "locale": "ru"
+          },
+          "lib/netcoreapp3.1/tr/Microsoft.TestPlatform.CommunicationUtilities.resources.dll": {
+            "locale": "tr"
+          },
+          "lib/netcoreapp3.1/tr/Microsoft.TestPlatform.CrossPlatEngine.resources.dll": {
+            "locale": "tr"
+          },
+          "lib/netcoreapp3.1/tr/Microsoft.VisualStudio.TestPlatform.Common.resources.dll": {
+            "locale": "tr"
+          },
+          "lib/netcoreapp3.1/zh-Hans/Microsoft.TestPlatform.CommunicationUtilities.resources.dll": {
+            "locale": "zh-Hans"
+          },
+          "lib/netcoreapp3.1/zh-Hans/Microsoft.TestPlatform.CrossPlatEngine.resources.dll": {
+            "locale": "zh-Hans"
+          },
+          "lib/netcoreapp3.1/zh-Hans/Microsoft.VisualStudio.TestPlatform.Common.resources.dll": {
+            "locale": "zh-Hans"
+          },
+          "lib/netcoreapp3.1/zh-Hant/Microsoft.TestPlatform.CommunicationUtilities.resources.dll": {
+            "locale": "zh-Hant"
+          },
+          "lib/netcoreapp3.1/zh-Hant/Microsoft.TestPlatform.CrossPlatEngine.resources.dll": {
+            "locale": "zh-Hant"
+          },
+          "lib/netcoreapp3.1/zh-Hant/Microsoft.VisualStudio.TestPlatform.Common.resources.dll": {
+            "locale": "zh-Hant"
+          }
+        }
+      },
+      "Newtonsoft.Json/13.0.1": {
+        "runtime": {
+          "lib/netstandard2.0/Newtonsoft.Json.dll": {
+            "assemblyVersion": "13.0.0.0",
+            "fileVersion": "13.0.1.25517"
+          }
+        }
+      },
+      "NuGet.Frameworks/6.5.0": {
+        "runtime": {
+          "lib/netstandard2.0/NuGet.Frameworks.dll": {
+            "assemblyVersion": "6.5.0.154",
+            "fileVersion": "6.5.0.154"
+          }
+        }
+      },
+      "xunit/2.5.3": {
+        "dependencies": {
+          "xunit.assert": "2.5.3",
+          "xunit.core": "2.5.3"
+        }
+      },
+      "xunit.abstractions/2.0.3": {
+        "runtime": {
+          "lib/netstandard2.0/xunit.abstractions.dll": {
+            "assemblyVersion": "2.0.0.0",
+            "fileVersion": "2.0.0.0"
+          }
+        }
+      },
+      "xunit.assert/2.5.3": {
+        "runtime": {
+          "lib/netstandard1.1/xunit.assert.dll": {
+            "assemblyVersion": "2.5.3.0",
+            "fileVersion": "2.5.3.0"
+          }
+        }
+      },
+      "xunit.core/2.5.3": {
+        "dependencies": {
+          "xunit.extensibility.core": "2.5.3",
+          "xunit.extensibility.execution": "2.5.3"
+        }
+      },
+      "xunit.extensibility.core/2.5.3": {
+        "dependencies": {
+          "xunit.abstractions": "2.0.3"
+        },
+        "runtime": {
+          "lib/netstandard1.1/xunit.core.dll": {
+            "assemblyVersion": "2.5.3.0",
+            "fileVersion": "2.5.3.0"
+          }
+        }
+      },
+      "xunit.extensibility.execution/2.5.3": {
+        "dependencies": {
+          "xunit.extensibility.core": "2.5.3"
+        },
+        "runtime": {
+          "lib/netstandard1.1/xunit.execution.dotnet.dll": {
+            "assemblyVersion": "2.5.3.0",
+            "fileVersion": "2.5.3.0"
+          }
+        }
+      },
+      "Hst.Commander.Core/1.0.0": {
+        "dependencies": {
+          "Hst.Commander.Extensions.Volume.Abstractions": "1.0.0",
+          "LTRData.DiscUtils": "1.0.54",
+          "LTRData.DiscUtils.Iso9660": "1.0.54"
+        },
+        "runtime": {
+          "Hst.Commander.Core.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.73.0"
+          }
+        }
+      },
+      "Hst.Commander.Extensions.Volume.Abstractions/1.0.0": {
+        "runtime": {
+          "Hst.Commander.Extensions.Volume.Abstractions.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.73.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "Hst.Commander.Core.Tests/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "LTRData.DiscUtils/1.0.54": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-QRdmW8JtEfXV5T5qwFWQgIVq9oBrOXntP6pFEVuzzH2Y0ZMhhLLF+dYYdQTtgwZjTnaC06Vz21PQPJrjflxH2g==",
+      "path": "ltrdata.discutils/1.0.54",
+      "hashPath": "ltrdata.discutils.1.0.54.nupkg.sha512"
+    },
+    "LTRData.DiscUtils.BootConfig/1.0.54": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-P7pkJdl+aVFImwDpWsUWm6/9LqlKDAO1ddmsqweiye8e2/tijZ/REwY2VADIEmfDwm4Hlv3rHjwNYGwoAMTumg==",
+      "path": "ltrdata.discutils.bootconfig/1.0.54",
+      "hashPath": "ltrdata.discutils.bootconfig.1.0.54.nupkg.sha512"
+    },
+    "LTRData.DiscUtils.Btrfs/1.0.54": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-lXTh4GlWGswY7QsvLVBunvNx0/ae6taDhl+1J6fY3sf9e6jhy9ngBPi3aTZ/OmWBUXCZ4sdHjKx67WWYNbzatw==",
+      "path": "ltrdata.discutils.btrfs/1.0.54",
+      "hashPath": "ltrdata.discutils.btrfs.1.0.54.nupkg.sha512"
+    },
+    "LTRData.DiscUtils.Core/1.0.54": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-AG0/KJphQkzTJA/y7npMoOtIveHKQFABxkWwnCq1Q8Tum0jYi0kAlfiSxrUInMbMA3Bekn/PRrrPGRf80GPngw==",
+      "path": "ltrdata.discutils.core/1.0.54",
+      "hashPath": "ltrdata.discutils.core.1.0.54.nupkg.sha512"
+    },
+    "LTRData.DiscUtils.Dmg/1.0.54": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-IQzFLuAJRnk2Y9PloDsW0+bYUcBkIICRsLnklnYm0Iea7zaLmu/LY9/nx+S08IaRocpRD+LPyWeYZDboT5fv/A==",
+      "path": "ltrdata.discutils.dmg/1.0.54",
+      "hashPath": "ltrdata.discutils.dmg.1.0.54.nupkg.sha512"
+    },
+    "LTRData.DiscUtils.Ext/1.0.54": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-FjhtrzhdNrB0Etdol7Ea+DxUOUYok/1UvNXvnsAWjqArr/8E9XWRlI44/VOALpZGq1DxlgO1XZuE9ZPTdlSUQQ==",
+      "path": "ltrdata.discutils.ext/1.0.54",
+      "hashPath": "ltrdata.discutils.ext.1.0.54.nupkg.sha512"
+    },
+    "LTRData.DiscUtils.Fat/1.0.54": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-98TTcABOCRjVXLrbHT8fVvwe6/FSHus5S04ZN19havNZdikDuI82aMaP+fv4Nu0UVcdvJJEmTr3VZMrDBOVV/g==",
+      "path": "ltrdata.discutils.fat/1.0.54",
+      "hashPath": "ltrdata.discutils.fat.1.0.54.nupkg.sha512"
+    },
+    "LTRData.DiscUtils.HfsPlus/1.0.54": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-x64b/dtkToSw1rME1Sox6tnJnqGcJyRX/nLafjeIhSvK69SUDVfVeqGfjwTgut0mFBzafqEI4bwSzDoHPeqEeQ==",
+      "path": "ltrdata.discutils.hfsplus/1.0.54",
+      "hashPath": "ltrdata.discutils.hfsplus.1.0.54.nupkg.sha512"
+    },
+    "LTRData.DiscUtils.Iscsi/1.0.54": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-5pX070NfdaSnIbVfKEC40WSivVJZtod1bLiLJxyxIGfBA+u/Sk9b6StgYKSysSAtie8HZbdw6O2wyvqIqZJQ5A==",
+      "path": "ltrdata.discutils.iscsi/1.0.54",
+      "hashPath": "ltrdata.discutils.iscsi.1.0.54.nupkg.sha512"
+    },
+    "LTRData.DiscUtils.Iso9660/1.0.54": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-Bb5/7EqUQv4pdoBOtJB9OUERck7+GZ2sNqKKlS4yyM7rnwlwXbN7725b1nf4OElQAGrUWclyK5eAhMNpcc3t7Q==",
+      "path": "ltrdata.discutils.iso9660/1.0.54",
+      "hashPath": "ltrdata.discutils.iso9660.1.0.54.nupkg.sha512"
+    },
+    "LTRData.DiscUtils.Lvm/1.0.54": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-pHSLmtE7Rl50bN76t+i9epIhtCAJ9ae5cN/f19ZK0GfOFr6ZLPsiEtoUSHA2XGcjXNIETDKeg4uSptOGChzxnQ==",
+      "path": "ltrdata.discutils.lvm/1.0.54",
+      "hashPath": "ltrdata.discutils.lvm.1.0.54.nupkg.sha512"
+    },
+    "LTRData.DiscUtils.Net/1.0.54": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-Y9HO5DocWsSvnPASayE+q8wE0Bnz25aSCMpZTCsmjqMSxh7r+D6DXEJ/pc+M5FJRXk7DZRpACNuj71uSzbF61g==",
+      "path": "ltrdata.discutils.net/1.0.54",
+      "hashPath": "ltrdata.discutils.net.1.0.54.nupkg.sha512"
+    },
+    "LTRData.DiscUtils.Nfs/1.0.54": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-QXJLR6Mb1pajhXQqH9VhPkyxKnwraXrJIH4bqUZpFapRp6pfw/YBrwgIu3DkgGrP0F1i/bgRxSqGyspV23ssKA==",
+      "path": "ltrdata.discutils.nfs/1.0.54",
+      "hashPath": "ltrdata.discutils.nfs.1.0.54.nupkg.sha512"
+    },
+    "LTRData.DiscUtils.Ntfs/1.0.54": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-YNYhWL+mLaeQ5VZkFR8Rza2ViQic+o6C5s3SnCSd64y0NX6FYozzS5GjCn87m3MHnqJLspZBjv59AA3MFmwc5g==",
+      "path": "ltrdata.discutils.ntfs/1.0.54",
+      "hashPath": "ltrdata.discutils.ntfs.1.0.54.nupkg.sha512"
+    },
+    "LTRData.DiscUtils.OpticalDiscSharing/1.0.54": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-2tJIqMu1az6EYlboMHdg095SXCFD0CH1G7aKavnh91YDDyqg7H5WiB+2Ns8F9Ft+j9/TeiSKa5Hpg9RG1S7v2A==",
+      "path": "ltrdata.discutils.opticaldiscsharing/1.0.54",
+      "hashPath": "ltrdata.discutils.opticaldiscsharing.1.0.54.nupkg.sha512"
+    },
+    "LTRData.DiscUtils.OpticalDisk/1.0.54": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-2rE8C3J7Eic4JOzRe3g26jKkNJwo48hG5jAq0RKfcO1jK/2KCogKmi2Do5+PFpbyCE9erkNfMFkU3uRdtehVJQ==",
+      "path": "ltrdata.discutils.opticaldisk/1.0.54",
+      "hashPath": "ltrdata.discutils.opticaldisk.1.0.54.nupkg.sha512"
+    },
+    "LTRData.DiscUtils.Registry/1.0.54": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-V97YyxRnvv+XBrnFc6JDAcE+XO90OvSYVMvQYhvSSEXo3IWk9NuCYzxq4y9OB8ZRgNRUI0RXFY8ZJgCDcTqLsw==",
+      "path": "ltrdata.discutils.registry/1.0.54",
+      "hashPath": "ltrdata.discutils.registry.1.0.54.nupkg.sha512"
+    },
+    "LTRData.DiscUtils.Sdi/1.0.54": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-0CQtkOvlGK4jMXY6/gwu1SiyD1Z06A5jTB/vO+JyoQ5zqx6ra3+Rll4Cn85yCPsyD1nmPGihHjNEtVFD/rPzMQ==",
+      "path": "ltrdata.discutils.sdi/1.0.54",
+      "hashPath": "ltrdata.discutils.sdi.1.0.54.nupkg.sha512"
+    },
+    "LTRData.DiscUtils.SquashFs/1.0.54": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-ZZxfGeOlKdqED05l1hiVv3DWpQQ5V7OjYTMs6RVuF4ldMn4s19YvP8rDS807eaokcZ1ISZqfl1s7eO23Sm2jjw==",
+      "path": "ltrdata.discutils.squashfs/1.0.54",
+      "hashPath": "ltrdata.discutils.squashfs.1.0.54.nupkg.sha512"
+    },
+    "LTRData.DiscUtils.Streams/1.0.54": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-uyjUCVvD5HUwUeYmy/0k32b1uoiL91HCRAfmJshL6UaCKtld9hyADoCA3/RaAfPptGzlAzYALeO9aGG5ZLGaeQ==",
+      "path": "ltrdata.discutils.streams/1.0.54",
+      "hashPath": "ltrdata.discutils.streams.1.0.54.nupkg.sha512"
+    },
+    "LTRData.DiscUtils.Swap/1.0.54": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-zdJ/xVsPKzatYCKecoVZ83IoxXvp2ZBBmcW/JizNEmeUJRa8BbNBd3tfgdL3KFcpKEaxLgYTZmgXTY9+Vd+Y9A==",
+      "path": "ltrdata.discutils.swap/1.0.54",
+      "hashPath": "ltrdata.discutils.swap.1.0.54.nupkg.sha512"
+    },
+    "LTRData.DiscUtils.Udf/1.0.54": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-E2yJzFM3L+PQWyfZzSRkwEsRnT1+RqVjxOtoBQanZbP+h77FE+FI2mEQrivyK7Rc6xAO8L+GVSle0QVLjsw1dQ==",
+      "path": "ltrdata.discutils.udf/1.0.54",
+      "hashPath": "ltrdata.discutils.udf.1.0.54.nupkg.sha512"
+    },
+    "LTRData.DiscUtils.Vdi/1.0.54": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-be3RUUhLr7jGx7BeOQO09X9oOXJfCHxanqFpJAYQr0Wb/LMmHeUn0m72Wkxm14oK3i4U9byRge1opFq8+lBdPg==",
+      "path": "ltrdata.discutils.vdi/1.0.54",
+      "hashPath": "ltrdata.discutils.vdi.1.0.54.nupkg.sha512"
+    },
+    "LTRData.DiscUtils.Vhd/1.0.54": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-xDAoPHB780bYkX84SEhfibZbTYVpkSQLkMBkmzU5hciVmntsc88oh74pu3gNCIPX6isirp7iFFppiTwoQs7LMg==",
+      "path": "ltrdata.discutils.vhd/1.0.54",
+      "hashPath": "ltrdata.discutils.vhd.1.0.54.nupkg.sha512"
+    },
+    "LTRData.DiscUtils.Vhdx/1.0.54": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-IIq1OzJcjv0kSHuGvihenS7VwfBr5mHVWUAMsESgU+eDTZ93veWQcpUHty6hCbu7+pnV3an7bGhJ0IOw4GO9ow==",
+      "path": "ltrdata.discutils.vhdx/1.0.54",
+      "hashPath": "ltrdata.discutils.vhdx.1.0.54.nupkg.sha512"
+    },
+    "LTRData.DiscUtils.VirtualFileSystem/1.0.54": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-AblZeRDQKivF9/w8T0g+7Au6HlPxSl9KOsrsD3OhIFWNzid4GhvwIaqxwg7HDnXjrzZVOc3aIQvEPoiEPqyhBg==",
+      "path": "ltrdata.discutils.virtualfilesystem/1.0.54",
+      "hashPath": "ltrdata.discutils.virtualfilesystem.1.0.54.nupkg.sha512"
+    },
+    "LTRData.DiscUtils.Vmdk/1.0.54": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-tjt7ep1mJvL07nQmBii/i9CRnB74S/iPCNGsnW4LE9EtKXV+m2YFjcXF09f3km+KGNTe0hMkSUy2QvltsDRcQw==",
+      "path": "ltrdata.discutils.vmdk/1.0.54",
+      "hashPath": "ltrdata.discutils.vmdk.1.0.54.nupkg.sha512"
+    },
+    "LTRData.DiscUtils.Wim/1.0.54": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-Nsm37uyFZzptRntzcj5M2xeV4Zj2Wfpdz6KIkYM4s4/c0IfyvRy0LaokA4dcSeI+A2FvxvQWkyO3EjKhUkosvA==",
+      "path": "ltrdata.discutils.wim/1.0.54",
+      "hashPath": "ltrdata.discutils.wim.1.0.54.nupkg.sha512"
+    },
+    "LTRData.DiscUtils.Xfs/1.0.54": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-3c7+ak/ldN0wQJNgNcrKxeu1v9LbrkQU72K8++qHrHnnOystu9WB7VsRyQbC4ksgRO9V86S5MZz/KAuczz+wLg==",
+      "path": "ltrdata.discutils.xfs/1.0.54",
+      "hashPath": "ltrdata.discutils.xfs.1.0.54.nupkg.sha512"
+    },
+    "LTRData.DiscUtils.Xva/1.0.54": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-VYRspuvHVWfKCLqZnbOl18IlHq7G6Vyx7DUukQsGNAcQJMjYtdbC9hpZ185Eq5isY/pi8BLA2lbGHdvSuaQ2Eg==",
+      "path": "ltrdata.discutils.xva/1.0.54",
+      "hashPath": "ltrdata.discutils.xva.1.0.54.nupkg.sha512"
+    },
+    "LTRData.Extensions/1.0.18": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-TdkXvniXbZV+kFu2LEbKxtigzmLtC5ud1/Tfqj2WQ49+em0laI18/FK5rqeWeqBJ2t52hsNfObngFvgwRMconw==",
+      "path": "ltrdata.extensions/1.0.18",
+      "hashPath": "ltrdata.extensions.1.0.18.nupkg.sha512"
+    },
+    "lzfse-net/1.0.15": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-O5AhPNxnNhI9Ena8b+VJ1hhgNac8rRmd1rnYopSEWHetU/1Z5xOFPuWT4nxpy2u5Qk7evS5kFj1dRDhcArBtpg==",
+      "path": "lzfse-net/1.0.15",
+      "hashPath": "lzfse-net.1.0.15.nupkg.sha512"
+    },
+    "lzo.net/0.0.6": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-d+F4Kf+Mnh3G83NOxXyxlZljkFvD5ZM7WUPu5Y7DTZousSgz1EAhpanSbj0+25KVrInroNoV/W9QqwtRH3avig==",
+      "path": "lzo.net/0.0.6",
+      "hashPath": "lzo.net.0.0.6.nupkg.sha512"
+    },
+    "Microsoft.Bcl.HashCode/6.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-GI4jcoi6eC9ZhNOQylIBaWOQjyGaR8T6N3tC1u8p3EXfndLCVNNWa+Zp+ocjvvS3kNBN09Zma2HXL0ezO0dRfw==",
+      "path": "microsoft.bcl.hashcode/6.0.0",
+      "hashPath": "microsoft.bcl.hashcode.6.0.0.nupkg.sha512"
+    },
+    "Microsoft.CodeCoverage/17.8.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-KC8SXWbGIdoFVdlxKk9WHccm0llm9HypcHMLUUFabRiTS3SO2fQXNZfdiF3qkEdTJhbRrxhdRxjL4jbtwPq4Ew==",
+      "path": "microsoft.codecoverage/17.8.0",
+      "hashPath": "microsoft.codecoverage.17.8.0.nupkg.sha512"
+    },
+    "Microsoft.NET.Test.Sdk/17.8.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-BmTYGbD/YuDHmApIENdoyN1jCk0Rj1fJB0+B/fVekyTdVidr91IlzhqzytiUgaEAzL1ZJcYCme0MeBMYvJVzvw==",
+      "path": "microsoft.net.test.sdk/17.8.0",
+      "hashPath": "microsoft.net.test.sdk.17.8.0.nupkg.sha512"
+    },
+    "Microsoft.TestPlatform.ObjectModel/17.8.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-AYy6vlpGMfz5kOFq99L93RGbqftW/8eQTqjT9iGXW6s9MRP3UdtY8idJ8rJcjeSja8A18IhIro5YnH3uv1nz4g==",
+      "path": "microsoft.testplatform.objectmodel/17.8.0",
+      "hashPath": "microsoft.testplatform.objectmodel.17.8.0.nupkg.sha512"
+    },
+    "Microsoft.TestPlatform.TestHost/17.8.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-9ivcl/7SGRmOT0YYrHQGohWiT5YCpkmy/UEzldfVisLm6QxbLaK3FAJqZXI34rnRLmqqDCeMQxKINwmKwAPiDw==",
+      "path": "microsoft.testplatform.testhost/17.8.0",
+      "hashPath": "microsoft.testplatform.testhost.17.8.0.nupkg.sha512"
+    },
+    "Newtonsoft.Json/13.0.1": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-ppPFpBcvxdsfUonNcvITKqLl3bqxWbDCZIzDWHzjpdAHRFfZe0Dw9HmA0+za13IdyrgJwpkDTDA9fHaxOrt20A==",
+      "path": "newtonsoft.json/13.0.1",
+      "hashPath": "newtonsoft.json.13.0.1.nupkg.sha512"
+    },
+    "NuGet.Frameworks/6.5.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-QWINE2x3MbTODsWT1Gh71GaGb5icBz4chS8VYvTgsBnsi8esgN6wtHhydd7fvToWECYGq7T4cgBBDiKD/363fg==",
+      "path": "nuget.frameworks/6.5.0",
+      "hashPath": "nuget.frameworks.6.5.0.nupkg.sha512"
+    },
+    "xunit/2.5.3": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-VxYDiWSwrLxOJ3UEN+ZPrBybB0SFShQ1E6PjT65VdoKCJhorgerFznThjSwawRH/WAip73YnucDVsE8WRj/8KQ==",
+      "path": "xunit/2.5.3",
+      "hashPath": "xunit.2.5.3.nupkg.sha512"
+    },
+    "xunit.abstractions/2.0.3": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-pot1I4YOxlWjIb5jmwvvQNbTrZ3lJQ+jUGkGjWE3hEFM0l5gOnBWS+H3qsex68s5cO52g+44vpGzhAt+42vwKg==",
+      "path": "xunit.abstractions/2.0.3",
+      "hashPath": "xunit.abstractions.2.0.3.nupkg.sha512"
+    },
+    "xunit.assert/2.5.3": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-MK3HiBckO3vdxEdUxXZyyRPsBNPsC/nz6y1gj/UZIZkjMnsVQyZPU8yxS/3cjTchYcqskt/nqUOS5wmD8JezdQ==",
+      "path": "xunit.assert/2.5.3",
+      "hashPath": "xunit.assert.2.5.3.nupkg.sha512"
+    },
+    "xunit.core/2.5.3": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-FE8yEEUkoMLd6kOHDXm/QYfX/dYzwc0c+Q4MQon6VGRwFuy6UVGwK/CFA5LEea+ZBEmcco7AEl2q78VjsA0j/w==",
+      "path": "xunit.core/2.5.3",
+      "hashPath": "xunit.core.2.5.3.nupkg.sha512"
+    },
+    "xunit.extensibility.core/2.5.3": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-IjAQlPeZWXP89pl1EuOG9991GH1qgAL0rQfkmX2UV+PDenbYb7oBnQopL9ujE6YaXxgaQazp7lFjsDyyxD6Mtw==",
+      "path": "xunit.extensibility.core/2.5.3",
+      "hashPath": "xunit.extensibility.core.2.5.3.nupkg.sha512"
+    },
+    "xunit.extensibility.execution/2.5.3": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-w9eGCHl+gJj1GzZSf0VTzYPp/gv4fiUDkr+yR7/Wv9/ucO2CHltGg2TnyySLFjzekkjuxVJZUE+tZyDNzryJFw==",
+      "path": "xunit.extensibility.execution/2.5.3",
+      "hashPath": "xunit.extensibility.execution.2.5.3.nupkg.sha512"
+    },
+    "Hst.Commander.Core/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Hst.Commander.Extensions.Volume.Abstractions/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}
