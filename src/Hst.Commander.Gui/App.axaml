@@ -1,7 +1,48 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Class="Hst.Commander.Gui.App"
-             RequestedThemeVariant="Dark">
+             xmlns:local="using:Hst.Commander.Gui"
+             x:Class="Hst.Commander.Gui.App">
+    <Application.Resources>
+        <!-- pane colors per theme, used by PaneView -->
+        <ResourceDictionary>
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="{x:Static local:ThemeManager.MidnightCommanderVariant}">
+                    <SolidColorBrush x:Key="PaneBackground" Color="#0000AA" />
+                    <SolidColorBrush x:Key="PaneBorder" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="HeaderForeground" Color="#FFFF55" />
+                    <SolidColorBrush x:Key="ContainerForeground" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="ItemForeground" Color="#AAAAAA" />
+                    <SolidColorBrush x:Key="PathForeground" Color="#FFFF55" />
+                    <SolidColorBrush x:Key="ActivePathBackground" Color="#AAAAAA" />
+                    <SolidColorBrush x:Key="ActivePathForeground" Color="#000000" />
+                    <SolidColorBrush x:Key="SelectedEntryForeground" Color="#000000" />
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="PaneBackground" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="PaneBorder" Color="#D0D0D0" />
+                    <SolidColorBrush x:Key="HeaderForeground" Color="#606060" />
+                    <SolidColorBrush x:Key="ContainerForeground" Color="#000000" />
+                    <SolidColorBrush x:Key="ItemForeground" Color="#404040" />
+                    <SolidColorBrush x:Key="PathForeground" Color="#404040" />
+                    <SolidColorBrush x:Key="ActivePathBackground" Color="#0067C0" />
+                    <SolidColorBrush x:Key="ActivePathForeground" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="SelectedEntryForeground" Color="#000000" />
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="PaneBackground" Color="#202020" />
+                    <SolidColorBrush x:Key="PaneBorder" Color="#404040" />
+                    <SolidColorBrush x:Key="HeaderForeground" Color="#A0A0A0" />
+                    <SolidColorBrush x:Key="ContainerForeground" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="ItemForeground" Color="#C8C8C8" />
+                    <SolidColorBrush x:Key="PathForeground" Color="#C8C8C8" />
+                    <SolidColorBrush x:Key="ActivePathBackground" Color="#4CC2FF" />
+                    <SolidColorBrush x:Key="ActivePathForeground" Color="#000000" />
+                    <SolidColorBrush x:Key="SelectedEntryForeground" Color="#FFFFFF" />
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
+
     <Application.Styles>
         <FluentTheme />
     </Application.Styles>

@@ -19,6 +19,8 @@ public partial class MainWindow : Window
         RightPane.NavigationContext = new NavigationContext(initialPath);
         LeftPane.NavigationFailed += async (_, exception) => await ShowErrorAsync(exception);
         RightPane.NavigationFailed += async (_, exception) => await ShowErrorAsync(exception);
+        SettingsMenuItem.Click += async (_, _) => await ShowSettingsAsync();
+        QuitMenuItem.Click += (_, _) => Close();
 
         AddHandler(KeyDownEvent, OnWindowKeyDown, RoutingStrategies.Tunnel);
         Opened += async (_, _) =>
@@ -44,6 +46,25 @@ public partial class MainWindow : Window
         // tab always switches between the panes instead of moving focus through the controls
         e.Handled = true;
         (LeftPane.IsKeyboardFocusWithin ? RightPane : LeftPane).FocusEntries();
+    }
+
+    private async Task ShowSettingsAsync()
+    {
+        var settings = await new SettingsDialog(GuiSettings.Load()).ShowDialog<GuiSettings?>(this);
+        if (settings == null)
+        {
+            return;
+        }
+
+        ThemeManager.Apply(settings.Theme);
+        try
+        {
+            settings.Save();
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            await ShowErrorAsync(new IOException($"Failed to save settings to '{GuiSettings.FilePath}': {exception.Message}", exception));
+        }
     }
 
     private Task ShowErrorAsync(Exception exception) => new ErrorDialog(exception.Message).ShowDialog(this);

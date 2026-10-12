@@ -23,10 +23,15 @@ src/
     PathBorderView.cs                            Pane top border with embedded current path
   Hst.Commander.Core.Tests/                      xUnit unit tests
   Hst.Commander.Gui/                             Avalonia 12 desktop GUI application
-    MainWindow.axaml(.cs)                        Dual-pane window, Tab pane switching, error display
+    MainWindow.axaml(.cs)                        Dual-pane window, File menu, Tab pane switching, error display
     PaneView.axaml(.cs)                          One pane: path, column header, entry ListBox, Enter/Backspace
     EntryItem.cs                                 Display row for an IEntry (size/date formatting)
     ErrorDialog.axaml(.cs)                       Modal error dialog
+    SettingsDialog.axaml(.cs)                    Modal settings view (theme selection with live preview)
+    GuiSettings.cs                               GUI settings record, loaded/saved as JSON
+    GuiTheme.cs                                  Theme enum: MidnightCommander, Light, Dark
+    ThemeManager.cs                              Applies a theme (theme variant + Midnight Commander styles)
+    MidnightCommanderStyles.axaml(.cs)           Styles only active in the Midnight Commander theme
 ```
 
 ---
@@ -125,7 +130,7 @@ Going up when at the root of a nested volume calls `PopVolume()`.
 
 ### Namespaces
 - Abstractions: `Hst.Commander.Extensions.Volume.Abstractions`
-- Core: `Hst.Commander.Core` (`NavigationContext`, `Paths`), `Hst.Commander.Core.Volumes` (volumes)
+- Core: `Hst.Commander.Core` (`NavigationContext`, `Paths`, `SettingsPaths`), `Hst.Commander.Core.Volumes` (volumes)
 - Tui: `Hst.Commander.Tui`
 - Gui: `Hst.Commander.Gui`
 - Tests: `Hst.Commander.Core.Tests`
@@ -197,8 +202,13 @@ Key GUI patterns already in use:
 - Column dividers are drawn by a non-hit-testable grid behind the list, so they continue below the last entry.
 - Up/Down/PageUp/PageDown/Home/End use the `ListBox` built-in navigation. Enter (or double-click) opens the selected entry and Backspace goes to the parent; both are handled with a tunnelling `KeyDown` handler on the list.
 - Tab is handled at window level (tunnelling) and always switches focus between the two panes.
-- The same Midnight Commander-inspired palette as the TUI: blue panes, directories in white, files in gray, current row in black on gray in the focused pane (cyan in the unfocused pane), and the active pane's path highlighted.
+- Three themes, selected in File > Settings: **Midnight Commander** (default), **Light** and **Dark**.
+  - Midnight Commander uses the same palette as the TUI: blue panes, directories in white, files in gray, current row in black on gray in the focused pane (cyan in the unfocused pane), cyan menu bar and the active pane's path highlighted. It is a custom `ThemeVariant` (`ThemeManager.MidnightCommanderVariant`, inheriting Dark) plus `MidnightCommanderStyles`, which `ThemeManager` adds to `Application.Styles` only for this theme.
+  - Light and Dark use the normal Fluent control styling (including list selection) in light/dark colors.
+  - Pane colors are per-theme brushes in `App.axaml` `ThemeDictionaries` (`PaneBackground`, `PaneBorder`, `HeaderForeground`, `ContainerForeground`, `ItemForeground`, `PathForeground`, `ActivePathBackground`, `ActivePathForeground`, `SelectedEntryForeground`), referenced with `DynamicResource` so theme changes apply live.
+- Settings are stored in `~/.hst-commander/gui-settings.json` (`SettingsPaths.Directory` in Core, `GuiSettings.FilePath`). A missing or invalid file falls back to defaults. The settings dialog previews theme changes live, saves on OK and reverts on Cancel.
 - Errors are shown with `ErrorDialog` via `ShowDialog(owner)`.
+- A top `Menu` docked above the panes has a File menu: Settings opens the modal `SettingsDialog` and Quit closes the main window (exiting the application).
 
 ---
 

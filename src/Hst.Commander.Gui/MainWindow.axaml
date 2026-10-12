@@ -4,10 +4,18 @@
         x:Class="Hst.Commander.Gui.MainWindow"
         Title="HST Commander"
         Width="1200" Height="750"
-        Background="#0000AA"
         WindowStartupLocation="CenterScreen">
-    <Grid ColumnDefinitions="*,*">
-        <local:PaneView x:Name="LeftPane" Grid.Column="0" />
-        <local:PaneView x:Name="RightPane" Grid.Column="1" />
-    </Grid>
+    <DockPanel>
+        <Menu DockPanel.Dock="Top">
+            <MenuItem Header="_File">
+                <MenuItem x:Name="SettingsMenuItem" Header="_Settings..." />
+                <Separator />
+                <MenuItem x:Name="QuitMenuItem" Header="_Quit" InputGesture="Alt+F4" />
+            </MenuItem>
+        </Menu>
+        <Grid ColumnDefinitions="*,*">
+            <local:PaneView x:Name="LeftPane" Grid.Column="0" />
+            <local:PaneView x:Name="RightPane" Grid.Column="1" />
+        </Grid>
+    </DockPanel>
 </Window>

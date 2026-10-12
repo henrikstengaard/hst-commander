@@ -6,10 +6,9 @@
         MinWidth="300" MaxWidth="600"
         CanResize="False"
         ShowInTaskbar="False"
-        WindowStartupLocation="CenterOwner"
-        Background="#AA0000">
+        WindowStartupLocation="CenterOwner">
     <StackPanel Margin="16" Spacing="16">
-        <TextBlock x:Name="MessageText" Foreground="White" TextWrapping="Wrap" />
+        <TextBlock x:Name="MessageText" TextWrapping="Wrap" />
         <Button x:Name="OkButton" Content="OK" HorizontalAlignment="Center" MinWidth="80"
                 HorizontalContentAlignment="Center" IsDefault="True" IsCancel="True" />
     </StackPanel>

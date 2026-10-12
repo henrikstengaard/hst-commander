@@ -4,17 +4,6 @@
              x:Class="Hst.Commander.Gui.PaneView"
              FontFamily="Cascadia Mono, Consolas, Menlo, DejaVu Sans Mono, monospace"
              FontSize="14">
-    <UserControl.Resources>
-        <SolidColorBrush x:Key="PaneBackground" Color="#0000AA" />
-        <SolidColorBrush x:Key="PaneBorder" Color="#FFFFFF" />
-        <SolidColorBrush x:Key="HeaderForeground" Color="#FFFF55" />
-        <SolidColorBrush x:Key="ContainerForeground" Color="#FFFFFF" />
-        <SolidColorBrush x:Key="ItemForeground" Color="#AAAAAA" />
-        <SolidColorBrush x:Key="SelectedBackground" Color="#AAAAAA" />
-        <SolidColorBrush x:Key="InactiveSelectedBackground" Color="#00AAAA" />
-        <SolidColorBrush x:Key="SelectedForeground" Color="#000000" />
-    </UserControl.Resources>
-
     <UserControl.Styles>
         <Style Selector="ListBox.entries">
             <Setter Property="Background" Value="Transparent" />
@@ -24,23 +13,14 @@
             <Setter Property="Padding" Value="0" />
             <Setter Property="MinHeight" Value="0" />
         </Style>
-        <Style Selector="ListBox.entries ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="Transparent" />
-        </Style>
-        <Style Selector="ListBox.entries ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="{StaticResource InactiveSelectedBackground}" />
-        </Style>
-        <Style Selector="ListBox.entries:focus-within ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="{StaticResource SelectedBackground}" />
-        </Style>
         <Style Selector="ListBox.entries Grid.row TextBlock">
-            <Setter Property="Foreground" Value="{StaticResource ItemForeground}" />
+            <Setter Property="Foreground" Value="{DynamicResource ItemForeground}" />
         </Style>
         <Style Selector="ListBox.entries Grid.row.container TextBlock">
-            <Setter Property="Foreground" Value="{StaticResource ContainerForeground}" />
+            <Setter Property="Foreground" Value="{DynamicResource ContainerForeground}" />
         </Style>
         <Style Selector="ListBox.entries ListBoxItem:selected Grid.row TextBlock">
-            <Setter Property="Foreground" Value="{StaticResource SelectedForeground}" />
+            <Setter Property="Foreground" Value="{DynamicResource SelectedEntryForeground}" />
         </Style>
         <Style Selector="Grid.row TextBlock, Grid.header TextBlock">
             <Setter Property="Padding" Value="4,1" />
@@ -48,24 +28,24 @@
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
         <Style Selector="Grid.header TextBlock">
-            <Setter Property="Foreground" Value="{StaticResource HeaderForeground}" />
+            <Setter Property="Foreground" Value="{DynamicResource HeaderForeground}" />
             <Setter Property="HorizontalAlignment" Value="Center" />
         </Style>
         <Style Selector="Border#PathBadge">
-            <Setter Property="Background" Value="{StaticResource PaneBackground}" />
+            <Setter Property="Background" Value="{DynamicResource PaneBackground}" />
         </Style>
         <Style Selector="Border#PathBadge TextBlock">
-            <Setter Property="Foreground" Value="{StaticResource HeaderForeground}" />
+            <Setter Property="Foreground" Value="{DynamicResource PathForeground}" />
         </Style>
         <Style Selector="Border#PathBadge.active">
-            <Setter Property="Background" Value="{StaticResource SelectedBackground}" />
+            <Setter Property="Background" Value="{DynamicResource ActivePathBackground}" />
         </Style>
         <Style Selector="Border#PathBadge.active TextBlock">
-            <Setter Property="Foreground" Value="{StaticResource SelectedForeground}" />
+            <Setter Property="Foreground" Value="{DynamicResource ActivePathForeground}" />
         </Style>
     </UserControl.Styles>
 
-    <Border Background="{StaticResource PaneBackground}" BorderBrush="{StaticResource PaneBorder}"
+    <Border Background="{DynamicResource PaneBackground}" BorderBrush="{DynamicResource PaneBorder}"
             BorderThickness="1" Margin="2">
         <Grid RowDefinitions="Auto,*">
             <!-- current path shown at the top of the pane, highlighted when the pane is active -->
@@ -76,8 +56,8 @@
             <Grid Grid.Row="1" RowDefinitions="Auto,*">
                 <!-- column dividers continue below the last entry -->
                 <Grid Grid.RowSpan="2" IsHitTestVisible="False" ColumnDefinitions="*,90,150">
-                    <Border Grid.Column="1" BorderBrush="{StaticResource PaneBorder}" BorderThickness="1,0,0,0" />
-                    <Border Grid.Column="2" BorderBrush="{StaticResource PaneBorder}" BorderThickness="1,0,0,0" />
+                    <Border Grid.Column="1" BorderBrush="{DynamicResource PaneBorder}" BorderThickness="1,0,0,0" />
+                    <Border Grid.Column="2" BorderBrush="{DynamicResource PaneBorder}" BorderThickness="1,0,0,0" />
                 </Grid>
 
                 <Grid Grid.Row="0" Classes="header" ColumnDefinitions="*,90,150">

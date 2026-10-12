@@ -1,0 +1,38 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="using:Hst.Commander.Gui"
+        x:Class="Hst.Commander.Gui.MidnightCommanderStyles">
+    <!-- styles only applied for the Midnight Commander theme, overriding the Fluent control styling -->
+    <Style Selector="local|MainWindow">
+        <Setter Property="Background" Value="#0000AA" />
+    </Style>
+    <Style Selector="Menu">
+        <Setter Property="Background" Value="#00AAAA" />
+    </Style>
+    <Style Selector="Menu > MenuItem">
+        <Setter Property="Foreground" Value="#000000" />
+    </Style>
+
+    <Style Selector="ListBox.entries ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="ListBox.entries ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="#00AAAA" />
+    </Style>
+    <Style Selector="ListBox.entries:focus-within ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="#AAAAAA" />
+    </Style>
+
+    <Style Selector="local|ErrorDialog">
+        <Setter Property="Background" Value="#AA0000" />
+    </Style>
+    <Style Selector="local|ErrorDialog TextBlock#MessageText">
+        <Setter Property="Foreground" Value="#FFFFFF" />
+    </Style>
+    <Style Selector="local|SettingsDialog">
+        <Setter Property="Background" Value="#AAAAAA" />
+    </Style>
+    <Style Selector="local|SettingsDialog TextBlock">
+        <Setter Property="Foreground" Value="#000000" />
+    </Style>
+</Styles>
