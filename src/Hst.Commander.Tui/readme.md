@@ -1,6 +1,6 @@
-# Hst Commander Console
+# Hst Commander TUI
 
-Hst Commander Console is a console based file manager inspired by Norton and Midnight Commander.
+Hst Commander TUI is a terminal based file manager inspired by Norton and Midnight Commander.
 
 ## Usage
 

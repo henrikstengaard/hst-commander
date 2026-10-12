@@ -1,7 +1,7 @@
 using System.Text;
 using Terminal.Gui;
 
-namespace Hst.Commander.Console;
+namespace Hst.Commander.Tui;
 
 /// <summary>
 ///     TableView that continues the column dividers below the last entry and shows the scroll position on its right border.

@@ -2,7 +2,7 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hst.Commander.Gui", "Hst.Commander.Gui\Hst.Commander.Gui.csproj", "{BBC6EC75-D908-41C3-9620-0AFD0D3389D7}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hst.Commander.Console", "Hst.Commander.Console\Hst.Commander.Console.csproj", "{8A0732B2-623D-4807-8B13-FE07C5F9C64A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hst.Commander.Tui", "Hst.Commander.Tui\Hst.Commander.Tui.csproj", "{8A0732B2-623D-4807-8B13-FE07C5F9C64A}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hst.Commander.Core", "Hst.Commander.Core\Hst.Commander.Core.csproj", "{95A565DB-CB75-46C1-B0DD-390A189D17F6}"
 EndProject

@@ -1,4 +1,4 @@
-using Hst.Commander.Console;
+using Hst.Commander.Tui;
 using Terminal.Gui;
 
 var mainWindow = new MainWindow(Environment.CurrentDirectory);

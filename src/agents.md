@@ -17,7 +17,7 @@ src/
   Hst.Commander.sln                              Solution file (5 projects)
   Hst.Commander.Extensions.Volume.Abstractions/  IVolume / IEntry interfaces (no external deps)
   Hst.Commander.Core/                            Volume implementations, NavigationContext + shared utilities
-  Hst.Commander.Console/                         Terminal.Gui TUI application
+  Hst.Commander.Tui/                             Terminal.Gui TUI application
     MainWindow.cs                                Dual-pane window, columns, key bindings, colors
     EntryTableView.cs                            TableView with empty-row dividers and scroll thumb
     PathBorderView.cs                            Pane top border with embedded current path
@@ -45,7 +45,7 @@ src/
 [NavigationContext]  <- Hst.Commander.Core
   Wraps NestedVolume, owns pane-level state
         |
-[MainWindow (TUI)]  <- Hst.Commander.Console
+[MainWindow (TUI)]  <- Hst.Commander.Tui
   Two TableView panes, key bindings, Terminal.Gui
 [MainWindow (GUI)]  <- Hst.Commander.Gui
   Two PaneView (ListBox) panes, key bindings, Avalonia
@@ -126,7 +126,7 @@ Going up when at the root of a nested volume calls `PopVolume()`.
 ### Namespaces
 - Abstractions: `Hst.Commander.Extensions.Volume.Abstractions`
 - Core: `Hst.Commander.Core` (`NavigationContext`, `Paths`), `Hst.Commander.Core.Volumes` (volumes)
-- Console: `Hst.Commander.Console`
+- Tui: `Hst.Commander.Tui`
 - Gui: `Hst.Commander.Gui`
 - Tests: `Hst.Commander.Core.Tests`
 
@@ -211,8 +211,8 @@ dotnet build src/Hst.Commander.sln
 # Run the GUI app
 dotnet run --project src/Hst.Commander.Gui/Hst.Commander.Gui.csproj
 
-# Run the console app
-dotnet run --project src/Hst.Commander.Console/Hst.Commander.Console.csproj
+# Run the TUI app
+dotnet run --project src/Hst.Commander.Tui/Hst.Commander.Tui.csproj
 
 # Run unit tests
 dotnet test src/Hst.Commander.Core.Tests/Hst.Commander.Core.Tests.csproj
@@ -232,7 +232,7 @@ dotnet test src/Hst.Commander.Core.Tests/Hst.Commander.Core.Tests.csproj --logge
 | `LTRData.DiscUtils` | 1.0.54 | `Hst.Commander.Core` — raw disk image support |
 | `LTRData.DiscUtils.Iso9660` | 1.0.54 | `Hst.Commander.Core` — ISO 9660 reading |
 | `System.Linq.Async` | 6.0.1 | `Hst.Commander.Core` — async LINQ |
-| `Terminal.Gui` | 2.0.0-prealpha.1895 | `Hst.Commander.Console` — TUI framework |
+| `Terminal.Gui` | 2.0.0-prealpha.1895 | `Hst.Commander.Tui` — TUI framework |
 | `Avalonia`, `Avalonia.Desktop`, `Avalonia.Themes.Fluent` | 12.1.4 | `Hst.Commander.Gui` — desktop GUI framework |
 | `xunit` | 2.5.3 | `Hst.Commander.Core.Tests` |
 | `coverlet.collector` | 6.0.0 | `Hst.Commander.Core.Tests` — coverage |

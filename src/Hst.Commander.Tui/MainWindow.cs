@@ -5,7 +5,7 @@ using Hst.Commander.Extensions.Volume.Abstractions;
 using Terminal.Gui;
 using TuiAttribute = Terminal.Gui.Attribute;
 
-namespace Hst.Commander.Console;
+namespace Hst.Commander.Tui;
 
 public sealed class MainWindow : Window
 {

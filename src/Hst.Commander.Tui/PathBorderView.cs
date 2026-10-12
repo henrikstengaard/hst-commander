@@ -2,7 +2,7 @@ using System.Text;
 using Terminal.Gui;
 using TuiAttribute = Terminal.Gui.Attribute;
 
-namespace Hst.Commander.Console;
+namespace Hst.Commander.Tui;
 
 /// <summary>
 ///     Top border of a pane with the current path embedded, joining the column dividers of the table below.
