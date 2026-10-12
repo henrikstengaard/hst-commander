@@ -40,13 +40,26 @@ public partial class PaneView : UserControl
 
     public void FocusEntries()
     {
-        if (EntriesList.SelectedIndex >= 0 && EntriesList.ContainerFromIndex(EntriesList.SelectedIndex) is { } container)
+        if (EntriesList.SelectedIndex < 0 && EntriesList.ItemCount > 0)
         {
-            container.Focus(NavigationMethod.Tab);
+            EntriesList.SelectedIndex = 0;
+        }
+
+        if (EntriesList.SelectedIndex < 0)
+        {
+            EntriesList.Focus(NavigationMethod.Tab);
             return;
         }
 
-        EntriesList.Focus(NavigationMethod.Tab);
+        // the list box itself is not focusable and arrow keys only move the selection when an item has focus,
+        // so make sure the selected item's container is realized before focusing it
+        EntriesList.ScrollIntoView(EntriesList.SelectedIndex);
+        if (EntriesList.ContainerFromIndex(EntriesList.SelectedIndex) is null)
+        {
+            EntriesList.UpdateLayout();
+        }
+
+        EntriesList.ContainerFromIndex(EntriesList.SelectedIndex)?.Focus(NavigationMethod.Tab);
     }
 
     private async void OnEntriesKeyDown(object? sender, KeyEventArgs e)
@@ -61,7 +74,43 @@ public partial class PaneView : UserControl
                 e.Handled = true;
                 await RunNavigationAsync(() => NavigationContext.GoParentAsync());
                 break;
+            // the list box scroll viewer handles these keys by only scrolling the view,
+            // so move the selection instead
+            case Key.PageUp:
+                e.Handled = true;
+                MoveSelection(-GetPageSize());
+                break;
+            case Key.PageDown:
+                e.Handled = true;
+                MoveSelection(GetPageSize());
+                break;
+            case Key.Home:
+                e.Handled = true;
+                MoveSelection(-EntriesList.ItemCount);
+                break;
+            case Key.End:
+                e.Handled = true;
+                MoveSelection(EntriesList.ItemCount);
+                break;
         }
+    }
+
+    private int GetPageSize()
+    {
+        var container = EntriesList.ContainerFromIndex(Math.Max(EntriesList.SelectedIndex, 0));
+        var itemHeight = container?.Bounds.Height ?? 0;
+        return itemHeight > 0 ? Math.Max(1, (int)(EntriesList.Bounds.Height / itemHeight) - 1) : 1;
+    }
+
+    private void MoveSelection(int offset)
+    {
+        if (EntriesList.ItemCount == 0)
+        {
+            return;
+        }
+
+        EntriesList.SelectedIndex = Math.Clamp(EntriesList.SelectedIndex + offset, 0, EntriesList.ItemCount - 1);
+        FocusEntries();
     }
 
     private async Task ActivateSelectedEntryAsync()
