@@ -29,6 +29,53 @@ public sealed class NavigationContext : IDisposable
         }
     }
 
+    /// <summary>
+    ///     Free and total space of the local drive at the current path formatted as "free/total", e.g. "87G/256G".
+    ///     Null when listing drives, inside an image or when the drive is unavailable.
+    /// </summary>
+    public string? DiskSpace
+    {
+        get
+        {
+            if (_isoStreams.Count > 0 || !_localVolume.CurrentPathComponents.Any())
+            {
+                return null;
+            }
+
+            try
+            {
+                var currentPath = Path.GetFullPath(
+                    string.Join(Path.DirectorySeparatorChar, _localVolume.CurrentPathComponents));
+                var driveInfo = FindDrive(currentPath);
+                return driveInfo is { IsReady: true }
+                    ? $"{SizeFormatter.FormatHumanized(driveInfo.AvailableFreeSpace)}/{SizeFormatter.FormatHumanized(driveInfo.TotalSize)}"
+                    : null;
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
+            {
+                return null;
+            }
+        }
+    }
+
+    /// <summary>Finds the drive or mount point with the longest root directory containing the path.</summary>
+    private static DriveInfo? FindDrive(string path)
+    {
+        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        return DriveInfo.GetDrives()
+            .Where(drive => IsInDirectory(path, drive.RootDirectory.FullName, comparison))
+            .MaxBy(drive => drive.RootDirectory.FullName.Length);
+    }
+
+    private static bool IsInDirectory(string path, string directory, StringComparison comparison)
+    {
+        var directoryWithSeparator = Path.EndsInDirectorySeparator(directory)
+            ? directory
+            : directory + Path.DirectorySeparatorChar;
+        return path.Equals(directory, comparison) ||
+               (path + Path.DirectorySeparatorChar).StartsWith(directoryWithSeparator, comparison);
+    }
+
     public async Task<IReadOnlyList<IEntry>> ListEntriesAsync(CancellationToken cancellationToken = default)
     {
         var entries = new List<IEntry>();

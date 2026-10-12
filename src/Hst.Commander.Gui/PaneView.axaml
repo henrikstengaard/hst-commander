@@ -47,13 +47,17 @@
 
     <Border Background="{DynamicResource PaneBackground}" BorderBrush="{DynamicResource PaneBorder}"
             BorderThickness="1" Margin="2">
-        <Grid RowDefinitions="Auto,*">
+        <Grid RowDefinitions="Auto,Auto,*">
             <!-- current path shown at the top of the pane, highlighted when the pane is active -->
             <Border x:Name="PathBadge" Grid.Row="0" HorizontalAlignment="Left" Margin="8,2" Padding="4,0">
                 <TextBlock x:Name="PathText" TextTrimming="PrefixCharacterEllipsis" />
             </Border>
 
-            <Grid Grid.Row="1" RowDefinitions="Auto,*">
+            <!-- free/total disk space of the current drive, shown below the path -->
+            <TextBlock x:Name="DiskSpaceText" Grid.Row="1" Margin="12,0,8,2"
+                       Foreground="{DynamicResource PathForeground}" />
+
+            <Grid Grid.Row="2" RowDefinitions="Auto,*">
                 <!-- column dividers continue below the last entry -->
                 <Grid Grid.RowSpan="2" IsHitTestVisible="False" ColumnDefinitions="*,90,150">
                     <Border Grid.Column="1" BorderBrush="{DynamicResource PaneBorder}" BorderThickness="1,0,0,0" />

@@ -143,6 +143,8 @@ public partial class PaneView : UserControl
         var entries = (await NavigationContext.ListEntriesAsync()).Select(entry => new EntryItem(entry)).ToList();
 
         PathText.Text = NavigationContext.CurrentPath;
+        DiskSpaceText.Text = NavigationContext.DiskSpace;
+        DiskSpaceText.IsVisible = DiskSpaceText.Text != null;
         EntriesList.ItemsSource = entries;
         EntriesList.SelectedIndex = entries.Count == 0 ? -1 : Math.Clamp(selectedIndex, 0, entries.Count - 1);
         if (EntriesList.SelectedItem != null)

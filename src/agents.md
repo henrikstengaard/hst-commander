@@ -20,7 +20,7 @@ src/
   Hst.Commander.Tui/                             Terminal.Gui TUI application
     MainWindow.cs                                Dual-pane window, columns, key bindings, colors
     EntryTableView.cs                            TableView with empty-row dividers and scroll thumb
-    PathBorderView.cs                            Pane top border with embedded current path
+    PathBorderView.cs                            Pane top border with embedded current path and disk space row below
   Hst.Commander.Core.Tests/                      xUnit unit tests
   Hst.Commander.Gui/                             Avalonia 12 desktop GUI application
     MainWindow.axaml(.cs)                        Dual-pane window, File menu, Tab pane switching, error display
@@ -130,7 +130,7 @@ Going up when at the root of a nested volume calls `PopVolume()`.
 
 ### Namespaces
 - Abstractions: `Hst.Commander.Extensions.Volume.Abstractions`
-- Core: `Hst.Commander.Core` (`NavigationContext`, `Paths`, `SettingsPaths`), `Hst.Commander.Core.Volumes` (volumes)
+- Core: `Hst.Commander.Core` (`NavigationContext`, `Paths`, `SettingsPaths`, `SizeFormatter`), `Hst.Commander.Core.Volumes` (volumes)
 - Tui: `Hst.Commander.Tui`
 - Gui: `Hst.Commander.Gui`
 - Tests: `Hst.Commander.Core.Tests`
@@ -182,9 +182,10 @@ The TUI uses **Terminal.Gui v2 pre-alpha** (`2.0.0-prealpha.1895`). The API surf
 
 Key TUI patterns already in use:
 - `EntryTableView` (a `TableView` with `DataTableSource`) for the two panes. It draws column dividers below the last entry and a scroll thumb on the right border.
-- `PathBorderView` draws the pane's top border with the current path embedded, joining the column dividers; the path is highlighted in the focused pane and trimmed from the left with `...`.
+- `PathBorderView` draws the pane's top border with the current path embedded, joining the column dividers; the path is highlighted in the focused pane and trimmed from the left with `...`. Its second row shows `NavigationContext.DiskSpace` (free/total, e.g. `87G/256G`) below the path, with the column dividers continuing through it.
 - Each pane is a private `Pane` class holding its `NavigationContext` (from Core), views, entries and `DataTable`.
 - The name column expands to the remaining pane width; size and modified-date columns use fixed widths when space permits and shrink on narrow panes so all three columns and separators stay within the pane. File sizes use compact B/KB/MB/GB units; long names are shortened with `~`, retaining up to the final three filename stem characters and the extension when it fits.
+- `NavigationContext.DiskSpace` returns the free/total space of the local drive (longest matching mount point) as humanized integers via `SizeFormatter.FormatHumanized` (e.g. `87G/256G`, 1024-based); it is null in the drive list and inside images.
 - `".."` is inserted as row 0 by `NavigationContext.ListEntriesAsync` when `HasParent` is true (shared by both front-ends).
 - Key bindings are attached via `tableView.KeyDown += async (_, key) => { ... }`.
 - Up/Down move the selected row by one entry per key event; holding a key uses the OS/terminal's repeat rate. PageUp/PageDown move by one visible page and Home/End jump to the first/last entry.
@@ -198,7 +199,7 @@ Key TUI patterns already in use:
 The GUI uses **Avalonia 12** with the Fluent theme and plain code-behind (no MVVM framework).
 
 Key GUI patterns already in use:
-- `PaneView` (UserControl) holds a `NavigationContext`, the path badge, a column header row and a `ListBox` of `EntryItem` rows. The name column fills the remaining width; size and modified columns have fixed widths and long names are trimmed with an ellipsis.
+- `PaneView` (UserControl) holds a `NavigationContext`, the path badge, the disk space (`NavigationContext.DiskSpace`, hidden when null) below it, a column header row and a `ListBox` of `EntryItem` rows. The name column fills the remaining width; size and modified columns have fixed widths and long names are trimmed with an ellipsis.
 - Column dividers are drawn by a non-hit-testable grid behind the list, so they continue below the last entry.
 - The left pane has focus on startup. `PaneView.FocusEntries` focuses the selected item's container (selecting the first entry if none is, and realizing it with `UpdateLayout` if needed); the `ListBox` itself is not focusable, and arrow keys only move the selection while an item has focus.
 - Up/Down use the `ListBox` built-in navigation. PageUp/PageDown (one visible page) and Home/End are handled in `PaneView`, because the list's `ScrollViewer` would otherwise consume them and only scroll the view without moving the selection. Enter (or double-click) opens the selected entry and Backspace goes to the parent; both are handled with a tunnelling `KeyDown` handler on the list.

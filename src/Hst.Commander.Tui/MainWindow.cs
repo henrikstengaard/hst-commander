@@ -60,7 +60,7 @@ public sealed class MainWindow : Window
             X = 0,
             Y = 0,
             Width = Dim.Fill(),
-            Height = 1,
+            Height = 2,
             Path = navigationContext.CurrentPath,
             BorderAttribute = new TuiAttribute(ColorName16.White, ColorName16.Blue),
             PathAttribute = new TuiAttribute(ColorName16.BrightYellow, ColorName16.Blue),
@@ -69,7 +69,7 @@ public sealed class MainWindow : Window
         var tableView = new EntryTableView
         {
             X = 0,
-            Y = 1,
+            Y = 2,
             Width = Dim.Fill(),
             Height = Dim.Fill(1),
             FullRowSelect = true,
@@ -189,6 +189,7 @@ public sealed class MainWindow : Window
     {
         pane.Entries = await pane.NavigationContext.ListEntriesAsync();
         pane.PathBorder.Path = pane.NavigationContext.CurrentPath;
+        pane.PathBorder.DiskSpace = pane.NavigationContext.DiskSpace;
         pane.PathBorder.NeedsDraw = true;
 
         var table = new DataTable();

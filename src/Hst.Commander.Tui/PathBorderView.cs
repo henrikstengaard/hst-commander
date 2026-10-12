@@ -5,13 +5,16 @@ using TuiAttribute = Terminal.Gui.Attribute;
 namespace Hst.Commander.Tui;
 
 /// <summary>
-///     Top border of a pane with the current path embedded, joining the column dividers of the table below.
+///     Top border of a pane with the current path embedded, joining the column dividers of the table below,
+///     and a second row with the free/total disk space shown below the path.
 /// </summary>
 public sealed class PathBorderView : View
 {
     private const string Ellipsis = "...";
 
     public string Path { get; set; } = string.Empty;
+
+    public string? DiskSpace { get; set; }
 
     public IReadOnlyList<int> Dividers { get; set; } = [];
 
@@ -37,6 +40,8 @@ public sealed class PathBorderView : View
             AddRune(x, 0, GetBorderGlyph(x, width));
         }
 
+        DrawDiskSpaceRow(width);
+
         // path is placed after the left corner and a line segment, padded with a space on each side
         var maxPathLength = width - 4;
         if (maxPathLength <= 0 || string.IsNullOrEmpty(Path))
@@ -54,6 +59,34 @@ public sealed class PathBorderView : View
         Move(1, 0);
         AddStr($" {text} ");
         return true;
+    }
+
+    private void DrawDiskSpaceRow(int width)
+    {
+        if (Viewport.Height < 2)
+        {
+            return;
+        }
+
+        SetAttribute(BorderAttribute);
+        for (var x = 0; x < width; x++)
+        {
+            AddRune(x, 1, Dividers.Contains(x) || (Dividers.Count == 0 && (x == 0 || x == width - 1))
+                ? Glyphs.VLine
+                : (Rune)' ');
+        }
+
+        // disk space is aligned with the path text and kept within the first column
+        var firstColumnEnd = Dividers.Count > 1 ? Dividers[1] : width - 1;
+        var maxLength = firstColumnEnd - 2;
+        if (string.IsNullOrEmpty(DiskSpace) || maxLength <= 0)
+        {
+            return;
+        }
+
+        SetAttribute(PathAttribute);
+        Move(2, 1);
+        AddStr(DiskSpace.Length <= maxLength ? DiskSpace : DiskSpace[..maxLength]);
     }
 
     /// <summary>Drops a partial leading segment so the tail starts at a separator, unless the last segment alone doesn't fit.</summary>
