@@ -1,9 +1,8 @@
 using DiscUtils.Iso9660;
-using Hst.Commander.Core;
 using Hst.Commander.Core.Volumes;
 using Hst.Commander.Extensions.Volume.Abstractions;
 
-namespace Hst.Commander.Console;
+namespace Hst.Commander.Core;
 
 public sealed class NavigationContext : IDisposable
 {

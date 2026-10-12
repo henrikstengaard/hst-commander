@@ -1,0 +1,16 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Hst.Commander.Gui.ErrorDialog"
+        Title="Error"
+        SizeToContent="WidthAndHeight"
+        MinWidth="300" MaxWidth="600"
+        CanResize="False"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        Background="#AA0000">
+    <StackPanel Margin="16" Spacing="16">
+        <TextBlock x:Name="MessageText" Foreground="White" TextWrapping="Wrap" />
+        <Button x:Name="OkButton" Content="OK" HorizontalAlignment="Center" MinWidth="80"
+                HorizontalContentAlignment="Center" IsDefault="True" IsCancel="True" />
+    </StackPanel>
+</Window>

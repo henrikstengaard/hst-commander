@@ -28,10 +28,11 @@ bld/
 [Oo]bj/
 [Ll]og/
 
+# Build output redirected by a Directory.Build.props outside the repository (OutputPath=..\$(Configuration))
+src/net*/
+
 # Visual Studio 2015/2017 cache/options directory
 .vs/
-# Uncomment if you have tasks that create the project's static files in wwwroot
-#wwwroot/
 
 # MSTest test Results
 [Tt]est[Rr]esult*/
@@ -249,13 +250,6 @@ FakesAssemblies/
 # GhostDoc plugin setting file
 *.GhostDoc.xml
 
-# Node.js Tools for Visual Studio
-.ntvs_analysis.dat
-node_modules/
-
-# TypeScript v1 declaration files
-typings/
-
 # Visual Studio 6 build log
 *.plg
 
@@ -310,3 +304,7 @@ __pycache__/
 # OpenCover UI analysis results
 OpenCover/
 coverageReport.xml
+
+# Avalonia
+*.axaml.user
+.avalonia-build-tasks/

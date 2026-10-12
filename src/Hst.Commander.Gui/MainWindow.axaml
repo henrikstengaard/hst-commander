@@ -1,0 +1,13 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="using:Hst.Commander.Gui"
+        x:Class="Hst.Commander.Gui.MainWindow"
+        Title="HST Commander"
+        Width="1200" Height="750"
+        Background="#0000AA"
+        WindowStartupLocation="CenterScreen">
+    <Grid ColumnDefinitions="*,*">
+        <local:PaneView x:Name="LeftPane" Grid.Column="0" />
+        <local:PaneView x:Name="RightPane" Grid.Column="1" />
+    </Grid>
+</Window>

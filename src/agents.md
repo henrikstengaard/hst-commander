@@ -2,9 +2,11 @@
 
 ## Project Overview
 
-HST Commander is a dual-pane file manager for .NET 9, inspired by Norton Commander and Midnight Commander. The distinguishing feature is a **pluggable volume abstraction** that lets any container — a local directory, an ISO 9660 image, a disk image, or a future plugin type — be browsed transparently in the same dual-pane UI.
+HST Commander is a dual-pane file manager for .NET 10, inspired by Norton Commander and Midnight Commander. The distinguishing feature is a **pluggable volume abstraction** that lets any container — a local directory, an ISO 9660 image, a disk image, or a future plugin type — be browsed transparently in the same dual-pane UI.
 
-The active front-end is a terminal UI (TUI) built with Terminal.Gui v2. A dormant ASP.NET Core + React web front-end exists but is not connected to the core model and should be ignored for new work.
+There are two front-ends with the same functionality: a terminal UI (TUI) built with Terminal.Gui v2 and a desktop GUI built with Avalonia 12. Both share `NavigationContext` from Core. The earlier ASP.NET Core + React web prototype has been removed and is no longer relevant.
+
+**Front-end parity:** user-facing features are implemented in both front-ends. Put navigation and volume logic in `Hst.Commander.Core` (e.g. `NavigationContext`) so the TUI and GUI only contain presentation and key handling.
 
 ---
 
@@ -14,10 +16,17 @@ The active front-end is a terminal UI (TUI) built with Terminal.Gui v2. A dorman
 src/
   Hst.Commander.sln                              Solution file (5 projects)
   Hst.Commander.Extensions.Volume.Abstractions/  IVolume / IEntry interfaces (no external deps)
-  Hst.Commander.Core/                            Volume implementations + shared utilities
-  Hst.Commander.Console/                         Terminal.Gui TUI application (active)
+  Hst.Commander.Core/                            Volume implementations, NavigationContext + shared utilities
+  Hst.Commander.Console/                         Terminal.Gui TUI application
+    MainWindow.cs                                Dual-pane window, columns, key bindings, colors
+    EntryTableView.cs                            TableView with empty-row dividers and scroll thumb
+    PathBorderView.cs                            Pane top border with embedded current path
   Hst.Commander.Core.Tests/                      xUnit unit tests
-  Hst.Commander.Gui/                             ASP.NET Core + React prototype (dormant, ignore)
+  Hst.Commander.Gui/                             Avalonia 12 desktop GUI application
+    MainWindow.axaml(.cs)                        Dual-pane window, Tab pane switching, error display
+    PaneView.axaml(.cs)                          One pane: path, column header, entry ListBox, Enter/Backspace
+    EntryItem.cs                                 Display row for an IEntry (size/date formatting)
+    ErrorDialog.axaml(.cs)                       Modal error dialog
 ```
 
 ---
@@ -33,11 +42,13 @@ src/
   LocalVolume, Iso9660Volume, NestedVolume,
   EntryVolumeProvider, DiskImageVolume (stub), NullVolume
         |
-[NavigationContext]  <- Hst.Commander.Console
+[NavigationContext]  <- Hst.Commander.Core
   Wraps NestedVolume, owns pane-level state
         |
 [MainWindow (TUI)]  <- Hst.Commander.Console
   Two TableView panes, key bindings, Terminal.Gui
+[MainWindow (GUI)]  <- Hst.Commander.Gui
+  Two PaneView (ListBox) panes, key bindings, Avalonia
 ```
 
 ### Key Interfaces
@@ -86,7 +97,7 @@ Going up when at the root of a nested volume calls `PopVolume()`.
 ## Current Status
 
 **Working:**
-- The .NET 9 Terminal.Gui v2 dual-pane browser, with per-pane navigation and current-directory startup.
+- The Terminal.Gui v2 TUI and Avalonia 12 GUI dual-pane browsers, with per-pane navigation and current-directory startup.
 - Local drive/directory listing, parent navigation, and read-only browsing of local ISO images as nested volumes.
 - The volume abstraction layer and implementations: `LocalVolume`, `Iso9660Volume`, `NestedVolume`, `EntryVolumeProvider`, and `NullVolume`.
 - All unit tests in `Hst.Commander.Core.Tests`.
@@ -101,7 +112,7 @@ Going up when at the root of a nested volume calls `PopVolume()`.
 ## Coding Conventions
 
 ### Language and Style
-- C# 12 / .NET 9. Enable nullable reference types (`<Nullable>enable</Nullable>`).
+- C# / .NET 10 (`net10.0`). Enable nullable reference types (`<Nullable>enable</Nullable>`).
 - Use primary constructor syntax where appropriate: `public class Foo(IVolume volume)`.
 - Use `record` types for simple data carriers (e.g., `Entry`, `Location`).
 - `async`/`await` and `IAsyncEnumerable<T>` for I/O. Use `System.Linq.Async` (`ToListAsync()`, etc.).
@@ -114,13 +125,15 @@ Going up when at the root of a nested volume calls `PopVolume()`.
 
 ### Namespaces
 - Abstractions: `Hst.Commander.Extensions.Volume.Abstractions`
-- Core: `Hst.Commander.Core.Volumes`
+- Core: `Hst.Commander.Core` (`NavigationContext`, `Paths`), `Hst.Commander.Core.Volumes` (volumes)
 - Console: `Hst.Commander.Console`
+- Gui: `Hst.Commander.Gui`
 - Tests: `Hst.Commander.Core.Tests`
 
 ### Error Handling
 - Throw `ArgumentNullException.ThrowIfNull(arg)` for null guard checks.
 - Surface errors to the TUI via `MessageBox.ErrorQuery("Error", e.Message, "OK")`.
+- Surface errors to the GUI via `PaneView.NavigationFailed`, which `MainWindow` shows with `ErrorDialog`.
 
 ---
 
@@ -130,7 +143,7 @@ Going up when at the root of a nested volume calls `PopVolume()`.
 2. **Implement all five members**: `Name`, `CurrentPathComponents`, `ListEntries`, `ChangeDirectory`, `OpenEntry`.
 3. **Handle `Paths.Root` and `Paths.Parent`** in `ChangeDirectory` — both are case-insensitive string comparisons.
 4. **Add unit tests** in `Hst.Commander.Core.Tests/` using the `Given<YourVolume>` naming pattern.
-5. **Wire up detection** in `NavigationContext` or `MainWindow`: when `OpenEntry` returns an entry that matches your format, construct the volume and call `nestedVolume.PushVolume(new EntryVolumeProvider(entry, yourVolume))`.
+5. **Wire up detection** in `NavigationContext` (`Hst.Commander.Core`): when `OpenEntry` returns an entry that matches your format, construct the volume and call `nestedVolume.PushVolume(new EntryVolumeProvider(entry, yourVolume))`.
 
 Example test pattern (from `GivenNestedVolumeWithTestVolume.cs`):
 ```csharp
@@ -163,15 +176,29 @@ public async Task When_VolumeIsPushed_Then_NestedVolumeListsEntriesFromNewVolume
 The TUI uses **Terminal.Gui v2 pre-alpha** (`2.0.0-prealpha.1895`). The API surface differs from v1 — consult the installed package, not online v1 docs.
 
 Key TUI patterns already in use:
-- `TableView` with `DataTableSource` for the two panes.
+- `EntryTableView` (a `TableView` with `DataTableSource`) for the two panes. It draws column dividers below the last entry and a scroll thumb on the right border.
+- `PathBorderView` draws the pane's top border with the current path embedded, joining the column dividers; the path is highlighted in the focused pane and trimmed from the left with `...`.
+- Each pane is a private `Pane` class holding its `NavigationContext` (from Core), views, entries and `DataTable`.
 - The name column expands to the remaining pane width; size and modified-date columns use fixed widths when space permits and shrink on narrow panes so all three columns and separators stay within the pane. File sizes use compact B/KB/MB/GB units; long names are shortened with `~`, retaining up to the final three filename stem characters and the extension when it fits.
-- `".."` is inserted as row 0 when `context.HasParent` is true.
+- `".."` is inserted as row 0 by `NavigationContext.ListEntriesAsync` when `HasParent` is true (shared by both front-ends).
 - Key bindings are attached via `tableView.KeyDown += async (_, key) => { ... }`.
 - Up/Down move the selected row by one entry per key event; holding a key uses the OS/terminal's repeat rate. PageUp/PageDown move by one visible page and Home/End jump to the first/last entry.
 - The pane backgrounds use a Midnight Commander-inspired blue palette, with directories in white, files in gray, and the current row in black on gray in both panes.
 - Directory names have no slash prefix.
 - Window-level key bindings use `this.KeyUp`.
 - Dialogs: `new Dialog { Buttons = [okButton] }`, run with `Application.Run(dialog)`.
+
+## Adding GUI Features
+
+The GUI uses **Avalonia 12** with the Fluent theme and plain code-behind (no MVVM framework).
+
+Key GUI patterns already in use:
+- `PaneView` (UserControl) holds a `NavigationContext`, the path badge, a column header row and a `ListBox` of `EntryItem` rows. The name column fills the remaining width; size and modified columns have fixed widths and long names are trimmed with an ellipsis.
+- Column dividers are drawn by a non-hit-testable grid behind the list, so they continue below the last entry.
+- Up/Down/PageUp/PageDown/Home/End use the `ListBox` built-in navigation. Enter (or double-click) opens the selected entry and Backspace goes to the parent; both are handled with a tunnelling `KeyDown` handler on the list.
+- Tab is handled at window level (tunnelling) and always switches focus between the two panes.
+- The same Midnight Commander-inspired palette as the TUI: blue panes, directories in white, files in gray, current row in black on gray in the focused pane (cyan in the unfocused pane), and the active pane's path highlighted.
+- Errors are shown with `ErrorDialog` via `ShowDialog(owner)`.
 
 ---
 
@@ -180,6 +207,9 @@ Key TUI patterns already in use:
 ```shell
 # Build the solution
 dotnet build src/Hst.Commander.sln
+
+# Run the GUI app
+dotnet run --project src/Hst.Commander.Gui/Hst.Commander.Gui.csproj
 
 # Run the console app
 dotnet run --project src/Hst.Commander.Console/Hst.Commander.Console.csproj
@@ -191,7 +221,7 @@ dotnet test src/Hst.Commander.Core.Tests/Hst.Commander.Core.Tests.csproj
 dotnet test src/Hst.Commander.Core.Tests/Hst.Commander.Core.Tests.csproj --logger "console;verbosity=normal"
 ```
 
-> **Note:** The Console project currently does not compile due to WIP issues in `MainWindow.cs` and `NavigationContext.cs` (see WIP section above). Running `dotnet build` on the solution will report errors. The Core and Tests projects build and pass independently.
+> **Note:** Build output may land in `src/net10.0/` instead of each project's `bin/` when a `Directory.Build.props` outside the repository (e.g. in a parent folder) sets `OutputPath`. That folder is ignored by `.gitignore`; do not commit build output.
 
 ---
 
@@ -203,5 +233,6 @@ dotnet test src/Hst.Commander.Core.Tests/Hst.Commander.Core.Tests.csproj --logge
 | `LTRData.DiscUtils.Iso9660` | 1.0.54 | `Hst.Commander.Core` — ISO 9660 reading |
 | `System.Linq.Async` | 6.0.1 | `Hst.Commander.Core` — async LINQ |
 | `Terminal.Gui` | 2.0.0-prealpha.1895 | `Hst.Commander.Console` — TUI framework |
+| `Avalonia`, `Avalonia.Desktop`, `Avalonia.Themes.Fluent` | 12.1.4 | `Hst.Commander.Gui` — desktop GUI framework |
 | `xunit` | 2.5.3 | `Hst.Commander.Core.Tests` |
 | `coverlet.collector` | 6.0.0 | `Hst.Commander.Core.Tests` — coverage |
