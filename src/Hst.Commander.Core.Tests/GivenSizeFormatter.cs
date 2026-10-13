@@ -1,3 +1,6 @@
+using Hst.Commander.Core.Volumes;
+using Hst.Commander.Extensions.Volume.Abstractions;
+
 namespace Hst.Commander.Core.Tests;
 
 public class GivenSizeFormatter
@@ -16,6 +19,28 @@ public class GivenSizeFormatter
     {
         // act
         var formatted = SizeFormatter.FormatHumanized(size);
+
+        // assert
+        Assert.Equal(expected, formatted);
+    }
+
+    [Fact]
+    public void When_FormatEntrySizeForDirectory_Then_DirIsReturned()
+    {
+        // act
+        var formatted = SizeFormatter.FormatEntrySize(new Entry("dir1", EntryType.Container, 0));
+
+        // assert
+        Assert.Equal("<DIR>", formatted);
+    }
+
+    [Theory]
+    [InlineData(512L, "512B")]
+    [InlineData(1536L, "2K")]
+    public void When_FormatEntrySizeForFile_Then_SizeWithUnitIsReturned(long size, string expected)
+    {
+        // act
+        var formatted = SizeFormatter.FormatEntrySize(new Entry("file1", EntryType.Item, size));
 
         // assert
         Assert.Equal(expected, formatted);

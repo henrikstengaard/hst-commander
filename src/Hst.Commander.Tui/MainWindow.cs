@@ -1,5 +1,4 @@
 using System.Data;
-using System.Globalization;
 using Hst.Commander.Core;
 using Hst.Commander.Extensions.Volume.Abstractions;
 using Terminal.Gui;
@@ -187,6 +186,7 @@ public sealed class MainWindow : Window
 
     private static async Task RefreshPaneAsync(Pane pane)
     {
+        var previousPath = pane.PathBorder.Path;
         pane.Entries = await pane.NavigationContext.ListEntriesAsync();
         pane.PathBorder.Path = pane.NavigationContext.CurrentPath;
         pane.PathBorder.DiskSpace = pane.NavigationContext.DiskSpace;
@@ -199,7 +199,7 @@ public sealed class MainWindow : Window
 
         foreach (var entry in pane.Entries)
         {
-            var size = FormatSize(entry.Size);
+            var size = SizeFormatter.FormatEntrySize(entry);
             var modifiedDate = entry.ModifiedDate?.ToString("yyyy-MM-dd HH:mm") ?? string.Empty;
             table.Rows.Add(entry.Name, size, modifiedDate);
         }
@@ -208,30 +208,12 @@ public sealed class MainWindow : Window
         pane.DataTable = table;
         if (pane.Entries.Count > 0)
         {
-            pane.TableView.SelectedRow = Math.Clamp(pane.TableView.SelectedRow, 0, pane.Entries.Count - 1);
+            pane.TableView.SelectedRow = pane.NavigationContext.GetSelectedIndex(
+                pane.Entries, previousPath, pane.TableView.SelectedRow);
+            pane.TableView.EnsureSelectedCellIsVisible();
         }
 
         UpdatePaneColumns(pane);
-    }
-
-    private static string FormatSize(long? size)
-    {
-        if (size == null)
-        {
-            return string.Empty;
-        }
-
-        var value = (double)size.Value;
-        var units = new[] { "B", "KB", "MB", "GB", "TB", "PB", "EB" };
-        var unitIndex = 0;
-        while (Math.Abs(value) >= 1024 && unitIndex < units.Length - 1)
-        {
-            value /= 1024;
-            unitIndex++;
-        }
-
-        var numberFormat = value % 1 == 0 ? "0" : "0.#";
-        return $"{value.ToString(numberFormat, CultureInfo.InvariantCulture)} {units[unitIndex]}";
     }
 
     private static void UpdatePaneColumns(Pane pane)

@@ -16,6 +16,12 @@ public sealed class NavigationContext : IDisposable
         _nestedVolume = new NestedVolume(_localVolume);
     }
 
+    /// <summary>
+    ///     Name of the entry that was left when navigating to the parent, e.g. "dir1" when going up from
+    ///     "c:	emp\dir1". Front-ends select this entry after the parent is listed. Null after other navigation.
+    /// </summary>
+    public string? PreviousEntryName { get; private set; }
+
     public bool HasParent => _nestedVolume.CurrentPathComponents.Any();
 
     public string CurrentPath
@@ -93,6 +99,49 @@ public sealed class NavigationContext : IDisposable
         return entries;
     }
 
+    /// <summary>
+    ///     Index of the entry named <see cref="PreviousEntryName" /> in the entries, or -1 when not found.
+    ///     Trailing directory separators are ignored, so a drive root like "C:" matches the drive entry "C:\".
+    /// </summary>
+    public int IndexOfPreviousEntry(IReadOnlyList<IEntry> entries)
+    {
+        if (PreviousEntryName == null)
+        {
+            return -1;
+        }
+
+        for (var index = 0; index < entries.Count; index++)
+        {
+            if (Path.TrimEndingDirectorySeparator(entries[index].Name)
+                .Equals(PreviousEntryName, StringComparison.Ordinal))
+            {
+                return index;
+            }
+        }
+
+        return -1;
+    }
+
+    /// <summary>
+    ///     Index of the entry to select after listing entries. When the location changed since
+    ///     <paramref name="previousPath" />, the entry left when going to the parent is selected, otherwise the first
+    ///     entry. When the location is unchanged, the selected index is kept within the entries. -1 when empty.
+    /// </summary>
+    public int GetSelectedIndex(IReadOnlyList<IEntry> entries, string? previousPath, int selectedIndex)
+    {
+        if (entries.Count == 0)
+        {
+            return -1;
+        }
+
+        if (CurrentPath.Equals(previousPath, StringComparison.Ordinal))
+        {
+            return Math.Clamp(selectedIndex, 0, entries.Count - 1);
+        }
+
+        return Math.Max(IndexOfPreviousEntry(entries), 0);
+    }
+
     public async Task OpenEntryAsync(IEntry entry, CancellationToken cancellationToken = default)
     {
         if (entry.Name.Equals(Paths.Parent, StringComparison.Ordinal))
@@ -104,6 +153,7 @@ public sealed class NavigationContext : IDisposable
         if (entry.Type == EntryType.Container)
         {
             await _nestedVolume.ChangeDirectory([entry.Name], cancellationToken);
+            PreviousEntryName = null;
             return;
         }
 
@@ -126,6 +176,7 @@ public sealed class NavigationContext : IDisposable
             var isoVolume = new Iso9660Volume(new CDReader(isoStream, true));
             _nestedVolume.PushVolume(new EntryVolumeProvider(entry, isoVolume));
             _isoStreams.Push(isoStream);
+            PreviousEntryName = null;
         }
         catch
         {
@@ -136,14 +187,21 @@ public sealed class NavigationContext : IDisposable
 
     public async Task GoParentAsync(CancellationToken cancellationToken = default)
     {
+        // the last non-empty path component is the entry being left, e.g. "C:" for the drive root "C:\"
+        var previousEntryName = _nestedVolume.CurrentPathComponents
+            .LastOrDefault(pathComponent => pathComponent.Length > 0);
+
         if (_isoStreams.Count > 0 && _nestedVolume.CurrentVolumeIsAtRoot)
         {
             _nestedVolume.PopVolume();
             _isoStreams.Pop().Dispose();
-            return;
+        }
+        else
+        {
+            await _nestedVolume.ChangeDirectory([Paths.Parent], cancellationToken);
         }
 
-        await _nestedVolume.ChangeDirectory([Paths.Parent], cancellationToken);
+        PreviousEntryName = previousEntryName;
     }
 
     public void Dispose()

@@ -140,13 +140,15 @@ public partial class PaneView : UserControl
     {
         var hadFocus = EntriesList.IsKeyboardFocusWithin;
         var selectedIndex = EntriesList.SelectedIndex;
-        var entries = (await NavigationContext.ListEntriesAsync()).Select(entry => new EntryItem(entry)).ToList();
+        var navigationEntries = await NavigationContext.ListEntriesAsync();
+        var entries = navigationEntries.Select(entry => new EntryItem(entry)).ToList();
+        var previousPath = PathText.Text;
 
         PathText.Text = NavigationContext.CurrentPath;
         DiskSpaceText.Text = NavigationContext.DiskSpace;
         DiskSpaceText.IsVisible = DiskSpaceText.Text != null;
         EntriesList.ItemsSource = entries;
-        EntriesList.SelectedIndex = entries.Count == 0 ? -1 : Math.Clamp(selectedIndex, 0, entries.Count - 1);
+        EntriesList.SelectedIndex = NavigationContext.GetSelectedIndex(navigationEntries, previousPath, selectedIndex);
         if (EntriesList.SelectedItem != null)
         {
             EntriesList.ScrollIntoView(EntriesList.SelectedItem);
