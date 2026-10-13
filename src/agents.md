@@ -18,10 +18,11 @@ src/
   Hst.Commander.Extensions.Volume.Abstractions/  IVolume / IEntry interfaces (no external deps)
   Hst.Commander.Core/                            Volume implementations, NavigationContext + shared utilities
   Hst.Commander.Tui/                             Terminal.Gui TUI application
-    MainWindow.cs                                Dual-pane window, File menu, columns, key bindings, theme colors, F5 copy
+    MainWindow.cs                                Dual-pane window, File menu, columns, key bindings, theme colors, F5 copy, F8/Delete delete
     SettingsDialog.cs                            Modal settings dialog (theme selection with live preview)
     CopyDialog.cs                                Modal copy confirm dialog (destination and filter)
     CopyProgressDialog.cs                        Modal copy progress dialog (2 progress bars, speed, ETA, cancel)
+    DeleteProgressDialog.cs                      Modal delete progress dialog (current entry, total progress bar, cancel)
     TuiSettings.cs                               TUI settings record, loaded/saved as JSON
     TuiTheme.cs                                  Theme enum: MidnightCommander, Light, Dark
     TuiPalette.cs                                16-color palette per theme (panes, cursor, menu, dialog)
@@ -29,7 +30,7 @@ src/
     PathPanelView.cs                             Bordered panel with current path, marked-entries summary and disk space above the pane, plus the pane's top border
   Hst.Commander.Core.Tests/                      xUnit unit tests
   Hst.Commander.Gui/                             Avalonia 12 desktop GUI application
-    MainWindow.axaml(.cs)                        Dual-pane window, File menu, Tab pane switching, F5 copy, error display
+    MainWindow.axaml(.cs)                        Dual-pane window, File menu, Tab pane switching, F5 copy, F8/Delete delete, error display
     PaneView.axaml(.cs)                          One pane: path, column header, entry ListBox, Enter/Backspace
     EntryItem.cs                                 Display row for an IEntry (size/date formatting)
     ErrorDialog.axaml(.cs)                       Modal error dialog
@@ -37,6 +38,8 @@ src/
     CopyDialog.axaml(.cs)                        Modal copy confirm dialog (destination and filter)
     CopyProgressDialog.axaml(.cs)                Modal copy progress dialog running the copy (2 progress bars, speed, ETA, cancel)
     OverwriteDialog.axaml(.cs)                   Modal confirm overwriting an existing file (Yes, No, All)
+    DeleteDialog.axaml(.cs)                      Modal confirm deleting entries (Yes, No)
+    DeleteProgressDialog.axaml(.cs)              Modal delete progress dialog running the delete (current entry, total progress bar, cancel)
     GuiSettings.cs                               GUI settings record, loaded/saved as JSON
     GuiTheme.cs                                  Theme enum: MidnightCommander, Light, Dark
     ThemeManager.cs                              Applies a theme (theme variant + Midnight Commander styles)
@@ -101,7 +104,12 @@ Task SetModifiedDate(string name, DateTime modifiedDate, CancellationToken cance
 
 - `VolumeCopy.CopyToAsync` (`Hst.Commander.Core.Volumes`) is an extension method copying entries from the current directory of any `IVolume` to the current directory of another, using only `OpenRead`, `OpenWrite`, `CreateContainer`, `ListEntries` and `ChangeDirectory`. It first scans the entries (containers recursively) to know the total size, then copies; both volumes are changed back to their starting directory afterwards. Containers are merged with existing ones. Modified dates are preserved with `IVolume.SetModifiedDate`: items right after they are written, containers after everything is copied, deepest first (writing into a container changes its date); a destination throwing `NotSupportedException` keeps the written dates. Before an item that already exists in the destination is overwritten, `CopyOptions.ConfirmOverwrite` is asked with an `OverwriteRequest` (name, both entries and a shared `Message` with exact sizes in bytes, e.g. `1,234,567 bytes`, and dates) and answers `OverwriteAnswer.Yes`, `No` (skip the item, removed from the progress totals) or `All` (overwrite the rest without asking); without a callback items are overwritten. Destination entries are listed once per directory to detect existing items, and the speed/ETA clock is paused while asking. `CopyOptions` holds the filter (`EntryFilter`: `*`/`?` wildcards, several patterns separated by `;`, case-insensitive, applied to items only — containers are always copied) and an optional target name for copying a single item under another name. Progress is reported as `CopyProgress` (current item and total bytes/items, average speed, ETA, plus shared display texts) at most every 100 ms and at each item start/end. When a copy is cancelled or fails while an item is being written, the destination stream is closed and the partial item is deleted with `IVolume.Delete` (cleanup errors are ignored so the original error is kept).
 - `NavigationContext.CopyAsync` is what the front-ends call. It never uses the pane's own volumes: `NavigationContext.OpenLocationAsync` opens an independent `VolumeLocation` (a new `LocalVolume`, or the ISO image opened again from its file) so the copy can run on a background thread. The destination text is resolved as: the other pane's current path → that pane's location (may be an image); otherwise a local directory (relative paths are relative to the source's local directory; a missing directory is created); a single file copied to a non-directory path whose parent exists is copied under that name. Copying entries onto themselves or a directory into itself throws `IOException`.
-- `NavigationContext.GetOperationEntries` returns the marked entries, or the entry under the cursor when none are marked (never `..`). Marks are cleared after a successful copy.
+- `NavigationContext.GetOperationEntries` returns the marked entries, or the entry under the cursor when none are marked (never `..`). Marks are cleared after a successful copy or delete.
+
+### Deleting
+
+- `VolumeDelete.DeleteAsync` (`Hst.Commander.Core.Volumes`) is an extension method deleting entries from the current directory of any `IVolume` using only `ListEntries`, `ChangeDirectory` and `Delete` (which only deletes items and empty containers). It first scans the entries (containers recursively, entries within a container before the container), then deletes them in that order. Progress is reported as `DeleteProgress` (current entry, deleted/total entries counting items and containers, shared `TotalText` e.g. `3/10 entries`) at most every 100 ms and when done. The volume is changed back to its starting directory, also when cancelled or failed. Read-only volumes throw `NotSupportedException`.
+- `NavigationContext.DeleteAsync` is what the front-ends call; like copying it uses a volume of its own from `OpenLocationAsync` so it can run on a background thread. `NavigationContext.GetDeleteDescription` gives the confirm question, e.g. `Delete 'a.txt'?` or `Delete 3 entries?`.
 
 ### Navigation Model
 
@@ -130,9 +138,10 @@ Going up when at the root of a nested volume calls `PopVolume()`.
 - All unit tests in `Hst.Commander.Core.Tests`.
 
 - Copying (F5) between panes and volumes, with a confirm dialog (destination, filter) and a progress dialog.
+- Deleting (F8 or Delete) the marked entries or the entry under the cursor, with a confirm dialog and a progress dialog.
 
 **Not implemented:**
-- Move, delete, and other file-management operations.
+- Move, rename, make directory and other file-management operations.
 - Opening ISO images located inside another ISO; the current `IEntry` contract does not expose file contents.
 - `DiskImageVolume` remains an intentional stub.
 
@@ -216,8 +225,9 @@ Key TUI patterns already in use:
 - Entries are selected (marked) with Insert or Space, which toggles the mark of the entry under the cursor and moves the cursor down. Marked entries are drawn in yellow (also under the cursor). The marks live in `NavigationContext` (`ToggleMark`, `IsMarked`, `MarkedEntries`, `MarkedSize`, `MarkedSummary`; shared by both front-ends): `..` can't be marked, marks are cleared when the location changes and `ListEntriesAsync` drops marks of entries no longer listed. In code "marked" is used to avoid confusion with the selected row (cursor).
 - Key bindings are attached via `tableView.KeyDown += async (_, key) => { ... }`.
 - Up/Down move the selected row by one entry per key event; holding a key uses the OS/terminal's repeat rate. PageUp/PageDown move by one visible page and Home/End jump to the first/last entry.
-- A `MenuBar` at the top of `MainWindow` (panes start at row 1) has a File menu: Copy (F5) copies from the active pane (the pane last focused), Settings opens the modal `SettingsDialog` and Quit calls `Application.RequestStop()`, exiting the application. F9 or Alt+F opens the menu.
+- A `MenuBar` at the top of `MainWindow` (panes start at row 1) has a File menu: Copy (F5) and Delete (F8 or Delete) act on the active pane (the pane last focused), Settings opens the modal `SettingsDialog` and Quit calls `Application.RequestStop()`, exiting the application. F9 or Alt+F opens the menu.
 - F5 copies the marked entries (or the entry under the cursor) to the other pane: `CopyDialog` confirms the destination (default: the other pane's path) and filter (default `*`), then `NavigationContext.CopyAsync` runs on a background thread (`Task.Run`) while the modal `CopyProgressDialog` shows the current file and total progress bars, speed and ETA. Progress is marshalled with `Application.Invoke`; existing files are confirmed with `MessageBox.Query` (Yes, No, All; Esc answers No) invoked on the UI thread from the background copy through a `TaskCompletionSource`. Cancel or Esc cancels the copy and the dialog stays open until the copy has stopped. Errors are shown with `MessageBox.ErrorQuery`, both panes are refreshed afterwards.
+- F8 or Delete deletes the marked entries (or the entry under the cursor) after confirming with `MessageBox.Query` (Yes, No; Esc answers No), then `NavigationContext.DeleteAsync` runs on a background thread while the modal `DeleteProgressDialog` shows the current entry and a total progress bar, same pattern as copying (progress via `Application.Invoke`, Cancel or Esc cancels and the dialog stays open until the delete has stopped). Errors are shown with `MessageBox.ErrorQuery`, both panes are refreshed afterwards.
 - Three themes, selected in File > Settings, same as the GUI: **Midnight Commander** (default), **Light** and **Dark**. Colors come from `TuiPalette` (16 legacy colors); `MainWindow.ApplyTheme` reapplies them to the menu bar and panes. Midnight Commander uses blue panes with directories in white, files in gray, marked entries in yellow, the current row in black on gray in both panes and a cyan menu bar.
 - Settings are stored in `~/.hst-commander/tui-settings.json` (`SettingsPaths.Directory`, `TuiSettings.FilePath`), separate from the GUI settings. A missing or invalid file falls back to defaults. The settings dialog uses a `RadioGroup` for the theme, previews changes live, saves on OK and reverts on Cancel/Esc.
 - Directory names have no slash prefix.
@@ -241,8 +251,9 @@ Key GUI patterns already in use:
   - Pane colors are per-theme brushes in `App.axaml` `ThemeDictionaries` (`PaneBackground`, `PaneBorder`, `HeaderForeground`, `ContainerForeground`, `ItemForeground`, `PathForeground`, `ActivePathBackground`, `ActivePathForeground`, `SelectedEntryForeground`, `MarkedEntryForeground`), referenced with `DynamicResource` so theme changes apply live.
 - Settings are stored in `~/.hst-commander/gui-settings.json` (`SettingsPaths.Directory` in Core, `GuiSettings.FilePath`). A missing or invalid file falls back to defaults. The settings dialog previews theme changes live, saves on OK and reverts on Cancel.
 - Errors are shown with `ErrorDialog` via `ShowDialog(owner)`.
-- A top `Menu` docked above the panes has a File menu: Copy (F5) copies from the active pane (tracked with `GotFocus`), Settings opens the modal `SettingsDialog` and Quit closes the main window (exiting the application).
+- A top `Menu` docked above the panes has a File menu: Copy (F5) and Delete (F8 or Delete) act on the active pane (tracked with `GotFocus`), Settings opens the modal `SettingsDialog` and Quit closes the main window (exiting the application).
 - F5 is handled at window level (tunnelling): `CopyDialog` confirms the destination and filter, then `CopyProgressDialog` runs `NavigationContext.CopyAsync` with `Task.Run` when opened, reporting through a `Progress<CopyProgress>` created on the UI thread. Existing files are confirmed with the modal `OverwriteDialog` (Yes, No, All; closing answers No), shown over the progress dialog via `Dispatcher.UIThread.InvokeAsync`. Cancel or closing the window cancels the copy; the dialog closes when the copy has stopped and exposes the `Exception`. `PaneView.SelectedEntry` gives the entry under the cursor and `PaneView.RefreshEntriesAsync` relists a pane after copying. Both dialogs have Midnight Commander styles (gray background) like the settings dialog.
+- F8 and Delete are handled at window level (tunnelling): the modal `DeleteDialog` confirms (Yes, No; closing answers No), then `DeleteProgressDialog` runs `NavigationContext.DeleteAsync` with `Task.Run` when opened, showing the current entry and a total progress bar, with the same cancel/close/`Exception` behaviour as `CopyProgressDialog`. Both panes are refreshed afterwards; both dialogs have the Midnight Commander gray styles.
 
 ---
 

@@ -35,6 +35,7 @@ public sealed class MainWindow : Window
                 new MenuBarItem("_File", new MenuItem[]
                 {
                     new("_Copy...", "F5", CopyFromActivePane),
+                    new("_Delete...", "F8", DeleteFromActivePane),
                     null!,
                     new("_Settings...", string.Empty, ShowSettings),
                     null!,
@@ -226,10 +227,70 @@ public sealed class MainWindow : Window
                 key.Handled = true;
                 _ = CopyAsync(pane, otherPane);
             }
+            else if (key.KeyCode == KeyCode.F8 || key.KeyCode == KeyCode.Delete)
+            {
+                key.Handled = true;
+                _ = DeleteAsync(pane, otherPane);
+            }
         };
     }
 
     private void CopyFromActivePane() => _ = CopyAsync(_activePane, _activePane == _leftPane ? _rightPane : _leftPane);
+
+    private void DeleteFromActivePane() =>
+        _ = DeleteAsync(_activePane, _activePane == _leftPane ? _rightPane : _leftPane);
+
+    /// <summary>
+    ///     Deletes the marked entries, or the entry under the cursor, after confirming, showing the progress while
+    ///     deleting. The other pane is refreshed too, as it may show the same location.
+    /// </summary>
+    private async Task DeleteAsync(Pane pane, Pane otherPane)
+    {
+        var entries = pane.NavigationContext.GetOperationEntries(GetCurrentEntry(pane));
+        if (entries.Count == 0)
+        {
+            return;
+        }
+
+        // esc answers no
+        if (MessageBox.Query("Delete", NavigationContext.GetDeleteDescription(entries), "_Yes", "_No") != 0)
+        {
+            pane.TableView.SetFocus();
+            return;
+        }
+
+        // delete in the background and update the dialog on the UI thread; it closes when the delete has stopped
+        var progressDialog = new DeleteProgressDialog(_palette);
+        var progress = new UiProgress<DeleteProgress>(value => Application.Invoke(() => progressDialog.Update(value)));
+        var cancellationToken = progressDialog.CancellationToken;
+        var deleteTask = Task.Run(() => pane.NavigationContext.DeleteAsync(entries, progress, cancellationToken));
+        _ = deleteTask.ContinueWith(_ => Application.Invoke(progressDialog.Complete), TaskScheduler.Default);
+        Application.Run(progressDialog);
+        progressDialog.Dispose();
+
+        try
+        {
+            await deleteTask;
+            pane.NavigationContext.ClearMarks();
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception exception)
+        {
+            MessageBox.ErrorQuery("Error", exception.Message, "OK");
+        }
+
+        await InitializePaneAsync(pane);
+        await InitializePaneAsync(otherPane);
+        pane.TableView.SetFocus();
+    }
+
+    private static IEntry? GetCurrentEntry(Pane pane)
+    {
+        var selectedRow = pane.TableView.SelectedRow;
+        return selectedRow >= 0 && selectedRow < pane.Entries.Count ? pane.Entries[selectedRow] : null;
+    }
 
     /// <summary>
     ///     Copies the marked entries, or the entry under the cursor, to the other pane after confirming the destination
@@ -237,9 +298,7 @@ public sealed class MainWindow : Window
     /// </summary>
     private async Task CopyAsync(Pane pane, Pane otherPane)
     {
-        var selectedRow = pane.TableView.SelectedRow;
-        var currentEntry = selectedRow >= 0 && selectedRow < pane.Entries.Count ? pane.Entries[selectedRow] : null;
-        var entries = pane.NavigationContext.GetOperationEntries(currentEntry);
+        var entries = pane.NavigationContext.GetOperationEntries(GetCurrentEntry(pane));
         if (entries.Count == 0)
         {
             return;

@@ -1,0 +1,16 @@
+namespace Hst.Commander.Core.Volumes;
+
+/// <summary>
+/// Progress of a delete reported by <see cref="VolumeDelete.DeleteAsync" />.
+/// </summary>
+/// <param name="CurrentName">Name of the entry being deleted.</param>
+/// <param name="DeletedEntries">Number of entries deleted, items and containers.</param>
+/// <param name="TotalEntries">Total number of entries to delete, items and containers.</param>
+public record DeleteProgress(string CurrentName, int DeletedEntries, int TotalEntries)
+{
+    /// <summary>Fraction of the entries deleted, between 0 and 1.</summary>
+    public double TotalFraction => TotalEntries <= 0 ? 1 : Math.Clamp((double)DeletedEntries / TotalEntries, 0, 1);
+
+    /// <summary>Deleted and total entries, e.g. "3/10 entries".</summary>
+    public string TotalText => $"{DeletedEntries}/{TotalEntries} entries";
+}

@@ -463,6 +463,41 @@ public class GivenNavigationContext
         }
     }
 
+    [Fact]
+    public async Task When_DeleteMarkedEntries_Then_EntriesAreDeleted()
+    {
+        // arrange - a file, a directory with a file and a file to keep
+        var rootPath = CreateTempDirectory();
+        Directory.CreateDirectory(Path.Combine(rootPath, "dir1"));
+        await File.WriteAllTextAsync(Path.Combine(rootPath, "dir1", "file2.txt"), "file2");
+        await File.WriteAllTextAsync(Path.Combine(rootPath, "file1.txt"), "file1");
+        await File.WriteAllTextAsync(Path.Combine(rootPath, "keep.txt"), "keep");
+        try
+        {
+            using var navigationContext = new NavigationContext(rootPath);
+            foreach (var entry in (await navigationContext.ListEntriesAsync())
+                     .Where(entry => entry.Name is "dir1" or "file1.txt"))
+            {
+                navigationContext.ToggleMark(entry);
+            }
+
+            var entries = navigationContext.GetOperationEntries(null);
+
+            // act
+            await navigationContext.DeleteAsync(entries);
+
+            // assert
+            Assert.Equal("Delete 2 entries?", NavigationContext.GetDeleteDescription(entries));
+            Assert.False(Directory.Exists(Path.Combine(rootPath, "dir1")));
+            Assert.False(File.Exists(Path.Combine(rootPath, "file1.txt")));
+            Assert.True(File.Exists(Path.Combine(rootPath, "keep.txt")));
+        }
+        finally
+        {
+            Directory.Delete(rootPath, true);
+        }
+    }
+
     private static string CreateTempDirectory()
     {
         var path = Path.Combine(Path.GetTempPath(), $"hst-commander-{Guid.NewGuid()}");

@@ -85,7 +85,12 @@ public sealed class NavigationContext : IDisposable
         ? $"Copy '{entries.First().Name}'"
         : $"Copy {entries.Count} entries";
 
-    public bool HasParent => _nestedVolume.CurrentPathComponents.Any();
+    /// <summary>Question shown in the delete confirm dialog, e.g. "Delete 3 entries?" or "Delete 'a.txt'?".</summary>
+    public static string GetDeleteDescription(IReadOnlyCollection<IEntry> entries) => entries.Count == 1
+        ? $"Delete '{entries.First().Name}'?"
+        : $"Delete {entries.Count} entries?";
+
+    public bool HasParent =>_nestedVolume.CurrentPathComponents.Any();
 
     public string CurrentPath
     {
@@ -338,6 +343,20 @@ public sealed class NavigationContext : IDisposable
             await source.Volume.CopyToAsync(entries, destination.Volume,
                 new CopyOptions(filter, targetName, confirmOverwrite), progress, cancellationToken);
         }
+    }
+
+    /// <summary>
+    ///     Deletes entries in the current location, directories with everything in them. Like copying, it uses a volume
+    ///     of its own, so it can run on a background thread. Images are read-only and throw
+    ///     <see cref="NotSupportedException" />.
+    /// </summary>
+    public async Task DeleteAsync(IReadOnlyCollection<IEntry> entries, IProgress<DeleteProgress>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+
+        using var location = await OpenLocationAsync(cancellationToken);
+        await location.Volume.DeleteAsync(entries, progress, cancellationToken);
     }
 
     private async Task<(VolumeLocation Location, string? TargetName)> OpenDestinationAsync(

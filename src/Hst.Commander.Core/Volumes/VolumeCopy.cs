@@ -214,9 +214,10 @@ public static class VolumeCopy
 
     /// <summary>
     /// Changes directory of a volume from the current to the target directory, both relative to the directory the
-    /// copy started in, by going up to their common parent and down into the target.
+    /// copy started in, by going up to their common parent and down into the target. Also used by
+    /// <see cref="VolumeDelete" />.
     /// </summary>
-    private static async Task ChangeDirectoryAsync(IVolume volume, List<string> currentDirectory,
+    internal static async Task ChangeDirectoryAsync(IVolume volume, List<string> currentDirectory,
         IReadOnlyList<string> targetDirectory, CancellationToken cancellationToken)
     {
         var commonLength = 0;

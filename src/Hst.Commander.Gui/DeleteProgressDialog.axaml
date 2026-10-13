@@ -1,0 +1,17 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Hst.Commander.Gui.DeleteProgressDialog"
+        Title="Delete"
+        Width="560"
+        SizeToContent="Height"
+        CanResize="False"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner">
+    <StackPanel Margin="16" Spacing="8">
+        <TextBlock x:Name="CurrentText" Text="Preparing..." TextTrimming="CharacterEllipsis" />
+        <TextBlock x:Name="TotalText" Text="Total" />
+        <ProgressBar x:Name="TotalProgressBar" Minimum="0" Maximum="1" ShowProgressText="True" />
+        <Button x:Name="CancelButton" Content="Cancel" MinWidth="80" HorizontalAlignment="Right"
+                HorizontalContentAlignment="Center" IsCancel="True" Margin="0,8,0,0" />
+    </StackPanel>
+</Window>

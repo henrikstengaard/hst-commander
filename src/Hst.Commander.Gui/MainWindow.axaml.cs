@@ -27,6 +27,7 @@ public partial class MainWindow : Window
         LeftPane.NavigationFailed += async (_, exception) => await ShowErrorAsync(exception);
         RightPane.NavigationFailed += async (_, exception) => await ShowErrorAsync(exception);
         CopyMenuItem.Click += async (_, _) => await CopyAsync(_activePane);
+        DeleteMenuItem.Click += async (_, _) => await DeleteAsync(_activePane);
         SettingsMenuItem.Click += async (_, _) => await ShowSettingsAsync();
         QuitMenuItem.Click += (_, _) => Close();
 
@@ -57,7 +58,52 @@ public partial class MainWindow : Window
                 e.Handled = true;
                 await CopyAsync(_activePane);
                 break;
+            case Key.F8:
+            case Key.Delete:
+                e.Handled = true;
+                await DeleteAsync(_activePane);
+                break;
         }
+    }
+
+    /// <summary>
+    ///     Deletes the marked entries, or the entry under the cursor, of a pane after confirming, showing the progress
+    ///     while deleting. The other pane is refreshed too, as it may show the same location.
+    /// </summary>
+    private async Task DeleteAsync(PaneView pane)
+    {
+        var otherPane = pane == LeftPane ? RightPane : LeftPane;
+        var entries = pane.NavigationContext.GetOperationEntries(pane.SelectedEntry);
+        if (entries.Count == 0)
+        {
+            return;
+        }
+
+        if (await new DeleteDialog(NavigationContext.GetDeleteDescription(entries)).ShowDialog<bool?>(this) != true)
+        {
+            pane.FocusEntries();
+            return;
+        }
+
+        var progressDialog = new DeleteProgressDialog((progress, cancellationToken) =>
+            pane.NavigationContext.DeleteAsync(entries, progress, cancellationToken));
+        await progressDialog.ShowDialog(this);
+
+        switch (progressDialog.Exception)
+        {
+            case null:
+                pane.NavigationContext.ClearMarks();
+                break;
+            case OperationCanceledException:
+                break;
+            default:
+                await ShowErrorAsync(progressDialog.Exception);
+                break;
+        }
+
+        await pane.RefreshEntriesAsync();
+        await otherPane.RefreshEntriesAsync();
+        pane.FocusEntries();
     }
 
     /// <summary>

@@ -9,6 +9,7 @@
         <Menu DockPanel.Dock="Top">
             <MenuItem Header="_File">
                 <MenuItem x:Name="CopyMenuItem" Header="_Copy..." InputGesture="F5" />
+                <MenuItem x:Name="DeleteMenuItem" Header="_Delete..." InputGesture="F8" />
                 <Separator />
                 <MenuItem x:Name="SettingsMenuItem" Header="_Settings..." />
                 <Separator />
