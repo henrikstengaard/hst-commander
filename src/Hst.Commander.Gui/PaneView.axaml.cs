@@ -173,7 +173,7 @@ public partial class PaneView : UserControl
         var selectedIndex = EntriesList.SelectedIndex;
         var navigationEntries = await NavigationContext.ListEntriesAsync();
         var entries = navigationEntries
-            .Select(entry => new EntryItem(entry, NavigationContext.IsMarked(entry)))
+            .Select(entry => new EntryItem(entry, NavigationContext.IsMarked(entry), NavigationContext.IsExecutable(entry)))
             .ToList();
         var previousPath = PathText.Text;
 

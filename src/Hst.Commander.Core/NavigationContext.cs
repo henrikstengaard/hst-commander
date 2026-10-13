@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using DiscUtils.Iso9660;
 using Hst.Commander.Core.Volumes;
 using Hst.Commander.Extensions.Volume.Abstractions;
@@ -10,11 +11,19 @@ public sealed class NavigationContext : IDisposable
     private readonly NestedVolume _nestedVolume;
     private readonly Stack<Stream> _isoStreams = new();
     private readonly Dictionary<string, IEntry> _markedEntries = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _executableNames = new(StringComparer.Ordinal);
+    private readonly Action<string> _startFile;
     private Iso9660Volume? _isoVolume;
     private string? _isoPath;
 
-    public NavigationContext(string initialPath)
+    /// <param name="initialPath">Local directory to start in, empty for the drive list.</param>
+    /// <param name="startFile">
+    ///     Starts a local file opened with <see cref="OpenEntryAsync" />, given its full path. Defaults to starting it
+    ///     with the shell, which executes programs and opens other files with their associated application.
+    /// </param>
+    public NavigationContext(string initialPath, Action<string>? startFile = null)
     {
+        _startFile = startFile ?? StartFile;
         _localVolume = new LocalVolume(initialPath);
         _nestedVolume = new NestedVolume(_localVolume);
     }
@@ -43,6 +52,20 @@ public sealed class NavigationContext : IDisposable
         : $"{SizeFormatter.FormatHumanized(MarkedSize)} in {_markedEntries.Count} selected";
 
     public bool IsMarked(IEntry entry) => _markedEntries.ContainsKey(entry.Name);
+
+    /// <summary>
+    ///     True when the entry is an executable local file, shown in the executable color. On Windows by its extension
+    ///     (see <see cref="IsExecutableName" />), on other systems by its execute permission. Updated when entries are
+    ///     listed.
+    /// </summary>
+    public bool IsExecutable(IEntry entry) => _executableNames.Contains(entry.Name);
+
+    /// <summary>File extensions of executable files on Windows.</summary>
+    public static IReadOnlyCollection<string> ExecutableExtensions { get; } = [".exe", ".com", ".bat", ".cmd", ".msi"];
+
+    /// <summary>True when the file name has an executable extension, e.g. "setup.exe" or "build.cmd".</summary>
+    public static bool IsExecutableName(string name) =>
+        ExecutableExtensions.Contains(Path.GetExtension(name), StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Toggles the mark of an entry. The parent entry ".." can't be marked. Returns true when marked.</summary>
     public bool ToggleMark(IEntry entry)
@@ -169,6 +192,8 @@ public sealed class NavigationContext : IDisposable
             entries.Add(entry);
         }
 
+        UpdateExecutableNames(entries);
+
         // keep marks of entries still present, refreshed with the listed entries so sizes are current
         var markedEntries = entries.Where(IsMarked).ToList();
         _markedEntries.Clear();
@@ -178,6 +203,42 @@ public sealed class NavigationContext : IDisposable
         }
 
         return entries;
+    }
+
+    private void UpdateExecutableNames(IEnumerable<IEntry> entries)
+    {
+        _executableNames.Clear();
+
+        // files inside images can't be executed
+        var localPath = _isoStreams.Count == 0 ? LocalPath : null;
+        if (localPath == null)
+        {
+            return;
+        }
+
+        foreach (var entry in entries.Where(entry => entry.Type == EntryType.Item))
+        {
+            if (OperatingSystem.IsWindows()
+                    ? IsExecutableName(entry.Name)
+                    : HasExecutePermission(Path.Combine(localPath, entry.Name)))
+            {
+                _executableNames.Add(entry.Name);
+            }
+        }
+    }
+
+    [System.Runtime.Versioning.UnsupportedOSPlatform("windows")]
+    private static bool HasExecutePermission(string path)
+    {
+        try
+        {
+            return (File.GetUnixFileMode(path) &
+                    (UnixFileMode.UserExecute | UnixFileMode.GroupExecute | UnixFileMode.OtherExecute)) != 0;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
     }
 
     /// <summary>
@@ -241,6 +302,12 @@ public sealed class NavigationContext : IDisposable
 
         if (!entry.Name.EndsWith(".iso", StringComparison.OrdinalIgnoreCase))
         {
+            // local files are started, e.g. executing a program; files inside images can't be started
+            if (_isoStreams.Count == 0 && LocalPath is { } localPath)
+            {
+                _startFile(Path.Combine(localPath, entry.Name));
+            }
+
             return;
         }
 
@@ -290,6 +357,19 @@ public sealed class NavigationContext : IDisposable
 
         PreviousEntryName = previousEntryName;
         _markedEntries.Clear();
+    }
+
+    /// <summary>
+    ///     Starts a file with the shell in its directory: programs are executed and other files are opened with their
+    ///     associated application.
+    /// </summary>
+    private static void StartFile(string path)
+    {
+        using var process = Process.Start(new ProcessStartInfo(path)
+        {
+            UseShellExecute = true,
+            WorkingDirectory = Path.GetDirectoryName(path) ?? string.Empty
+        });
     }
 
     /// <summary>

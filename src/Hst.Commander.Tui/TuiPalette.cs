@@ -12,6 +12,7 @@ public sealed record TuiPalette(
     ColorName16 Header,
     ColorName16 Container,
     ColorName16 Item,
+    ColorName16 Executable,
     ColorName16 Marked,
     ColorName16 Path,
     TuiAttribute Cursor,
@@ -24,13 +25,14 @@ public sealed record TuiPalette(
     TuiAttribute Dialog,
     TuiAttribute DialogFocus)
 {
-    /// <summary>Blue panes with directories in white, files in gray and cyan menu and function key bars.</summary>
+    /// <summary>Blue panes with directories in white, files in gray, executables in green and cyan menu and function key bars.</summary>
     public static TuiPalette MidnightCommander { get; } = new(
         PaneBackground: ColorName16.Blue,
         Border: ColorName16.White,
         Header: ColorName16.BrightYellow,
         Container: ColorName16.White,
         Item: ColorName16.Gray,
+        Executable: ColorName16.BrightGreen,
         Marked: ColorName16.BrightYellow,
         Path: ColorName16.BrightYellow,
         Cursor: new TuiAttribute(ColorName16.Black, ColorName16.Gray),
@@ -49,6 +51,7 @@ public sealed record TuiPalette(
         Header: ColorName16.Blue,
         Container: ColorName16.Black,
         Item: ColorName16.DarkGray,
+        Executable: ColorName16.Green,
         Marked: ColorName16.Red,
         Path: ColorName16.Black,
         Cursor: new TuiAttribute(ColorName16.White, ColorName16.Blue),
@@ -67,6 +70,7 @@ public sealed record TuiPalette(
         Header: ColorName16.Gray,
         Container: ColorName16.White,
         Item: ColorName16.Gray,
+        Executable: ColorName16.BrightGreen,
         Marked: ColorName16.BrightYellow,
         Path: ColorName16.Gray,
         Cursor: new TuiAttribute(ColorName16.White, ColorName16.DarkGray),

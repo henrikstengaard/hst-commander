@@ -12,6 +12,7 @@
                     <SolidColorBrush x:Key="HeaderForeground" Color="#FFFF55" />
                     <SolidColorBrush x:Key="ContainerForeground" Color="#FFFFFF" />
                     <SolidColorBrush x:Key="ItemForeground" Color="#AAAAAA" />
+                    <SolidColorBrush x:Key="ExecutableForeground" Color="#55FF55" />
                     <SolidColorBrush x:Key="PathForeground" Color="#FFFF55" />
                     <SolidColorBrush x:Key="ActivePathBackground" Color="#AAAAAA" />
                     <SolidColorBrush x:Key="ActivePathForeground" Color="#000000" />
@@ -24,6 +25,7 @@
                     <SolidColorBrush x:Key="HeaderForeground" Color="#606060" />
                     <SolidColorBrush x:Key="ContainerForeground" Color="#000000" />
                     <SolidColorBrush x:Key="ItemForeground" Color="#404040" />
+                    <SolidColorBrush x:Key="ExecutableForeground" Color="#008000" />
                     <SolidColorBrush x:Key="PathForeground" Color="#404040" />
                     <SolidColorBrush x:Key="ActivePathBackground" Color="#0067C0" />
                     <SolidColorBrush x:Key="ActivePathForeground" Color="#FFFFFF" />
@@ -36,6 +38,7 @@
                     <SolidColorBrush x:Key="HeaderForeground" Color="#A0A0A0" />
                     <SolidColorBrush x:Key="ContainerForeground" Color="#FFFFFF" />
                     <SolidColorBrush x:Key="ItemForeground" Color="#C8C8C8" />
+                    <SolidColorBrush x:Key="ExecutableForeground" Color="#6CCB5F" />
                     <SolidColorBrush x:Key="PathForeground" Color="#C8C8C8" />
                     <SolidColorBrush x:Key="ActivePathBackground" Color="#4CC2FF" />
                     <SolidColorBrush x:Key="ActivePathForeground" Color="#000000" />

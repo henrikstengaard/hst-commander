@@ -7,7 +7,7 @@ namespace Hst.Commander.Gui;
 /// <summary>
 ///     Display row for an entry in a pane.
 /// </summary>
-public sealed class EntryItem(IEntry entry, bool isMarked = false) : INotifyPropertyChanged
+public sealed class EntryItem(IEntry entry, bool isMarked = false, bool isExecutable = false) : INotifyPropertyChanged
 {
     private bool _isMarked = isMarked;
 
@@ -18,6 +18,9 @@ public sealed class EntryItem(IEntry entry, bool isMarked = false) : INotifyProp
     public string Name => Entry.Name;
 
     public bool IsContainer => Entry.Type == EntryType.Container;
+
+    /// <summary>True when the entry is an executable file, shown in the executable color.</summary>
+    public bool IsExecutable { get; } = isExecutable;
 
     /// <summary>True when the entry is selected (marked) by the user, shown in the marked entry color.</summary>
     public bool IsMarked

@@ -498,6 +498,72 @@ public class GivenNavigationContext
         }
     }
 
+    [Fact]
+    public async Task When_ListEntries_Then_ExecutableFilesAreDetected()
+    {
+        // arrange
+        var rootPath = CreateTempDirectory();
+        var toolPath = Path.Combine(rootPath, OperatingSystem.IsWindows() ? "tool.exe" : "tool");
+        await File.WriteAllTextAsync(toolPath, "tool");
+        await File.WriteAllTextAsync(Path.Combine(rootPath, "readme.txt"), "readme");
+        Directory.CreateDirectory(Path.Combine(rootPath, "dir.exe"));
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(toolPath, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
+
+        try
+        {
+            using var navigationContext = new NavigationContext(rootPath);
+
+            // act
+            var entries = await navigationContext.ListEntriesAsync();
+
+            // assert
+            Assert.True(navigationContext.IsExecutable(entries.Single(entry => entry.Name == Path.GetFileName(toolPath))));
+            Assert.False(navigationContext.IsExecutable(entries.Single(entry => entry.Name == "readme.txt")));
+            Assert.False(navigationContext.IsExecutable(entries.Single(entry => entry.Name == "dir.exe")));
+        }
+        finally
+        {
+            Directory.Delete(rootPath, true);
+        }
+    }
+
+    [Theory]
+    [InlineData("setup.exe", true)]
+    [InlineData("BUILD.CMD", true)]
+    [InlineData("run.bat", true)]
+    [InlineData("readme.txt", false)]
+    [InlineData("exe", false)]
+    public void When_IsExecutableName_Then_ExecutableExtensionsAreDetected(string name, bool expected) =>
+        Assert.Equal(expected, NavigationContext.IsExecutableName(name));
+
+    [Fact]
+    public async Task When_OpenFile_Then_FileIsStarted()
+    {
+        // arrange
+        var rootPath = CreateTempDirectory();
+        await File.WriteAllTextAsync(Path.Combine(rootPath, "file1.txt"), "file1");
+        try
+        {
+            var startedPaths = new List<string>();
+            using var navigationContext = new NavigationContext(rootPath, startedPaths.Add);
+            var entry = (await navigationContext.ListEntriesAsync()).Single(entry => entry.Name == "file1.txt");
+
+            // act
+            await navigationContext.OpenEntryAsync(entry);
+
+            // assert
+            Assert.Equal([Path.Combine(rootPath, "file1.txt")], startedPaths);
+            Assert.Equal(rootPath, navigationContext.CurrentPath);
+        }
+        finally
+        {
+            Directory.Delete(rootPath, true);
+        }
+    }
+
     private static string CreateTempDirectory()
     {
         var path = Path.Combine(Path.GetTempPath(), $"hst-commander-{Guid.NewGuid()}");

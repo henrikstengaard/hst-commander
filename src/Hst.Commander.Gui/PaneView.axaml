@@ -19,6 +19,9 @@
         <Style Selector="ListBox.entries Grid.row.container TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource ContainerForeground}" />
         </Style>
+        <Style Selector="ListBox.entries Grid.row.executable TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource ExecutableForeground}" />
+        </Style>
         <Style Selector="ListBox.entries ListBoxItem:selected Grid.row TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource SelectedEntryForeground}" />
         </Style>
@@ -85,6 +88,7 @@
                     <ListBox.ItemTemplate>
                         <DataTemplate x:DataType="local:EntryItem">
                             <Grid Classes="row" Classes.container="{Binding IsContainer}"
+                                  Classes.executable="{Binding IsExecutable}"
                                   Classes.marked="{Binding IsMarked}" Background="Transparent"
                                   ColumnDefinitions="*,90,150">
                                 <TextBlock Grid.Column="0" Text="{Binding Name}" />

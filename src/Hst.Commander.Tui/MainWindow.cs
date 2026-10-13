@@ -566,7 +566,9 @@ public sealed class MainWindow : Window
         var isMarked = pane.NavigationContext.IsMarked(entry);
         var foreground = isMarked
             ? _palette.Marked
-            : entry.Type == EntryType.Container ? _palette.Container : _palette.Item;
+            : entry.Type == EntryType.Container
+                ? _palette.Container
+                : pane.NavigationContext.IsExecutable(entry) ? _palette.Executable : _palette.Item;
         var normal = new TuiAttribute(foreground, _palette.PaneBackground);
         var selected = rowIndex == pane.TableView.SelectedRow
             ? isMarked ? _palette.MarkedCursor : _palette.Cursor
