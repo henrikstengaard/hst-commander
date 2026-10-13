@@ -16,6 +16,43 @@
                 <MenuItem x:Name="QuitMenuItem" Header="_Quit" InputGesture="Alt+F4" />
             </MenuItem>
         </Menu>
+        <!-- function key bar; the buttons aren't focusable so the active pane keeps the focus -->
+        <UniformGrid DockPanel.Dock="Bottom" Rows="1">
+            <UniformGrid.Styles>
+                <Style Selector="Button.functionKey">
+                    <Setter Property="Focusable" Value="False" />
+                    <Setter Property="HorizontalAlignment" Value="Stretch" />
+                    <Setter Property="HorizontalContentAlignment" Value="Left" />
+                    <Setter Property="Margin" Value="1" />
+                    <Setter Property="Padding" Value="0" />
+                </Style>
+                <Style Selector="Button.functionKey TextBlock">
+                    <Setter Property="Padding" Value="6,3" />
+                </Style>
+                <Style Selector="Button.functionKey TextBlock.key">
+                    <Setter Property="FontWeight" Value="Bold" />
+                    <Setter Property="Padding" Value="6,3,0,3" />
+                </Style>
+            </UniformGrid.Styles>
+            <Button x:Name="ViewButton" Classes="functionKey">
+                <StackPanel Orientation="Horizontal"><TextBlock Classes="key" Text="F3" /><TextBlock Text="View" /></StackPanel>
+            </Button>
+            <Button x:Name="EditButton" Classes="functionKey">
+                <StackPanel Orientation="Horizontal"><TextBlock Classes="key" Text="F4" /><TextBlock Text="Edit" /></StackPanel>
+            </Button>
+            <Button x:Name="CopyButton" Classes="functionKey">
+                <StackPanel Orientation="Horizontal"><TextBlock Classes="key" Text="F5" /><TextBlock Text="Copy" /></StackPanel>
+            </Button>
+            <Button x:Name="MoveButton" Classes="functionKey">
+                <StackPanel Orientation="Horizontal"><TextBlock Classes="key" Text="F6" /><TextBlock Text="Move" /></StackPanel>
+            </Button>
+            <Button x:Name="MkdirButton" Classes="functionKey">
+                <StackPanel Orientation="Horizontal"><TextBlock Classes="key" Text="F7" /><TextBlock Text="Mkdir" /></StackPanel>
+            </Button>
+            <Button x:Name="DeleteButton" Classes="functionKey">
+                <StackPanel Orientation="Horizontal"><TextBlock Classes="key" Text="F8" /><TextBlock Text="Delete" /></StackPanel>
+            </Button>
+        </UniformGrid>
         <Grid ColumnDefinitions="*,*">
             <local:PaneView x:Name="LeftPane" Grid.Column="0" />
             <local:PaneView x:Name="RightPane" Grid.Column="1" />

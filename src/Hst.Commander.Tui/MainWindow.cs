@@ -14,6 +14,7 @@ public sealed class MainWindow : Window
     private const int ColumnCount = 3;
 
     private readonly MenuBar _menuBar;
+    private readonly FunctionKeyBarView _functionKeyBar;
     private readonly Pane _leftPane;
     private readonly Pane _rightPane;
     private TuiPalette _palette;
@@ -43,11 +44,27 @@ public sealed class MainWindow : Window
                 })
             ]
         };
+        _functionKeyBar = new FunctionKeyBarView
+        {
+            X = 0,
+            Y = Pos.AnchorEnd(1),
+            Width = Dim.Fill(),
+            Height = 1,
+            Items =
+            [
+                new FunctionKeyItem("F3", "View"),
+                new FunctionKeyItem("F4", "Edit"),
+                new FunctionKeyItem("F5", "Copy", CopyFromActivePane),
+                new FunctionKeyItem("F6", "Move"),
+                new FunctionKeyItem("F7", "Mkdir"),
+                new FunctionKeyItem("F8", "Delete", DeleteFromActivePane)
+            ]
+        };
         _leftPane = CreatePane(new NavigationContext(initialPath), 0);
         _rightPane = CreatePane(new NavigationContext(initialPath), 50);
         _activePane = _leftPane;
 
-        Add(_menuBar, _leftPane.View, _rightPane.View);
+        Add(_menuBar, _leftPane.View, _rightPane.View, _functionKeyBar);
         ApplyTheme(theme);
         ConfigurePaneKeys(_leftPane, _rightPane);
         ConfigurePaneKeys(_rightPane, _leftPane);
@@ -66,12 +83,15 @@ public sealed class MainWindow : Window
         _rightPane.NavigationContext.Dispose();
     }
 
-    /// <summary>Applies the colors of a theme to the menu bar and both panes.</summary>
+    /// <summary>Applies the colors of a theme to the menu bar, both panes and the function key bar.</summary>
     public void ApplyTheme(TuiTheme theme)
     {
         _palette = TuiPalette.For(theme);
         _menuBar.ColorScheme = _palette.MenuColorScheme;
         _menuBar.NeedsDraw = true;
+        _functionKeyBar.KeyAttribute = _palette.FunctionKey;
+        _functionKeyBar.TitleAttribute = _palette.Menu;
+        _functionKeyBar.NeedsDraw = true;
         foreach (var pane in new[] { _leftPane, _rightPane })
         {
             ApplyPaneColors(pane);
@@ -129,7 +149,7 @@ public sealed class MainWindow : Window
             X = Pos.Percent(xPercent),
             Y = 1,
             Width = Dim.Percent(50),
-            Height = Dim.Fill(),
+            Height = Dim.Fill(1),
             CanFocus = true
         };
         var pathPanel = new PathPanelView

@@ -28,6 +28,8 @@ public partial class MainWindow : Window
         RightPane.NavigationFailed += async (_, exception) => await ShowErrorAsync(exception);
         CopyMenuItem.Click += async (_, _) => await CopyAsync(_activePane);
         DeleteMenuItem.Click += async (_, _) => await DeleteAsync(_activePane);
+        CopyButton.Click += async (_, _) => await CopyAsync(_activePane);
+        DeleteButton.Click += async (_, _) => await DeleteAsync(_activePane);
         SettingsMenuItem.Click += async (_, _) => await ShowSettingsAsync();
         QuitMenuItem.Click += (_, _) => Close();
 

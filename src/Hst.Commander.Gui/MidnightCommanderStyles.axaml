@@ -13,6 +13,26 @@
         <Setter Property="Foreground" Value="#000000" />
     </Style>
 
+    <!-- function key bar: key in white on black, title in black on cyan -->
+    <Style Selector="Button.functionKey">
+        <Setter Property="Background" Value="#00AAAA" />
+        <Setter Property="CornerRadius" Value="0" />
+    </Style>
+    <Style Selector="Button.functionKey:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="#55FFFF" />
+    </Style>
+    <Style Selector="Button.functionKey:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="#AAAAAA" />
+    </Style>
+    <Style Selector="Button.functionKey TextBlock">
+        <Setter Property="Foreground" Value="#000000" />
+    </Style>
+    <Style Selector="Button.functionKey TextBlock.key">
+        <Setter Property="Foreground" Value="#FFFFFF" />
+        <Setter Property="Background" Value="#000000" />
+        <Setter Property="Padding" Value="6,3" />
+    </Style>
+
     <Style Selector="ListBox.entries ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
         <Setter Property="Background" Value="Transparent" />
     </Style>

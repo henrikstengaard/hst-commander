@@ -18,7 +18,8 @@ src/
   Hst.Commander.Extensions.Volume.Abstractions/  IVolume / IEntry interfaces (no external deps)
   Hst.Commander.Core/                            Volume implementations, NavigationContext + shared utilities
   Hst.Commander.Tui/                             Terminal.Gui TUI application
-    MainWindow.cs                                Dual-pane window, File menu, columns, key bindings, theme colors, F5 copy, F8/Delete delete
+    MainWindow.cs                                Dual-pane window, File menu, function key bar, columns, key bindings, theme colors, F5 copy, F8/Delete delete
+    FunctionKeyBarView.cs                        Function key bar at the bottom (F3 View ... F8 Delete), clickable items
     SettingsDialog.cs                            Modal settings dialog (theme selection with live preview)
     CopyDialog.cs                                Modal copy confirm dialog (destination and filter)
     CopyProgressDialog.cs                        Modal copy progress dialog (2 progress bars, speed, ETA, cancel)
@@ -30,7 +31,7 @@ src/
     PathPanelView.cs                             Bordered panel with current path, marked-entries summary and disk space above the pane, plus the pane's top border
   Hst.Commander.Core.Tests/                      xUnit unit tests
   Hst.Commander.Gui/                             Avalonia 12 desktop GUI application
-    MainWindow.axaml(.cs)                        Dual-pane window, File menu, Tab pane switching, F5 copy, F8/Delete delete, error display
+    MainWindow.axaml(.cs)                        Dual-pane window, File menu, function key bar, Tab pane switching, F5 copy, F8/Delete delete, error display
     PaneView.axaml(.cs)                          One pane: path, column header, entry ListBox, Enter/Backspace
     EntryItem.cs                                 Display row for an IEntry (size/date formatting)
     ErrorDialog.axaml(.cs)                       Modal error dialog
@@ -226,6 +227,7 @@ Key TUI patterns already in use:
 - Key bindings are attached via `tableView.KeyDown += async (_, key) => { ... }`.
 - Up/Down move the selected row by one entry per key event; holding a key uses the OS/terminal's repeat rate. PageUp/PageDown move by one visible page and Home/End jump to the first/last entry.
 - A `MenuBar` at the top of `MainWindow` (panes start at row 1) has a File menu: Copy (F5) and Delete (F8 or Delete) act on the active pane (the pane last focused), Settings opens the modal `SettingsDialog` and Quit calls `Application.RequestStop()`, exiting the application. F9 or Alt+F opens the menu.
+- A `FunctionKeyBarView` spans the full width below the panes (panes use `Dim.Fill(1)`) with the items `F3 View`, `F4 Edit`, `F5 Copy`, `F6 Move`, `F7 Mkdir` and `F8 Delete`, each getting an equal share of the width; the key is drawn in `TuiPalette.FunctionKey` and the title in `TuiPalette.Menu`. Clicking `F5 Copy` or `F8 Delete` copies or deletes from the active pane like the File menu; the other items have no action yet.
 - F5 copies the marked entries (or the entry under the cursor) to the other pane: `CopyDialog` confirms the destination (default: the other pane's path) and filter (default `*`), then `NavigationContext.CopyAsync` runs on a background thread (`Task.Run`) while the modal `CopyProgressDialog` shows the current file and total progress bars, speed and ETA. Progress is marshalled with `Application.Invoke`; existing files are confirmed with `MessageBox.Query` (Yes, No, All; Esc answers No) invoked on the UI thread from the background copy through a `TaskCompletionSource`. Cancel or Esc cancels the copy and the dialog stays open until the copy has stopped. Errors are shown with `MessageBox.ErrorQuery`, both panes are refreshed afterwards.
 - F8 or Delete deletes the marked entries (or the entry under the cursor) after confirming with `MessageBox.Query` (Yes, No; Esc answers No), then `NavigationContext.DeleteAsync` runs on a background thread while the modal `DeleteProgressDialog` shows the current entry and a total progress bar, same pattern as copying (progress via `Application.Invoke`, Cancel or Esc cancels and the dialog stays open until the delete has stopped). Errors are shown with `MessageBox.ErrorQuery`, both panes are refreshed afterwards.
 - Three themes, selected in File > Settings, same as the GUI: **Midnight Commander** (default), **Light** and **Dark**. Colors come from `TuiPalette` (16 legacy colors); `MainWindow.ApplyTheme` reapplies them to the menu bar and panes. Midnight Commander uses blue panes with directories in white, files in gray, marked entries in yellow, the current row in black on gray in both panes and a cyan menu bar.
@@ -252,6 +254,7 @@ Key GUI patterns already in use:
 - Settings are stored in `~/.hst-commander/gui-settings.json` (`SettingsPaths.Directory` in Core, `GuiSettings.FilePath`). A missing or invalid file falls back to defaults. The settings dialog previews theme changes live, saves on OK and reverts on Cancel.
 - Errors are shown with `ErrorDialog` via `ShowDialog(owner)`.
 - A top `Menu` docked above the panes has a File menu: Copy (F5) and Delete (F8 or Delete) act on the active pane (tracked with `GotFocus`), Settings opens the modal `SettingsDialog` and Quit closes the main window (exiting the application).
+- A function key bar (`UniformGrid` of non-focusable `Button.functionKey`, so the active pane keeps focus) is docked full width below the panes with `F3 View`, `F4 Edit`, `F5 Copy`, `F6 Move`, `F7 Mkdir` and `F8 Delete`. `CopyButton` and `DeleteButton` copy or delete from the active pane like the File menu; the other buttons have no action yet. In Midnight Commander the buttons are cyan with the key in white on black.
 - F5 is handled at window level (tunnelling): `CopyDialog` confirms the destination and filter, then `CopyProgressDialog` runs `NavigationContext.CopyAsync` with `Task.Run` when opened, reporting through a `Progress<CopyProgress>` created on the UI thread. Existing files are confirmed with the modal `OverwriteDialog` (Yes, No, All; closing answers No), shown over the progress dialog via `Dispatcher.UIThread.InvokeAsync`. Cancel or closing the window cancels the copy; the dialog closes when the copy has stopped and exposes the `Exception`. `PaneView.SelectedEntry` gives the entry under the cursor and `PaneView.RefreshEntriesAsync` relists a pane after copying. Both dialogs have Midnight Commander styles (gray background) like the settings dialog.
 - F8 and Delete are handled at window level (tunnelling): the modal `DeleteDialog` confirms (Yes, No; closing answers No), then `DeleteProgressDialog` runs `NavigationContext.DeleteAsync` with `Task.Run` when opened, showing the current entry and a total progress bar, with the same cancel/close/`Exception` behaviour as `CopyProgressDialog`. Both panes are refreshed afterwards; both dialogs have the Midnight Commander gray styles.
 

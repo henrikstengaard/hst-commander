@@ -20,10 +20,11 @@ public sealed record TuiPalette(
     TuiAttribute Menu,
     TuiAttribute MenuFocus,
     TuiAttribute MenuHot,
+    TuiAttribute FunctionKey,
     TuiAttribute Dialog,
     TuiAttribute DialogFocus)
 {
-    /// <summary>Blue panes with directories in white, files in gray and a cyan menu bar.</summary>
+    /// <summary>Blue panes with directories in white, files in gray and cyan menu and function key bars.</summary>
     public static TuiPalette MidnightCommander { get; } = new(
         PaneBackground: ColorName16.Blue,
         Border: ColorName16.White,
@@ -38,6 +39,7 @@ public sealed record TuiPalette(
         Menu: new TuiAttribute(ColorName16.Black, ColorName16.Cyan),
         MenuFocus: new TuiAttribute(ColorName16.White, ColorName16.Black),
         MenuHot: new TuiAttribute(ColorName16.BrightYellow, ColorName16.Cyan),
+        FunctionKey: new TuiAttribute(ColorName16.White, ColorName16.Black),
         Dialog: new TuiAttribute(ColorName16.Black, ColorName16.Gray),
         DialogFocus: new TuiAttribute(ColorName16.Black, ColorName16.BrightCyan));
 
@@ -55,6 +57,7 @@ public sealed record TuiPalette(
         Menu: new TuiAttribute(ColorName16.Black, ColorName16.Gray),
         MenuFocus: new TuiAttribute(ColorName16.White, ColorName16.Blue),
         MenuHot: new TuiAttribute(ColorName16.Blue, ColorName16.Gray),
+        FunctionKey: new TuiAttribute(ColorName16.White, ColorName16.DarkGray),
         Dialog: new TuiAttribute(ColorName16.Black, ColorName16.White),
         DialogFocus: new TuiAttribute(ColorName16.White, ColorName16.Blue));
 
@@ -72,6 +75,7 @@ public sealed record TuiPalette(
         Menu: new TuiAttribute(ColorName16.White, ColorName16.DarkGray),
         MenuFocus: new TuiAttribute(ColorName16.Black, ColorName16.BrightCyan),
         MenuHot: new TuiAttribute(ColorName16.BrightCyan, ColorName16.DarkGray),
+        FunctionKey: new TuiAttribute(ColorName16.Gray, ColorName16.Black),
         Dialog: new TuiAttribute(ColorName16.White, ColorName16.DarkGray),
         DialogFocus: new TuiAttribute(ColorName16.Black, ColorName16.BrightCyan));
 
