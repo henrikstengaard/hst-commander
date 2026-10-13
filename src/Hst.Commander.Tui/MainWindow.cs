@@ -54,12 +54,12 @@ public sealed class MainWindow : Window
             Height = Dim.Fill(),
             CanFocus = true
         };
-        var pathBorder = new PathBorderView
+        var pathPanel = new PathPanelView
         {
             X = 0,
             Y = 0,
             Width = Dim.Fill(),
-            Height = 2,
+            Height = PathPanelView.RequiredHeight,
             Path = navigationContext.CurrentPath,
             BorderAttribute = new TuiAttribute(ColorName16.White, ColorName16.Blue),
             PathAttribute = new TuiAttribute(ColorName16.BrightYellow, ColorName16.Blue),
@@ -68,7 +68,7 @@ public sealed class MainWindow : Window
         var tableView = new EntryTableView
         {
             X = 0,
-            Y = 2,
+            Y = PathPanelView.RequiredHeight,
             Width = Dim.Fill(),
             Height = Dim.Fill(1),
             FullRowSelect = true,
@@ -91,7 +91,7 @@ public sealed class MainWindow : Window
                 new TuiAttribute(ColorName16.White, ColorName16.Blue))
         };
 
-        var pane = new Pane(navigationContext, view, pathBorder, tableView, bottomLine);
+        var pane = new Pane(navigationContext, view, pathPanel, tableView, bottomLine);
         tableView.Style = new TableStyle
         {
             ShowVerticalCellLines = true,
@@ -102,7 +102,7 @@ public sealed class MainWindow : Window
         };
         tableView.FrameChanged += (_, _) => UpdatePaneColumns(pane);
 
-        view.Add(pathBorder, tableView, bottomLine);
+        view.Add(pathPanel, tableView, bottomLine);
 
         return pane;
     }
@@ -113,8 +113,8 @@ public sealed class MainWindow : Window
         pane.TableView.HasFocusChanged += (_, _) =>
         {
             pane.TableView.NeedsDraw = true;
-            pane.PathBorder.IsActive = pane.TableView.HasFocus;
-            pane.PathBorder.NeedsDraw = true;
+            pane.PathPanel.IsActive = pane.TableView.HasFocus;
+            pane.PathPanel.NeedsDraw = true;
         };
         pane.TableView.SelectedCellChanged += (_, _) => pane.TableView.NeedsDraw = true;
         pane.TableView.KeyDown += (_, key) =>
@@ -186,11 +186,11 @@ public sealed class MainWindow : Window
 
     private static async Task RefreshPaneAsync(Pane pane)
     {
-        var previousPath = pane.PathBorder.Path;
+        var previousPath = pane.PathPanel.Path;
         pane.Entries = await pane.NavigationContext.ListEntriesAsync();
-        pane.PathBorder.Path = pane.NavigationContext.CurrentPath;
-        pane.PathBorder.DiskSpace = pane.NavigationContext.DiskSpace;
-        pane.PathBorder.NeedsDraw = true;
+        pane.PathPanel.Path = pane.NavigationContext.CurrentPath;
+        pane.PathPanel.DiskSpace = pane.NavigationContext.DiskSpace;
+        pane.PathPanel.NeedsDraw = true;
 
         var table = new DataTable();
         table.Columns.Add("Name", typeof(string));
@@ -229,8 +229,8 @@ public sealed class MainWindow : Window
         };
         pane.TableView.ColumnWidths = [widths.Name, widths.Size, widths.Modified];
         pane.BottomLine.Text = CreateBottomLine(pane.TableView);
-        pane.PathBorder.Dividers = pane.TableView.GetDividerPositions();
-        pane.PathBorder.NeedsDraw = true;
+        pane.PathPanel.Dividers = pane.TableView.GetDividerPositions();
+        pane.PathPanel.NeedsDraw = true;
 
         if (pane.DataTable == null)
         {
@@ -361,13 +361,13 @@ public sealed class MainWindow : Window
     private sealed class Pane(
         NavigationContext navigationContext,
         View view,
-        PathBorderView pathBorder,
+        PathPanelView pathPanel,
         EntryTableView tableView,
         Label bottomLine)
     {
         public NavigationContext NavigationContext { get; } = navigationContext;
         public View View { get; } = view;
-        public PathBorderView PathBorder { get; } = pathBorder;
+        public PathPanelView PathPanel { get; } = pathPanel;
         public EntryTableView TableView { get; } = tableView;
         public Label BottomLine { get; } = bottomLine;
         public IReadOnlyList<IEntry> Entries { get; set; } = [];

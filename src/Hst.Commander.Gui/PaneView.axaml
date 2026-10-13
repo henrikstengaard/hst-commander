@@ -45,19 +45,23 @@
         </Style>
     </UserControl.Styles>
 
-    <Border Background="{DynamicResource PaneBackground}" BorderBrush="{DynamicResource PaneBorder}"
-            BorderThickness="1" Margin="2">
-        <Grid RowDefinitions="Auto,Auto,*">
-            <!-- current path shown at the top of the pane, highlighted when the pane is active -->
-            <Border x:Name="PathBadge" Grid.Row="0" HorizontalAlignment="Left" Margin="8,2" Padding="4,0">
-                <TextBlock x:Name="PathText" TextTrimming="PrefixCharacterEllipsis" />
-            </Border>
+    <Grid RowDefinitions="Auto,*">
+        <!-- bordered panel above the pane with the current path, highlighted when the pane is active,
+             and the free/total disk space of the current drive -->
+        <Border Grid.Row="0" Background="{DynamicResource PaneBackground}" BorderBrush="{DynamicResource PaneBorder}"
+                BorderThickness="1" Margin="2,2,2,0" Padding="4,2">
+            <Grid ColumnDefinitions="*,Auto">
+                <Border x:Name="PathBadge" Grid.Column="0" HorizontalAlignment="Left" Padding="4,0">
+                    <TextBlock x:Name="PathText" TextTrimming="PrefixCharacterEllipsis" />
+                </Border>
+                <TextBlock x:Name="DiskSpaceText" Grid.Column="1" Margin="8,0,4,0" VerticalAlignment="Center"
+                           Foreground="{DynamicResource PathForeground}" />
+            </Grid>
+        </Border>
 
-            <!-- free/total disk space of the current drive, shown below the path -->
-            <TextBlock x:Name="DiskSpaceText" Grid.Row="1" Margin="12,0,8,2"
-                       Foreground="{DynamicResource PathForeground}" />
-
-            <Grid Grid.Row="2" RowDefinitions="Auto,*">
+        <Border Grid.Row="1" Background="{DynamicResource PaneBackground}" BorderBrush="{DynamicResource PaneBorder}"
+                BorderThickness="1" Margin="2">
+            <Grid RowDefinitions="Auto,*">
                 <!-- column dividers continue below the last entry -->
                 <Grid Grid.RowSpan="2" IsHitTestVisible="False" ColumnDefinitions="*,90,150">
                     <Border Grid.Column="1" BorderBrush="{DynamicResource PaneBorder}" BorderThickness="1,0,0,0" />
@@ -83,6 +87,6 @@
                     </ListBox.ItemTemplate>
                 </ListBox>
             </Grid>
-        </Grid>
-    </Border>
+        </Border>
+    </Grid>
 </UserControl>

@@ -5,12 +5,15 @@ using TuiAttribute = Terminal.Gui.Attribute;
 namespace Hst.Commander.Tui;
 
 /// <summary>
-///     Top border of a pane with the current path embedded, joining the column dividers of the table below,
-///     and a second row with the free/total disk space shown below the path.
+///     Bordered panel above a pane showing the current path and the free/total disk space,
+///     followed by the top border of the pane joining the column dividers of the table below.
 /// </summary>
-public sealed class PathBorderView : View
+public sealed class PathPanelView : View
 {
     private const string Ellipsis = "...";
+
+    /// <summary>Rows used by the panel (top border, content and bottom border) and the pane's top border.</summary>
+    public const int RequiredHeight = 4;
 
     public string Path { get; set; } = string.Empty;
 
@@ -34,19 +37,49 @@ public sealed class PathBorderView : View
             return true;
         }
 
+        DrawPanel(width);
+        DrawPaneTopBorder(width, RequiredHeight - 1);
+        return true;
+    }
+
+    private void DrawPanel(int width)
+    {
         SetAttribute(BorderAttribute);
         for (var x = 0; x < width; x++)
         {
-            AddRune(x, 0, GetBorderGlyph(x, width));
+            var isLeft = x == 0;
+            var isRight = x == width - 1;
+            AddRune(x, 0, isLeft ? Glyphs.ULCorner : isRight ? Glyphs.URCorner : Glyphs.HLine);
+            AddRune(x, 1, isLeft || isRight ? Glyphs.VLine : (Rune)' ');
+            AddRune(x, 2, isLeft ? Glyphs.LLCorner : isRight ? Glyphs.LRCorner : Glyphs.HLine);
         }
 
-        DrawDiskSpaceRow(width);
+        // content is placed inside the left and right border, padded with a space on each side
+        var contentWidth = width - 4;
+        if (contentWidth <= 0)
+        {
+            return;
+        }
 
-        // path is placed after the left corner and a line segment, padded with a space on each side
-        var maxPathLength = width - 4;
+        // disk space is right-aligned and only shown when it leaves room for at least part of the path
+        var diskSpace = DiskSpace ?? string.Empty;
+        if (diskSpace.Length > 0 && diskSpace.Length + 1 + Ellipsis.Length + 2 > contentWidth)
+        {
+            diskSpace = string.Empty;
+        }
+
+        if (diskSpace.Length > 0)
+        {
+            SetAttribute(PathAttribute);
+            Move(width - 2 - diskSpace.Length, 1);
+            AddStr(diskSpace);
+        }
+
+        // path is padded with a space on each side, so it starts on the border padding
+        var maxPathLength = contentWidth - (diskSpace.Length > 0 ? diskSpace.Length + 1 : 0);
         if (maxPathLength <= 0 || string.IsNullOrEmpty(Path))
         {
-            return true;
+            return;
         }
 
         var text = Path.Length <= maxPathLength
@@ -56,14 +89,13 @@ public sealed class PathBorderView : View
                 : Ellipsis + TrimToSeparator(Path[^(maxPathLength - Ellipsis.Length)..]);
 
         SetAttribute(IsActive ? ActivePathAttribute : PathAttribute);
-        Move(1, 0);
+        Move(1, 1);
         AddStr($" {text} ");
-        return true;
     }
 
-    private void DrawDiskSpaceRow(int width)
+    private void DrawPaneTopBorder(int width, int row)
     {
-        if (Viewport.Height < 2)
+        if (Viewport.Height <= row)
         {
             return;
         }
@@ -71,22 +103,8 @@ public sealed class PathBorderView : View
         SetAttribute(BorderAttribute);
         for (var x = 0; x < width; x++)
         {
-            AddRune(x, 1, Dividers.Contains(x) || (Dividers.Count == 0 && (x == 0 || x == width - 1))
-                ? Glyphs.VLine
-                : (Rune)' ');
+            AddRune(x, row, GetBorderGlyph(x, width));
         }
-
-        // disk space is aligned with the path text and kept within the first column
-        var firstColumnEnd = Dividers.Count > 1 ? Dividers[1] : width - 1;
-        var maxLength = firstColumnEnd - 2;
-        if (string.IsNullOrEmpty(DiskSpace) || maxLength <= 0)
-        {
-            return;
-        }
-
-        SetAttribute(PathAttribute);
-        Move(2, 1);
-        AddStr(DiskSpace.Length <= maxLength ? DiskSpace : DiskSpace[..maxLength]);
     }
 
     /// <summary>Drops a partial leading segment so the tail starts at a separator, unless the last segment alone doesn't fit.</summary>
