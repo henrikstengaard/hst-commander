@@ -140,6 +140,11 @@ public sealed class MainWindow : Window
                     key.KeyCode == KeyCode.Home || key.KeyCode == KeyCode.End);
                 key.Handled = true;
             }
+            else if (key.KeyCode == KeyCode.Insert || key.KeyCode == KeyCode.Space)
+            {
+                ToggleMarkAndMoveDown(pane);
+                key.Handled = true;
+            }
             else if (key.KeyCode == KeyCode.Backspace)
             {
                 key.Handled = true;
@@ -190,6 +195,7 @@ public sealed class MainWindow : Window
         pane.Entries = await pane.NavigationContext.ListEntriesAsync();
         pane.PathPanel.Path = pane.NavigationContext.CurrentPath;
         pane.PathPanel.DiskSpace = pane.NavigationContext.DiskSpace;
+        pane.PathPanel.Summary = pane.NavigationContext.MarkedSummary;
         pane.PathPanel.NeedsDraw = true;
 
         var table = new DataTable();
@@ -325,6 +331,21 @@ public sealed class MainWindow : Window
         pane.TableView.NeedsDraw = true;
     }
 
+    /// <summary>Toggles the mark of the entry under the cursor and moves the cursor to the next entry.</summary>
+    private static void ToggleMarkAndMoveDown(Pane pane)
+    {
+        var selectedRow = pane.TableView.SelectedRow;
+        if (selectedRow < 0 || selectedRow >= pane.Entries.Count)
+        {
+            return;
+        }
+
+        pane.NavigationContext.ToggleMark(pane.Entries[selectedRow]);
+        pane.PathPanel.Summary = pane.NavigationContext.MarkedSummary;
+        pane.PathPanel.NeedsDraw = true;
+        MoveSelection(pane, 1);
+    }
+
     private static ColorScheme GetRowColorScheme(Pane pane, int rowIndex)
     {
         if (rowIndex < 0 || rowIndex >= pane.Entries.Count)
@@ -335,10 +356,13 @@ public sealed class MainWindow : Window
         }
 
         var entry = pane.Entries[rowIndex];
-        var foreground = entry.Type == EntryType.Container ? ColorName16.White : ColorName16.Gray;
+        var isMarked = pane.NavigationContext.IsMarked(entry);
+        var foreground = isMarked
+            ? ColorName16.BrightYellow
+            : entry.Type == EntryType.Container ? ColorName16.White : ColorName16.Gray;
         var normal = new TuiAttribute(foreground, ColorName16.Blue);
         var selected = rowIndex == pane.TableView.SelectedRow
-            ? new TuiAttribute(ColorName16.Black, ColorName16.Gray)
+            ? new TuiAttribute(isMarked ? ColorName16.BrightYellow : ColorName16.Black, ColorName16.Gray)
             : new TuiAttribute(foreground, ColorName16.Blue);
 
         return CreateColorScheme(normal, selected);

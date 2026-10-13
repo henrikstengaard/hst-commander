@@ -9,6 +9,7 @@ public sealed class NavigationContext : IDisposable
     private readonly LocalVolume _localVolume;
     private readonly NestedVolume _nestedVolume;
     private readonly Stack<Stream> _isoStreams = new();
+    private readonly Dictionary<string, IEntry> _markedEntries = new(StringComparer.Ordinal);
 
     public NavigationContext(string initialPath)
     {
@@ -21,6 +22,42 @@ public sealed class NavigationContext : IDisposable
     ///     "c:	emp\dir1". Front-ends select this entry after the parent is listed. Null after other navigation.
     /// </summary>
     public string? PreviousEntryName { get; private set; }
+
+    /// <summary>
+    ///     Entries selected (marked) by the user in the current location, e.g. for file operations. The entry under the
+    ///     cursor is not marked unless toggled. Cleared when the location changes.
+    /// </summary>
+    public IReadOnlyCollection<IEntry> MarkedEntries => _markedEntries.Values;
+
+    /// <summary>Total size of the marked entries in bytes. Entries without a size, like directories, count as 0.</summary>
+    public long MarkedSize => _markedEntries.Values.Sum(entry => entry.Size ?? 0);
+
+    /// <summary>
+    ///     Summary of the marked entries shown below the current path, e.g. "12K in 3 selected".
+    ///     Null when no entries are marked.
+    /// </summary>
+    public string? MarkedSummary => _markedEntries.Count == 0
+        ? null
+        : $"{SizeFormatter.FormatHumanized(MarkedSize)} in {_markedEntries.Count} selected";
+
+    public bool IsMarked(IEntry entry) => _markedEntries.ContainsKey(entry.Name);
+
+    /// <summary>Toggles the mark of an entry. The parent entry ".." can't be marked. Returns true when marked.</summary>
+    public bool ToggleMark(IEntry entry)
+    {
+        if (entry.Name.Equals(Paths.Parent, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (_markedEntries.Remove(entry.Name))
+        {
+            return false;
+        }
+
+        _markedEntries[entry.Name] = entry;
+        return true;
+    }
 
     public bool HasParent => _nestedVolume.CurrentPathComponents.Any();
 
@@ -96,6 +133,14 @@ public sealed class NavigationContext : IDisposable
             entries.Add(entry);
         }
 
+        // keep marks of entries still present, refreshed with the listed entries so sizes are current
+        var markedEntries = entries.Where(IsMarked).ToList();
+        _markedEntries.Clear();
+        foreach (var entry in markedEntries)
+        {
+            _markedEntries[entry.Name] = entry;
+        }
+
         return entries;
     }
 
@@ -154,6 +199,7 @@ public sealed class NavigationContext : IDisposable
         {
             await _nestedVolume.ChangeDirectory([entry.Name], cancellationToken);
             PreviousEntryName = null;
+            _markedEntries.Clear();
             return;
         }
 
@@ -177,6 +223,7 @@ public sealed class NavigationContext : IDisposable
             _nestedVolume.PushVolume(new EntryVolumeProvider(entry, isoVolume));
             _isoStreams.Push(isoStream);
             PreviousEntryName = null;
+            _markedEntries.Clear();
         }
         catch
         {
@@ -202,6 +249,7 @@ public sealed class NavigationContext : IDisposable
         }
 
         PreviousEntryName = previousEntryName;
+        _markedEntries.Clear();
     }
 
     public void Dispose()

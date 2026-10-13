@@ -162,4 +162,114 @@ public class GivenNavigationContext
             Directory.Delete(rootPath, true);
         }
     }
+
+    [Fact]
+    public async Task When_ToggleMark_Then_SummaryContainsSizeAndCount()
+    {
+        // arrange
+        var rootPath = Path.Combine(Path.GetTempPath(), $"hst-commander-{Guid.NewGuid()}");
+        Directory.CreateDirectory(Path.Combine(rootPath, "dir1"));
+        File.WriteAllBytes(Path.Combine(rootPath, "file1.bin"), new byte[1024]);
+        File.WriteAllBytes(Path.Combine(rootPath, "file2.bin"), new byte[1024]);
+        try
+        {
+            using var navigationContext = new NavigationContext(rootPath);
+            var entries = await navigationContext.ListEntriesAsync();
+
+            // act
+            foreach (var entry in entries)
+            {
+                navigationContext.ToggleMark(entry);
+            }
+
+            // assert
+            Assert.False(navigationContext.IsMarked(entries.Single(entry => entry.Name == Paths.Parent)));
+            Assert.Equal(3, navigationContext.MarkedEntries.Count);
+            Assert.Equal(2048, navigationContext.MarkedSize);
+            Assert.Equal("2K in 3 selected", navigationContext.MarkedSummary);
+        }
+        finally
+        {
+            Directory.Delete(rootPath, true);
+        }
+    }
+
+    [Fact]
+    public async Task When_ToggleMarkTwice_Then_EntryIsNotMarked()
+    {
+        // arrange
+        var rootPath = Path.Combine(Path.GetTempPath(), $"hst-commander-{Guid.NewGuid()}");
+        Directory.CreateDirectory(Path.Combine(rootPath, "dir1"));
+        try
+        {
+            using var navigationContext = new NavigationContext(rootPath);
+            var entry = (await navigationContext.ListEntriesAsync()).Single(entry => entry.Name == "dir1");
+
+            // act
+            var firstToggle = navigationContext.ToggleMark(entry);
+            var secondToggle = navigationContext.ToggleMark(entry);
+
+            // assert
+            Assert.True(firstToggle);
+            Assert.False(secondToggle);
+            Assert.False(navigationContext.IsMarked(entry));
+            Assert.Null(navigationContext.MarkedSummary);
+        }
+        finally
+        {
+            Directory.Delete(rootPath, true);
+        }
+    }
+
+    [Fact]
+    public async Task When_LocationChanges_Then_MarksAreCleared()
+    {
+        // arrange
+        var rootPath = Path.Combine(Path.GetTempPath(), $"hst-commander-{Guid.NewGuid()}");
+        Directory.CreateDirectory(Path.Combine(rootPath, "dir1"));
+        try
+        {
+            using var navigationContext = new NavigationContext(rootPath);
+            var entry = (await navigationContext.ListEntriesAsync()).Single(entry => entry.Name == "dir1");
+            navigationContext.ToggleMark(entry);
+
+            // act
+            await navigationContext.OpenEntryAsync(entry);
+
+            // assert
+            Assert.Empty(navigationContext.MarkedEntries);
+        }
+        finally
+        {
+            Directory.Delete(rootPath, true);
+        }
+    }
+
+    [Fact]
+    public async Task When_ListEntriesAtSameLocation_Then_MarksOfRemovedEntriesAreDropped()
+    {
+        // arrange
+        var rootPath = Path.Combine(Path.GetTempPath(), $"hst-commander-{Guid.NewGuid()}");
+        Directory.CreateDirectory(Path.Combine(rootPath, "dir1"));
+        Directory.CreateDirectory(Path.Combine(rootPath, "dir2"));
+        try
+        {
+            using var navigationContext = new NavigationContext(rootPath);
+            foreach (var entry in await navigationContext.ListEntriesAsync())
+            {
+                navigationContext.ToggleMark(entry);
+            }
+
+            // act
+            Directory.Delete(Path.Combine(rootPath, "dir2"));
+            await navigationContext.ListEntriesAsync();
+
+            // assert
+            Assert.Equal(["dir1"], navigationContext.MarkedEntries.Select(entry => entry.Name));
+        }
+        finally
+        {
+            Directory.Delete(rootPath, true);
+        }
+    }
 }

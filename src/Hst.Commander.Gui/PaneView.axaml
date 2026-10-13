@@ -22,6 +22,10 @@
         <Style Selector="ListBox.entries ListBoxItem:selected Grid.row TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource SelectedEntryForeground}" />
         </Style>
+        <!-- after the current row style, so marked entries keep their color under the cursor -->
+        <Style Selector="ListBox.entries Grid.row.marked TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource MarkedEntryForeground}" />
+        </Style>
         <Style Selector="Grid.row TextBlock, Grid.header TextBlock">
             <Setter Property="Padding" Value="4,1" />
             <Setter Property="TextTrimming" Value="CharacterEllipsis" />
@@ -47,14 +51,17 @@
 
     <Grid RowDefinitions="Auto,*">
         <!-- bordered panel above the pane with the current path, highlighted when the pane is active,
-             and the free/total disk space of the current drive -->
+             and below it the summary of the marked entries and the free/total disk space of the current drive -->
         <Border Grid.Row="0" Background="{DynamicResource PaneBackground}" BorderBrush="{DynamicResource PaneBorder}"
                 BorderThickness="1" Margin="2,2,2,0" Padding="4,2">
-            <Grid ColumnDefinitions="*,Auto">
-                <Border x:Name="PathBadge" Grid.Column="0" HorizontalAlignment="Left" Padding="4,0">
+            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                <Border x:Name="PathBadge" Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2"
+                        HorizontalAlignment="Left" Padding="4,0">
                     <TextBlock x:Name="PathText" TextTrimming="PrefixCharacterEllipsis" />
                 </Border>
-                <TextBlock x:Name="DiskSpaceText" Grid.Column="1" Margin="8,0,4,0" VerticalAlignment="Center"
+                <TextBlock x:Name="SummaryText" Grid.Row="1" Grid.Column="0" Margin="4,0,0,0"
+                           TextTrimming="CharacterEllipsis" Foreground="{DynamicResource PathForeground}" />
+                <TextBlock x:Name="DiskSpaceText" Grid.Row="1" Grid.Column="1" Margin="8,0,4,0"
                            Foreground="{DynamicResource PathForeground}" />
             </Grid>
         </Border>
@@ -77,7 +84,8 @@
                 <ListBox x:Name="EntriesList" Grid.Row="1" Classes="entries" SelectionMode="Single">
                     <ListBox.ItemTemplate>
                         <DataTemplate x:DataType="local:EntryItem">
-                            <Grid Classes="row" Classes.container="{Binding IsContainer}" Background="Transparent"
+                            <Grid Classes="row" Classes.container="{Binding IsContainer}"
+                                  Classes.marked="{Binding IsMarked}" Background="Transparent"
                                   ColumnDefinitions="*,90,150">
                                 <TextBlock Grid.Column="0" Text="{Binding Name}" />
                                 <TextBlock Grid.Column="1" Text="{Binding Size}" TextAlignment="Right" />

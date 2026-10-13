@@ -70,6 +70,11 @@ public partial class PaneView : UserControl
                 e.Handled = true;
                 await ActivateSelectedEntryAsync();
                 break;
+            case Key.Insert:
+            case Key.Space:
+                e.Handled = true;
+                ToggleMarkAndMoveDown();
+                break;
             case Key.Back:
                 e.Handled = true;
                 await RunNavigationAsync(() => NavigationContext.GoParentAsync());
@@ -113,6 +118,25 @@ public partial class PaneView : UserControl
         FocusEntries();
     }
 
+    /// <summary>Toggles the mark of the entry under the cursor and moves the cursor to the next entry.</summary>
+    private void ToggleMarkAndMoveDown()
+    {
+        if (EntriesList.SelectedItem is not EntryItem item)
+        {
+            return;
+        }
+
+        item.IsMarked = NavigationContext.ToggleMark(item.Entry);
+        UpdateSummary();
+        MoveSelection(1);
+    }
+
+    private void UpdateSummary()
+    {
+        SummaryText.Text = NavigationContext.MarkedSummary;
+        SummaryText.IsVisible = SummaryText.Text != null;
+    }
+
     private async Task ActivateSelectedEntryAsync()
     {
         if (EntriesList.SelectedItem is not EntryItem item)
@@ -141,12 +165,15 @@ public partial class PaneView : UserControl
         var hadFocus = EntriesList.IsKeyboardFocusWithin;
         var selectedIndex = EntriesList.SelectedIndex;
         var navigationEntries = await NavigationContext.ListEntriesAsync();
-        var entries = navigationEntries.Select(entry => new EntryItem(entry)).ToList();
+        var entries = navigationEntries
+            .Select(entry => new EntryItem(entry, NavigationContext.IsMarked(entry)))
+            .ToList();
         var previousPath = PathText.Text;
 
         PathText.Text = NavigationContext.CurrentPath;
         DiskSpaceText.Text = NavigationContext.DiskSpace;
         DiskSpaceText.IsVisible = DiskSpaceText.Text != null;
+        UpdateSummary();
         EntriesList.ItemsSource = entries;
         EntriesList.SelectedIndex = NavigationContext.GetSelectedIndex(navigationEntries, previousPath, selectedIndex);
         if (EntriesList.SelectedItem != null)
