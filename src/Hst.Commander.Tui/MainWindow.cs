@@ -12,21 +12,37 @@ public sealed class MainWindow : Window
     private const int ModifiedColumnWidth = 16;
     private const int ColumnCount = 3;
 
+    private readonly MenuBar _menuBar;
     private readonly Pane _leftPane;
     private readonly Pane _rightPane;
+    private TuiPalette _palette;
 
-    public MainWindow(string initialPath)
+    public MainWindow(string initialPath, TuiTheme theme)
     {
         BorderStyle = LineStyle.None;
         X = 0;
         Y = 0;
         Width = Dim.Fill();
         Height = Dim.Fill();
+        _palette = TuiPalette.For(theme);
 
+        _menuBar = new MenuBar
+        {
+            Menus =
+            [
+                new MenuBarItem("_File", new MenuItem[]
+                {
+                    new("_Settings...", string.Empty, ShowSettings),
+                    null!,
+                    new("_Quit", string.Empty, () => Application.RequestStop())
+                })
+            ]
+        };
         _leftPane = CreatePane(new NavigationContext(initialPath), 0);
         _rightPane = CreatePane(new NavigationContext(initialPath), 50);
 
-        Add(_leftPane.View, _rightPane.View);
+        Add(_menuBar, _leftPane.View, _rightPane.View);
+        ApplyTheme(theme);
         ConfigurePaneKeys(_leftPane, _rightPane);
         ConfigurePaneKeys(_rightPane, _leftPane);
         Initialized += (_, _) => _leftPane.TableView.SetFocus();
@@ -44,12 +60,68 @@ public sealed class MainWindow : Window
         _rightPane.NavigationContext.Dispose();
     }
 
-    private static Pane CreatePane(NavigationContext navigationContext, int xPercent)
+    /// <summary>Applies the colors of a theme to the menu bar and both panes.</summary>
+    public void ApplyTheme(TuiTheme theme)
+    {
+        _palette = TuiPalette.For(theme);
+        _menuBar.ColorScheme = _palette.MenuColorScheme;
+        _menuBar.NeedsDraw = true;
+        foreach (var pane in new[] { _leftPane, _rightPane })
+        {
+            ApplyPaneColors(pane);
+        }
+
+        NeedsDraw = true;
+    }
+
+    private void ApplyPaneColors(Pane pane)
+    {
+        var normal = _palette.PaneNormal;
+        pane.PathPanel.BorderAttribute = normal;
+        pane.PathPanel.PathAttribute = new TuiAttribute(_palette.Path, _palette.PaneBackground);
+        pane.PathPanel.ActivePathAttribute = _palette.ActivePath;
+        pane.PathPanel.NeedsDraw = true;
+        pane.TableView.ColorScheme = CreateColorScheme(
+            normal,
+            _palette.Cursor,
+            new TuiAttribute(_palette.Header, _palette.PaneBackground),
+            _palette.Cursor);
+        pane.TableView.NeedsDraw = true;
+        pane.BottomLine.ColorScheme = CreateColorScheme(normal, normal);
+        pane.BottomLine.NeedsDraw = true;
+    }
+
+    private void ShowSettings()
+    {
+        var settings = TuiSettings.Load();
+        var dialog = new SettingsDialog(settings, ApplyTheme, _palette);
+        Application.Run(dialog);
+        var result = dialog.Result;
+        dialog.Dispose();
+
+        if (result == null)
+        {
+            ApplyTheme(settings.Theme);
+            return;
+        }
+
+        ApplyTheme(result.Theme);
+        try
+        {
+            result.Save();
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            MessageBox.ErrorQuery("Error", $"Failed to save settings to '{TuiSettings.FilePath}': {exception.Message}", "OK");
+        }
+    }
+
+    private Pane CreatePane(NavigationContext navigationContext, int xPercent)
     {
         var view = new View
         {
             X = Pos.Percent(xPercent),
-            Y = 0,
+            Y = 1,
             Width = Dim.Percent(50),
             Height = Dim.Fill(),
             CanFocus = true
@@ -60,10 +132,7 @@ public sealed class MainWindow : Window
             Y = 0,
             Width = Dim.Fill(),
             Height = PathPanelView.RequiredHeight,
-            Path = navigationContext.CurrentPath,
-            BorderAttribute = new TuiAttribute(ColorName16.White, ColorName16.Blue),
-            PathAttribute = new TuiAttribute(ColorName16.BrightYellow, ColorName16.Blue),
-            ActivePathAttribute = new TuiAttribute(ColorName16.Black, ColorName16.Gray)
+            Path = navigationContext.CurrentPath
         };
         var tableView = new EntryTableView
         {
@@ -73,22 +142,14 @@ public sealed class MainWindow : Window
             Height = Dim.Fill(1),
             FullRowSelect = true,
             MaxCellWidth = int.MaxValue,
-            CellActivationKey = KeyCode.Enter,
-            ColorScheme = CreateColorScheme(
-                new TuiAttribute(ColorName16.White, ColorName16.Blue),
-                new TuiAttribute(ColorName16.Black, ColorName16.BrightCyan),
-                new TuiAttribute(ColorName16.BrightYellow, ColorName16.Blue),
-                new TuiAttribute(ColorName16.Black, ColorName16.BrightCyan))
+            CellActivationKey = KeyCode.Enter
         };
 
         var bottomLine = new Label
         {
             X = 0,
             Y = Pos.AnchorEnd(),
-            Width = Dim.Fill(),
-            ColorScheme = CreateColorScheme(
-                new TuiAttribute(ColorName16.White, ColorName16.Blue),
-                new TuiAttribute(ColorName16.White, ColorName16.Blue))
+            Width = Dim.Fill()
         };
 
         var pane = new Pane(navigationContext, view, pathPanel, tableView, bottomLine);
@@ -346,24 +407,22 @@ public sealed class MainWindow : Window
         MoveSelection(pane, 1);
     }
 
-    private static ColorScheme GetRowColorScheme(Pane pane, int rowIndex)
+    private ColorScheme GetRowColorScheme(Pane pane, int rowIndex)
     {
         if (rowIndex < 0 || rowIndex >= pane.Entries.Count)
         {
-            return CreateColorScheme(
-                new TuiAttribute(ColorName16.White, ColorName16.Blue),
-                new TuiAttribute(ColorName16.Black, ColorName16.BrightCyan));
+            return CreateColorScheme(_palette.PaneNormal, _palette.Cursor);
         }
 
         var entry = pane.Entries[rowIndex];
         var isMarked = pane.NavigationContext.IsMarked(entry);
         var foreground = isMarked
-            ? ColorName16.BrightYellow
-            : entry.Type == EntryType.Container ? ColorName16.White : ColorName16.Gray;
-        var normal = new TuiAttribute(foreground, ColorName16.Blue);
+            ? _palette.Marked
+            : entry.Type == EntryType.Container ? _palette.Container : _palette.Item;
+        var normal = new TuiAttribute(foreground, _palette.PaneBackground);
         var selected = rowIndex == pane.TableView.SelectedRow
-            ? new TuiAttribute(isMarked ? ColorName16.BrightYellow : ColorName16.Black, ColorName16.Gray)
-            : new TuiAttribute(foreground, ColorName16.Blue);
+            ? isMarked ? _palette.MarkedCursor : _palette.Cursor
+            : normal;
 
         return CreateColorScheme(normal, selected);
     }

@@ -18,7 +18,11 @@ src/
   Hst.Commander.Extensions.Volume.Abstractions/  IVolume / IEntry interfaces (no external deps)
   Hst.Commander.Core/                            Volume implementations, NavigationContext + shared utilities
   Hst.Commander.Tui/                             Terminal.Gui TUI application
-    MainWindow.cs                                Dual-pane window, columns, key bindings, colors
+    MainWindow.cs                                Dual-pane window, File menu, columns, key bindings, theme colors
+    SettingsDialog.cs                            Modal settings dialog (theme selection with live preview)
+    TuiSettings.cs                               TUI settings record, loaded/saved as JSON
+    TuiTheme.cs                                  Theme enum: MidnightCommander, Light, Dark
+    TuiPalette.cs                                16-color palette per theme (panes, cursor, menu, dialog)
     EntryTableView.cs                            TableView with empty-row dividers and scroll thumb
     PathPanelView.cs                             Bordered panel with current path, marked-entries summary and disk space above the pane, plus the pane's top border
   Hst.Commander.Core.Tests/                      xUnit unit tests
@@ -192,7 +196,9 @@ Key TUI patterns already in use:
 - Entries are selected (marked) with Insert or Space, which toggles the mark of the entry under the cursor and moves the cursor down. Marked entries are drawn in yellow (also under the cursor). The marks live in `NavigationContext` (`ToggleMark`, `IsMarked`, `MarkedEntries`, `MarkedSize`, `MarkedSummary`; shared by both front-ends): `..` can't be marked, marks are cleared when the location changes and `ListEntriesAsync` drops marks of entries no longer listed. In code "marked" is used to avoid confusion with the selected row (cursor).
 - Key bindings are attached via `tableView.KeyDown += async (_, key) => { ... }`.
 - Up/Down move the selected row by one entry per key event; holding a key uses the OS/terminal's repeat rate. PageUp/PageDown move by one visible page and Home/End jump to the first/last entry.
-- The pane backgrounds use a Midnight Commander-inspired blue palette, with directories in white, files in gray, and the current row in black on gray in both panes.
+- A `MenuBar` at the top of `MainWindow` (panes start at row 1) has a File menu: Settings opens the modal `SettingsDialog` and Quit calls `Application.RequestStop()`, exiting the application. F9 or Alt+F opens the menu.
+- Three themes, selected in File > Settings, same as the GUI: **Midnight Commander** (default), **Light** and **Dark**. Colors come from `TuiPalette` (16 legacy colors); `MainWindow.ApplyTheme` reapplies them to the menu bar and panes. Midnight Commander uses blue panes with directories in white, files in gray, marked entries in yellow, the current row in black on gray in both panes and a cyan menu bar.
+- Settings are stored in `~/.hst-commander/tui-settings.json` (`SettingsPaths.Directory`, `TuiSettings.FilePath`), separate from the GUI settings. A missing or invalid file falls back to defaults. The settings dialog uses a `RadioGroup` for the theme, previews changes live, saves on OK and reverts on Cancel/Esc.
 - Directory names have no slash prefix.
 - Window-level key bindings use `this.KeyUp`.
 - Dialogs: `new Dialog { Buttons = [okButton] }`, run with `Application.Run(dialog)`.
