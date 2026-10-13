@@ -132,6 +132,66 @@ public class LocalVolume(string path) : IVolume
         return Task.FromResult(fileEntry);
     }
 
+    public Task<Stream> OpenRead(string name, CancellationToken cancellationToken = default) =>
+        Task.FromResult<Stream>(new FileStream(GetItemPath(name), FileMode.Open, FileAccess.Read, FileShare.Read,
+            BufferSize, true));
+
+    public Task<Stream> OpenWrite(string name, CancellationToken cancellationToken = default) =>
+        Task.FromResult<Stream>(new FileStream(GetItemPath(name), FileMode.Create, FileAccess.Write, FileShare.None,
+            BufferSize, true));
+
+    public Task CreateContainer(string name, CancellationToken cancellationToken = default)
+    {
+        Directory.CreateDirectory(GetItemPath(name));
+        return Task.CompletedTask;
+    }
+
+    public Task Delete(string name, CancellationToken cancellationToken = default)
+    {
+        var path = GetItemPath(name);
+        if (Directory.Exists(path))
+        {
+            Directory.Delete(path);
+        }
+        else
+        {
+            File.Delete(path);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task SetModifiedDate(string name, DateTime modifiedDate, CancellationToken cancellationToken = default)
+    {
+        var path = GetItemPath(name);
+        var modifiedDateUtc = modifiedDate.Kind == DateTimeKind.Local ? modifiedDate.ToUniversalTime() : modifiedDate;
+        if (Directory.Exists(path))
+        {
+            Directory.SetLastWriteTimeUtc(path, modifiedDateUtc);
+        }
+        else
+        {
+            File.SetLastWriteTimeUtc(path, modifiedDateUtc);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private const int BufferSize = 81920;
+
+    /// <summary>
+    /// Path of an entry in the current directory. Entries can't be read or written in the drive list.
+    /// </summary>
+    private string GetItemPath(string name)
+    {
+        if (_currentPath == null)
+        {
+            throw new IOException("Entries can't be read or written in the drive list");
+        }
+
+        return Path.Combine(_currentPath, name);
+    }
+
     private static Task<IEnumerable<IEntry>> GetDriveEntries() => 
         Task.FromResult(DriveInfo.GetDrives().Select(CreateEntry));
 

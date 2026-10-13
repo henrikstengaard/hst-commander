@@ -32,4 +32,19 @@ public class EntryVolumeProvider(IEntry entry, IVolume volumeProvider) : IVolume
 
     public Task<IEntry> OpenEntry(string name, CancellationToken cancellationToken = default) =>
         volumeProvider.OpenEntry(name, cancellationToken);
+
+    public Task<Stream> OpenRead(string name, CancellationToken cancellationToken = default) =>
+        volumeProvider.OpenRead(name, cancellationToken);
+
+    public Task<Stream> OpenWrite(string name, CancellationToken cancellationToken = default) =>
+        volumeProvider.OpenWrite(name, cancellationToken);
+
+    public Task CreateContainer(string name, CancellationToken cancellationToken = default) =>
+        volumeProvider.CreateContainer(name, cancellationToken);
+
+    public Task Delete(string name, CancellationToken cancellationToken = default) =>
+        volumeProvider.Delete(name, cancellationToken);
+
+    public Task SetModifiedDate(string name, DateTime modifiedDate, CancellationToken cancellationToken = default) =>
+        volumeProvider.SetModifiedDate(name, modifiedDate, cancellationToken);
 }

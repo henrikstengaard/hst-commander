@@ -1,5 +1,6 @@
 using System.Data;
 using Hst.Commander.Core;
+using Hst.Commander.Core.Volumes;
 using Hst.Commander.Extensions.Volume.Abstractions;
 using Terminal.Gui;
 using TuiAttribute = Terminal.Gui.Attribute;
@@ -16,6 +17,7 @@ public sealed class MainWindow : Window
     private readonly Pane _leftPane;
     private readonly Pane _rightPane;
     private TuiPalette _palette;
+    private Pane _activePane;
 
     public MainWindow(string initialPath, TuiTheme theme)
     {
@@ -32,6 +34,8 @@ public sealed class MainWindow : Window
             [
                 new MenuBarItem("_File", new MenuItem[]
                 {
+                    new("_Copy...", "F5", CopyFromActivePane),
+                    null!,
                     new("_Settings...", string.Empty, ShowSettings),
                     null!,
                     new("_Quit", string.Empty, () => Application.RequestStop())
@@ -40,6 +44,7 @@ public sealed class MainWindow : Window
         };
         _leftPane = CreatePane(new NavigationContext(initialPath), 0);
         _rightPane = CreatePane(new NavigationContext(initialPath), 50);
+        _activePane = _leftPane;
 
         Add(_menuBar, _leftPane.View, _rightPane.View);
         ApplyTheme(theme);
@@ -173,6 +178,11 @@ public sealed class MainWindow : Window
         pane.TableView.CellActivated += async (_, _) => await ActivateSelectedEntryAsync(pane);
         pane.TableView.HasFocusChanged += (_, _) =>
         {
+            if (pane.TableView.HasFocus)
+            {
+                _activePane = pane;
+            }
+
             pane.TableView.NeedsDraw = true;
             pane.PathPanel.IsActive = pane.TableView.HasFocus;
             pane.PathPanel.NeedsDraw = true;
@@ -211,7 +221,66 @@ public sealed class MainWindow : Window
                 key.Handled = true;
                 _ = RunNavigationAsync(pane, () => pane.NavigationContext.GoParentAsync());
             }
+            else if (key.KeyCode == KeyCode.F5)
+            {
+                key.Handled = true;
+                _ = CopyAsync(pane, otherPane);
+            }
         };
+    }
+
+    private void CopyFromActivePane() => _ = CopyAsync(_activePane, _activePane == _leftPane ? _rightPane : _leftPane);
+
+    /// <summary>
+    ///     Copies the marked entries, or the entry under the cursor, to the other pane after confirming the destination
+    ///     and filter in the copy dialog, showing the progress while copying.
+    /// </summary>
+    private async Task CopyAsync(Pane pane, Pane otherPane)
+    {
+        var selectedRow = pane.TableView.SelectedRow;
+        var currentEntry = selectedRow >= 0 && selectedRow < pane.Entries.Count ? pane.Entries[selectedRow] : null;
+        var entries = pane.NavigationContext.GetOperationEntries(currentEntry);
+        if (entries.Count == 0)
+        {
+            return;
+        }
+
+        var copyDialog = new CopyDialog(NavigationContext.GetCopyDescription(entries),
+            otherPane.NavigationContext.CurrentPath, _palette);
+        Application.Run(copyDialog);
+        var request = copyDialog.Result;
+        copyDialog.Dispose();
+        if (request == null)
+        {
+            return;
+        }
+
+        // copy in the background and update the dialog on the UI thread; it closes when the copy has stopped
+        var progressDialog = new CopyProgressDialog(_palette);
+        var progress = new UiProgress<CopyProgress>(value => Application.Invoke(() => progressDialog.Update(value)));
+        var cancellationToken = progressDialog.CancellationToken;
+        var copyTask = Task.Run(() => pane.NavigationContext.CopyAsync(entries, otherPane.NavigationContext,
+            request.Destination, request.Filter, progress, ConfirmOverwriteAsync, cancellationToken));
+        _ = copyTask.ContinueWith(_ => Application.Invoke(progressDialog.Complete), TaskScheduler.Default);
+        Application.Run(progressDialog);
+        progressDialog.Dispose();
+
+        try
+        {
+            await copyTask;
+            pane.NavigationContext.ClearMarks();
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception exception)
+        {
+            MessageBox.ErrorQuery("Error", exception.Message, "OK");
+        }
+
+        await InitializePaneAsync(pane);
+        await InitializePaneAsync(otherPane);
+        pane.TableView.SetFocus();
     }
 
     private async Task ActivateSelectedEntryAsync(Pane pane)
@@ -440,6 +509,39 @@ public sealed class MainWindow : Window
             HotFocus = hotFocus ?? focus,
             Disabled = normal
         };
+
+    /// <summary>
+    ///     Asks on the UI thread whether to overwrite an existing file, called from the copy running in the background.
+    ///     Esc answers no.
+    /// </summary>
+    private static Task<OverwriteAnswer> ConfirmOverwriteAsync(OverwriteRequest request, CancellationToken _)
+    {
+        var answer = new TaskCompletionSource<OverwriteAnswer>(TaskCreationOptions.RunContinuationsAsynchronously);
+        Application.Invoke(() =>
+        {
+            try
+            {
+                var button = MessageBox.Query("Overwrite", request.Message, "_Yes", "_No", "_All");
+                answer.SetResult(button switch
+                {
+                    0 => OverwriteAnswer.Yes,
+                    2 => OverwriteAnswer.All,
+                    _ => OverwriteAnswer.No
+                });
+            }
+            catch (Exception exception)
+            {
+                answer.SetException(exception);
+            }
+        });
+        return answer.Task;
+    }
+
+    /// <summary>Progress calling the handler on the reporting thread; the handler invokes the UI thread.</summary>
+    private sealed class UiProgress<T>(Action<T> handler) : IProgress<T>
+    {
+        public void Report(T value) => handler(value);
+    }
 
     private sealed class Pane(
         NavigationContext navigationContext,

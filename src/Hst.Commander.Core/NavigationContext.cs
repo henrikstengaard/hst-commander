@@ -10,6 +10,8 @@ public sealed class NavigationContext : IDisposable
     private readonly NestedVolume _nestedVolume;
     private readonly Stack<Stream> _isoStreams = new();
     private readonly Dictionary<string, IEntry> _markedEntries = new(StringComparer.Ordinal);
+    private Iso9660Volume? _isoVolume;
+    private string? _isoPath;
 
     public NavigationContext(string initialPath)
     {
@@ -59,6 +61,30 @@ public sealed class NavigationContext : IDisposable
         return true;
     }
 
+    /// <summary>Clears the marks of all entries, e.g. after the marked entries are copied.</summary>
+    public void ClearMarks() => _markedEntries.Clear();
+
+    /// <summary>
+    ///     Entries a file operation like copy applies to: the marked entries or, when none are marked, the entry under
+    ///     the cursor. The parent entry ".." is never included.
+    /// </summary>
+    public IReadOnlyList<IEntry> GetOperationEntries(IEntry? currentEntry)
+    {
+        if (_markedEntries.Count > 0)
+        {
+            return _markedEntries.Values.ToList();
+        }
+
+        return currentEntry == null || currentEntry.Name.Equals(Paths.Parent, StringComparison.Ordinal)
+            ? []
+            : [currentEntry];
+    }
+
+    /// <summary>Description of the entries to copy shown in the copy dialog, e.g. "Copy 3 entries" or "Copy 'a.txt'".</summary>
+    public static string GetCopyDescription(IReadOnlyCollection<IEntry> entries) => entries.Count == 1
+        ? $"Copy '{entries.First().Name}'"
+        : $"Copy {entries.Count} entries";
+
     public bool HasParent => _nestedVolume.CurrentPathComponents.Any();
 
     public string CurrentPath
@@ -71,6 +97,11 @@ public sealed class NavigationContext : IDisposable
                 : string.Join(Path.DirectorySeparatorChar, pathComponents);
         }
     }
+
+    /// <summary>Local directory of the current path or containing the current image. Null in the drive list.</summary>
+    private string? LocalPath => _localVolume.CurrentPathComponents.Any()
+        ? string.Join(Path.DirectorySeparatorChar, _localVolume.CurrentPathComponents)
+        : null;
 
     /// <summary>
     ///     Free and total space of the local drive at the current path formatted as "free/total", e.g. "87G/256G".
@@ -222,6 +253,8 @@ public sealed class NavigationContext : IDisposable
             var isoVolume = new Iso9660Volume(new CDReader(isoStream, true));
             _nestedVolume.PushVolume(new EntryVolumeProvider(entry, isoVolume));
             _isoStreams.Push(isoStream);
+            _isoVolume = isoVolume;
+            _isoPath = isoPath;
             PreviousEntryName = null;
             _markedEntries.Clear();
         }
@@ -242,6 +275,8 @@ public sealed class NavigationContext : IDisposable
         {
             _nestedVolume.PopVolume();
             _isoStreams.Pop().Dispose();
+            _isoVolume = null;
+            _isoPath = null;
         }
         else
         {
@@ -250,6 +285,128 @@ public sealed class NavigationContext : IDisposable
 
         PreviousEntryName = previousEntryName;
         _markedEntries.Clear();
+    }
+
+    /// <summary>
+    ///     Opens a volume of its own at the current location, so it can be used, e.g. for copying, without changing the
+    ///     current directory of this context. An image is opened again from its file.
+    /// </summary>
+    public async Task<VolumeLocation> OpenLocationAsync(CancellationToken cancellationToken = default)
+    {
+        if (_isoVolume != null && _isoPath != null)
+        {
+            var isoStream = File.OpenRead(_isoPath);
+            try
+            {
+                var isoVolume = new Iso9660Volume(new CDReader(isoStream, true));
+                await isoVolume.ChangeDirectory(_isoVolume.CurrentPathComponents.ToList(), cancellationToken);
+                return new VolumeLocation(isoVolume, CurrentPath, isoStream);
+            }
+            catch
+            {
+                await isoStream.DisposeAsync();
+                throw;
+            }
+        }
+
+        var localPath = LocalPath ?? throw new IOException("The drive list is not a directory");
+        return CreateLocalLocation(localPath);
+    }
+
+    /// <summary>
+    ///     Copies entries in the current location to a destination. When the destination path is the current path of
+    ///     <paramref name="destinationContext" /> (the other pane), entries are copied to its location, which may be
+    ///     inside an image. Otherwise the destination is a local directory; a relative path is relative to the current
+    ///     local directory and a missing directory is created. A single file copied to a path that isn't a directory
+    ///     is copied with that name. Existing files are overwritten only when <paramref name="confirmOverwrite" />
+    ///     answers yes or all (or is null).
+    /// </summary>
+    public async Task CopyAsync(IReadOnlyCollection<IEntry> entries, NavigationContext destinationContext,
+        string destinationPath, string filter, IProgress<CopyProgress>? progress = null,
+        Func<OverwriteRequest, CancellationToken, Task<OverwriteAnswer>>? confirmOverwrite = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+        ArgumentNullException.ThrowIfNull(destinationContext);
+
+        using var source = await OpenLocationAsync(cancellationToken);
+        var (destination, targetName) = await OpenDestinationAsync(entries, destinationContext, destinationPath,
+            cancellationToken);
+        using (destination)
+        {
+            ThrowIfCopyingOntoItself(source.Path, entries, destination.Path, targetName);
+            await source.Volume.CopyToAsync(entries, destination.Volume,
+                new CopyOptions(filter, targetName, confirmOverwrite), progress, cancellationToken);
+        }
+    }
+
+    private async Task<(VolumeLocation Location, string? TargetName)> OpenDestinationAsync(
+        IReadOnlyCollection<IEntry> entries, NavigationContext destinationContext, string destinationPath,
+        CancellationToken cancellationToken)
+    {
+        var path = destinationPath.Trim();
+        if (path.Length == 0)
+        {
+            throw new IOException("Destination is empty");
+        }
+
+        if (path.Equals(destinationContext.CurrentPath, StringComparison.Ordinal))
+        {
+            return (await destinationContext.OpenLocationAsync(cancellationToken), null);
+        }
+
+        var basePath = LocalPath;
+        if (basePath == null && !Path.IsPathRooted(path))
+        {
+            throw new IOException($"Destination '{path}' is not a full path");
+        }
+
+        var fullPath = Path.GetFullPath(basePath == null ? path : Path.Combine(basePath, path));
+        if (Directory.Exists(fullPath))
+        {
+            return (CreateLocalLocation(fullPath), null);
+        }
+
+        // a single file copied to a path that isn't a directory, e.g. "c:\temp\b.txt", is copied as that file
+        var parentPath = Path.GetDirectoryName(Path.TrimEndingDirectorySeparator(fullPath));
+        if (entries.Count == 1 && entries.First().Type == EntryType.Item && !Path.EndsInDirectorySeparator(path) &&
+            parentPath != null && Directory.Exists(parentPath))
+        {
+            return (CreateLocalLocation(parentPath), Path.GetFileName(Path.TrimEndingDirectorySeparator(fullPath)));
+        }
+
+        Directory.CreateDirectory(fullPath);
+        return (CreateLocalLocation(fullPath), null);
+    }
+
+    private static VolumeLocation CreateLocalLocation(string path)
+    {
+        var localVolume = new LocalVolume(path);
+        return new VolumeLocation(localVolume,
+            string.Join(Path.DirectorySeparatorChar, localVolume.CurrentPathComponents));
+    }
+
+    private static void ThrowIfCopyingOntoItself(string sourcePath, IEnumerable<IEntry> entries,
+        string destinationPath, string? targetName)
+    {
+        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        sourcePath = Path.TrimEndingDirectorySeparator(sourcePath);
+        destinationPath = Path.TrimEndingDirectorySeparator(destinationPath);
+        var entryList = entries.ToList();
+
+        if (destinationPath.Equals(sourcePath, comparison) &&
+            (targetName == null || entryList.Any(entry => entry.Name.Equals(targetName, comparison))))
+        {
+            throw new IOException("Cannot copy entries onto themselves");
+        }
+
+        foreach (var entry in entryList.Where(entry => entry.Type == EntryType.Container))
+        {
+            if (IsInDirectory(destinationPath, Path.Combine(sourcePath, entry.Name), comparison))
+            {
+                throw new IOException($"Cannot copy directory '{entry.Name}' into itself");
+            }
+        }
     }
 
     public void Dispose()

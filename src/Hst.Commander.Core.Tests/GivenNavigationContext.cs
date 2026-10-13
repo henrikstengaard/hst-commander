@@ -1,3 +1,4 @@
+using DiscUtils.Iso9660;
 using Hst.Commander.Core.Volumes;
 using Hst.Commander.Extensions.Volume.Abstractions;
 
@@ -271,5 +272,201 @@ public class GivenNavigationContext
         {
             Directory.Delete(rootPath, true);
         }
+    }
+
+    [Fact]
+    public async Task When_CopyMarkedEntriesToOtherContext_Then_EntriesAreCopied()
+    {
+        // arrange - source with a file and a directory, destination empty
+        var rootPath = CreateTempDirectory();
+        var sourcePath = Path.Combine(rootPath, "source");
+        var destinationPath = Path.Combine(rootPath, "destination");
+        Directory.CreateDirectory(Path.Combine(sourcePath, "dir1"));
+        Directory.CreateDirectory(destinationPath);
+        await File.WriteAllTextAsync(Path.Combine(sourcePath, "file1.txt"), "file1");
+        await File.WriteAllTextAsync(Path.Combine(sourcePath, "dir1", "file2.txt"), "file2");
+        try
+        {
+            using var source = new NavigationContext(sourcePath);
+            using var destination = new NavigationContext(destinationPath);
+            foreach (var entry in await source.ListEntriesAsync())
+            {
+                source.ToggleMark(entry);
+            }
+
+            var entries = source.GetOperationEntries(null);
+
+            // act
+            await source.CopyAsync(entries, destination, destination.CurrentPath, EntryFilter.All);
+
+            // assert
+            Assert.Equal(2, entries.Count);
+            Assert.Equal("file1", await File.ReadAllTextAsync(Path.Combine(destinationPath, "file1.txt")));
+            Assert.Equal("file2", await File.ReadAllTextAsync(Path.Combine(destinationPath, "dir1", "file2.txt")));
+        }
+        finally
+        {
+            Directory.Delete(rootPath, true);
+        }
+    }
+
+    [Fact]
+    public async Task When_CopySingleFileToNewFilePath_Then_FileIsCopiedWithNewName()
+    {
+        // arrange
+        var rootPath = CreateTempDirectory();
+        await File.WriteAllTextAsync(Path.Combine(rootPath, "file1.txt"), "file1");
+        try
+        {
+            using var source = new NavigationContext(rootPath);
+            var entries = source.GetOperationEntries(
+                (await source.ListEntriesAsync()).First(entry => entry.Name == "file1.txt"));
+
+            // act - copy with a relative destination path
+            await source.CopyAsync(entries, source, "copy.txt", EntryFilter.All);
+
+            // assert
+            Assert.Equal("file1", await File.ReadAllTextAsync(Path.Combine(rootPath, "copy.txt")));
+        }
+        finally
+        {
+            Directory.Delete(rootPath, true);
+        }
+    }
+
+    [Fact]
+    public async Task When_CopyToMissingDirectory_Then_DirectoryIsCreated()
+    {
+        // arrange
+        var rootPath = CreateTempDirectory();
+        await File.WriteAllTextAsync(Path.Combine(rootPath, "file1.txt"), "file1");
+        await File.WriteAllTextAsync(Path.Combine(rootPath, "file2.txt"), "file2");
+        try
+        {
+            using var source = new NavigationContext(rootPath);
+            var entries = (await source.ListEntriesAsync()).Where(entry => entry.Name != Paths.Parent).ToList();
+            var destinationPath = Path.Combine(rootPath, "new-dir");
+
+            // act
+            await source.CopyAsync(entries, source, destinationPath, EntryFilter.All);
+
+            // assert
+            Assert.True(File.Exists(Path.Combine(destinationPath, "file1.txt")));
+            Assert.True(File.Exists(Path.Combine(destinationPath, "file2.txt")));
+        }
+        finally
+        {
+            Directory.Delete(rootPath, true);
+        }
+    }
+
+    [Fact]
+    public async Task When_CopyOntoItself_Then_IOExceptionIsThrown()
+    {
+        // arrange
+        var rootPath = CreateTempDirectory();
+        await File.WriteAllTextAsync(Path.Combine(rootPath, "file1.txt"), "file1");
+        try
+        {
+            using var source = new NavigationContext(rootPath);
+            var entries = source.GetOperationEntries(
+                (await source.ListEntriesAsync()).First(entry => entry.Name == "file1.txt"));
+
+            // act & assert - the file is left unchanged
+            await Assert.ThrowsAsync<IOException>(() =>
+                source.CopyAsync(entries, source, source.CurrentPath, EntryFilter.All));
+            Assert.Equal("file1", await File.ReadAllTextAsync(Path.Combine(rootPath, "file1.txt")));
+        }
+        finally
+        {
+            Directory.Delete(rootPath, true);
+        }
+    }
+
+    [Fact]
+    public async Task When_CopyDirectoryIntoItself_Then_IOExceptionIsThrown()
+    {
+        // arrange
+        var rootPath = CreateTempDirectory();
+        Directory.CreateDirectory(Path.Combine(rootPath, "dir1", "sub"));
+        try
+        {
+            using var source = new NavigationContext(rootPath);
+            var entries = source.GetOperationEntries(
+                (await source.ListEntriesAsync()).First(entry => entry.Name == "dir1"));
+
+            // act & assert
+            await Assert.ThrowsAsync<IOException>(() =>
+                source.CopyAsync(entries, source, Path.Combine(rootPath, "dir1", "sub"), EntryFilter.All));
+        }
+        finally
+        {
+            Directory.Delete(rootPath, true);
+        }
+    }
+
+    [Fact]
+    public async Task When_CopyFromIsoImage_Then_FilesAreCopiedToLocalDirectory()
+    {
+        // arrange - create an iso image with a file in a directory
+        var rootPath = CreateTempDirectory();
+        var destinationPath = Path.Combine(rootPath, "destination");
+        Directory.CreateDirectory(destinationPath);
+        var builder = new CDBuilder { UseJoliet = true };
+        builder.AddDirectory("dir1");
+        builder.AddFile(@"dir1\file1.txt", "iso-file1"u8.ToArray());
+        builder.Build(Path.Combine(rootPath, "image.iso"));
+        try
+        {
+            using var source = new NavigationContext(rootPath);
+            using var destination = new NavigationContext(destinationPath);
+            await source.OpenEntryAsync((await source.ListEntriesAsync()).First(entry => entry.Name == "image.iso"));
+            await source.OpenEntryAsync((await source.ListEntriesAsync()).First(entry => entry.Name == "dir1"));
+            var entries = source.GetOperationEntries(
+                (await source.ListEntriesAsync()).First(entry => entry.Name == "file1.txt"));
+
+            // act
+            await source.CopyAsync(entries, destination, destination.CurrentPath, EntryFilter.All);
+
+            // assert
+            Assert.Equal("iso-file1", await File.ReadAllTextAsync(Path.Combine(destinationPath, "file1.txt")));
+        }
+        finally
+        {
+            Directory.Delete(rootPath, true);
+        }
+    }
+
+    [Fact]
+    public async Task When_GetOperationEntriesWithoutMarks_Then_CurrentEntryIsReturnedExceptParent()
+    {
+        // arrange
+        var rootPath = CreateTempDirectory();
+        Directory.CreateDirectory(Path.Combine(rootPath, "dir1"));
+        try
+        {
+            using var navigationContext = new NavigationContext(rootPath);
+            var entries = await navigationContext.ListEntriesAsync();
+
+            // act
+            var parentEntries = navigationContext.GetOperationEntries(entries[0]);
+            var dirEntries = navigationContext.GetOperationEntries(entries[1]);
+
+            // assert
+            Assert.Equal(Paths.Parent, entries[0].Name);
+            Assert.Empty(parentEntries);
+            Assert.Equal(["dir1"], dirEntries.Select(entry => entry.Name));
+        }
+        finally
+        {
+            Directory.Delete(rootPath, true);
+        }
+    }
+
+    private static string CreateTempDirectory()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"hst-commander-{Guid.NewGuid()}");
+        Directory.CreateDirectory(path);
+        return path;
     }
 }

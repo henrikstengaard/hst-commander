@@ -45,4 +45,31 @@ public class GivenSizeFormatter
         // assert
         Assert.Equal(expected, formatted);
     }
+
+    [Theory]
+    [InlineData(0d, "0.0 B/s")]
+    [InlineData(512d, "512.0 B/s")]
+    [InlineData(1536d, "1.5 KB/s")]
+    [InlineData(12.3d * 1024 * 1024, "12.3 MB/s")]
+    [InlineData(2d * 1024 * 1024 * 1024, "2.0 GB/s")]
+    public void When_FormatSpeed_Then_SpeedWithUnitPerSecondIsReturned(double bytesPerSecond, string expected)
+    {
+        // act
+        var formatted = SizeFormatter.FormatSpeed(bytesPerSecond);
+
+        // assert
+        Assert.Equal(expected, formatted);
+    }
+
+    [Fact]
+    public void When_FormatEta_Then_HoursMinutesAndSecondsAreReturned()
+    {
+        // arrange
+        var progress = new CopyProgress("file1", 0, 0, 0, 0, 0, 0, 0, new TimeSpan(1, 2, 3));
+        var unknownProgress = progress with { Eta = null };
+
+        // assert
+        Assert.Equal("1:02:03", progress.EtaText);
+        Assert.Equal("--:--:--", unknownProgress.EtaText);
+    }
 }

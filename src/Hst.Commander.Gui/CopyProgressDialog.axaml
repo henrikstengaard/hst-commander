@@ -1,0 +1,19 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Hst.Commander.Gui.CopyProgressDialog"
+        Title="Copy"
+        Width="560"
+        SizeToContent="Height"
+        CanResize="False"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner">
+    <StackPanel Margin="16" Spacing="8">
+        <TextBlock x:Name="CurrentText" Text="Preparing..." TextTrimming="CharacterEllipsis" />
+        <ProgressBar x:Name="CurrentProgressBar" Minimum="0" Maximum="1" ShowProgressText="True" />
+        <TextBlock x:Name="TotalText" Text="Total" Margin="0,8,0,0" />
+        <ProgressBar x:Name="TotalProgressBar" Minimum="0" Maximum="1" ShowProgressText="True" />
+        <TextBlock x:Name="SpeedText" Margin="0,8,0,0" />
+        <Button x:Name="CancelButton" Content="Cancel" MinWidth="80" HorizontalAlignment="Right"
+                HorizontalContentAlignment="Center" IsCancel="True" />
+    </StackPanel>
+</Window>

@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Hst.Commander.Core;
+using Hst.Commander.Extensions.Volume.Abstractions;
 
 namespace Hst.Commander.Gui;
 
@@ -36,7 +37,13 @@ public partial class PaneView : UserControl
         set => _navigationContext = value;
     }
 
-    public Task InitializeAsync() => RunNavigationAsync(() => Task.CompletedTask);
+    /// <summary>Entry under the cursor, null when the list is empty.</summary>
+    public IEntry? SelectedEntry => (EntriesList.SelectedItem as EntryItem)?.Entry;
+
+    public Task InitializeAsync() => RefreshEntriesAsync();
+
+    /// <summary>Lists the entries of the current location again, e.g. after copying.</summary>
+    public Task RefreshEntriesAsync() => RunNavigationAsync(() => Task.CompletedTask);
 
     public void FocusEntries()
     {

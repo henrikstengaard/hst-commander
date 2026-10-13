@@ -126,6 +126,29 @@ public partial class Iso9660Volume(CDReader cdReader) : IVolume
         return Task.FromResult(fileEntry);
     }
 
+    public Task<Stream> OpenRead(string name, CancellationToken cancellationToken = default)
+    {
+        var path = CreatePath(_currentPathComponents.Concat([name]));
+        if (!cdReader.FileExists(path))
+        {
+            throw new IOException($"File not found '{name}'");
+        }
+
+        return Task.FromResult<Stream>(cdReader.OpenFile(path, FileMode.Open, FileAccess.Read));
+    }
+
+    public Task<Stream> OpenWrite(string name, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("ISO 9660 images are read-only");
+
+    public Task CreateContainer(string name, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("ISO 9660 images are read-only");
+
+    public Task Delete(string name, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("ISO 9660 images are read-only");
+
+    public Task SetModifiedDate(string name, DateTime modifiedDate, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("ISO 9660 images are read-only");
+
     [GeneratedRegex(";\\d+$", RegexOptions.IgnoreCase | RegexOptions.Compiled, "en-US")]
     private static partial Regex MyRegex();
 }

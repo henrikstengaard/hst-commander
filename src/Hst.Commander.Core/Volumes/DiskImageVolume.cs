@@ -30,4 +30,29 @@ public class DiskImageVolume(Stream stream) : IVolume
     {
         throw new NotImplementedException();
     }
+
+    public Task<Stream> OpenRead(string name, CancellationToken cancellationToken = default)
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task<Stream> OpenWrite(string name, CancellationToken cancellationToken = default)
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task CreateContainer(string name, CancellationToken cancellationToken = default)
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task Delete(string name, CancellationToken cancellationToken = default)
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task SetModifiedDate(string name, DateTime modifiedDate, CancellationToken cancellationToken = default)
+    {
+        throw new NotImplementedException();
+    }
 }

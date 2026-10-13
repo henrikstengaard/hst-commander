@@ -8,6 +8,8 @@
     <DockPanel>
         <Menu DockPanel.Dock="Top">
             <MenuItem Header="_File">
+                <MenuItem x:Name="CopyMenuItem" Header="_Copy..." InputGesture="F5" />
+                <Separator />
                 <MenuItem x:Name="SettingsMenuItem" Header="_Settings..." />
                 <Separator />
                 <MenuItem x:Name="QuitMenuItem" Header="_Quit" InputGesture="Alt+F4" />

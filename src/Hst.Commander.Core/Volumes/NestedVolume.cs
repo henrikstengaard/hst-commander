@@ -104,6 +104,21 @@ public class NestedVolume(IVolume volume) : IVolume
     public async Task<IEntry> OpenEntry(string name, CancellationToken cancellationToken = default) => 
         await _currentVolume.OpenEntry(name, cancellationToken);
 
+    public Task<Stream> OpenRead(string name, CancellationToken cancellationToken = default) =>
+        _currentVolume.OpenRead(name, cancellationToken);
+
+    public Task<Stream> OpenWrite(string name, CancellationToken cancellationToken = default) =>
+        _currentVolume.OpenWrite(name, cancellationToken);
+
+    public Task CreateContainer(string name, CancellationToken cancellationToken = default) =>
+        _currentVolume.CreateContainer(name, cancellationToken);
+
+    public Task Delete(string name, CancellationToken cancellationToken = default) =>
+        _currentVolume.Delete(name, cancellationToken);
+
+    public Task SetModifiedDate(string name, DateTime modifiedDate, CancellationToken cancellationToken = default) =>
+        _currentVolume.SetModifiedDate(name, modifiedDate, cancellationToken);
+
     /// <summary>
     /// Name of the nested volume.
     /// </summary>

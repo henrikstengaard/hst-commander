@@ -38,4 +38,20 @@ public static class SizeFormatter
         return Math.Round(value, MidpointRounding.AwayFromZero).ToString("0", CultureInfo.InvariantCulture) +
                Units[unitIndex];
     }
+
+    /// <summary>Formats a speed in bytes per second with one decimal and a 1024-based unit, e.g. "12.3 MB/s".</summary>
+    public static string FormatSpeed(double bytesPerSecond)
+    {
+        var value = Math.Max(0, bytesPerSecond);
+        var unitIndex = 0;
+        while (Math.Round(value, 1, MidpointRounding.AwayFromZero) >= 1024 && unitIndex < Units.Length - 1)
+        {
+            value /= 1024;
+            unitIndex++;
+        }
+
+        var unit = unitIndex == 0 ? "B" : Units[unitIndex] + "B";
+        return Math.Round(value, 1, MidpointRounding.AwayFromZero).ToString("0.0", CultureInfo.InvariantCulture) +
+               $" {unit}/s";
+    }
 }

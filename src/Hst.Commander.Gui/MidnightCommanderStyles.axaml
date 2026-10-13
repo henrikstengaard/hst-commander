@@ -29,6 +29,12 @@
     <Style Selector="local|ErrorDialog TextBlock#MessageText">
         <Setter Property="Foreground" Value="#FFFFFF" />
     </Style>
+    <Style Selector="local|CopyDialog, local|CopyProgressDialog, local|OverwriteDialog">
+        <Setter Property="Background" Value="#AAAAAA" />
+    </Style>
+    <Style Selector="local|CopyDialog TextBlock, local|CopyProgressDialog TextBlock, local|OverwriteDialog TextBlock">
+        <Setter Property="Foreground" Value="#000000" />
+    </Style>
     <Style Selector="local|SettingsDialog">
         <Setter Property="Background" Value="#AAAAAA" />
     </Style>

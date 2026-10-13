@@ -7,7 +7,7 @@ public class TestEntry(string name, EntryType type, long? size = null, DateTime?
 {
     public string Name { get; } = name;
     public EntryType Type { get; } = type;
-    public long? Size { get; } = size;
-    public DateTime? ModifiedDate { get; } = date;
+    public long? Size { get; set; } = size;
+    public DateTime? ModifiedDate { get; set; } = date;
     public byte[]? Data { get; set; } = data;
 }
