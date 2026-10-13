@@ -2,7 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="using:Hst.Commander.Gui"
         x:Class="Hst.Commander.Gui.MainWindow"
-        Title="HST Commander"
+        Title="Hst Commander"
         Width="1200" Height="750"
         WindowStartupLocation="CenterScreen">
     <DockPanel>
