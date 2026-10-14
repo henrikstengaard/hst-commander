@@ -29,8 +29,10 @@ public partial class MainWindow : Window
         LeftPane.NavigationFailed += async (_, exception) => await ShowErrorAsync(exception);
         RightPane.NavigationFailed += async (_, exception) => await ShowErrorAsync(exception);
         CopyMenuItem.Click += async (_, _) => await CopyAsync(_activePane);
+        MakeDirectoryMenuItem.Click += async (_, _) => await MakeDirectoryAsync(_activePane);
         DeleteMenuItem.Click += async (_, _) => await DeleteAsync(_activePane);
         CopyButton.Click += async (_, _) => await CopyAsync(_activePane);
+        MkdirButton.Click += async (_, _) => await MakeDirectoryAsync(_activePane);
         DeleteButton.Click += async (_, _) => await DeleteAsync(_activePane);
         LeftVolumeMenuItem.Click += async (_, _) => await ChooseVolumeProviderAsync(LeftPane);
         RightVolumeMenuItem.Click += async (_, _) => await ChooseVolumeProviderAsync(RightPane);
@@ -78,6 +80,10 @@ public partial class MainWindow : Window
             case Key.F5:
                 e.Handled = true;
                 await CopyAsync(_activePane);
+                break;
+            case Key.F7:
+                e.Handled = true;
+                await MakeDirectoryAsync(_activePane);
                 break;
             case Key.F8:
             case Key.Delete:
@@ -134,6 +140,30 @@ public partial class MainWindow : Window
         else if (result?.Path is { } path)
         {
             await pane.ChangeLocationAsync(path);
+        }
+
+        pane.FocusEntries();
+    }
+
+    /// <summary>
+    ///     Creates a directory in the current location of a pane with the name entered in the make directory dialog and
+    ///     selects it. The other pane is refreshed too, as it may show the same location.
+    /// </summary>
+    private async Task MakeDirectoryAsync(PaneView pane)
+    {
+        var otherPane = pane == LeftPane ? RightPane : LeftPane;
+        if (pane.NavigationContext.CreateDirectoryNotSupportedMessage is { } message)
+        {
+            await new ErrorDialog(message).ShowDialog(this);
+            pane.FocusEntries();
+            return;
+        }
+
+        var name = await new MakeDirectoryDialog().ShowDialog<string?>(this);
+        if (name != null)
+        {
+            await pane.CreateDirectoryAsync(name);
+            await otherPane.RefreshEntriesAsync();
         }
 
         pane.FocusEntries();

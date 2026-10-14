@@ -18,12 +18,13 @@ src/
   Hst.Commander.Extensions.Volume.Abstractions/  IVolumeProvider / IVolume / IEntry interfaces (no external deps)
   Hst.Commander.Core/                            Volume implementations, volume providers, NavigationContext + shared utilities
   Hst.Commander.Tui/                             Terminal.Gui TUI application
-    MainWindow.cs                                Dual-pane window, File menu, function key bar, columns, key bindings, theme colors, F5 copy, F8/Delete delete
+    MainWindow.cs                                Dual-pane window, File menu, function key bar, columns, key bindings, theme colors, F5 copy, F7 make directory, F8/Delete delete
     FunctionKeyBarView.cs                        Function key bar at the bottom (F3 View ... F8 Delete), clickable items
     SettingsDialog.cs                            Modal settings dialog (theme selection with live preview, volume provider keys)
     CopyDialog.cs                                Modal copy confirm dialog (destination and filter)
     CopyProgressDialog.cs                        Modal copy progress dialog (2 progress bars, speed, ETA, cancel)
     DeleteProgressDialog.cs                      Modal delete progress dialog (current entry, total progress bar, cancel)
+    MakeDirectoryDialog.cs                       Modal make directory dialog (F7): directory name, OK, Cancel
     VolumeProviderDialog.cs                      Modal list of volume providers for a pane (Alt+F1/Alt+F2), centered over the pane
     LocationDialog.cs                            Modal location dialog (Ctrl+L or double-click path): path, Volumes, OK, Cancel
     TerminalScreen.cs                            Terminal output screen used while the TUI is shut down (like Midnight Commander): runs programs, Ctrl+O shows the output, own screen buffer on the classic Windows console
@@ -34,7 +35,7 @@ src/
     PathPanelView.cs                             Bordered panel with current path, marked-entries summary and disk space above the pane, plus the pane's top border
   Hst.Commander.Core.Tests/                      xUnit unit tests
   Hst.Commander.Gui/                             Avalonia 12 desktop GUI application
-    MainWindow.axaml(.cs)                        Dual-pane window, File menu, function key bar, Tab pane switching, F5 copy, F8/Delete delete, error display
+    MainWindow.axaml(.cs)                        Dual-pane window, File menu, function key bar, Tab pane switching, F5 copy, F7 make directory, F8/Delete delete, error display
     PaneView.axaml(.cs)                          One pane: path, column header, entry ListBox, Enter/Backspace
     EntryItem.cs                                 Display row for an IEntry (size/date formatting)
     ErrorDialog.axaml(.cs)                       Modal error dialog
@@ -44,6 +45,7 @@ src/
     OverwriteDialog.axaml(.cs)                   Modal confirm overwriting an existing file (Yes, No, All)
     DeleteDialog.axaml(.cs)                      Modal confirm deleting entries (Yes, No)
     DeleteProgressDialog.axaml(.cs)              Modal delete progress dialog running the delete (current entry, total progress bar, cancel)
+    MakeDirectoryDialog.axaml(.cs)               Modal make directory dialog (F7): directory name, OK, Cancel
     VolumeProviderDialog.axaml(.cs)              Modal list of volume providers for a pane (Alt+F1/Alt+F2), centered over the pane
     LocationDialog.axaml(.cs)                    Modal location dialog (Ctrl+L or double-click path): path, Volumes, OK, Cancel
     GuiSettings.cs                               GUI settings record, loaded/saved as JSON
@@ -114,7 +116,7 @@ Volume providers are what a pane can show; they are intended to become the plugi
 | `DiskImageVolume` | **Stub** — all methods throw `NotImplementedException`. Intended for raw disk images (MBR/GPT/RDB partition tables) |
 | `NullVolume` | Null object — returns an empty entry list, safe fallback |
 
-`Iso9660Volume` is read-only: `OpenWrite`, `CreateContainer`, `Delete` and `SetModifiedDate` throw `NotSupportedException`.
+`Iso9660Volume` is read-only: `OpenWrite`, `CreateContainer`, `Delete` and `SetModifiedDate` throw `NotSupportedException`. `LocalVolume.CreateContainer` throws `NotSupportedException` in the drive list.
 
 ### Copying
 
@@ -126,6 +128,11 @@ Volume providers are what a pane can show; they are intended to become the plugi
 
 - `VolumeDelete.DeleteAsync` (`Hst.Commander.Core.Volumes`) is an extension method deleting entries from the current directory of any `IVolume` using only `ListEntries`, `ChangeDirectory` and `Delete` (which only deletes items and empty containers). It first scans the entries (containers recursively, entries within a container before the container), then deletes them in that order. Progress is reported as `DeleteProgress` (current entry, deleted/total entries counting items and containers, shared `TotalText` e.g. `3/10 entries`) at most every 100 ms and when done. The volume is changed back to its starting directory, also when cancelled or failed. Read-only volumes throw `NotSupportedException`.
 - `NavigationContext.DeleteAsync` is what the front-ends call; like copying it uses a volume of its own from `OpenLocationAsync` so it can run on a background thread. `NavigationContext.GetDeleteDescription` gives the confirm question, e.g. `Delete 'a.txt'?` or `Delete 3 entries?`.
+
+### Making Directories
+
+- `NavigationContext.CreateDirectoryAsync(name)` creates a directory in the current location with `IVolume.CreateContainer` on the pane's own volume. The name is trimmed; an empty name, `.`, `..`, names with `/`, `\` or invalid file name characters and names of existing entries (case-insensitive on Windows) throw `IOException`. The created directory is selected once by `GetSelectedIndex` when the entries are listed again.
+- `NavigationContext.CreateDirectoryNotSupportedMessage` is the reason a directory can't be created (the local drive list, inside an ISO image), null when supported; `CreateDirectoryAsync` then throws `NotSupportedException`. Both front-ends show it as an error instead of the make directory dialog.
 
 ### Navigation Model
 
@@ -173,10 +180,11 @@ The keys opening the volume provider list of the left/right pane are chosen in F
 - Changing location with Ctrl+L or by double-clicking the path (location dialog), including paths into ISO images.
 - Choosing the volume provider of the left/right pane with Alt+F1/Alt+F2 or Shift+F1/Shift+F2 (configurable, see Volume Provider Keys) or File > Left/Right volume from `VolumeProviders.All`; only the built-in Local volume provider exists so far.
 - Copying (F5) between panes and volumes, with a confirm dialog (destination, filter) and a progress dialog.
+- Making a directory (F7) in the active pane, with a dialog for the directory name.
 - Deleting (F8 or Delete) the marked entries or the entry under the cursor, with a confirm dialog and a progress dialog.
 
 **Not implemented:**
-- Move, rename, make directory and other file-management operations.
+- Move, rename and other file-management operations.
 - Opening ISO images located inside another ISO; the current `IEntry` contract does not expose file contents.
 - Loading `IVolumeProvider` plugins at startup; `VolumeProviders.All` only lists the built-in providers.
 - `DiskImageVolume` remains an intentional stub.
@@ -263,9 +271,10 @@ Key TUI patterns already in use:
 - Entries are selected (marked) with Insert or Space, which toggles the mark of the entry under the cursor and moves the cursor down. Marked entries are drawn in yellow (also under the cursor). The marks live in `NavigationContext` (`ToggleMark`, `IsMarked`, `MarkedEntries`, `MarkedSize`, `MarkedSummary`; shared by both front-ends): `..` can't be marked, marks are cleared when the location changes and `ListEntriesAsync` drops marks of entries no longer listed. In code "marked" is used to avoid confusion with the selected row (cursor).
 - Key bindings are attached via `tableView.KeyDown += async (_, key) => { ... }`.
 - Up/Down move the selected row by one entry per key event; holding a key uses the OS/terminal's repeat rate. PageUp/PageDown move by one visible page and Home/End jump to the first/last entry.
-- A `MenuBar` at the top of `MainWindow` (panes start at row 1) has a File menu: Copy (F5) and Delete (F8 or Delete) act on the active pane (the pane last focused), Left volume and Right volume (showing the configured volume provider keys as `MenuItem.Help`) choose a pane's volume provider, Location (Ctrl+L) opens the location dialog of the active pane, Settings opens the modal `SettingsDialog` and Quit calls `Application.RequestStop()`, exiting the application. F9 or Alt+F opens the menu.
-- A `FunctionKeyBarView` spans the full width below the panes (panes use `Dim.Fill(1)`) with the items `F3 View`, `F4 Edit`, `F5 Copy`, `F6 Move`, `F7 Mkdir` and `F8 Delete`, each getting an equal share of the width; the key is drawn in `TuiPalette.FunctionKey` and the title in `TuiPalette.Menu`. Clicking `F5 Copy` or `F8 Delete` copies or deletes from the active pane like the File menu; the other items have no action yet.
+- A `MenuBar` at the top of `MainWindow` (panes start at row 1) has a File menu: Copy (F5), Make directory (F7) and Delete (F8 or Delete) act on the active pane (the pane last focused), Left volume and Right volume (showing the configured volume provider keys as `MenuItem.Help`) choose a pane's volume provider, Location (Ctrl+L) opens the location dialog of the active pane, Settings opens the modal `SettingsDialog` and Quit calls `Application.RequestStop()`, exiting the application. F9 or Alt+F opens the menu.
+- A `FunctionKeyBarView` spans the full width below the panes (panes use `Dim.Fill(1)`) with the items `F3 View`, `F4 Edit`, `F5 Copy`, `F6 Move`, `F7 Mkdir` and `F8 Delete`, each getting an equal share of the width; the key is drawn in `TuiPalette.FunctionKey` and the title in `TuiPalette.Menu`. Clicking `F5 Copy`, `F7 Mkdir` or `F8 Delete` copies, makes a directory or deletes in the active pane like the File menu; the other items have no action yet.
 - F5 copies the marked entries (or the entry under the cursor) to the other pane: `CopyDialog` confirms the destination (default: the other pane's path) and filter (default `*`), then `NavigationContext.CopyAsync` runs on a background thread (`Task.Run`) while the modal `CopyProgressDialog` shows the current file and total progress bars, speed and ETA. Progress is marshalled with `Application.Invoke`; existing files are confirmed with `MessageBox.Query` (Yes, No, All; Esc answers No) invoked on the UI thread from the background copy through a `TaskCompletionSource`. Cancel or Esc cancels the copy and the dialog stays open until the copy has stopped. Errors are shown with `MessageBox.ErrorQuery`, both panes are refreshed afterwards.
+- F7 opens the modal `MakeDirectoryDialog` (name field, OK, Cancel; Esc cancels) and creates the directory with `NavigationContext.CreateDirectoryAsync` (see Making Directories) through `RunNavigationAsync`, which selects it; the other pane is refreshed too. Where directories can't be created, `CreateDirectoryNotSupportedMessage` is shown with `MessageBox.ErrorQuery` instead of the dialog.
 - F8 or Delete deletes the marked entries (or the entry under the cursor) after confirming with `MessageBox.Query` (Yes, No; Esc answers No), then `NavigationContext.DeleteAsync` runs on a background thread while the modal `DeleteProgressDialog` shows the current entry and a total progress bar, same pattern as copying (progress via `Application.Invoke`, Cancel or Esc cancels and the dialog stays open until the delete has stopped). Errors are shown with `MessageBox.ErrorQuery`, both panes are refreshed afterwards.
 - Ctrl+L (panes' `KeyDown`) and double-clicking the path line (`PathPanelView.PathDoubleClicked`, raised from `OnMouseEvent`) open `LocationDialog` for that pane; its Volumes button runs the `VolumeProviderDialog` on top (see Changing Location).
 - The volume provider keys (Alt+F1/Alt+F2 or Shift+F1/Shift+F2, see Volume Provider Keys; handled in the panes' `KeyDown`, so from either pane) open the modal `VolumeProviderDialog` for the left/right pane, titled `Left`/`Right` and centered over that pane: a `ListView` of `VolumeProviders.All` (`Name  Description`) with the pane's current provider selected; Enter or double-click chooses, Esc cancels. The chosen provider is shown with `NavigationContext.ChangeVolumeProviderAsync` and the pane gets the focus.
@@ -295,11 +304,12 @@ Key GUI patterns already in use:
   - Pane colors are per-theme brushes in `App.axaml` `ThemeDictionaries` (`PaneBackground`, `PaneBorder`, `HeaderForeground`, `ContainerForeground`, `ItemForeground`, `ExecutableForeground`, `PathForeground`, `ActivePathBackground`, `ActivePathForeground`, `SelectedEntryForeground`, `MarkedEntryForeground`), referenced with `DynamicResource` so theme changes apply live.
 - Settings are stored in `~/.hst-commander/gui-settings.json` (`SettingsPaths.Directory` in Core, `GuiSettings.FilePath`). A missing or invalid file falls back to defaults. The settings dialog has combo boxes for the theme and the volume provider keys, previews theme changes live, saves on OK and reverts on Cancel.
 - Errors are shown with `ErrorDialog` via `ShowDialog(owner)`.
-- A top `Menu` docked above the panes has a File menu: Copy (F5) and Delete (F8 or Delete) act on the active pane (tracked with `GotFocus`), Left volume and Right volume (showing the configured volume provider keys as `InputGesture`) choose a pane's volume provider, Location (Ctrl+L) opens the location dialog of the active pane, Settings opens the modal `SettingsDialog` and Quit closes the main window (exiting the application).
-- A function key bar (`UniformGrid` of non-focusable `Button.functionKey`, so the active pane keeps focus) is docked full width below the panes with `F3 View`, `F4 Edit`, `F5 Copy`, `F6 Move`, `F7 Mkdir` and `F8 Delete`. `CopyButton` and `DeleteButton` copy or delete from the active pane like the File menu; the other buttons have no action yet.
+- A top `Menu` docked above the panes has a File menu: Copy (F5), Make directory (F7) and Delete (F8 or Delete) act on the active pane (tracked with `GotFocus`), Left volume and Right volume (showing the configured volume provider keys as `InputGesture`) choose a pane's volume provider, Location (Ctrl+L) opens the location dialog of the active pane, Settings opens the modal `SettingsDialog` and Quit closes the main window (exiting the application).
+- A function key bar (`UniformGrid` of non-focusable `Button.functionKey`, so the active pane keeps focus) is docked full width below the panes with `F3 View`, `F4 Edit`, `F5 Copy`, `F6 Move`, `F7 Mkdir` and `F8 Delete`. `CopyButton`, `MkdirButton` and `DeleteButton` copy, make a directory or delete in the active pane like the File menu; the other buttons have no action yet.
 - F5 is handled at window level (tunnelling): `CopyDialog` confirms the destination and filter, then `CopyProgressDialog` runs `NavigationContext.CopyAsync` with `Task.Run` when opened, reporting through a `Progress<CopyProgress>` created on the UI thread. Existing files are confirmed with the modal `OverwriteDialog` (Yes, No, All; closing answers No), shown over the progress dialog via `Dispatcher.UIThread.InvokeAsync`. Cancel or closing the window cancels the copy; the dialog closes when the copy has stopped and exposes the `Exception`. `PaneView.SelectedEntry` gives the entry under the cursor and `PaneView.RefreshEntriesAsync` relists a pane after copying.
 - Ctrl+L (window level, tunnelling, active pane) and double-clicking the path badge (`PaneView.PathDoubleClicked`) open `LocationDialog` for that pane; its Volumes button shows the `VolumeProviderDialog` owned by the location dialog. `PaneView.ChangeLocationAsync` changes to the entered path (see Changing Location).
 - The volume provider keys (Alt+F1/Alt+F2 or Shift+F1/Shift+F2, see Volume Provider Keys) are handled at window level (tunnelling) and open the modal `VolumeProviderDialog` for the left/right pane, titled `Left`/`Right` and positioned over that pane when opened: a `ListBox` of `VolumeProviders.All` (name and description) with the pane's current provider selected; OK, Enter or double-click chooses, Cancel/Esc/closing cancels. `PaneView.ChangeVolumeProviderAsync` shows the chosen provider and the pane gets the focus.
+- F7 is handled at window level (tunnelling): the modal `MakeDirectoryDialog` (name, OK, Cancel; closing cancels) asks for the name and `PaneView.CreateDirectoryAsync` creates and selects the directory (see Making Directories); the other pane is refreshed too. Where directories can't be created, `CreateDirectoryNotSupportedMessage` is shown with `ErrorDialog` instead of the dialog.
 - F8 and Delete are handled at window level (tunnelling): the modal `DeleteDialog` confirms (Yes, No; closing answers No), then `DeleteProgressDialog` runs `NavigationContext.DeleteAsync` with `Task.Run` when opened, showing the current entry and a total progress bar, with the same cancel/close/`Exception` behaviour as `CopyProgressDialog`. Both panes are refreshed afterwards.
 
 ---

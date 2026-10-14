@@ -44,6 +44,7 @@ public sealed class MainWindow : Window
                 new MenuBarItem("_File", new MenuItem[]
                 {
                     new("_Copy...", "F5", CopyFromActivePane),
+                    new("_Make directory...", "F7", MakeDirectoryInActivePane),
                     new("_Delete...", "F8", DeleteFromActivePane),
                     null!,
                     _leftVolumeMenuItem,
@@ -68,7 +69,7 @@ public sealed class MainWindow : Window
                 new FunctionKeyItem("F4", "Edit"),
                 new FunctionKeyItem("F5", "Copy", CopyFromActivePane),
                 new FunctionKeyItem("F6", "Move"),
-                new FunctionKeyItem("F7", "Mkdir"),
+                new FunctionKeyItem("F7", "Mkdir", MakeDirectoryInActivePane),
                 new FunctionKeyItem("F8", "Delete", DeleteFromActivePane)
             ]
         };
@@ -350,6 +351,11 @@ public sealed class MainWindow : Window
                 key.Handled = true;
                 _ = CopyAsync(pane, otherPane);
             }
+            else if (key.KeyCode == KeyCode.F7)
+            {
+                key.Handled = true;
+                _ = MakeDirectoryAsync(pane, otherPane);
+            }
             else if (key.KeyCode == KeyCode.F8 || key.KeyCode == KeyCode.Delete)
             {
                 key.Handled = true;
@@ -362,6 +368,9 @@ public sealed class MainWindow : Window
 
     private void DeleteFromActivePane() =>
         _ = DeleteAsync(_activePane, _activePane == _leftPane ? _rightPane : _leftPane);
+
+    private void MakeDirectoryInActivePane() =>
+        _ = MakeDirectoryAsync(_activePane, _activePane == _leftPane ? _rightPane : _leftPane);
 
     private void ChooseLeftVolumeProvider() => _ = ChooseVolumeProviderAsync(_leftPane);
 
@@ -460,6 +469,34 @@ public sealed class MainWindow : Window
         await InitializePaneAsync(pane);
         await InitializePaneAsync(otherPane);
         pane.TableView.SetFocus();
+    }
+
+    /// <summary>
+    ///     Creates a directory in the current location of a pane with the name entered in the make directory dialog and
+    ///     selects it. The other pane is refreshed too, as it may show the same location.
+    /// </summary>
+    private async Task MakeDirectoryAsync(Pane pane, Pane otherPane)
+    {
+        if (pane.NavigationContext.CreateDirectoryNotSupportedMessage is { } message)
+        {
+            MessageBox.ErrorQuery("Error", message, "OK");
+            pane.TableView.SetFocus();
+            return;
+        }
+
+        var dialog = new MakeDirectoryDialog(_palette);
+        Application.Run(dialog);
+        var name = dialog.Result;
+        dialog.Dispose();
+
+        pane.TableView.SetFocus();
+        if (name == null)
+        {
+            return;
+        }
+
+        await RunNavigationAsync(pane, () => pane.NavigationContext.CreateDirectoryAsync(name));
+        await InitializePaneAsync(otherPane);
     }
 
     private static IEntry? GetCurrentEntry(Pane pane)

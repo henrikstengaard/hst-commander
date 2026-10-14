@@ -57,6 +57,10 @@ public partial class PaneView : UserControl
     public Task ChangeLocationAsync(string path) =>
         RunNavigationAsync(() => NavigationContext.ChangeLocationAsync(path));
 
+    /// <summary>Creates a directory in the current location and selects it, see <see cref="NavigationContext.CreateDirectoryAsync" />.</summary>
+    public Task CreateDirectoryAsync(string name) =>
+        RunNavigationAsync(() => NavigationContext.CreateDirectoryAsync(name));
+
     public void FocusEntries()
     {
         if (EntriesList.SelectedIndex < 0 && EntriesList.ItemCount > 0)

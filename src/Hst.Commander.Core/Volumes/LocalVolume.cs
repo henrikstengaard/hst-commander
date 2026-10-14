@@ -142,6 +142,11 @@ public class LocalVolume(string path) : IVolume
 
     public Task CreateContainer(string name, CancellationToken cancellationToken = default)
     {
+        if (_currentPath == null)
+        {
+            throw new NotSupportedException("Creating a directory is not supported in the drive list");
+        }
+
         Directory.CreateDirectory(GetItemPath(name));
         return Task.CompletedTask;
     }

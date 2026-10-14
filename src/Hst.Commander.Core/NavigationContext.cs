@@ -15,6 +15,7 @@ public sealed class NavigationContext : IDisposable
     private readonly Action<string> _startFile;
     private Iso9660Volume? _isoVolume;
     private string? _isoPath;
+    private string? _createdEntryName;
 
     /// <param name="initialPath">Local directory to start in, empty for the drive list.</param>
     /// <param name="startFile">
@@ -416,7 +417,13 @@ public sealed class NavigationContext : IDisposable
 
         if (CurrentPath.Equals(previousPath, StringComparison.Ordinal))
         {
-            return Math.Clamp(selectedIndex, 0, entries.Count - 1);
+            // a directory just created is selected once
+            var createdEntryName = _createdEntryName;
+            _createdEntryName = null;
+            var createdIndex = createdEntryName == null
+                ? -1
+                : entries.ToList().FindIndex(entry => entry.Name.Equals(createdEntryName, StringComparison.Ordinal));
+            return createdIndex >= 0 ? createdIndex : Math.Clamp(selectedIndex, 0, entries.Count - 1);
         }
 
         return Math.Max(IndexOfPreviousEntry(entries), 0);
@@ -580,6 +587,57 @@ public sealed class NavigationContext : IDisposable
 
         using var location = await OpenLocationAsync(cancellationToken);
         await location.Volume.DeleteAsync(entries, progress, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Why a directory can't be created in the current location, e.g. in the local drive list or inside a read-only
+    ///     image. Null when creating a directory is supported, front-ends then ask for its name.
+    /// </summary>
+    public string? CreateDirectoryNotSupportedMessage =>
+        _rootVolume is LocalVolume && !_nestedVolume.CurrentPathComponents.Any()
+            ? "Creating a directory is not supported in the drive list"
+            : _isoStreams.Count > 0
+                ? "Creating a directory is not supported in an image, images are read-only"
+                : null;
+
+    /// <summary>
+    ///     Creates a directory in the current location. The created directory is selected by
+    ///     <see cref="GetSelectedIndex" /> when the entries are listed again. Throws <see cref="NotSupportedException" />
+    ///     when the location doesn't support it (see <see cref="CreateDirectoryNotSupportedMessage" />) and
+    ///     <see cref="IOException" /> when the name is invalid or an entry with the name already exists.
+    /// </summary>
+    public async Task CreateDirectoryAsync(string name, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+
+        if (CreateDirectoryNotSupportedMessage is { } message)
+        {
+            throw new NotSupportedException(message);
+        }
+
+        name = name.Trim();
+        if (name.Length == 0)
+        {
+            throw new IOException("Directory name is empty");
+        }
+
+        if (name is "." or ".." ||name.IndexOfAny(['/', '\\']) >= 0 ||
+            name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+        {
+            throw new IOException($"Invalid directory name '{name}'");
+        }
+
+        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        await foreach (var entry in _nestedVolume.ListEntries(cancellationToken))
+        {
+            if (entry.Name.Equals(name, comparison))
+            {
+                throw new IOException($"'{entry.Name}' already exists");
+            }
+        }
+
+        await _nestedVolume.CreateContainer(name, cancellationToken);
+        _createdEntryName = name;
     }
 
     private async Task<(VolumeLocation Location, string? TargetName)> OpenDestinationAsync(
