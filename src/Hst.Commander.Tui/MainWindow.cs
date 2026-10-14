@@ -19,6 +19,8 @@ public sealed class MainWindow : Window
     private readonly Pane _rightPane;
     private TuiPalette _palette;
     private Pane _activePane;
+    private TerminalAction? _pendingTerminalAction;
+    private string? _pendingError;
 
     public MainWindow(string initialPath, TuiTheme theme)
     {
@@ -60,15 +62,67 @@ public sealed class MainWindow : Window
                 new FunctionKeyItem("F8", "Delete", DeleteFromActivePane)
             ]
         };
-        _leftPane = CreatePane(new NavigationContext(initialPath), 0);
-        _rightPane = CreatePane(new NavigationContext(initialPath), 50);
+        _leftPane = CreatePane(new NavigationContext(initialPath, StartFile), 0);
+        _rightPane = CreatePane(new NavigationContext(initialPath, StartFile), 50);
         _activePane = _leftPane;
 
         Add(_menuBar, _leftPane.View, _rightPane.View, _functionKeyBar);
         ApplyTheme(theme);
         ConfigurePaneKeys(_leftPane, _rightPane);
         ConfigurePaneKeys(_rightPane, _leftPane);
-        Initialized += (_, _) => _leftPane.TableView.SetFocus();
+        // also when run again after a program has run in the terminal
+        Loaded += (_, _) =>
+        {
+            _activePane.TableView.SetFocus();
+            ShowPendingError();
+        };
+    }
+
+    /// <summary>Shows an error when the window is run again, e.g. when a program couldn't be started.</summary>
+    public void ShowErrorWhenLoaded(string message) => _pendingError = message;
+
+    private void ShowPendingError()
+    {
+        if (_pendingError is not { } message)
+        {
+            return;
+        }
+
+        _pendingError = null;
+        Application.Invoke(() => MessageBox.ErrorQuery("Error", message, "OK"));
+    }
+
+    /// <summary>
+    ///     Returns and clears what to do in the terminal, which stopped the window so it can be done while the TUI is
+    ///     shut down: run a program opened in a pane or show the output screen. Null when the window was stopped to quit.
+    /// </summary>
+    public TerminalAction? TakePendingTerminalAction()
+    {
+        var action = _pendingTerminalAction;
+        _pendingTerminalAction = null;
+        return action;
+    }
+
+    /// <summary>Stops the window, so the action is done in the terminal while the TUI is shut down.</summary>
+    private void RequestTerminalAction(TerminalAction action)
+    {
+        _pendingTerminalAction = action;
+        Application.RequestStop(this);
+    }
+
+    /// <summary>
+    ///     Starts a local file opened in a pane. Programs running in the terminal stop the window, like Midnight
+    ///     Commander suspends its UI, other files are started with the shell.
+    /// </summary>
+    private void StartFile(string path)
+    {
+        if (!FileStarter.IsTerminalProgram(path))
+        {
+            FileStarter.StartWithShell(path);
+            return;
+        }
+
+        RequestTerminalAction(new TerminalAction.RunProgram(path));
     }
 
     public async Task InitializeAsync()
@@ -241,6 +295,11 @@ public sealed class MainWindow : Window
             {
                 key.Handled = true;
                 _ = RunNavigationAsync(pane, () => pane.NavigationContext.GoParentAsync());
+            }
+            else if (key == Key.O.WithCtrl)
+            {
+                key.Handled = true;
+                RequestTerminalAction(new TerminalAction.ShowOutput());
             }
             else if (key.KeyCode == KeyCode.F5)
             {

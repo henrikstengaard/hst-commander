@@ -24,6 +24,7 @@ src/
     CopyDialog.cs                                Modal copy confirm dialog (destination and filter)
     CopyProgressDialog.cs                        Modal copy progress dialog (2 progress bars, speed, ETA, cancel)
     DeleteProgressDialog.cs                      Modal delete progress dialog (current entry, total progress bar, cancel)
+    TerminalScreen.cs                            Terminal output screen used while the TUI is shut down (like Midnight Commander): runs programs, Ctrl+O shows the output, own screen buffer on the classic Windows console
     TuiSettings.cs                               TUI settings record, loaded/saved as JSON
     TuiTheme.cs                                  Theme enum: MidnightCommander, Light, Dark
     TuiPalette.cs                                16-color palette per theme (panes, cursor, menu, dialog)
@@ -121,9 +122,9 @@ Each UI pane has a `NavigationContext` that owns a `NestedVolume`. Browsing into
 
 Going up when at the root of a nested volume calls `PopVolume()`.
 
-Opening any other local file (Enter or double-click in both front-ends) starts it with the shell (`Process.Start` with `UseShellExecute`, working directory = the file's directory): programs are executed and other files open in their associated application. Files inside images are not started. The `NavigationContext` constructor takes an optional `startFile` callback (full path) so tests can replace starting the file. Errors (e.g. no associated application) are shown like navigation errors.
+Opening any other local file (Enter or double-click in both front-ends) calls the `NavigationContext` constructor's optional `startFile` callback with the full path, defaulting to `FileStarter.StartWithShell` (`Process.Start` with `UseShellExecute`, working directory = the file's directory): programs are executed and other files open in their associated application. Files inside images are not started. The GUI uses the default; the TUI runs terminal programs itself (see Adding TUI Features). Errors (e.g. no associated application) are shown like navigation errors.
 
-`NavigationContext.IsExecutable(entry)` tells whether a listed local file is executable, updated by `ListEntriesAsync`: on Windows by extension (`ExecutableExtensions`: `.exe`, `.com`, `.bat`, `.cmd`, `.msi`; `IsExecutableName`), on other systems by the execute permission (`File.GetUnixFileMode`). Directories and files inside images are never executable. Both front-ends draw executables in green.
+`NavigationContext.IsExecutable(entry)` tells whether a listed local file is executable, updated by `ListEntriesAsync`: on Windows by extension (`ExecutableExtensions`: `.exe`, `.com`, `.bat`, `.cmd`, `.msi`; `IsExecutableName`), on other systems by the execute permission (`FileStarter.HasExecutePermission`). Directories and files inside images are never executable. Both front-ends draw executables in green.
 
 ### Path Conventions
 
@@ -169,7 +170,7 @@ Opening any other local file (Enter or double-click in both front-ends) starts i
 
 ### Namespaces
 - Abstractions: `Hst.Commander.Extensions.Volume.Abstractions`
-- Core: `Hst.Commander.Core` (`NavigationContext`, `Paths`, `SettingsPaths`, `SizeFormatter`), `Hst.Commander.Core.Volumes` (volumes)
+- Core: `Hst.Commander.Core` (`NavigationContext`, `FileStarter`, `Paths`, `SettingsPaths`, `SizeFormatter`), `Hst.Commander.Core.Volumes` (volumes)
 - Tui: `Hst.Commander.Tui`
 - Gui: `Hst.Commander.Gui`
 - Tests: `Hst.Commander.Core.Tests`
@@ -238,6 +239,8 @@ Key TUI patterns already in use:
 - Three themes, selected in File > Settings, same as the GUI: **Midnight Commander** (default), **Light** and **Dark**. Colors come from `TuiPalette` (16 legacy colors); `MainWindow.ApplyTheme` reapplies them to the menu bar and panes. Midnight Commander uses blue panes with directories in white, files in gray, executables in bright green, marked entries in yellow, the current row in black on gray in both panes and a cyan menu bar.
 - Settings are stored in `~/.hst-commander/tui-settings.json` (`SettingsPaths.Directory`, `TuiSettings.FilePath`), separate from the GUI settings. A missing or invalid file falls back to defaults. The settings dialog uses a `RadioGroup` for the theme, previews changes live, saves on OK and reverts on Cancel/Esc.
 - Directory names have no slash prefix.
+- Opening a program that runs in the terminal (`FileStarter.IsTerminalProgram`: on Windows console-subsystem `.exe` (`FileStarter.IsConsoleExecutable` reads the PE header), `.com`, `.bat`, `.cmd`; elsewhere files with execute permission) suspends the TUI like Midnight Commander: `MainWindow.StartFile` requests a `TerminalAction.RunProgram`, which stores the action and stops the window with `Application.RequestStop`. `Program.cs` loops: `TerminalScreen.EnterTui`, `Application.Init`, refresh both panes, `Application.Run(mainWindow)`, `Application.Shutdown`, `TerminalScreen.LeaveTui`, then does `MainWindow.TakePendingTerminalAction` (null when quitting) and runs the same `MainWindow` again. `TerminalScreen.Run` runs the program in the terminal in its directory below the previous output (Ctrl+C is ignored by HST Commander) and returns directly when it exits, without a pause; an error starting it is shown with `MessageBox.ErrorQuery` once the window is loaded again (`MainWindow.ShowErrorWhenLoaded`). The `Loaded` event focuses the active pane on every run. Other files, including GUI programs on Windows, are started with the shell without suspending.
+- Ctrl+O shows the output screen like Midnight Commander (`TerminalAction.ShowOutput`): the TUI is shut down the same way and `TerminalScreen.ShowOutput` waits for any key before the TUI returns. TUI only, the GUI has no terminal. The output screen is kept because Windows Terminal and Unix terminals draw the TUI on the alternate screen; the classic Windows console (no `WT_SESSION`) draws it on the standard output's screen buffer, so `EnterTui` gives the TUI a screen buffer of its own there (`CreateConsoleScreenBuffer` + `SetStdHandle`). `LeaveTui` restores the standard output handle and makes its screen buffer active again, also needed because Terminal.Gui's `WindowsConsole.Cleanup` activates a new empty buffer on shutdown.
 - Window-level key bindings use `this.KeyUp`.
 - Dialogs: `new Dialog { Buttons = [okButton] }`, run with `Application.Run(dialog)`.
 

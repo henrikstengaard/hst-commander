@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using DiscUtils.Iso9660;
 using Hst.Commander.Core.Volumes;
 using Hst.Commander.Extensions.Volume.Abstractions;
@@ -23,7 +22,7 @@ public sealed class NavigationContext : IDisposable
     /// </param>
     public NavigationContext(string initialPath, Action<string>? startFile = null)
     {
-        _startFile = startFile ?? StartFile;
+        _startFile = startFile ?? FileStarter.StartWithShell;
         _localVolume = new LocalVolume(initialPath);
         _nestedVolume = new NestedVolume(_localVolume);
     }
@@ -220,24 +219,10 @@ public sealed class NavigationContext : IDisposable
         {
             if (OperatingSystem.IsWindows()
                     ? IsExecutableName(entry.Name)
-                    : HasExecutePermission(Path.Combine(localPath, entry.Name)))
+                    : FileStarter.HasExecutePermission(Path.Combine(localPath, entry.Name)))
             {
                 _executableNames.Add(entry.Name);
             }
-        }
-    }
-
-    [System.Runtime.Versioning.UnsupportedOSPlatform("windows")]
-    private static bool HasExecutePermission(string path)
-    {
-        try
-        {
-            return (File.GetUnixFileMode(path) &
-                    (UnixFileMode.UserExecute | UnixFileMode.GroupExecute | UnixFileMode.OtherExecute)) != 0;
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-        {
-            return false;
         }
     }
 
@@ -357,19 +342,6 @@ public sealed class NavigationContext : IDisposable
 
         PreviousEntryName = previousEntryName;
         _markedEntries.Clear();
-    }
-
-    /// <summary>
-    ///     Starts a file with the shell in its directory: programs are executed and other files are opened with their
-    ///     associated application.
-    /// </summary>
-    private static void StartFile(string path)
-    {
-        using var process = Process.Start(new ProcessStartInfo(path)
-        {
-            UseShellExecute = true,
-            WorkingDirectory = Path.GetDirectoryName(path) ?? string.Empty
-        });
     }
 
     /// <summary>
