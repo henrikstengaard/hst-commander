@@ -36,6 +36,21 @@ public sealed class PathPanelView : View
 
     public bool IsActive { get; set; }
 
+    /// <summary>Raised when the path is double-clicked, opening the location dialog.</summary>
+    public event EventHandler? PathDoubleClicked;
+
+    protected override bool OnMouseEvent(MouseEventArgs mouseEvent)
+    {
+        // the path is on the first line inside the border
+        if (mouseEvent.IsDoubleClicked && mouseEvent.Position.Y == 1)
+        {
+            PathDoubleClicked?.Invoke(this, EventArgs.Empty);
+            return true;
+        }
+
+        return base.OnMouseEvent(mouseEvent);
+    }
+
     protected override bool OnDrawingContent()
     {
         var width = Viewport.Width;

@@ -2,7 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="Hst.Commander.Gui.SettingsDialog"
         Title="Settings"
-        Width="400" Height="200"
+        Width="440" Height="220"
         CanResize="False"
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner">
@@ -13,9 +13,11 @@
             <Button x:Name="CancelButton" Content="Cancel" MinWidth="80" HorizontalContentAlignment="Center"
                     IsCancel="True" />
         </StackPanel>
-        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto" VerticalAlignment="Top">
-            <TextBlock Grid.Column="0" Text="Theme:" VerticalAlignment="Center" Margin="0,0,12,0" />
-            <ComboBox x:Name="ThemeComboBox" Grid.Column="1" HorizontalAlignment="Stretch" />
+        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" RowSpacing="12" VerticalAlignment="Top">
+            <TextBlock Grid.Row="0" Grid.Column="0" Text="Theme:" VerticalAlignment="Center" Margin="0,0,12,0" />
+            <ComboBox x:Name="ThemeComboBox" Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch" />
+            <TextBlock Grid.Row="1" Grid.Column="0" Text="Volume keys:" VerticalAlignment="Center" Margin="0,0,12,0" />
+            <ComboBox x:Name="VolumeProviderKeysComboBox" Grid.Row="1" Grid.Column="1" HorizontalAlignment="Stretch" />
         </Grid>
     </DockPanel>
 </Window>

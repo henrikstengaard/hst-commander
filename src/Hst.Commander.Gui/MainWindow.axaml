@@ -11,6 +11,10 @@
                 <MenuItem x:Name="CopyMenuItem" Header="_Copy..." InputGesture="F5" />
                 <MenuItem x:Name="DeleteMenuItem" Header="_Delete..." InputGesture="F8" />
                 <Separator />
+                <MenuItem x:Name="LeftVolumeMenuItem" Header="_Left volume..." />
+                <MenuItem x:Name="RightVolumeMenuItem" Header="_Right volume..." />
+                <MenuItem x:Name="LocationMenuItem" Header="L_ocation..." InputGesture="Ctrl+L" />
+                <Separator />
                 <MenuItem x:Name="SettingsMenuItem" Header="_Settings..." />
                 <Separator />
                 <MenuItem x:Name="QuitMenuItem" Header="_Quit" InputGesture="Alt+F4" />

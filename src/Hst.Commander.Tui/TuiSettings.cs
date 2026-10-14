@@ -19,6 +19,25 @@ public sealed record TuiSettings
 
     public TuiTheme Theme { get; init; } = TuiTheme.MidnightCommander;
 
+    /// <summary>
+    ///     Keys opening the volume provider list of the left and right pane, null for the default of the host operating
+    ///     system (see <see cref="VolumeProviderKeyBindings.Default" />).
+    /// </summary>
+    public VolumeProviderKeys? VolumeProviderKeys { get; init; }
+
+    /// <summary>Keys opening the volume provider lists, the chosen ones or the default of the host operating system.</summary>
+    [JsonIgnore]
+    public VolumeProviderKeys EffectiveVolumeProviderKeys => VolumeProviderKeys ?? VolumeProviderKeyBindings.Default;
+
+    /// <summary>
+    ///     Settings with the volume provider keys chosen in the settings dialog. Choosing the keys already in effect
+    ///     keeps them unset, so the default of the host operating system still applies.
+    /// </summary>
+    public TuiSettings WithVolumeProviderKeys(VolumeProviderKeys keys) => this with
+    {
+        VolumeProviderKeys = keys == EffectiveVolumeProviderKeys ? VolumeProviderKeys : keys
+    };
+
     /// <summary>Loads the settings, falling back to defaults when the file is missing or invalid.</summary>
     public static TuiSettings Load()
     {

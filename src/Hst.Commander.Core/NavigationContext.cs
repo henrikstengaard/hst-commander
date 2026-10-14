@@ -6,8 +6,9 @@ namespace Hst.Commander.Core;
 
 public sealed class NavigationContext : IDisposable
 {
-    private readonly LocalVolume _localVolume;
-    private readonly NestedVolume _nestedVolume;
+    private IVolumeProvider _volumeProvider;
+    private IVolume _rootVolume;
+    private NestedVolume _nestedVolume;
     private readonly Stack<Stream> _isoStreams = new();
     private readonly Dictionary<string, IEntry> _markedEntries = new(StringComparer.Ordinal);
     private readonly HashSet<string> _executableNames = new(StringComparer.Ordinal);
@@ -23,8 +24,161 @@ public sealed class NavigationContext : IDisposable
     public NavigationContext(string initialPath, Action<string>? startFile = null)
     {
         _startFile = startFile ?? FileStarter.StartWithShell;
-        _localVolume = new LocalVolume(initialPath);
-        _nestedVolume = new NestedVolume(_localVolume);
+        _volumeProvider = VolumeProviders.Local;
+        _rootVolume = new LocalVolume(initialPath);
+        _nestedVolume = new NestedVolume(_rootVolume);
+    }
+
+    /// <summary>Volume provider of the volume shown, changed with <see cref="ChangeVolumeProviderAsync" />.</summary>
+    public IVolumeProvider VolumeProvider => _volumeProvider;
+
+    /// <summary>
+    ///     Shows a new volume from a volume provider at its root, e.g. chosen with Alt+F1/Alt+F2. Images opened in the
+    ///     current volume are closed and marks are cleared.
+    /// </summary>
+    public async Task ChangeVolumeProviderAsync(IVolumeProvider volumeProvider,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(volumeProvider);
+
+        SetRootVolume(volumeProvider, await volumeProvider.CreateVolume(cancellationToken));
+    }
+
+    /// <summary>
+    ///     Changes to a location entered by the user, e.g. in the location dialog (Ctrl+L). The location is unchanged
+    ///     when the path fails or equals <see cref="CurrentPath" />. A path is resolved as:
+    ///     <list type="bullet">
+    ///         <item>empty or "Computer" (in a local volume): the local drive list;</item>
+    ///         <item>a local directory, relative paths relative to the current local directory;</item>
+    ///         <item>a local path going into an ISO image, e.g. "c:\images\disk.iso\dir1";</item>
+    ///         <item>
+    ///             otherwise, when another volume provider is shown, a path in its volume from the root, e.g. "dir1"
+    ///             or the provider name for the root.
+    ///         </item>
+    ///     </list>
+    /// </summary>
+    public async Task ChangeLocationAsync(string path, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+
+        path = path.Trim();
+        if (path.Equals(CurrentPath, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        var isLocal = _rootVolume is LocalVolume;
+        if (path.Length == 0 || (isLocal && path.Equals("Computer", StringComparison.OrdinalIgnoreCase)))
+        {
+            SetRootVolume(VolumeProviders.Local, new LocalVolume(string.Empty));
+            return;
+        }
+
+        if (!isLocal && !Path.IsPathRooted(path))
+        {
+            await ChangeVolumeLocationAsync(path, cancellationToken);
+            return;
+        }
+
+        // a drive like "c:" is its root directory, not the current directory of the drive
+        if (OperatingSystem.IsWindows() && path.Length == 2 && path[1] == ':')
+        {
+            path += Path.DirectorySeparatorChar;
+        }
+
+        var basePath = LocalPath;
+        if (basePath == null && !Path.IsPathRooted(path))
+        {
+            throw new IOException($"Location '{path}' is not a full path");
+        }
+
+        await ChangeLocalLocationAsync(Path.GetFullPath(basePath == null ? path : Path.Combine(basePath, path)),
+            cancellationToken);
+    }
+
+    /// <summary>Changes to a path from the root of a new volume of the current (non-local) volume provider.</summary>
+    private async Task ChangeVolumeLocationAsync(string path, CancellationToken cancellationToken)
+    {
+        var pathComponents = path.Equals(_volumeProvider.Name, StringComparison.OrdinalIgnoreCase)
+            ? []
+            : SplitPath(path);
+        var volume = await _volumeProvider.CreateVolume(cancellationToken);
+        try
+        {
+            await volume.ChangeDirectory([Paths.Root, ..pathComponents], cancellationToken);
+        }
+        catch
+        {
+            (volume as IDisposable)?.Dispose();
+            throw;
+        }
+
+        SetRootVolume(_volumeProvider, volume);
+    }
+
+    /// <summary>Changes to a local directory or a directory inside a local ISO image.</summary>
+    private async Task ChangeLocalLocationAsync(string fullPath, CancellationToken cancellationToken)
+    {
+        if (Directory.Exists(fullPath))
+        {
+            SetRootVolume(VolumeProviders.Local, new LocalVolume(fullPath));
+            return;
+        }
+
+        // the closest existing file in the path must be an image, e.g. "c:\images\disk.iso" of
+        // "c:\images\disk.iso\dir1"
+        var imagePath = Path.TrimEndingDirectorySeparator(fullPath);
+        while (imagePath != null && !File.Exists(imagePath) && !Directory.Exists(imagePath))
+        {
+            imagePath = Path.GetDirectoryName(imagePath);
+        }
+
+        if (imagePath == null || !File.Exists(imagePath) ||
+            !imagePath.EndsWith(".iso", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new IOException($"Location '{fullPath}' not found");
+        }
+
+        var imageDirectory = Path.GetDirectoryName(imagePath) ??
+                             throw new IOException($"Location '{fullPath}' not found");
+        var pathComponents = SplitPath(Path.GetRelativePath(imagePath, fullPath))
+            .Where(pathComponent => pathComponent != ".")
+            .ToList();
+        var isoStream = File.OpenRead(imagePath);
+        try
+        {
+            var isoVolume = new Iso9660Volume(new CDReader(isoStream, true));
+            if (pathComponents.Count > 0)
+            {
+                await isoVolume.ChangeDirectory(pathComponents, cancellationToken);
+            }
+
+            SetRootVolume(VolumeProviders.Local, new LocalVolume(imageDirectory));
+            _nestedVolume.PushVolume(new EntryVolumeProvider(
+                new Entry(Path.GetFileName(imagePath), EntryType.Item), isoVolume));
+            _isoStreams.Push(isoStream);
+            _isoVolume = isoVolume;
+            _isoPath = imagePath;
+        }
+        catch
+        {
+            await isoStream.DisposeAsync();
+            throw;
+        }
+    }
+
+    private static string[] SplitPath(string path) => path.Split(
+        [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar], StringSplitOptions.RemoveEmptyEntries);
+
+    /// <summary>Shows a root volume, closing the current one and clearing the marks.</summary>
+    private void SetRootVolume(IVolumeProvider volumeProvider, IVolume volume)
+    {
+        CloseVolumes();
+        _volumeProvider = volumeProvider;
+        _rootVolume = volume;
+        _nestedVolume = new NestedVolume(volume);
+        PreviousEntryName = null;
+        _markedEntries.Clear();
     }
 
     /// <summary>
@@ -120,14 +274,14 @@ public sealed class NavigationContext : IDisposable
         {
             var pathComponents = _nestedVolume.CurrentPathComponents.ToArray();
             return pathComponents.Length == 0
-                ? "Computer"
+                ? _rootVolume is LocalVolume ? "Computer" : _volumeProvider.Name
                 : string.Join(Path.DirectorySeparatorChar, pathComponents);
         }
     }
 
     /// <summary>Local directory of the current path or containing the current image. Null in the drive list.</summary>
-    private string? LocalPath => _localVolume.CurrentPathComponents.Any()
-        ? string.Join(Path.DirectorySeparatorChar, _localVolume.CurrentPathComponents)
+    private string? LocalPath => _rootVolume is LocalVolume localVolume && localVolume.CurrentPathComponents.Any()
+        ? string.Join(Path.DirectorySeparatorChar, localVolume.CurrentPathComponents)
         : null;
 
     /// <summary>
@@ -138,15 +292,14 @@ public sealed class NavigationContext : IDisposable
     {
         get
         {
-            if (_isoStreams.Count > 0 || !_localVolume.CurrentPathComponents.Any())
+            if (_isoStreams.Count > 0 || LocalPath is not { } localPath)
             {
                 return null;
             }
 
             try
             {
-                var currentPath = Path.GetFullPath(
-                    string.Join(Path.DirectorySeparatorChar, _localVolume.CurrentPathComponents));
+                var currentPath = Path.GetFullPath(localPath);
                 var driveInfo = FindDrive(currentPath);
                 return driveInfo is { IsReady: true }
                     ? $"{SizeFormatter.FormatHumanized(driveInfo.AvailableFreeSpace)}/{SizeFormatter.FormatHumanized(driveInfo.TotalSize)}"
@@ -301,7 +454,7 @@ public sealed class NavigationContext : IDisposable
             throw new IOException("Opening ISO files from inside another ISO image is not supported.");
         }
 
-        var currentPath = string.Join(Path.DirectorySeparatorChar, _localVolume.CurrentPathComponents);
+        var currentPath = LocalPath ?? throw new IOException("Opening ISO images is only supported for local files.");
         var isoPath = Path.Combine(currentPath, entry.Name);
         var isoStream = File.OpenRead(isoPath);
 
@@ -366,8 +519,26 @@ public sealed class NavigationContext : IDisposable
             }
         }
 
-        var localPath = LocalPath ?? throw new IOException("The drive list is not a directory");
-        return CreateLocalLocation(localPath);
+        if (_rootVolume is LocalVolume)
+        {
+            var localPath = LocalPath ?? throw new IOException("The drive list is not a directory");
+            return CreateLocalLocation(localPath);
+        }
+
+        // other volumes are created again by their provider and changed to the current directory
+        var volume = await _volumeProvider.CreateVolume(cancellationToken);
+        try
+        {
+            var pathComponents = _rootVolume.CurrentPathComponents
+                .Where(pathComponent => !pathComponent.Equals(Paths.Root, StringComparison.OrdinalIgnoreCase));
+            await volume.ChangeDirectory([Paths.Root, ..pathComponents], cancellationToken);
+            return new VolumeLocation(volume, CurrentPath, volume as IDisposable);
+        }
+        catch
+        {
+            (volume as IDisposable)?.Dispose();
+            throw;
+        }
     }
 
     /// <summary>
@@ -480,11 +651,18 @@ public sealed class NavigationContext : IDisposable
         }
     }
 
-    public void Dispose()
+    /// <summary>Closes images opened in the current volume and the volume itself, when disposable.</summary>
+    private void CloseVolumes()
     {
         while (_isoStreams.Count > 0)
         {
             _isoStreams.Pop().Dispose();
         }
+
+        _isoVolume = null;
+        _isoPath = null;
+        (_rootVolume as IDisposable)?.Dispose();
     }
+
+    public void Dispose() => CloseVolumes();
 }

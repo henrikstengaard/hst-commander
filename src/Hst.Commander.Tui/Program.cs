@@ -1,7 +1,7 @@
 using Hst.Commander.Tui;
 using Terminal.Gui;
 
-var mainWindow = new MainWindow(Environment.CurrentDirectory, TuiSettings.Load().Theme);
+var mainWindow = new MainWindow(Environment.CurrentDirectory, TuiSettings.Load());
 
 try
 {

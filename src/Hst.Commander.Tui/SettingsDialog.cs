@@ -1,3 +1,4 @@
+using Hst.Commander.Core;
 using Terminal.Gui;
 
 namespace Hst.Commander.Tui;
@@ -16,6 +17,7 @@ public sealed class SettingsDialog : Dialog
     ];
 
     private readonly RadioGroup _themeRadioGroup;
+    private readonly RadioGroup _volumeProviderKeysRadioGroup;
     private readonly TuiSettings _settings;
     private readonly Action<TuiTheme> _preview;
 
@@ -24,24 +26,35 @@ public sealed class SettingsDialog : Dialog
         _settings = settings;
         _preview = preview;
         Title = "Settings";
-        Width = 40;
-        Height = 10;
+        Width = 50;
+        Height = 13;
         ColorScheme = palette.DialogColorScheme;
 
         var themeLabel = new Label { X = 1, Y = 1, Text = "Theme:" };
         _themeRadioGroup = new RadioGroup
         {
-            X = Pos.Right(themeLabel) + 1,
+            X = 15,
             Y = 1,
             RadioLabels = Themes.Select(theme => theme.Name).ToArray(),
             SelectedItem = Math.Max(0, Array.FindIndex(Themes, theme => theme.Theme == settings.Theme))
         };
         _themeRadioGroup.SelectedItemChanged += (_, _) => Preview(SelectedTheme);
 
+        var volumeProviderKeysLabel = new Label { X = 1, Y = 5, Text = "Volume keys:" };
+        _volumeProviderKeysRadioGroup = new RadioGroup
+        {
+            X = 15,
+            Y = 5,
+            RadioLabels = VolumeProviderKeyBindings.All.Select(keys => keys == VolumeProviderKeyBindings.Default
+                ? $"{VolumeProviderKeyBindings.GetName(keys)} (default)"
+                : VolumeProviderKeyBindings.GetName(keys)).ToArray(),
+            SelectedItem = Math.Max(0, VolumeProviderKeyBindings.All.ToList().IndexOf(settings.EffectiveVolumeProviderKeys))
+        };
+
         var okButton = new Button { Text = "OK", IsDefault = true };
         okButton.Accepting += (_, e) =>
         {
-            Result = _settings with { Theme = SelectedTheme };
+            Result = (_settings with { Theme = SelectedTheme }).WithVolumeProviderKeys(SelectedVolumeProviderKeys);
             e.Cancel = true;
             Application.RequestStop(this);
         };
@@ -52,7 +65,7 @@ public sealed class SettingsDialog : Dialog
             Application.RequestStop(this);
         };
 
-        Add(themeLabel, _themeRadioGroup);
+        Add(themeLabel, _themeRadioGroup, volumeProviderKeysLabel, _volumeProviderKeysRadioGroup);
         AddButton(okButton);
         AddButton(cancelButton);
         Initialized += (_, _) => _themeRadioGroup.SetFocus();
@@ -62,6 +75,9 @@ public sealed class SettingsDialog : Dialog
     public TuiSettings? Result { get; private set; }
 
     private TuiTheme SelectedTheme => Themes[Math.Max(0, _themeRadioGroup.SelectedItem)].Theme;
+
+    private VolumeProviderKeys SelectedVolumeProviderKeys =>
+        VolumeProviderKeyBindings.All[Math.Max(0, _volumeProviderKeysRadioGroup.SelectedItem)];
 
     private void Preview(TuiTheme theme)
     {

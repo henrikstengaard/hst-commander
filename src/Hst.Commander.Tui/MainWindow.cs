@@ -17,13 +17,17 @@ public sealed class MainWindow : Window
     private readonly FunctionKeyBarView _functionKeyBar;
     private readonly Pane _leftPane;
     private readonly Pane _rightPane;
+    private readonly MenuItem _leftVolumeMenuItem;
+    private readonly MenuItem _rightVolumeMenuItem;
+    private VolumeProviderKeys _volumeProviderKeys;
     private TuiPalette _palette;
     private Pane _activePane;
     private TerminalAction? _pendingTerminalAction;
     private string? _pendingError;
 
-    public MainWindow(string initialPath, TuiTheme theme)
+    public MainWindow(string initialPath, TuiSettings settings)
     {
+        var theme = settings.Theme;
         BorderStyle = LineStyle.None;
         X = 0;
         Y = 0;
@@ -31,6 +35,8 @@ public sealed class MainWindow : Window
         Height = Dim.Fill();
         _palette = TuiPalette.For(theme);
 
+        _leftVolumeMenuItem = new MenuItem("_Left volume...", string.Empty, ChooseLeftVolumeProvider);
+        _rightVolumeMenuItem = new MenuItem("_Right volume...", string.Empty, ChooseRightVolumeProvider);
         _menuBar = new MenuBar
         {
             Menus =
@@ -39,6 +45,10 @@ public sealed class MainWindow : Window
                 {
                     new("_Copy...", "F5", CopyFromActivePane),
                     new("_Delete...", "F8", DeleteFromActivePane),
+                    null!,
+                    _leftVolumeMenuItem,
+                    _rightVolumeMenuItem,
+                    new("L_ocation...", "Ctrl+L", ShowLocationOfActivePane),
                     null!,
                     new("_Settings...", string.Empty, ShowSettings),
                     null!,
@@ -68,6 +78,7 @@ public sealed class MainWindow : Window
 
         Add(_menuBar, _leftPane.View, _rightPane.View, _functionKeyBar);
         ApplyTheme(theme);
+        ApplyVolumeProviderKeys(settings.EffectiveVolumeProviderKeys);
         ConfigurePaneKeys(_leftPane, _rightPane);
         ConfigurePaneKeys(_rightPane, _leftPane);
         // also when run again after a program has run in the terminal
@@ -154,6 +165,22 @@ public sealed class MainWindow : Window
         NeedsDraw = true;
     }
 
+    /// <summary>Sets the keys opening the volume provider lists, shown in the File menu.</summary>
+    private void ApplyVolumeProviderKeys(VolumeProviderKeys keys)
+    {
+        _volumeProviderKeys = keys;
+        _leftVolumeMenuItem.Help = VolumeProviderKeyBindings.GetLeftKeyText(keys);
+        _rightVolumeMenuItem.Help = VolumeProviderKeyBindings.GetRightKeyText(keys);
+    }
+
+    private Key LeftVolumeProviderKey => WithVolumeProviderModifier(Key.F1);
+
+    private Key RightVolumeProviderKey => WithVolumeProviderModifier(Key.F2);
+
+    private Key WithVolumeProviderModifier(Key key) => _volumeProviderKeys == VolumeProviderKeys.ShiftFunctionKeys
+        ? key.WithShift
+        : key.WithAlt;
+
     private void ApplyPaneColors(Pane pane)
     {
         var normal = _palette.PaneNormal;
@@ -186,6 +213,7 @@ public sealed class MainWindow : Window
         }
 
         ApplyTheme(result.Theme);
+        ApplyVolumeProviderKeys(result.EffectiveVolumeProviderKeys);
         try
         {
             result.Save();
@@ -251,6 +279,7 @@ public sealed class MainWindow : Window
     private void ConfigurePaneKeys(Pane pane, Pane otherPane)
     {
         pane.TableView.CellActivated += async (_, _) => await ActivateSelectedEntryAsync(pane);
+        pane.PathPanel.PathDoubleClicked += async (_, _) => await ShowLocationAsync(pane);
         pane.TableView.HasFocusChanged += (_, _) =>
         {
             if (pane.TableView.HasFocus)
@@ -301,6 +330,21 @@ public sealed class MainWindow : Window
                 key.Handled = true;
                 RequestTerminalAction(new TerminalAction.ShowOutput());
             }
+            else if (key == Key.L.WithCtrl)
+            {
+                key.Handled = true;
+                _ = ShowLocationAsync(pane);
+            }
+            else if (key == LeftVolumeProviderKey)
+            {
+                key.Handled = true;
+                ChooseLeftVolumeProvider();
+            }
+            else if (key == RightVolumeProviderKey)
+            {
+                key.Handled = true;
+                ChooseRightVolumeProvider();
+            }
             else if (key.KeyCode == KeyCode.F5)
             {
                 key.Handled = true;
@@ -318,6 +362,59 @@ public sealed class MainWindow : Window
 
     private void DeleteFromActivePane() =>
         _ = DeleteAsync(_activePane, _activePane == _leftPane ? _rightPane : _leftPane);
+
+    private void ChooseLeftVolumeProvider() => _ = ChooseVolumeProviderAsync(_leftPane);
+
+    private void ChooseRightVolumeProvider() => _ = ChooseVolumeProviderAsync(_rightPane);
+
+    private void ShowLocationOfActivePane() => _ = ShowLocationAsync(_activePane);
+
+    /// <summary>
+    ///     Shows the location dialog of a pane with its current path, changing to the entered path on OK or showing the
+    ///     volume provider chosen with Volumes. The pane gets the focus.
+    /// </summary>
+    private async Task ShowLocationAsync(Pane pane)
+    {
+        var dialog = new LocationDialog(pane.NavigationContext.CurrentPath, () => ChooseVolumeProvider(pane), _palette);
+        Application.Run(dialog);
+        var result = dialog.Result;
+        dialog.Dispose();
+
+        pane.TableView.SetFocus();
+        if (result?.VolumeProvider is { } volumeProvider)
+        {
+            await RunNavigationAsync(pane, () => pane.NavigationContext.ChangeVolumeProviderAsync(volumeProvider));
+        }
+        else if (result?.Path is { } path)
+        {
+            await RunNavigationAsync(pane, () => pane.NavigationContext.ChangeLocationAsync(path));
+        }
+    }
+
+    /// <summary>
+    ///     Lets the user choose the volume provider a pane shows from the list of volume providers, centered over the
+    ///     pane, and shows the root of a new volume from it. The pane gets the focus.
+    /// </summary>
+    private async Task ChooseVolumeProviderAsync(Pane pane)
+    {
+        var volumeProvider = ChooseVolumeProvider(pane);
+        pane.TableView.SetFocus();
+        if (volumeProvider != null)
+        {
+            await RunNavigationAsync(pane, () => pane.NavigationContext.ChangeVolumeProviderAsync(volumeProvider));
+        }
+    }
+
+    /// <summary>Shows the volume provider list centered over a pane, returning the chosen one or null.</summary>
+    private IVolumeProvider? ChooseVolumeProvider(Pane pane)
+    {
+        var dialog = new VolumeProviderDialog(pane == _leftPane ? "Left" : "Right", VolumeProviders.All,
+            pane.NavigationContext.VolumeProvider, pane.View.Frame, _palette);
+        Application.Run(dialog);
+        var volumeProvider = dialog.Result;
+        dialog.Dispose();
+        return volumeProvider;
+    }
 
     /// <summary>
     ///     Deletes the marked entries, or the entry under the cursor, after confirming, showing the progress while

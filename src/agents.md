@@ -15,15 +15,17 @@ There are two front-ends with the same functionality: a terminal UI (TUI) built 
 ```
 src/
   Hst.Commander.sln                              Solution file (5 projects)
-  Hst.Commander.Extensions.Volume.Abstractions/  IVolume / IEntry interfaces (no external deps)
-  Hst.Commander.Core/                            Volume implementations, NavigationContext + shared utilities
+  Hst.Commander.Extensions.Volume.Abstractions/  IVolumeProvider / IVolume / IEntry interfaces (no external deps)
+  Hst.Commander.Core/                            Volume implementations, volume providers, NavigationContext + shared utilities
   Hst.Commander.Tui/                             Terminal.Gui TUI application
     MainWindow.cs                                Dual-pane window, File menu, function key bar, columns, key bindings, theme colors, F5 copy, F8/Delete delete
     FunctionKeyBarView.cs                        Function key bar at the bottom (F3 View ... F8 Delete), clickable items
-    SettingsDialog.cs                            Modal settings dialog (theme selection with live preview)
+    SettingsDialog.cs                            Modal settings dialog (theme selection with live preview, volume provider keys)
     CopyDialog.cs                                Modal copy confirm dialog (destination and filter)
     CopyProgressDialog.cs                        Modal copy progress dialog (2 progress bars, speed, ETA, cancel)
     DeleteProgressDialog.cs                      Modal delete progress dialog (current entry, total progress bar, cancel)
+    VolumeProviderDialog.cs                      Modal list of volume providers for a pane (Alt+F1/Alt+F2), centered over the pane
+    LocationDialog.cs                            Modal location dialog (Ctrl+L or double-click path): path, Volumes, OK, Cancel
     TerminalScreen.cs                            Terminal output screen used while the TUI is shut down (like Midnight Commander): runs programs, Ctrl+O shows the output, own screen buffer on the classic Windows console
     TuiSettings.cs                               TUI settings record, loaded/saved as JSON
     TuiTheme.cs                                  Theme enum: MidnightCommander, Light, Dark
@@ -36,12 +38,14 @@ src/
     PaneView.axaml(.cs)                          One pane: path, column header, entry ListBox, Enter/Backspace
     EntryItem.cs                                 Display row for an IEntry (size/date formatting)
     ErrorDialog.axaml(.cs)                       Modal error dialog
-    SettingsDialog.axaml(.cs)                    Modal settings view (theme selection with live preview)
+    SettingsDialog.axaml(.cs)                    Modal settings view (theme selection with live preview, volume provider keys)
     CopyDialog.axaml(.cs)                        Modal copy confirm dialog (destination and filter)
     CopyProgressDialog.axaml(.cs)                Modal copy progress dialog running the copy (2 progress bars, speed, ETA, cancel)
     OverwriteDialog.axaml(.cs)                   Modal confirm overwriting an existing file (Yes, No, All)
     DeleteDialog.axaml(.cs)                      Modal confirm deleting entries (Yes, No)
     DeleteProgressDialog.axaml(.cs)              Modal delete progress dialog running the delete (current entry, total progress bar, cancel)
+    VolumeProviderDialog.axaml(.cs)              Modal list of volume providers for a pane (Alt+F1/Alt+F2), centered over the pane
+    LocationDialog.axaml(.cs)                    Modal location dialog (Ctrl+L or double-click path): path, Volumes, OK, Cancel
     GuiSettings.cs                               GUI settings record, loaded/saved as JSON
     GuiTheme.cs                                  Theme enum: MidnightCommander, Light, Dark
     ThemeManager.cs                              Applies a theme (theme variant + Midnight Commander styles)
@@ -55,9 +59,10 @@ src/
 ### Layer Diagram
 
 ```
-[IVolume / IEntry]  <- Hst.Commander.Extensions.Volume.Abstractions
+[IVolumeProvider / IVolume / IEntry]  <- Hst.Commander.Extensions.Volume.Abstractions
         |
 [Volume Implementations]  <- Hst.Commander.Core
+  LocalVolumeProvider (VolumeProviders.All),
   LocalVolume, Iso9660Volume, NestedVolume,
   EntryVolumeProvider, DiskImageVolume (stub), NullVolume
         |
@@ -86,6 +91,14 @@ Task Delete(string name, CancellationToken cancellationToken = default);        
 Task SetModifiedDate(string name, DateTime modifiedDate, CancellationToken cancellationToken = default); // unspecified kind = UTC; NotSupportedException when read-only
 ```
 
+**`IVolumeProvider`** (`Hst.Commander.Extensions.Volume.Abstractions/IVolumeProvider.cs`)
+```csharp
+string Name { get; }          // shown in the Alt+F1/Alt+F2 list, e.g. "Local"
+string Description { get; }   // shown next to the name
+Task<IVolume> CreateVolume(CancellationToken cancellationToken = default); // new, independent volume at its root
+```
+Volume providers are what a pane can show; they are intended to become the plugin system (Hst Commander scanning for `IVolumeProvider` implementations at startup). `VolumeProviders.All` (`Hst.Commander.Core`) is the list shown to the user, currently only the built-in `VolumeProviders.Local` (`LocalVolumeProvider`); discovered plugins are meant to be appended after it. Each `CreateVolume` call must return a volume of its own (copy/delete open a second one on a background thread); a volume implementing `IDisposable` is disposed when no longer used.
+
 **`IEntry`** (`Hst.Commander.Extensions.Volume.Abstractions/IEntry.cs`)
 - `Name`, `Type` (`EntryType.Container` | `EntryType.Item`), `Size`, `ModifiedDate`
 
@@ -93,6 +106,7 @@ Task SetModifiedDate(string name, DateTime modifiedDate, CancellationToken cance
 
 | Class | Purpose |
 |---|---|
+| `LocalVolumeProvider` | Volume provider "Local" creating a `LocalVolume` at the drive list |
 | `LocalVolume` | Browses the real file system; lists drives when at root |
 | `Iso9660Volume` | Reads ISO 9660 / CD-ROM images via `LTRData.DiscUtils.Iso9660` |
 | `NestedVolume` | Compositor — holds a `LinkedList<IVolume>`. Drilling into a file pushes a new volume; going up pops it. The combined `CurrentPathComponents` spans all nested volumes |
@@ -105,7 +119,7 @@ Task SetModifiedDate(string name, DateTime modifiedDate, CancellationToken cance
 ### Copying
 
 - `VolumeCopy.CopyToAsync` (`Hst.Commander.Core.Volumes`) is an extension method copying entries from the current directory of any `IVolume` to the current directory of another, using only `OpenRead`, `OpenWrite`, `CreateContainer`, `ListEntries` and `ChangeDirectory`. It first scans the entries (containers recursively) to know the total size, then copies; both volumes are changed back to their starting directory afterwards. Containers are merged with existing ones. Modified dates are preserved with `IVolume.SetModifiedDate`: items right after they are written, containers after everything is copied, deepest first (writing into a container changes its date); a destination throwing `NotSupportedException` keeps the written dates. Before an item that already exists in the destination is overwritten, `CopyOptions.ConfirmOverwrite` is asked with an `OverwriteRequest` (name, both entries and a shared `Message` with exact sizes in bytes, e.g. `1,234,567 bytes`, and dates) and answers `OverwriteAnswer.Yes`, `No` (skip the item, removed from the progress totals) or `All` (overwrite the rest without asking); without a callback items are overwritten. Destination entries are listed once per directory to detect existing items, and the speed/ETA clock is paused while asking. `CopyOptions` holds the filter (`EntryFilter`: `*`/`?` wildcards, several patterns separated by `;`, case-insensitive, applied to items only — containers are always copied) and an optional target name for copying a single item under another name. Progress is reported as `CopyProgress` (current item and total bytes/items, average speed, ETA, plus shared display texts) at most every 100 ms and at each item start/end. When a copy is cancelled or fails while an item is being written, the destination stream is closed and the partial item is deleted with `IVolume.Delete` (cleanup errors are ignored so the original error is kept).
-- `NavigationContext.CopyAsync` is what the front-ends call. It never uses the pane's own volumes: `NavigationContext.OpenLocationAsync` opens an independent `VolumeLocation` (a new `LocalVolume`, or the ISO image opened again from its file) so the copy can run on a background thread. The destination text is resolved as: the other pane's current path → that pane's location (may be an image); otherwise a local directory (relative paths are relative to the source's local directory; a missing directory is created); a single file copied to a non-directory path whose parent exists is copied under that name. Copying entries onto themselves or a directory into itself throws `IOException`.
+- `NavigationContext.CopyAsync` is what the front-ends call. It never uses the pane's own volumes: `NavigationContext.OpenLocationAsync` opens an independent `VolumeLocation` (a new `LocalVolume`, the ISO image opened again from its file, or for other volume providers a new volume from `IVolumeProvider.CreateVolume` changed to `[Paths.Root, ..current path components]`) so the copy can run on a background thread. The destination text is resolved as: the other pane's current path → that pane's location (may be an image); otherwise a local directory (relative paths are relative to the source's local directory; a missing directory is created); a single file copied to a non-directory path whose parent exists is copied under that name. Copying entries onto themselves or a directory into itself throws `IOException`.
 - `NavigationContext.GetOperationEntries` returns the marked entries, or the entry under the cursor when none are marked (never `..`). Marks are cleared after a successful copy or delete.
 
 ### Deleting
@@ -115,7 +129,7 @@ Task SetModifiedDate(string name, DateTime modifiedDate, CancellationToken cance
 
 ### Navigation Model
 
-Each UI pane has a `NavigationContext` that owns a `NestedVolume`. Browsing into a directory calls `ChangeDirectory` on the current volume. Browsing into a file that represents a mountable container (e.g., `.iso`) should:
+Each UI pane has a `NavigationContext` that owns a `NestedVolume` over a root volume from a volume provider. It starts with `VolumeProviders.Local` at the initial path; `NavigationContext.ChangeVolumeProviderAsync(provider)` (Alt+F1/Alt+F2) creates a new root volume from the provider, closes opened images and the previous root volume (when disposable) and clears marks. `NavigationContext.VolumeProvider` is the provider shown. `CurrentPath` at the root is `Computer` for the local drive list and the provider's `Name` otherwise. Local-only features (disk space, starting files, executables, opening ISO images) need a `LocalVolume` root; opening an ISO in another volume throws `IOException`. Browsing into a directory calls `ChangeDirectory` on the current volume. Browsing into a file that represents a mountable container (e.g., `.iso`) should:
 1. For local files, open the selected ISO by its path; `IEntry` currently provides metadata only, not a stream.
 2. Construct an `Iso9660Volume` over the open file stream.
 3. Wrap it in an `EntryVolumeProvider` and call `nestedVolume.PushVolume(entryVolumeProvider)`.
@@ -125,6 +139,18 @@ Going up when at the root of a nested volume calls `PopVolume()`.
 Opening any other local file (Enter or double-click in both front-ends) calls the `NavigationContext` constructor's optional `startFile` callback with the full path, defaulting to `FileStarter.StartWithShell` (`Process.Start` with `UseShellExecute`, working directory = the file's directory): programs are executed and other files open in their associated application. Files inside images are not started. The GUI uses the default; the TUI runs terminal programs itself (see Adding TUI Features). Errors (e.g. no associated application) are shown like navigation errors.
 
 `NavigationContext.IsExecutable(entry)` tells whether a listed local file is executable, updated by `ListEntriesAsync`: on Windows by extension (`ExecutableExtensions`: `.exe`, `.com`, `.bat`, `.cmd`, `.msi`; `IsExecutableName`), on other systems by the execute permission (`FileStarter.HasExecutePermission`). Directories and files inside images are never executable. Both front-ends draw executables in green.
+
+### Changing Location
+
+Ctrl+L, double-clicking the path of a pane or File > Location opens the location dialog of a pane (the active pane for Ctrl+L and the menu) in both front-ends: a path field filled with `NavigationContext.CurrentPath`, a `Volumes...` button opening the volume provider list of the pane (choosing one closes the location dialog and shows that provider with `ChangeVolumeProviderAsync`), OK and Cancel. The result is a `LocationDialogResult` (path or volume provider). OK calls `NavigationContext.ChangeLocationAsync(path)`, which leaves the location unchanged when the path fails (the error is shown) or equals the current path, and resolves:
+- empty, or `Computer` in a local volume: the local drive list;
+- a local directory (relative to the current local directory; `c:` means `c:\`), switching to the Local volume provider;
+- a local path going into an ISO image, e.g. `c:\images\disk.iso\dir1` (the closest existing file in the path must be an `.iso`);
+- otherwise, when a non-local volume provider is shown and the path isn't rooted, a path from the root of a new volume of that provider (its `Name` is the root).
+
+### Volume Provider Keys
+
+The keys opening the volume provider list of the left/right pane are chosen in File > Settings of both front-ends (`Volume keys`): `VolumeProviderKeys.AltFunctionKeys` (Alt+F1/Alt+F2) or `ShiftFunctionKeys` (Shift+F1/Shift+F2). `TuiSettings`/`GuiSettings.VolumeProviderKeys` is null until chosen, and `EffectiveVolumeProviderKeys` then falls back to `VolumeProviderKeyBindings.Default`, the best fit for the host OS: Alt on Windows, Shift elsewhere (Linux desktops take Alt+F1/Alt+F2, e.g. Alt+F2 opens the run dialog on GNOME/KDE/XFCE, and macOS terminals only send Alt with Option set as Meta key). `WithVolumeProviderKeys` keeps the setting unset when the keys already in effect are chosen. The settings dialogs mark the OS default with `(default)`; the File menu shows the keys in effect (`GetLeftKeyText`/`GetRightKeyText`) and changes apply on OK.
 
 ### Path Conventions
 
@@ -144,12 +170,15 @@ Opening any other local file (Enter or double-click in both front-ends) calls th
 - The volume abstraction layer and implementations: `LocalVolume`, `Iso9660Volume`, `NestedVolume`, `EntryVolumeProvider`, and `NullVolume`.
 - All unit tests in `Hst.Commander.Core.Tests`.
 
+- Changing location with Ctrl+L or by double-clicking the path (location dialog), including paths into ISO images.
+- Choosing the volume provider of the left/right pane with Alt+F1/Alt+F2 or Shift+F1/Shift+F2 (configurable, see Volume Provider Keys) or File > Left/Right volume from `VolumeProviders.All`; only the built-in Local volume provider exists so far.
 - Copying (F5) between panes and volumes, with a confirm dialog (destination, filter) and a progress dialog.
 - Deleting (F8 or Delete) the marked entries or the entry under the cursor, with a confirm dialog and a progress dialog.
 
 **Not implemented:**
 - Move, rename, make directory and other file-management operations.
 - Opening ISO images located inside another ISO; the current `IEntry` contract does not expose file contents.
+- Loading `IVolumeProvider` plugins at startup; `VolumeProviders.All` only lists the built-in providers.
 - `DiskImageVolume` remains an intentional stub.
 
 ---
@@ -188,7 +217,8 @@ Opening any other local file (Enter or double-click in both front-ends) calls th
 2. **Implement all members**: `Name`, `CurrentPathComponents`, `ListEntries`, `ChangeDirectory`, `OpenEntry`, `OpenRead`, `OpenWrite`, `CreateContainer` (throw `NotSupportedException` from the write members when the volume is read-only). Copying to and from the volume then works through `VolumeCopy.CopyToAsync`.
 3. **Handle `Paths.Root` and `Paths.Parent`** in `ChangeDirectory` — both are case-insensitive string comparisons.
 4. **Add unit tests** in `Hst.Commander.Core.Tests/` using the `Given<YourVolume>` naming pattern.
-5. **Wire up detection** in `NavigationContext` (`Hst.Commander.Core`): when `OpenEntry` returns an entry that matches your format, construct the volume and call `nestedVolume.PushVolume(new EntryVolumeProvider(entry, yourVolume))`.
+5. **To make it selectable with Alt+F1/Alt+F2**, implement `IVolumeProvider` (see `LocalVolumeProvider`) and add it to `VolumeProviders.All`.
+6. **Or wire up detection** in `NavigationContext` (`Hst.Commander.Core`): when `OpenEntry` returns an entry that matches your format, construct the volume and call `nestedVolume.PushVolume(new EntryVolumeProvider(entry, yourVolume))`.
 
 Example test pattern (from `GivenNestedVolumeWithTestVolume.cs`):
 ```csharp
@@ -211,6 +241,7 @@ public async Task When_VolumeIsPushed_Then_NestedVolumeListsEntriesFromNewVolume
 ### Test Helpers
 
 - `TestVolume` (`Hst.Commander.Core.Tests/TestVolume.cs`): in-memory `IVolume` backed by a `Dictionary<string, List<TestEntry>>`. Supports `..` in `ChangeDirectory`, reading/writing `TestEntry.Data` and creating containers; `GetEntry(pathComponents)` looks up an entry for assertions.
+- `TestVolumeProvider` (`Hst.Commander.Core.Tests/TestVolumeProvider.cs`): `IVolumeProvider` creating a new `TestVolume` filled by a setup action on each `CreateVolume`.
 - `TestEntry` (`Hst.Commander.Core.Tests/TestEntry.cs`): in-memory `IEntry` with optional `byte[]? Data`.
 - Use `AddEntry(pathComponents, entry)` to build the in-memory tree.
 
@@ -232,12 +263,14 @@ Key TUI patterns already in use:
 - Entries are selected (marked) with Insert or Space, which toggles the mark of the entry under the cursor and moves the cursor down. Marked entries are drawn in yellow (also under the cursor). The marks live in `NavigationContext` (`ToggleMark`, `IsMarked`, `MarkedEntries`, `MarkedSize`, `MarkedSummary`; shared by both front-ends): `..` can't be marked, marks are cleared when the location changes and `ListEntriesAsync` drops marks of entries no longer listed. In code "marked" is used to avoid confusion with the selected row (cursor).
 - Key bindings are attached via `tableView.KeyDown += async (_, key) => { ... }`.
 - Up/Down move the selected row by one entry per key event; holding a key uses the OS/terminal's repeat rate. PageUp/PageDown move by one visible page and Home/End jump to the first/last entry.
-- A `MenuBar` at the top of `MainWindow` (panes start at row 1) has a File menu: Copy (F5) and Delete (F8 or Delete) act on the active pane (the pane last focused), Settings opens the modal `SettingsDialog` and Quit calls `Application.RequestStop()`, exiting the application. F9 or Alt+F opens the menu.
+- A `MenuBar` at the top of `MainWindow` (panes start at row 1) has a File menu: Copy (F5) and Delete (F8 or Delete) act on the active pane (the pane last focused), Left volume and Right volume (showing the configured volume provider keys as `MenuItem.Help`) choose a pane's volume provider, Location (Ctrl+L) opens the location dialog of the active pane, Settings opens the modal `SettingsDialog` and Quit calls `Application.RequestStop()`, exiting the application. F9 or Alt+F opens the menu.
 - A `FunctionKeyBarView` spans the full width below the panes (panes use `Dim.Fill(1)`) with the items `F3 View`, `F4 Edit`, `F5 Copy`, `F6 Move`, `F7 Mkdir` and `F8 Delete`, each getting an equal share of the width; the key is drawn in `TuiPalette.FunctionKey` and the title in `TuiPalette.Menu`. Clicking `F5 Copy` or `F8 Delete` copies or deletes from the active pane like the File menu; the other items have no action yet.
 - F5 copies the marked entries (or the entry under the cursor) to the other pane: `CopyDialog` confirms the destination (default: the other pane's path) and filter (default `*`), then `NavigationContext.CopyAsync` runs on a background thread (`Task.Run`) while the modal `CopyProgressDialog` shows the current file and total progress bars, speed and ETA. Progress is marshalled with `Application.Invoke`; existing files are confirmed with `MessageBox.Query` (Yes, No, All; Esc answers No) invoked on the UI thread from the background copy through a `TaskCompletionSource`. Cancel or Esc cancels the copy and the dialog stays open until the copy has stopped. Errors are shown with `MessageBox.ErrorQuery`, both panes are refreshed afterwards.
 - F8 or Delete deletes the marked entries (or the entry under the cursor) after confirming with `MessageBox.Query` (Yes, No; Esc answers No), then `NavigationContext.DeleteAsync` runs on a background thread while the modal `DeleteProgressDialog` shows the current entry and a total progress bar, same pattern as copying (progress via `Application.Invoke`, Cancel or Esc cancels and the dialog stays open until the delete has stopped). Errors are shown with `MessageBox.ErrorQuery`, both panes are refreshed afterwards.
+- Ctrl+L (panes' `KeyDown`) and double-clicking the path line (`PathPanelView.PathDoubleClicked`, raised from `OnMouseEvent`) open `LocationDialog` for that pane; its Volumes button runs the `VolumeProviderDialog` on top (see Changing Location).
+- The volume provider keys (Alt+F1/Alt+F2 or Shift+F1/Shift+F2, see Volume Provider Keys; handled in the panes' `KeyDown`, so from either pane) open the modal `VolumeProviderDialog` for the left/right pane, titled `Left`/`Right` and centered over that pane: a `ListView` of `VolumeProviders.All` (`Name  Description`) with the pane's current provider selected; Enter or double-click chooses, Esc cancels. The chosen provider is shown with `NavigationContext.ChangeVolumeProviderAsync` and the pane gets the focus.
 - Three themes, selected in File > Settings, same as the GUI: **Midnight Commander** (default), **Light** and **Dark**. Colors come from `TuiPalette` (16 legacy colors); `MainWindow.ApplyTheme` reapplies them to the menu bar and panes. Midnight Commander uses blue panes with directories in white, files in gray, executables in bright green, marked entries in yellow, the current row in black on gray in both panes and a cyan menu bar.
-- Settings are stored in `~/.hst-commander/tui-settings.json` (`SettingsPaths.Directory`, `TuiSettings.FilePath`), separate from the GUI settings. A missing or invalid file falls back to defaults. The settings dialog uses a `RadioGroup` for the theme, previews changes live, saves on OK and reverts on Cancel/Esc.
+- Settings are stored in `~/.hst-commander/tui-settings.json` (`SettingsPaths.Directory`, `TuiSettings.FilePath`), separate from the GUI settings. A missing or invalid file falls back to defaults. The settings dialog uses a `RadioGroup` for the theme and one for the volume provider keys, previews theme changes live, saves on OK and reverts on Cancel/Esc.
 - Directory names have no slash prefix.
 - Opening a program that runs in the terminal (`FileStarter.IsTerminalProgram`: on Windows console-subsystem `.exe` (`FileStarter.IsConsoleExecutable` reads the PE header), `.com`, `.bat`, `.cmd`; elsewhere files with execute permission) suspends the TUI like Midnight Commander: `MainWindow.StartFile` requests a `TerminalAction.RunProgram`, which stores the action and stops the window with `Application.RequestStop`. `Program.cs` loops: `TerminalScreen.EnterTui`, `Application.Init`, refresh both panes, `Application.Run(mainWindow)`, `Application.Shutdown`, `TerminalScreen.LeaveTui`, then does `MainWindow.TakePendingTerminalAction` (null when quitting) and runs the same `MainWindow` again. `TerminalScreen.Run` runs the program in the terminal in its directory below the previous output (Ctrl+C is ignored by HST Commander) and returns directly when it exits, without a pause; an error starting it is shown with `MessageBox.ErrorQuery` once the window is loaded again (`MainWindow.ShowErrorWhenLoaded`). The `Loaded` event focuses the active pane on every run. Other files, including GUI programs on Windows, are started with the shell without suspending.
 - Ctrl+O shows the output screen like Midnight Commander (`TerminalAction.ShowOutput`): the TUI is shut down the same way and `TerminalScreen.ShowOutput` waits for any key before the TUI returns. TUI only, the GUI has no terminal. The output screen is kept because Windows Terminal and Unix terminals draw the TUI on the alternate screen; the classic Windows console (no `WT_SESSION`) draws it on the standard output's screen buffer, so `EnterTui` gives the TUI a screen buffer of its own there (`CreateConsoleScreenBuffer` + `SetStdHandle`). `LeaveTui` restores the standard output handle and makes its screen buffer active again, also needed because Terminal.Gui's `WindowsConsole.Cleanup` activates a new empty buffer on shutdown.
@@ -260,11 +293,13 @@ Key GUI patterns already in use:
   - Midnight Commander uses the same palette as the TUI: blue panes, directories in white, files in gray, executables in green, current row in black on gray in the focused pane (cyan in the unfocused pane) and the active pane's path highlighted. Only the panes are colored: the menu, function key bar and dialogs use the normal Fluent dark styling. It is a custom `ThemeVariant` (`ThemeManager.MidnightCommanderVariant`, inheriting Dark) plus `MidnightCommanderStyles` (the current row colors only), which `ThemeManager` adds to `Application.Styles` only for this theme.
   - Light and Dark use the normal Fluent control styling (including list selection) in light/dark colors.
   - Pane colors are per-theme brushes in `App.axaml` `ThemeDictionaries` (`PaneBackground`, `PaneBorder`, `HeaderForeground`, `ContainerForeground`, `ItemForeground`, `ExecutableForeground`, `PathForeground`, `ActivePathBackground`, `ActivePathForeground`, `SelectedEntryForeground`, `MarkedEntryForeground`), referenced with `DynamicResource` so theme changes apply live.
-- Settings are stored in `~/.hst-commander/gui-settings.json` (`SettingsPaths.Directory` in Core, `GuiSettings.FilePath`). A missing or invalid file falls back to defaults. The settings dialog previews theme changes live, saves on OK and reverts on Cancel.
+- Settings are stored in `~/.hst-commander/gui-settings.json` (`SettingsPaths.Directory` in Core, `GuiSettings.FilePath`). A missing or invalid file falls back to defaults. The settings dialog has combo boxes for the theme and the volume provider keys, previews theme changes live, saves on OK and reverts on Cancel.
 - Errors are shown with `ErrorDialog` via `ShowDialog(owner)`.
-- A top `Menu` docked above the panes has a File menu: Copy (F5) and Delete (F8 or Delete) act on the active pane (tracked with `GotFocus`), Settings opens the modal `SettingsDialog` and Quit closes the main window (exiting the application).
+- A top `Menu` docked above the panes has a File menu: Copy (F5) and Delete (F8 or Delete) act on the active pane (tracked with `GotFocus`), Left volume and Right volume (showing the configured volume provider keys as `InputGesture`) choose a pane's volume provider, Location (Ctrl+L) opens the location dialog of the active pane, Settings opens the modal `SettingsDialog` and Quit closes the main window (exiting the application).
 - A function key bar (`UniformGrid` of non-focusable `Button.functionKey`, so the active pane keeps focus) is docked full width below the panes with `F3 View`, `F4 Edit`, `F5 Copy`, `F6 Move`, `F7 Mkdir` and `F8 Delete`. `CopyButton` and `DeleteButton` copy or delete from the active pane like the File menu; the other buttons have no action yet.
 - F5 is handled at window level (tunnelling): `CopyDialog` confirms the destination and filter, then `CopyProgressDialog` runs `NavigationContext.CopyAsync` with `Task.Run` when opened, reporting through a `Progress<CopyProgress>` created on the UI thread. Existing files are confirmed with the modal `OverwriteDialog` (Yes, No, All; closing answers No), shown over the progress dialog via `Dispatcher.UIThread.InvokeAsync`. Cancel or closing the window cancels the copy; the dialog closes when the copy has stopped and exposes the `Exception`. `PaneView.SelectedEntry` gives the entry under the cursor and `PaneView.RefreshEntriesAsync` relists a pane after copying.
+- Ctrl+L (window level, tunnelling, active pane) and double-clicking the path badge (`PaneView.PathDoubleClicked`) open `LocationDialog` for that pane; its Volumes button shows the `VolumeProviderDialog` owned by the location dialog. `PaneView.ChangeLocationAsync` changes to the entered path (see Changing Location).
+- The volume provider keys (Alt+F1/Alt+F2 or Shift+F1/Shift+F2, see Volume Provider Keys) are handled at window level (tunnelling) and open the modal `VolumeProviderDialog` for the left/right pane, titled `Left`/`Right` and positioned over that pane when opened: a `ListBox` of `VolumeProviders.All` (name and description) with the pane's current provider selected; OK, Enter or double-click chooses, Cancel/Esc/closing cancels. `PaneView.ChangeVolumeProviderAsync` shows the chosen provider and the pane gets the focus.
 - F8 and Delete are handled at window level (tunnelling): the modal `DeleteDialog` confirms (Yes, No; closing answers No), then `DeleteProgressDialog` runs `NavigationContext.DeleteAsync` with `Task.Run` when opened, showing the current entry and a total progress bar, with the same cancel/close/`Exception` behaviour as `CopyProgressDialog`. Both panes are refreshed afterwards.
 
 ---

@@ -19,6 +19,7 @@ public partial class PaneView : UserControl
 
         EntriesList.AddHandler(KeyDownEvent, OnEntriesKeyDown, RoutingStrategies.Tunnel);
         EntriesList.DoubleTapped += async (_, _) => await ActivateSelectedEntryAsync();
+        PathBadge.DoubleTapped += (_, _) => PathDoubleClicked?.Invoke(this, EventArgs.Empty);
         EntriesList.PropertyChanged += (_, e) =>
         {
             if (e.Property == IsKeyboardFocusWithinProperty)
@@ -30,6 +31,9 @@ public partial class PaneView : UserControl
 
     /// <summary>Raised when navigation fails, so the window can show the error.</summary>
     public event EventHandler<Exception>? NavigationFailed;
+
+    /// <summary>Raised when the path is double-clicked, so the window can show the location dialog.</summary>
+    public event EventHandler? PathDoubleClicked;
 
     public NavigationContext NavigationContext
     {
@@ -44,6 +48,14 @@ public partial class PaneView : UserControl
 
     /// <summary>Lists the entries of the current location again, e.g. after copying.</summary>
     public Task RefreshEntriesAsync() => RunNavigationAsync(() => Task.CompletedTask);
+
+    /// <summary>Shows the root of a new volume from a volume provider, e.g. chosen with Alt+F1/Alt+F2.</summary>
+    public Task ChangeVolumeProviderAsync(IVolumeProvider volumeProvider) =>
+        RunNavigationAsync(() => NavigationContext.ChangeVolumeProviderAsync(volumeProvider));
+
+    /// <summary>Changes to a location entered in the location dialog, see <see cref="NavigationContext.ChangeLocationAsync" />.</summary>
+    public Task ChangeLocationAsync(string path) =>
+        RunNavigationAsync(() => NavigationContext.ChangeLocationAsync(path));
 
     public void FocusEntries()
     {

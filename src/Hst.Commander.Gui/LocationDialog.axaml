@@ -1,0 +1,24 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Hst.Commander.Gui.LocationDialog"
+        Title="Location"
+        Width="560"
+        SizeToContent="Height"
+        CanResize="False"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner">
+    <StackPanel Margin="16" Spacing="8">
+        <TextBlock Text="Path:" />
+        <TextBox x:Name="PathTextBox" />
+        <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,8,0,0">
+            <Button x:Name="VolumesButton" Grid.Column="0" Content="_Volumes..." MinWidth="80"
+                    HorizontalContentAlignment="Center" />
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
+                <Button x:Name="OkButton" Content="OK" MinWidth="80" HorizontalContentAlignment="Center"
+                        IsDefault="True" />
+                <Button x:Name="CancelButton" Content="Cancel" MinWidth="80" HorizontalContentAlignment="Center"
+                        IsCancel="True" />
+            </StackPanel>
+        </Grid>
+    </StackPanel>
+</Window>
