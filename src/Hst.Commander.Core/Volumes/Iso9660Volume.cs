@@ -146,6 +146,9 @@ public partial class Iso9660Volume(CDReader cdReader) : IVolume
     public Task Delete(string name, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException("ISO 9660 images are read-only");
 
+    public Task Rename(string name, string newName, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("ISO 9660 images are read-only");
+
     public Task SetModifiedDate(string name, DateTime modifiedDate, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException("ISO 9660 images are read-only");
 

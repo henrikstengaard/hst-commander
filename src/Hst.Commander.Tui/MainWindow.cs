@@ -44,6 +44,7 @@ public sealed class MainWindow : Window
                 new MenuBarItem("_File", new MenuItem[]
                 {
                     new("_Copy...", "F5", CopyFromActivePane),
+                    new("Mo_ve/rename...", "F6", MoveFromActivePane),
                     new("_Make directory...", "F7", MakeDirectoryInActivePane),
                     new("_Delete...", "F8", DeleteFromActivePane),
                     null!,
@@ -68,7 +69,7 @@ public sealed class MainWindow : Window
                 new FunctionKeyItem("F3", "View"),
                 new FunctionKeyItem("F4", "Edit"),
                 new FunctionKeyItem("F5", "Copy", CopyFromActivePane),
-                new FunctionKeyItem("F6", "Move"),
+                new FunctionKeyItem("F6", "Move", MoveFromActivePane),
                 new FunctionKeyItem("F7", "Mkdir", MakeDirectoryInActivePane),
                 new FunctionKeyItem("F8", "Delete", DeleteFromActivePane)
             ]
@@ -351,6 +352,11 @@ public sealed class MainWindow : Window
                 key.Handled = true;
                 _ = CopyAsync(pane, otherPane);
             }
+            else if (key.KeyCode == KeyCode.F6)
+            {
+                key.Handled = true;
+                _ = MoveAsync(pane, otherPane);
+            }
             else if (key.KeyCode == KeyCode.F7)
             {
                 key.Handled = true;
@@ -365,6 +371,8 @@ public sealed class MainWindow : Window
     }
 
     private void CopyFromActivePane() => _ = CopyAsync(_activePane, _activePane == _leftPane ? _rightPane : _leftPane);
+
+    private void MoveFromActivePane() => _ = MoveAsync(_activePane, _activePane == _leftPane ? _rightPane : _leftPane);
 
     private void DeleteFromActivePane() =>
         _ = DeleteAsync(_activePane, _activePane == _leftPane ? _rightPane : _leftPane);
@@ -540,6 +548,84 @@ public sealed class MainWindow : Window
         try
         {
             await copyTask;
+            pane.NavigationContext.ClearMarks();
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception exception)
+        {
+            MessageBox.ErrorQuery("Error", exception.Message, "OK");
+        }
+
+        await InitializePaneAsync(pane);
+        await InitializePaneAsync(otherPane);
+        pane.TableView.SetFocus();
+    }
+
+    /// <summary>
+    ///     Moves the marked entries, or the entry under the cursor, to the other pane after confirming the destination
+    ///     and filter in the move dialog, showing the progress while moving. A single entry moved to a name without
+    ///     path separators is renamed instead and selected.
+    /// </summary>
+    private async Task MoveAsync(Pane pane, Pane otherPane)
+    {
+        var entries = pane.NavigationContext.GetOperationEntries(GetCurrentEntry(pane));
+        if (entries.Count == 0)
+        {
+            return;
+        }
+
+        if (pane.NavigationContext.MoveNotSupportedMessage is { } message)
+        {
+            MessageBox.ErrorQuery("Error", message, "OK");
+            pane.TableView.SetFocus();
+            return;
+        }
+
+        var moveDialog = new CopyDialog(NavigationContext.GetMoveDescription(entries),
+            otherPane.NavigationContext.CurrentPath, _palette, "Move");
+        Application.Run(moveDialog);
+        var request = moveDialog.Result;
+        moveDialog.Dispose();
+        pane.TableView.SetFocus();
+        if (request == null)
+        {
+            return;
+        }
+
+        string? newName;
+        try
+        {
+            newName = await pane.NavigationContext.GetRenameNameAsync(entries, otherPane.NavigationContext,
+                request.Destination);
+        }
+        catch (Exception exception)
+        {
+            MessageBox.ErrorQuery("Error", exception.Message, "OK");
+            return;
+        }
+
+        if (newName != null)
+        {
+            await RunNavigationAsync(pane, () => pane.NavigationContext.RenameAsync(entries[0], newName));
+            await InitializePaneAsync(otherPane);
+            return;
+        }
+
+        // move in the background and update the dialog on the UI thread; it closes when the move has stopped
+        var progressDialog = new CopyProgressDialog(_palette, "Move");
+        var progress = new UiProgress<CopyProgress>(value => Application.Invoke(() => progressDialog.Update(value)));
+        var cancellationToken = progressDialog.CancellationToken;
+        var moveTask = Task.Run(() => pane.NavigationContext.MoveAsync(entries, otherPane.NavigationContext,
+            request.Destination, request.Filter, progress, ConfirmOverwriteAsync, cancellationToken));
+        _ = moveTask.ContinueWith(_ => Application.Invoke(progressDialog.Complete), TaskScheduler.Default);
+        Application.Run(progressDialog);
+        progressDialog.Dispose();
+
+        try
+        {
+            await moveTask;
             pane.NavigationContext.ClearMarks();
         }
         catch (OperationCanceledException)

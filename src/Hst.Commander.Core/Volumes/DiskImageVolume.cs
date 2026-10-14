@@ -51,6 +51,11 @@ public class DiskImageVolume(Stream stream) : IVolume
         throw new NotImplementedException();
     }
 
+    public Task Rename(string name, string newName, CancellationToken cancellationToken = default)
+    {
+        throw new NotImplementedException();
+    }
+
     public Task SetModifiedDate(string name, DateTime modifiedDate, CancellationToken cancellationToken = default)
     {
         throw new NotImplementedException();

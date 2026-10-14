@@ -61,6 +61,10 @@ public partial class PaneView : UserControl
     public Task CreateDirectoryAsync(string name) =>
         RunNavigationAsync(() => NavigationContext.CreateDirectoryAsync(name));
 
+    /// <summary>Renames an entry in the current location and selects it, see <see cref="NavigationContext.RenameAsync" />.</summary>
+    public Task RenameAsync(IEntry entry, string newName) =>
+        RunNavigationAsync(() => NavigationContext.RenameAsync(entry, newName));
+
     public void FocusEntries()
     {
         if (EntriesList.SelectedIndex < 0 && EntriesList.ItemCount > 0)

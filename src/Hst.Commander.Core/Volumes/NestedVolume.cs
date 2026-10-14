@@ -116,6 +116,9 @@ public class NestedVolume(IVolume volume) : IVolume
     public Task Delete(string name, CancellationToken cancellationToken = default) =>
         _currentVolume.Delete(name, cancellationToken);
 
+    public Task Rename(string name, string newName, CancellationToken cancellationToken = default) =>
+        _currentVolume.Rename(name, newName, cancellationToken);
+
     public Task SetModifiedDate(string name, DateTime modifiedDate, CancellationToken cancellationToken = default) =>
         _currentVolume.SetModifiedDate(name, modifiedDate, cancellationToken);
 

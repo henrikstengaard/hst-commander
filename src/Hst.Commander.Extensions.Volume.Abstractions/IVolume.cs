@@ -65,6 +65,16 @@ public interface IVolume
     Task Delete(string name, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Rename an item or container in current directory.
+    /// Throws <see cref="IOException"/> when an entry with the new name exists, except when only the case of the name
+    /// changes, and <see cref="NotSupportedException"/> when the volume is read-only.
+    /// </summary>
+    /// <param name="name">Name of entry to rename.</param>
+    /// <param name="newName">New name of entry.</param>
+    /// <param name="cancellationToken"></param>
+    Task Rename(string name, string newName, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Set the modified date of an item or container in current directory, e.g. to preserve it when copying.
     /// Throws <see cref="NotSupportedException"/> when the volume is read-only.
     /// </summary>

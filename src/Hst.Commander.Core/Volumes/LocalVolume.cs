@@ -166,6 +166,29 @@ public class LocalVolume(string path) : IVolume
         return Task.CompletedTask;
     }
 
+    public Task Rename(string name, string newName, CancellationToken cancellationToken = default)
+    {
+        var path = GetItemPath(name);
+        var newPath = GetItemPath(newName);
+        var caseOnly = path.Equals(newPath, StringComparison.OrdinalIgnoreCase) &&
+                       !path.Equals(newPath, StringComparison.Ordinal);
+        if (!caseOnly && (File.Exists(newPath) || Directory.Exists(newPath)))
+        {
+            throw new IOException($"'{newName}' already exists");
+        }
+
+        if (Directory.Exists(path))
+        {
+            Directory.Move(path, newPath);
+        }
+        else
+        {
+            File.Move(path, newPath);
+        }
+
+        return Task.CompletedTask;
+    }
+
     public Task SetModifiedDate(string name, DateTime modifiedDate, CancellationToken cancellationToken = default)
     {
         var path = GetItemPath(name);

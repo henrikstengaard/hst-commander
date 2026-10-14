@@ -29,9 +29,11 @@ public partial class MainWindow : Window
         LeftPane.NavigationFailed += async (_, exception) => await ShowErrorAsync(exception);
         RightPane.NavigationFailed += async (_, exception) => await ShowErrorAsync(exception);
         CopyMenuItem.Click += async (_, _) => await CopyAsync(_activePane);
+        MoveMenuItem.Click += async (_, _) => await MoveAsync(_activePane);
         MakeDirectoryMenuItem.Click += async (_, _) => await MakeDirectoryAsync(_activePane);
         DeleteMenuItem.Click += async (_, _) => await DeleteAsync(_activePane);
         CopyButton.Click += async (_, _) => await CopyAsync(_activePane);
+        MoveButton.Click += async (_, _) => await MoveAsync(_activePane);
         MkdirButton.Click += async (_, _) => await MakeDirectoryAsync(_activePane);
         DeleteButton.Click += async (_, _) => await DeleteAsync(_activePane);
         LeftVolumeMenuItem.Click += async (_, _) => await ChooseVolumeProviderAsync(LeftPane);
@@ -80,6 +82,10 @@ public partial class MainWindow : Window
             case Key.F5:
                 e.Handled = true;
                 await CopyAsync(_activePane);
+                break;
+            case Key.F6:
+                e.Handled = true;
+                await MoveAsync(_activePane);
                 break;
             case Key.F7:
                 e.Handled = true;
@@ -233,6 +239,78 @@ public partial class MainWindow : Window
         var progressDialog = new CopyProgressDialog((progress, confirmOverwrite, cancellationToken) =>
             pane.NavigationContext.CopyAsync(entries, otherPane.NavigationContext, request.Destination,
                 request.Filter, progress, confirmOverwrite, cancellationToken));
+        await progressDialog.ShowDialog(this);
+
+        switch (progressDialog.Exception)
+        {
+            case null:
+                pane.NavigationContext.ClearMarks();
+                break;
+            case OperationCanceledException:
+                break;
+            default:
+                await ShowErrorAsync(progressDialog.Exception);
+                break;
+        }
+
+        await pane.RefreshEntriesAsync();
+        await otherPane.RefreshEntriesAsync();
+        pane.FocusEntries();
+    }
+
+    /// <summary>
+    ///     Moves the marked entries, or the entry under the cursor, of a pane to the other pane after confirming the
+    ///     destination and filter in the move dialog, showing the progress while moving. A single entry moved to a name
+    ///     without path separators is renamed instead and selected.
+    /// </summary>
+    private async Task MoveAsync(PaneView pane)
+    {
+        var otherPane = pane == LeftPane ? RightPane : LeftPane;
+        var entries = pane.NavigationContext.GetOperationEntries(pane.SelectedEntry);
+        if (entries.Count == 0)
+        {
+            return;
+        }
+
+        if (pane.NavigationContext.MoveNotSupportedMessage is { } message)
+        {
+            await new ErrorDialog(message).ShowDialog(this);
+            pane.FocusEntries();
+            return;
+        }
+
+        var request = await new CopyDialog(NavigationContext.GetMoveDescription(entries),
+            otherPane.NavigationContext.CurrentPath, "Move").ShowDialog<CopyDialogResult?>(this);
+        if (request == null)
+        {
+            pane.FocusEntries();
+            return;
+        }
+
+        string? newName;
+        try
+        {
+            newName = await pane.NavigationContext.GetRenameNameAsync(entries, otherPane.NavigationContext,
+                request.Destination);
+        }
+        catch (Exception exception)
+        {
+            await ShowErrorAsync(exception);
+            pane.FocusEntries();
+            return;
+        }
+
+        if (newName != null)
+        {
+            await pane.RenameAsync(entries[0], newName);
+            await otherPane.RefreshEntriesAsync();
+            pane.FocusEntries();
+            return;
+        }
+
+        var progressDialog = new CopyProgressDialog((progress, confirmOverwrite, cancellationToken) =>
+            pane.NavigationContext.MoveAsync(entries, otherPane.NavigationContext, request.Destination,
+                request.Filter, progress, confirmOverwrite, cancellationToken), "Move");
         await progressDialog.ShowDialog(this);
 
         switch (progressDialog.Exception)

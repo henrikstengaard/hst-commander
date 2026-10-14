@@ -15,7 +15,7 @@ public sealed class NavigationContext : IDisposable
     private readonly Action<string> _startFile;
     private Iso9660Volume? _isoVolume;
     private string? _isoPath;
-    private string? _createdEntryName;
+    private string? _newEntryName;
 
     /// <param name="initialPath">Local directory to start in, empty for the drive list.</param>
     /// <param name="startFile">
@@ -262,6 +262,11 @@ public sealed class NavigationContext : IDisposable
         ? $"Copy '{entries.First().Name}'"
         : $"Copy {entries.Count} entries";
 
+    /// <summary>Description of the entries to move shown in the move dialog, e.g. "Move 3 entries" or "Move 'a.txt'".</summary>
+    public static string GetMoveDescription(IReadOnlyCollection<IEntry> entries) => entries.Count == 1
+        ? $"Move '{entries.First().Name}'"
+        : $"Move {entries.Count} entries";
+
     /// <summary>Question shown in the delete confirm dialog, e.g. "Delete 3 entries?" or "Delete 'a.txt'?".</summary>
     public static string GetDeleteDescription(IReadOnlyCollection<IEntry> entries) => entries.Count == 1
         ? $"Delete '{entries.First().Name}'?"
@@ -417,13 +422,13 @@ public sealed class NavigationContext : IDisposable
 
         if (CurrentPath.Equals(previousPath, StringComparison.Ordinal))
         {
-            // a directory just created is selected once
-            var createdEntryName = _createdEntryName;
-            _createdEntryName = null;
-            var createdIndex = createdEntryName == null
+            // a directory just created or an entry just renamed is selected once
+            var newEntryName = _newEntryName;
+            _newEntryName = null;
+            var newIndex = newEntryName == null
                 ? -1
-                : entries.ToList().FindIndex(entry => entry.Name.Equals(createdEntryName, StringComparison.Ordinal));
-            return createdIndex >= 0 ? createdIndex : Math.Clamp(selectedIndex, 0, entries.Count - 1);
+                : entries.ToList().FindIndex(entry => entry.Name.Equals(newEntryName, StringComparison.Ordinal));
+            return newIndex >= 0 ? newIndex : Math.Clamp(selectedIndex, 0, entries.Count - 1);
         }
 
         return Math.Max(IndexOfPreviousEntry(entries), 0);
@@ -569,7 +574,7 @@ public sealed class NavigationContext : IDisposable
             cancellationToken);
         using (destination)
         {
-            ThrowIfCopyingOntoItself(source.Path, entries, destination.Path, targetName);
+            ThrowIfCopyingOntoItself(source.Path, entries, destination.Path, targetName, "copy");
             await source.Volume.CopyToAsync(entries, destination.Volume,
                 new CopyOptions(filter, targetName, confirmOverwrite), progress, cancellationToken);
         }
@@ -615,29 +620,218 @@ public sealed class NavigationContext : IDisposable
             throw new NotSupportedException(message);
         }
 
-        name = name.Trim();
-        if (name.Length == 0)
+        name = ValidateName(name, "Directory name");
+        if (await FindEntryAsync(name, cancellationToken) is { } existingEntry)
         {
-            throw new IOException("Directory name is empty");
-        }
-
-        if (name is "." or ".." ||name.IndexOfAny(['/', '\\']) >= 0 ||
-            name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
-        {
-            throw new IOException($"Invalid directory name '{name}'");
-        }
-
-        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
-        await foreach (var entry in _nestedVolume.ListEntries(cancellationToken))
-        {
-            if (entry.Name.Equals(name, comparison))
-            {
-                throw new IOException($"'{entry.Name}' already exists");
-            }
+            throw new IOException($"'{existingEntry.Name}' already exists");
         }
 
         await _nestedVolume.CreateContainer(name, cancellationToken);
-        _createdEntryName = name;
+        _newEntryName = name;
+    }
+
+    /// <summary>
+    ///     Why entries can't be moved from the current location, e.g. in the local drive list or inside a read-only
+    ///     image. Null when moving is supported, front-ends then show the move dialog.
+    /// </summary>
+    public string? MoveNotSupportedMessage =>
+        _rootVolume is LocalVolume && !_nestedVolume.CurrentPathComponents.Any()
+            ? "Moving is not supported in the drive list"
+            : _isoStreams.Count > 0
+                ? "Moving is not supported in an image, images are read-only"
+                : null;
+
+    /// <summary>
+    ///     The new name when a move destination entered in the move dialog renames the entry instead: a single entry
+    ///     moved to a name without path separators, which isn't the other pane's path or an existing directory in the
+    ///     current location (entries are moved into an existing directory). Null when the entries are moved.
+    /// </summary>
+    public async Task<string?> GetRenameNameAsync(IReadOnlyCollection<IEntry> entries,
+        NavigationContext destinationContext, string destinationPath, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+        ArgumentNullException.ThrowIfNull(destinationContext);
+        ArgumentNullException.ThrowIfNull(destinationPath);
+
+        var name = destinationPath.Trim();
+        if (entries.Count != 1 || name.Length == 0 || name is "." or ".." || name.IndexOfAny(['/', '\\']) >= 0 ||
+            Path.IsPathRooted(name) || name.Equals(destinationContext.CurrentPath, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var entry = entries.First();
+        var existingEntry = await FindEntryAsync(name, cancellationToken);
+        return existingEntry is { Type: EntryType.Container } && !existingEntry.Name.Equals(entry.Name, NameComparison)
+            ? null
+            : name;
+    }
+
+    /// <summary>
+    ///     Renames an entry in the current location. The renamed entry is selected by <see cref="GetSelectedIndex" />
+    ///     when the entries are listed again. Throws <see cref="NotSupportedException" /> when the location doesn't
+    ///     support it (see <see cref="MoveNotSupportedMessage" />) and <see cref="IOException" /> when the name is
+    ///     invalid or another entry with the name already exists.
+    /// </summary>
+    public async Task RenameAsync(IEntry entry, string newName, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        ArgumentNullException.ThrowIfNull(newName);
+
+        if (MoveNotSupportedMessage is { } message)
+        {
+            throw new NotSupportedException(message);
+        }
+
+        newName = ValidateName(newName, "Name");
+        if (newName.Equals(entry.Name, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        // only the case of the name may change, e.g. "a.txt" to "A.txt" on Windows
+        if (await FindEntryAsync(newName, cancellationToken) is { } existingEntry &&
+            !existingEntry.Name.Equals(entry.Name, StringComparison.Ordinal))
+        {
+            throw new IOException($"'{existingEntry.Name}' already exists");
+        }
+
+        await _nestedVolume.Rename(entry.Name, newName, cancellationToken);
+        _markedEntries.Remove(entry.Name);
+        _newEntryName = newName;
+    }
+
+    /// <summary>
+    ///     Moves entries in the current location to a destination, resolved like <see cref="CopyAsync" />. When the
+    ///     destination is a new name for a single entry (see <see cref="GetRenameNameAsync" />), the entry is renamed
+    ///     instead. Entries are moved by renaming them when the source and destination are on the same local drive,
+    ///     the filter matches all items and the destination has no entry with the name; otherwise they are copied and
+    ///     deleted from the source (see <see cref="VolumeMove.MoveToAsync" />), asking
+    ///     <paramref name="confirmOverwrite" /> before overwriting existing files.
+    /// </summary>
+    public async Task MoveAsync(IReadOnlyCollection<IEntry> entries, NavigationContext destinationContext,
+        string destinationPath, string filter, IProgress<CopyProgress>? progress = null,
+        Func<OverwriteRequest, CancellationToken, Task<OverwriteAnswer>>? confirmOverwrite = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+        ArgumentNullException.ThrowIfNull(destinationContext);
+
+        if (MoveNotSupportedMessage is { } message)
+        {
+            throw new NotSupportedException(message);
+        }
+
+        if (await GetRenameNameAsync(entries, destinationContext, destinationPath, cancellationToken) is { } newName)
+        {
+            await RenameAsync(entries.First(), newName, cancellationToken);
+            return;
+        }
+
+        using var source = await OpenLocationAsync(cancellationToken);
+        var (destination, targetName) = await OpenDestinationAsync(entries, destinationContext, destinationPath,
+            cancellationToken);
+        using (destination)
+        {
+            ThrowIfCopyingOntoItself(source.Path, entries, destination.Path, targetName, "move");
+            var remainingEntries = MoveOnSameDrive(source, entries, destination, filter, targetName, progress,
+                cancellationToken);
+            if (remainingEntries.Count > 0)
+            {
+                await source.Volume.MoveToAsync(remainingEntries, destination.Volume,
+                    new CopyOptions(filter, targetName, confirmOverwrite), progress, cancellationToken);
+            }
+        }
+    }
+
+    /// <summary>
+    ///     Moves entries by renaming them when both locations are local directories on the same drive and all items
+    ///     are moved, which is fast and needs no extra space. Returns the entries left to move by copying: all entries
+    ///     when renaming isn't possible, otherwise entries that exist in the destination (to confirm overwriting and
+    ///     merge directories).
+    /// </summary>
+    private static IReadOnlyList<IEntry> MoveOnSameDrive(VolumeLocation source, IReadOnlyCollection<IEntry> entries,
+        VolumeLocation destination, string filter, string? targetName, IProgress<CopyProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        if (source.Volume is not LocalVolume || destination.Volume is not LocalVolume ||
+            !(string.IsNullOrWhiteSpace(filter) || filter.Trim() is EntryFilter.All or "*.*") ||
+            FindDrive(source.Path) is not { } sourceDrive || FindDrive(destination.Path) is not { } destinationDrive ||
+            !sourceDrive.RootDirectory.FullName.Equals(destinationDrive.RootDirectory.FullName, NameComparison))
+        {
+            return entries.ToList();
+        }
+
+        var remainingEntries = new List<IEntry>();
+        var movedEntries = 0;
+        foreach (var entry in entries)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var sourcePath = Path.Combine(source.Path, entry.Name);
+            var destinationPath = Path.Combine(destination.Path, targetName ?? entry.Name);
+            if (File.Exists(destinationPath) || Directory.Exists(destinationPath))
+            {
+                remainingEntries.Add(entry);
+                continue;
+            }
+
+            progress?.Report(new CopyProgress(entry.Name, 0, 0, 0, 0, movedEntries, entries.Count, 0, null));
+            if (entry.Type == EntryType.Container)
+            {
+                Directory.Move(sourcePath, destinationPath);
+            }
+            else
+            {
+                File.Move(sourcePath, destinationPath);
+            }
+
+            movedEntries++;
+        }
+
+        if (movedEntries > 0)
+        {
+            progress?.Report(new CopyProgress(string.Empty, 0, 0, 0, 0, movedEntries, entries.Count, 0, null));
+        }
+
+        return remainingEntries;
+    }
+
+    private static StringComparison NameComparison =>
+        OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+
+    /// <summary>
+    ///     Trims an entry name entered by the user and checks it's valid: an empty name, "." and "..", and names with
+    ///     path separators or invalid file name characters throw <see cref="IOException" />.
+    /// </summary>
+    private static string ValidateName(string name, string description)
+    {
+        name = name.Trim();
+        if (name.Length == 0)
+        {
+            throw new IOException($"{description} is empty");
+        }
+
+        if (name is "." or ".." || name.IndexOfAny(['/', '\\']) >= 0 ||
+            name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+        {
+            throw new IOException($"Invalid {description.ToLowerInvariant()} '{name}'");
+        }
+
+        return name;
+    }
+
+    /// <summary>Finds an entry in the current location by name, case-insensitive on Windows.</summary>
+    private async Task<IEntry?> FindEntryAsync(string name, CancellationToken cancellationToken)
+    {
+        await foreach (var entry in _nestedVolume.ListEntries(cancellationToken))
+        {
+            if (entry.Name.Equals(name, NameComparison))
+            {
+                return entry;
+            }
+        }
+
+        return null;
     }
 
     private async Task<(VolumeLocation Location, string? TargetName)> OpenDestinationAsync(
@@ -687,9 +881,9 @@ public sealed class NavigationContext : IDisposable
     }
 
     private static void ThrowIfCopyingOntoItself(string sourcePath, IEnumerable<IEntry> entries,
-        string destinationPath, string? targetName)
+        string destinationPath, string? targetName, string operation)
     {
-        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        var comparison = NameComparison;
         sourcePath = Path.TrimEndingDirectorySeparator(sourcePath);
         destinationPath = Path.TrimEndingDirectorySeparator(destinationPath);
         var entryList = entries.ToList();
@@ -697,14 +891,14 @@ public sealed class NavigationContext : IDisposable
         if (destinationPath.Equals(sourcePath, comparison) &&
             (targetName == null || entryList.Any(entry => entry.Name.Equals(targetName, comparison))))
         {
-            throw new IOException("Cannot copy entries onto themselves");
+            throw new IOException($"Cannot {operation} entries onto themselves");
         }
 
         foreach (var entry in entryList.Where(entry => entry.Type == EntryType.Container))
         {
             if (IsInDirectory(destinationPath, Path.Combine(sourcePath, entry.Name), comparison))
             {
-                throw new IOException($"Cannot copy directory '{entry.Name}' into itself");
+                throw new IOException($"Cannot {operation} directory '{entry.Name}' into itself");
             }
         }
     }

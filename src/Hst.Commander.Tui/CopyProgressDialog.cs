@@ -4,7 +4,7 @@ using Terminal.Gui;
 namespace Hst.Commander.Tui;
 
 /// <summary>
-///     Modal dialog showing the progress of a copy with progress bars for the current file and in total, the copy
+///     Modal dialog showing the progress of a copy or move with progress bars for the current file and in total, the copy
 ///     speed and estimated time left. Cancel (or Esc) cancels the copy through <see cref="CancellationToken" />; the
 ///     dialog stays open until the copy has stopped and <see cref="Complete" /> is called.
 /// </summary>
@@ -19,9 +19,9 @@ public sealed class CopyProgressDialog : Dialog
     private readonly Button _cancelButton;
     private bool _completed;
 
-    public CopyProgressDialog(TuiPalette palette)
+    public CopyProgressDialog(TuiPalette palette, string title = "Copy")
     {
-        Title = "Copy";
+        Title = title;
         Width = Dim.Percent(70);
         Height = 13;
         ColorScheme = palette.DialogColorScheme;

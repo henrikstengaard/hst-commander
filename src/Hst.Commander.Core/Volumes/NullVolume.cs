@@ -32,6 +32,9 @@ public class NullVolume : IVolume
     public Task Delete(string name, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException("Null volume is read-only");
 
+    public Task Rename(string name, string newName, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("Null volume is read-only");
+
     public Task SetModifiedDate(string name, DateTime modifiedDate, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException("Null volume is read-only");
 }

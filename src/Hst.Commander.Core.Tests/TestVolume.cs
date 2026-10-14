@@ -190,6 +190,35 @@ public class TestVolume : IVolume
         return Task.CompletedTask;
     }
 
+    public Task Rename(string name, string newName, CancellationToken cancellationToken = default)
+    {
+        var entry = GetEntry(currentPathComponents.Append(name).ToArray()) ??
+                    throw new IOException("Entry not found");
+        if (GetEntry(currentPathComponents.Append(newName).ToArray()) != null)
+        {
+            throw new IOException($"'{newName}' already exists");
+        }
+
+        // a container's entries are moved to the new path, including the entries of containers within it
+        if (entry.Type == EntryType.Container)
+        {
+            var containerPath = CreatePath(currentPathComponents.Append(name));
+            var newContainerPath = CreatePath(currentPathComponents.Append(newName));
+            foreach (var path in entries.Keys.ToList())
+            {
+                if (path == containerPath || path.StartsWith(containerPath + "|", StringComparison.Ordinal))
+                {
+                    var pathEntries = entries[path];
+                    entries.Remove(path);
+                    entries[newContainerPath + path[containerPath.Length..]] = pathEntries;
+                }
+            }
+        }
+
+        entry.Name = newName;
+        return Task.CompletedTask;
+    }
+
     public Task SetModifiedDate(string name, DateTime modifiedDate, CancellationToken cancellationToken = default)
     {
         var entry = GetEntry(currentPathComponents.Append(name).ToArray()) ??

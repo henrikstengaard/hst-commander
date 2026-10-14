@@ -5,7 +5,7 @@ using Hst.Commander.Core.Volumes;
 namespace Hst.Commander.Gui;
 
 /// <summary>
-///     Modal dialog running a copy in the background and showing its progress with progress bars for the current file
+///     Modal dialog running a copy or move in the background and showing its progress with progress bars for the current file
 ///     and in total, the copy speed and estimated time left. Existing files are confirmed with
 ///     <see cref="OverwriteDialog" />. Cancel (or closing the window) cancels the copy; the dialog closes when the
 ///     copy has stopped and <see cref="Exception" /> holds the error, if any.
@@ -20,14 +20,16 @@ public partial class CopyProgressDialog : Window
     }
 
     /// <param name="copy">
-    ///     Copy to run with the progress, the overwrite confirmation and the cancellation token of the dialog.
+    ///     Copy (or move) to run with the progress, the overwrite confirmation and the cancellation token of the dialog.
     /// </param>
+    /// <param name="title">Title of the dialog, e.g. "Move".</param>
     public CopyProgressDialog(
         Func<IProgress<CopyProgress>, Func<OverwriteRequest, CancellationToken, Task<OverwriteAnswer>>,
-            CancellationToken, Task> copy)
+            CancellationToken, Task> copy, string title = "Copy")
     {
         InitializeComponent();
 
+        Title = title;
         CancelButton.Click += (_, _) => Cancel();
         Closing += (_, e) =>
         {

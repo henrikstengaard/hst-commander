@@ -40,9 +40,19 @@ public static class VolumeCopy
     /// <param name="options">Copy options, e.g. the filter of items to copy.</param>
     /// <param name="progress">Receives the copy progress, at most every 100 ms and when an item is copied.</param>
     /// <param name="cancellationToken"></param>
-    public static async Task CopyToAsync(this IVolume source, IEnumerable<IEntry> entries, IVolume destination,
+    public static Task CopyToAsync(this IVolume source, IEnumerable<IEntry> entries, IVolume destination,
         CopyOptions? options = null, IProgress<CopyProgress>? progress = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        TransferAsync(source, entries, destination, options, progress, deleteSource: false, cancellationToken);
+
+    /// <summary>
+    /// Copies entries like <see cref="CopyToAsync" />. With <paramref name="deleteSource" /> (used by
+    /// <see cref="VolumeMove" />), each item is deleted from the source once it is copied and each container once it
+    /// is empty, so items skipped or not matching the filter are kept with their containers.
+    /// </summary>
+    internal static async Task TransferAsync(IVolume source, IEnumerable<IEntry> entries, IVolume destination,
+        CopyOptions? options, IProgress<CopyProgress>? progress, bool deleteSource,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(entries);
@@ -98,6 +108,10 @@ public static class VolumeCopy
 
             await CopyItemAsync(source, destination, item, targetName, state, cancellationToken);
             await SetModifiedDateAsync(destination, targetName, item.Entry, cancellationToken);
+            if (deleteSource)
+            {
+                await source.Delete(item.Entry.Name, cancellationToken);
+            }
         }
 
         // containers are in the order they are created, so in reverse their entries come before them
@@ -105,6 +119,11 @@ public static class VolumeCopy
         {
             await ChangeDirectoryAsync(destination, destinationDirectory, item.Directory, cancellationToken);
             await SetModifiedDateAsync(destination, item.Entry.Name, item.Entry, cancellationToken);
+            if (deleteSource)
+            {
+                await ChangeDirectoryAsync(source, sourceDirectory, item.Directory, cancellationToken);
+                await DeleteIfEmptyAsync(source, item.Entry.Name, cancellationToken);
+            }
         }
 
         await ChangeDirectoryAsync(source, sourceDirectory, [], cancellationToken);
@@ -196,6 +215,18 @@ public static class VolumeCopy
         }
         catch (NotSupportedException)
         {
+        }
+    }
+
+    /// <summary>Deletes a container in the current directory when it is empty.</summary>
+    private static async Task DeleteIfEmptyAsync(IVolume volume, string name, CancellationToken cancellationToken)
+    {
+        await volume.ChangeDirectory([name], cancellationToken);
+        var isEmpty = !await volume.ListEntries(cancellationToken).AnyAsync(cancellationToken);
+        await volume.ChangeDirectory([Paths.Parent], cancellationToken);
+        if (isEmpty)
+        {
+            await volume.Delete(name, cancellationToken);
         }
     }
 

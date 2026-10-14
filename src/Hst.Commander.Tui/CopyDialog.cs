@@ -4,17 +4,17 @@ using Terminal.Gui;
 namespace Hst.Commander.Tui;
 
 /// <summary>
-///     Modal confirm dialog shown before copying, where the destination and the filter of the files to copy can be
-///     changed. <see cref="Result" /> holds the destination and filter on OK or null on cancel.
+///     Modal confirm dialog shown before copying or moving, where the destination and the filter of the files to copy
+///     or move can be changed. <see cref="Result" /> holds the destination and filter on OK or null on cancel.
 /// </summary>
 public sealed class CopyDialog : Dialog
 {
     private readonly TextField _destinationField;
     private readonly TextField _filterField;
 
-    public CopyDialog(string description, string destination, TuiPalette palette)
+    public CopyDialog(string description, string destination, TuiPalette palette, string title = "Copy")
     {
-        Title = "Copy";
+        Title = title;
         Width = Dim.Percent(70);
         Height = 11;
         ColorScheme = palette.DialogColorScheme;

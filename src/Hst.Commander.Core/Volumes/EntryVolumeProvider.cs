@@ -45,6 +45,9 @@ public class EntryVolumeProvider(IEntry entry, IVolume volumeProvider) : IVolume
     public Task Delete(string name, CancellationToken cancellationToken = default) =>
         volumeProvider.Delete(name, cancellationToken);
 
+    public Task Rename(string name, string newName, CancellationToken cancellationToken = default) =>
+        volumeProvider.Rename(name, newName, cancellationToken);
+
     public Task SetModifiedDate(string name, DateTime modifiedDate, CancellationToken cancellationToken = default) =>
         volumeProvider.SetModifiedDate(name, modifiedDate, cancellationToken);
 }
