@@ -335,6 +335,9 @@ public sealed class NavigationContext : IDisposable
 
     public bool HasParent =>_nestedVolume.CurrentPathComponents.Any();
 
+    /// <summary>True when listing the local drives, where the entries are drive roots.</summary>
+    public bool IsDriveList => _rootVolume is LocalVolume && !HasParent;
+
     public string CurrentPath
     {
         get
@@ -396,6 +399,28 @@ public sealed class NavigationContext : IDisposable
         return path.Equals(directory, comparison) ||
                (path + Path.DirectorySeparatorChar).StartsWith(directoryWithSeparator, comparison);
     }
+
+    /// <summary>
+    ///     Full local path of a listed entry, e.g. to get its icon from the OS: the drive root in the drive list. Null
+    ///     for "..", inside images and in other volume providers.
+    /// </summary>
+    public string? GetLocalPath(IEntry entry)
+    {
+        if (_isoStreams.Count > 0 || _rootVolume is not LocalVolume ||
+            entry.Name.Equals(Paths.Parent, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        return LocalPath is { } localPath ? Path.Combine(localPath, entry.Name) : entry.Name;
+    }
+
+    /// <summary>
+    ///     Opens a listed item in the current location for reading, e.g. to read its icon. Uses the pane's own volume,
+    ///     so it must not run concurrently with navigation.
+    /// </summary>
+    public Task<Stream> OpenReadAsync(IEntry entry, CancellationToken cancellationToken = default) =>
+        _nestedVolume.OpenRead(entry.Name, cancellationToken);
 
     public async Task<IReadOnlyList<IEntry>> ListEntriesAsync(CancellationToken cancellationToken = default)
     {

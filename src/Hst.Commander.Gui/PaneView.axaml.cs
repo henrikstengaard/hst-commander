@@ -3,6 +3,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Hst.Commander.Core;
 using Hst.Commander.Extensions.Volume.Abstractions;
+using Hst.Commander.Gui.Icons;
 
 namespace Hst.Commander.Gui;
 
@@ -12,6 +13,7 @@ namespace Hst.Commander.Gui;
 public partial class PaneView : UserControl
 {
     private NavigationContext? _navigationContext;
+    private CancellationTokenSource? _iconsCancellation;
 
     public PaneView()
     {
@@ -215,6 +217,8 @@ public partial class PaneView : UserControl
 
     private async Task RunNavigationAsync(Func<Task> action)
     {
+        // icons of files inside images are read from the pane's volume, so stop before navigating
+        _iconsCancellation?.Cancel();
         try
         {
             await action();
@@ -251,6 +255,24 @@ public partial class PaneView : UserControl
         {
             EntriesList.UpdateLayout();
             FocusEntries();
+        }
+
+        LoadIcons(entries);
+    }
+
+    /// <summary>Loads the icons of the listed entries in the background, replacing the initial icons.</summary>
+    private async void LoadIcons(IReadOnlyList<EntryItem> entries)
+    {
+        _iconsCancellation?.Cancel();
+        var cancellation = _iconsCancellation = new CancellationTokenSource();
+        var size = (int)Math.Ceiling(16 * (TopLevel.GetTopLevel(this)?.RenderScaling ?? 1));
+        try
+        {
+            await FileIcons.LoadAsync(entries, NavigationContext, size, cancellation.Token);
+        }
+        catch (Exception)
+        {
+            // icons are not essential, the initial icons are kept
         }
     }
 }

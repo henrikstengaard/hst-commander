@@ -1,5 +1,7 @@
 using System.ComponentModel;
+using Avalonia.Media;
 using Hst.Commander.Core;
+using Hst.Commander.Gui.Icons;
 using Hst.Commander.Extensions.Volume.Abstractions;
 
 namespace Hst.Commander.Gui;
@@ -10,6 +12,7 @@ namespace Hst.Commander.Gui;
 public sealed class EntryItem(IEntry entry, bool isMarked = false, bool isExecutable = false) : INotifyPropertyChanged
 {
     private bool _isMarked = isMarked;
+    private IImage _icon = FileIcons.GetInitialIcon(entry);
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -35,6 +38,22 @@ public sealed class EntryItem(IEntry entry, bool isMarked = false, bool isExecut
 
             _isMarked = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsMarked)));
+        }
+    }
+
+    /// <summary>Icon shown left of the name, replaced when <see cref="FileIcons" /> has loaded the actual icon.</summary>
+    public IImage Icon
+    {
+        get => _icon;
+        set
+        {
+            if (ReferenceEquals(_icon, value))
+            {
+                return;
+            }
+
+            _icon = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Icon)));
         }
     }
 

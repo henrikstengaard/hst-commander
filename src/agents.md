@@ -40,7 +40,12 @@ src/
   Hst.Commander.Gui/                             Avalonia 12 desktop GUI application
     MainWindow.axaml(.cs)                        Dual-pane window, File menu, function key bar, Tab pane switching, F5 copy, F6 move/rename, F7 make directory, F8/Delete delete, error display
     PaneView.axaml(.cs)                          One pane: path, column header, entry ListBox, Enter/Backspace
-    EntryItem.cs                                 Display row for an IEntry (size/date formatting)
+    EntryItem.cs                                 Display row for an IEntry (size/date formatting, icon)
+    Icons/FileIcons.cs                           Loads and caches the entry icons (embedded, OS registered, built-in fallback)
+    Icons/IFileIconProvider.cs                   Host OS icons for file types, folders, drives and files with own icons
+    Icons/WindowsFileIconProvider.cs             Windows shell icons (SHGetFileInfo)
+    Icons/FreedesktopFileIconProvider.cs         Linux/freedesktop icons (shared MIME database + PNG icon themes)
+    Icons/MacFileIconProvider.cs                 macOS icons (NSWorkspace via the Objective-C runtime)
     ErrorDialog.axaml(.cs)                       Modal error dialog
     SettingsDialog.axaml(.cs)                    Modal settings view (theme selection with live preview, volume provider keys)
     CopyDialog.axaml(.cs)                        Modal copy/move confirm dialog (destination and filter), titled Copy or Move
@@ -201,6 +206,7 @@ The keys opening the volume provider list of the left/right pane are chosen in F
 - The Terminal.Gui v2 TUI and Avalonia 12 GUI dual-pane browsers, with per-pane navigation and current-directory startup.
 - Local drive/directory listing, parent navigation, and read-only browsing of local ISO images as nested volumes.
 - Starting/executing local files with Enter or double-click, with executables drawn in green.
+- GUI entry icons: icons contained in programs and .ico files (also inside images), otherwise the host OS icons for file types, folders and drives.
 - The volume abstraction layer and implementations: `LocalVolume`, `Iso9660Volume`, `NestedVolume`, `EntryVolumeProvider`, and `NullVolume`.
 - All unit tests in `Hst.Commander.Core.Tests`.
 
@@ -237,9 +243,9 @@ The keys opening the volume provider list of the left/right pane are chosen in F
 
 ### Namespaces
 - Abstractions: `Hst.Commander.Extensions.Volume.Abstractions`
-- Core: `Hst.Commander.Core` (`AppInfo`, `NavigationContext`, `NameFilter`, `SelectGroupOptions`, `FileStarter`, `Paths`, `SettingsPaths`, `SizeFormatter`), `Hst.Commander.Core.Volumes` (volumes)
+- Core: `Hst.Commander.Core` (`AppInfo`, `EmbeddedIconReader`, `IconImage`, `NavigationContext`, `NameFilter`, `SelectGroupOptions`, `FileStarter`, `Paths`, `SettingsPaths`, `SizeFormatter`), `Hst.Commander.Core.Volumes` (volumes)
 - Tui: `Hst.Commander.Tui`
-- Gui: `Hst.Commander.Gui`
+- Gui: `Hst.Commander.Gui`, `Hst.Commander.Gui.Icons` (entry icons)
 - Tests: `Hst.Commander.Core.Tests`
 
 ### Error Handling
@@ -327,6 +333,9 @@ Key GUI patterns already in use:
 - Column dividers are drawn by a non-hit-testable grid behind the list, so they continue below the last entry.
 - The left pane has focus on startup. `PaneView.FocusEntries` focuses the selected item's container (selecting the first entry if none is, and realizing it with `UpdateLayout` if needed); the `ListBox` itself is not focusable, and arrow keys only move the selection while an item has focus.
 - Up/Down use the `ListBox` built-in navigation. PageUp/PageDown (one visible page) and Home/End are handled in `PaneView`, because the list's `ScrollViewer` would otherwise consume them and only scroll the view without moving the selection. Enter (or double-click) opens the selected entry and Backspace goes to the parent; both are handled with a tunnelling `KeyDown` handler on the list.
+- Each row shows a 16x16 icon left of the name (`EntryItem.Icon`). Rows start with the cached type icon (or the built-in `FileIcons.DefaultFolderIcon`/`DefaultFileIcon`), then `PaneView.LoadIcons` runs `FileIcons.LoadAsync` after each listing (cancelled when the pane navigates or lists again) with the icon size in pixels (16 × render scaling):
+  1. Type icons from the host OS (`IFileIconProvider`), cached per extension, folder and drive: Windows shell icons (`SHGetFileInfo` with file attributes, so files don't need to exist), freedesktop.org icons on Linux (extension → MIME type from `mime/globs2`, icon name from `mime/icons`, `<type>-<subtype>`, `mime/generic-icons`, `<media>-x-generic`; looked up as PNG in the current icon theme from `gsettings`/`kdeglobals`, the themes it inherits, common themes, `hicolor` and `pixmaps`; SVG-only icons are not supported) and NSWorkspace icons on macOS (called on the UI thread). Drives in the drive list get their own drive icon. Without an OS icon the built-in icons are kept.
+  2. Icons contained in files: `EmbeddedIconReader` (`Hst.Commander.Core`) reads the first icon group of a Windows executable (`.exe`, `.scr`) or an `.ico` file without OS support, choosing the smallest image at least the wanted size with the most colors, as an `IconImage` (PNG data or BGRA pixels, DIBs decoded with the AND mask). Local files are read on a background thread by `NavigationContext.GetLocalPath`; files inside images are read with `NavigationContext.OpenReadAsync` on the UI thread, as the pane's volume is not thread safe. When a local file has no icon of its own and the OS shows it with one (`IFileIconProvider.HasFileIcon`: on Windows programs, e.g. system programs with icons in `C:\Windows\SystemResources`, shortcuts `.lnk`/`.url`; `.icns` on macOS), the OS icon of the file is used. File icons are cached by path, size and modified date.
 - `EntryItem.IsExecutable` adds the `executable` class to the row, styled with `ExecutableForeground` (green); the current row and marked styles come after it.
 - Insert or Space toggles the mark of the current entry (via `NavigationContext.ToggleMark`) and moves down. `EntryItem.IsMarked` notifies changes and adds the `marked` class to the row, styled with `MarkedEntryForeground` (yellow) after the current-row style so marked entries stay yellow under the cursor.
 - Tab is handled at window level (tunnelling) and always switches focus between the two panes.

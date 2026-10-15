@@ -91,7 +91,11 @@
                                   Classes.executable="{Binding IsExecutable}"
                                   Classes.marked="{Binding IsMarked}" Background="Transparent"
                                   ColumnDefinitions="*,90,150">
-                                <TextBlock Grid.Column="0" Text="{Binding Name}" />
+                                <DockPanel Grid.Column="0">
+                                    <Image DockPanel.Dock="Left" Width="16" Height="16" Margin="4,0,0,0"
+                                           Source="{Binding Icon}" RenderOptions.BitmapInterpolationMode="HighQuality" />
+                                    <TextBlock Text="{Binding Name}" />
+                                </DockPanel>
                                 <TextBlock Grid.Column="1" Text="{Binding Size}" TextAlignment="Right" />
                                 <TextBlock Grid.Column="2" Text="{Binding Modified}" />
                             </Grid>
