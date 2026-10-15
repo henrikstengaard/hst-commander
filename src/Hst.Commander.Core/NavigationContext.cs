@@ -238,6 +238,67 @@ public sealed class NavigationContext : IDisposable
         return true;
     }
 
+    /// <summary>
+    ///     Marks the listed entries whose names match the filter of the select group dialog (+), adding to the entries
+    ///     already marked. Directories are marked too unless <see cref="SelectGroupOptions.FilesOnly" />; the parent
+    ///     entry ".." is never marked. Returns the number of matching entries. Throws <see cref="IOException" /> when
+    ///     the filter is an invalid regular expression.
+    /// </summary>
+    public int MarkGroup(IEnumerable<IEntry> entries, SelectGroupOptions options)
+    {
+        var matchingEntries = FindGroup(entries, options);
+        foreach (var entry in matchingEntries)
+        {
+            _markedEntries[entry.Name] = entry;
+        }
+
+        return matchingEntries.Count;
+    }
+
+    /// <summary>
+    ///     Unmarks the listed entries whose names match the filter of the unselect group dialog (-), matched like
+    ///     <see cref="MarkGroup" />; other marks are kept. Returns the number of matching entries. Throws
+    ///     <see cref="IOException" /> when the filter is an invalid regular expression.
+    /// </summary>
+    public int UnmarkGroup(IEnumerable<IEntry> entries, SelectGroupOptions options)
+    {
+        var matchingEntries = FindGroup(entries, options);
+        foreach (var entry in matchingEntries)
+        {
+            _markedEntries.Remove(entry.Name);
+        }
+
+        return matchingEntries.Count;
+    }
+
+    /// <summary>
+    ///     Inverts the marks of the listed entries (*): marked entries are unmarked and the others are marked,
+    ///     directories included. The parent entry ".." is never marked.
+    /// </summary>
+    public void InvertMarks(IEnumerable<IEntry> entries)
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+
+        foreach (var entry in entries.ToList())
+        {
+            ToggleMark(entry);
+        }
+    }
+
+    /// <summary>Listed entries, except "..", matching select group options.</summary>
+    private static List<IEntry> FindGroup(IEnumerable<IEntry> entries, SelectGroupOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+        ArgumentNullException.ThrowIfNull(options);
+
+        var filter = new NameFilter(options.Filter, options.CaseSensitive);
+        return entries
+            .Where(entry => !entry.Name.Equals(Paths.Parent, StringComparison.Ordinal) &&
+                            (!options.FilesOnly || entry.Type == EntryType.Item) &&
+                            filter.IsMatch(entry.Name))
+            .ToList();
+    }
+
     /// <summary>Clears the marks of all entries, e.g. after the marked entries are copied.</summary>
     public void ClearMarks() => _markedEntries.Clear();
 

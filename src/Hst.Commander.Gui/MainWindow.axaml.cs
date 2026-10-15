@@ -10,6 +10,7 @@ public partial class MainWindow : Window
 {
     private PaneView _activePane;
     private VolumeProviderKeys _volumeProviderKeys;
+    private string _selectGroupFilter = SelectGroupOptions.Default.Filter;
 
     public MainWindow() : this(Environment.CurrentDirectory)
     {
@@ -32,6 +33,9 @@ public partial class MainWindow : Window
         MoveMenuItem.Click += async (_, _) => await MoveAsync(_activePane);
         MakeDirectoryMenuItem.Click += async (_, _) => await MakeDirectoryAsync(_activePane);
         DeleteMenuItem.Click += async (_, _) => await DeleteAsync(_activePane);
+        SelectGroupMenuItem.Click += async (_, _) => await SelectGroupAsync(_activePane, true);
+        UnselectGroupMenuItem.Click += async (_, _) => await SelectGroupAsync(_activePane, false);
+        InvertSelectionMenuItem.Click += (_, _) => InvertSelection(_activePane);
         CopyButton.Click += async (_, _) => await CopyAsync(_activePane);
         MoveButton.Click += async (_, _) => await MoveAsync(_activePane);
         MkdirButton.Click += async (_, _) => await MakeDirectoryAsync(_activePane);
@@ -60,6 +64,28 @@ public partial class MainWindow : Window
 
     private async void OnWindowKeyDown(object? sender, KeyEventArgs e)
     {
+        // +, - and * depend on the keyboard layout, e.g. shift+= for + on US keyboards, so match the typed symbol
+        if (e.KeySymbol == "+" || e.Key == Key.Add)
+        {
+            e.Handled = true;
+            await SelectGroupAsync(_activePane, true);
+            return;
+        }
+
+        if (e.KeySymbol == "-" || e.Key == Key.Subtract)
+        {
+            e.Handled = true;
+            await SelectGroupAsync(_activePane, false);
+            return;
+        }
+
+        if (e.KeySymbol == "*" || e.Key == Key.Multiply)
+        {
+            e.Handled = true;
+            InvertSelection(_activePane);
+            return;
+        }
+
         switch (e.Key)
         {
             case Key.Tab:
@@ -148,6 +174,37 @@ public partial class MainWindow : Window
             await pane.ChangeLocationAsync(path);
         }
 
+        pane.FocusEntries();
+    }
+
+    /// <summary>
+    ///     Marks (select) or unmarks (unselect) the entries of a pane matching the filter entered in the select group
+    ///     dialog, keeping the other marks. The filter is remembered for the next time, the check boxes start unchecked.
+    /// </summary>
+    private async Task SelectGroupAsync(PaneView pane, bool select)
+    {
+        var options = await new SelectGroupDialog(SelectGroupOptions.Default with { Filter = _selectGroupFilter },
+            select ? "Select group" : "Unselect group").ShowDialog<SelectGroupOptions?>(this);
+        if (options != null)
+        {
+            _selectGroupFilter = options.Filter;
+            if (select)
+            {
+                pane.MarkGroup(options);
+            }
+            else
+            {
+                pane.UnmarkGroup(options);
+            }
+        }
+
+        pane.FocusEntries();
+    }
+
+    /// <summary>Inverts the marks of the entries of a pane: marked entries are unmarked and the others marked.</summary>
+    private static void InvertSelection(PaneView pane)
+    {
+        pane.InvertMarks();
         pane.FocusEntries();
     }
 

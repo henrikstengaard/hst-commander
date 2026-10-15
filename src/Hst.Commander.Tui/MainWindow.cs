@@ -24,6 +24,7 @@ public sealed class MainWindow : Window
     private Pane _activePane;
     private TerminalAction? _pendingTerminalAction;
     private string? _pendingError;
+    private string _selectGroupFilter = SelectGroupOptions.Default.Filter;
 
     public MainWindow(string initialPath, TuiSettings settings)
     {
@@ -47,6 +48,10 @@ public sealed class MainWindow : Window
                     new("Mo_ve/rename...", "F6", MoveFromActivePane),
                     new("_Make directory...", "F7", MakeDirectoryInActivePane),
                     new("_Delete...", "F8", DeleteFromActivePane),
+                    null!,
+                    new("Select _group...", "+", SelectGroupInActivePane),
+                    new("_Unselect group...", "-", UnselectGroupInActivePane),
+                    new("_Invert selection", "*", InvertSelectionInActivePane),
                     null!,
                     _leftVolumeMenuItem,
                     _rightVolumeMenuItem,
@@ -322,6 +327,21 @@ public sealed class MainWindow : Window
                 ToggleMarkAndMoveDown(pane);
                 key.Handled = true;
             }
+            else if (key.AsRune.Value == '+')
+            {
+                key.Handled = true;
+                SelectGroup(pane, true);
+            }
+            else if (key.AsRune.Value == '-')
+            {
+                key.Handled = true;
+                SelectGroup(pane, false);
+            }
+            else if (key.AsRune.Value == '*')
+            {
+                key.Handled = true;
+                InvertSelection(pane);
+            }
             else if (key.KeyCode == KeyCode.Backspace)
             {
                 key.Handled = true;
@@ -380,11 +400,71 @@ public sealed class MainWindow : Window
     private void MakeDirectoryInActivePane() =>
         _ = MakeDirectoryAsync(_activePane, _activePane == _leftPane ? _rightPane : _leftPane);
 
+    private void SelectGroupInActivePane() => SelectGroup(_activePane, true);
+
+    private void UnselectGroupInActivePane() => SelectGroup(_activePane, false);
+
+    private void InvertSelectionInActivePane() => InvertSelection(_activePane);
+
     private void ChooseLeftVolumeProvider() => _ = ChooseVolumeProviderAsync(_leftPane);
 
     private void ChooseRightVolumeProvider() => _ = ChooseVolumeProviderAsync(_rightPane);
 
     private void ShowLocationOfActivePane() => _ = ShowLocationAsync(_activePane);
+
+    /// <summary>
+    ///     Marks (select) or unmarks (unselect) the entries of a pane matching the filter entered in the select group
+    ///     dialog, keeping the other marks. The filter is remembered for the next time, the check boxes start unchecked.
+    /// </summary>
+    private void SelectGroup(Pane pane, bool select)
+    {
+        var dialog = new SelectGroupDialog(SelectGroupOptions.Default with { Filter = _selectGroupFilter }, _palette,
+            select ? "Select group" : "Unselect group");
+        Application.Run(dialog);
+        var options = dialog.Result;
+        dialog.Dispose();
+
+        pane.TableView.SetFocus();
+        if (options == null)
+        {
+            return;
+        }
+
+        _selectGroupFilter = options.Filter;
+        try
+        {
+            if (select)
+            {
+                pane.NavigationContext.MarkGroup(pane.Entries, options);
+            }
+            else
+            {
+                pane.NavigationContext.UnmarkGroup(pane.Entries, options);
+            }
+        }
+        catch (Exception exception)
+        {
+            MessageBox.ErrorQuery("Error", exception.Message, "OK");
+            return;
+        }
+
+        UpdateMarks(pane);
+    }
+
+    /// <summary>Inverts the marks of the entries of a pane: marked entries are unmarked and the others marked.</summary>
+    private static void InvertSelection(Pane pane)
+    {
+        pane.NavigationContext.InvertMarks(pane.Entries);
+        UpdateMarks(pane);
+    }
+
+    /// <summary>Redraws a pane and its marked-entries summary after its marks changed.</summary>
+    private static void UpdateMarks(Pane pane)
+    {
+        pane.PathPanel.Summary = pane.NavigationContext.MarkedSummary;
+        pane.PathPanel.NeedsDraw = true;
+        pane.TableView.NeedsDraw = true;
+    }
 
     /// <summary>
     ///     Shows the location dialog of a pane with its current path, changing to the entered path on OK or showing the

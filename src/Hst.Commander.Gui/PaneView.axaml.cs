@@ -158,6 +158,45 @@ public partial class PaneView : UserControl
         MoveSelection(1);
     }
 
+    /// <summary>
+    ///     Marks the entries matching the select group options, see <see cref="NavigationContext.MarkGroup" />. Errors
+    ///     like an invalid regular expression raise <see cref="NavigationFailed" />.
+    /// </summary>
+    public void MarkGroup(SelectGroupOptions options) =>
+        ChangeMarks(entries => NavigationContext.MarkGroup(entries, options));
+
+    /// <summary>
+    ///     Unmarks the entries matching the unselect group options, see <see cref="NavigationContext.UnmarkGroup" />.
+    ///     Errors like an invalid regular expression raise <see cref="NavigationFailed" />.
+    /// </summary>
+    public void UnmarkGroup(SelectGroupOptions options) =>
+        ChangeMarks(entries => NavigationContext.UnmarkGroup(entries, options));
+
+    /// <summary>Inverts the marks of the entries, see <see cref="NavigationContext.InvertMarks" />.</summary>
+    public void InvertMarks() => ChangeMarks(NavigationContext.InvertMarks);
+
+    /// <summary>Changes the marks of the listed entries and updates the rows and the summary.</summary>
+    private void ChangeMarks(Action<IReadOnlyList<IEntry>> changeMarks)
+    {
+        var items = EntriesList.ItemsSource as IReadOnlyList<EntryItem> ?? [];
+        try
+        {
+            changeMarks(items.Select(item => item.Entry).ToList());
+        }
+        catch (Exception exception)
+        {
+            NavigationFailed?.Invoke(this, exception);
+            return;
+        }
+
+        foreach (var item in items)
+        {
+            item.IsMarked = NavigationContext.IsMarked(item.Entry);
+        }
+
+        UpdateSummary();
+    }
+
     private void UpdateSummary()
     {
         SummaryText.Text = NavigationContext.MarkedSummary;
