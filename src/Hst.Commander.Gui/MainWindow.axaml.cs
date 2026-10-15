@@ -22,9 +22,10 @@ public partial class MainWindow : Window
         Title = AppInfo.Current.NameAndVersion;
 
         _activePane = LeftPane;
+        LeftPane.IsActive = true;
         ApplyVolumeProviderKeys(GuiSettings.Load().EffectiveVolumeProviderKeys);
-        LeftPane.GotFocus += (_, _) => _activePane = LeftPane;
-        RightPane.GotFocus += (_, _) => _activePane = RightPane;
+        LeftPane.GotFocus += (_, _) => SetActivePane(LeftPane);
+        RightPane.GotFocus += (_, _) => SetActivePane(RightPane);
 
         LeftPane.NavigationContext = new NavigationContext(initialPath);
         RightPane.NavigationContext = new NavigationContext(initialPath);
@@ -62,6 +63,14 @@ public partial class MainWindow : Window
             LeftPane.NavigationContext.Dispose();
             RightPane.NavigationContext.Dispose();
         };
+    }
+
+    /// <summary>Makes a pane the active pane, only the active pane shows the current entry.</summary>
+    private void SetActivePane(PaneView pane)
+    {
+        _activePane = pane;
+        LeftPane.IsActive = pane == LeftPane;
+        RightPane.IsActive = pane == RightPane;
     }
 
     private async void OnWindowKeyDown(object? sender, KeyEventArgs e)

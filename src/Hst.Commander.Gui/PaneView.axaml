@@ -22,7 +22,11 @@
         <Style Selector="ListBox.entries Grid.row.executable TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource ExecutableForeground}" />
         </Style>
-        <Style Selector="ListBox.entries ListBoxItem:selected Grid.row TextBlock">
+        <!-- the current entry is only shown in the active pane -->
+        <Style Selector="ListBox.entries:not(.active) ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="ListBox.entries.active ListBoxItem:selected Grid.row TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource SelectedEntryForeground}" />
         </Style>
         <!-- after the current row style, so marked entries keep their color under the cursor -->

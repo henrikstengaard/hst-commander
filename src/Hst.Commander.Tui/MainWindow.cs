@@ -935,7 +935,8 @@ public sealed class MainWindow : Window
                 ? _palette.Container
                 : pane.NavigationContext.IsExecutable(entry) ? _palette.Executable : _palette.Item;
         var normal = new TuiAttribute(foreground, _palette.PaneBackground);
-        var selected = rowIndex == pane.TableView.SelectedRow
+        // the current entry is only shown in the active pane
+        var selected = pane == _activePane && rowIndex == pane.TableView.SelectedRow
             ? isMarked ? _palette.MarkedCursor : _palette.Cursor
             : normal;
 

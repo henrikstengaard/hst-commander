@@ -44,6 +44,13 @@ public partial class PaneView : UserControl
     }
 
     /// <summary>Entry under the cursor, null when the list is empty.</summary>
+    /// <summary>Whether the pane is the active pane, the current entry is only shown in the active pane.</summary>
+    public bool IsActive
+    {
+        get => EntriesList.Classes.Contains("active");
+        set => EntriesList.Classes.Set("active", value);
+    }
+
     public IEntry? SelectedEntry => (EntriesList.SelectedItem as EntryItem)?.Entry;
 
     public Task InitializeAsync() => RefreshEntriesAsync();
