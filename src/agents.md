@@ -15,6 +15,8 @@ There are two front-ends with the same functionality: a terminal UI (TUI) built 
 ```
 src/
   Hst.Commander.sln                              Solution file (5 projects)
+  Directory.Build.props                          Shared product name, version, authors and copyright for all projects
+  Directory.Build.targets                        Replaces the last version part with the git commit count
   Hst.Commander.Extensions.Volume.Abstractions/  IVolumeProvider / IVolume / IEntry interfaces (no external deps)
   Hst.Commander.Core/                            Volume implementations, volume providers, NavigationContext + shared utilities
   Hst.Commander.Tui/                             Terminal.Gui TUI application
@@ -50,6 +52,7 @@ src/
     SelectGroupDialog.axaml(.cs)                 Modal select/unselect group dialog (+/-): filter, case sensitive, files only, OK, Cancel
     VolumeProviderDialog.axaml(.cs)              Modal list of volume providers for a pane (Alt+F1/Alt+F2), centered over the pane
     LocationDialog.axaml(.cs)                    Modal location dialog (Ctrl+L or double-click path): path, Volumes, OK, Cancel
+    AboutDialog.axaml(.cs)                       Modal about dialog (Help > About): name, version and author
     GuiSettings.cs                               GUI settings record, loaded/saved as JSON
     GuiTheme.cs                                  Theme enum: MidnightCommander, Light, Dark
     ThemeManager.cs                              Applies a theme (theme variant + Midnight Commander styles)
@@ -176,6 +179,13 @@ Ctrl+L, double-clicking the path of a pane or File > Location opens the location
 
 The keys opening the volume provider list of the left/right pane are chosen in File > Settings of both front-ends (`Volume keys`): `VolumeProviderKeys.AltFunctionKeys` (Alt+F1/Alt+F2) or `ShiftFunctionKeys` (Shift+F1/Shift+F2). `TuiSettings`/`GuiSettings.VolumeProviderKeys` is null until chosen, and `EffectiveVolumeProviderKeys` then falls back to `VolumeProviderKeyBindings.Default`, the best fit for the host OS: Alt on Windows, Shift elsewhere (Linux desktops take Alt+F1/Alt+F2, e.g. Alt+F2 opens the run dialog on GNOME/KDE/XFCE, and macOS terminals only send Alt with Option set as Meta key). `WithVolumeProviderKeys` keeps the setting unset when the keys already in effect are chosen. The settings dialogs mark the OS default with `(default)`; the File menu shows the keys in effect (`GetLeftKeyText`/`GetRightKeyText`) and changes apply on OK.
 
+### Versioning and About
+
+- Like Hst Imager, `src/Directory.Build.props` is the single source of truth for the version (`<Version>`, e.g. `0.1.0`) and sets `Product` (`Hst Commander`), `Authors`/`Company` and `Copyright` for all projects. `src/Directory.Build.targets` (`SetVersionFromGitCommitCount`) replaces the last version part with `git rev-list --count HEAD` (e.g. `0.1.29`), unless the version is passed with `-p:Version=...`; the .NET SDK appends the commit sha to the product version (`0.1.29+98d7be8...`). Bump the major/minor version in `Directory.Build.props`.
+- `AppInfo` (`Hst.Commander.Core`) reads the name (`AssemblyProductAttribute`), author (`AssemblyCompanyAttribute`) and version (`Major.Minor.Build`) of the entry assembly: `AppInfo.Current`, `NameAndVersion` (e.g. `Hst Commander v0.1.29`) and `AboutText`.
+- The GUI main window title is `AppInfo.NameAndVersion` (e.g. `Hst Commander v0.1.29`).
+- Both front-ends have a Help menu with About: the TUI shows `AppInfo.AboutText` with `MessageBox.Query`, the GUI shows the modal `AboutDialog`.
+
 ### Path Conventions
 
 - `Paths.Root` = `"/"`
@@ -195,6 +205,7 @@ The keys opening the volume provider list of the left/right pane are chosen in F
 - All unit tests in `Hst.Commander.Core.Tests`.
 
 - Changing location with Ctrl+L or by double-clicking the path (location dialog), including paths into ISO images.
+- Build versioning from the git commit count and a Help > About menu item in both front-ends.
 - Choosing the volume provider of the left/right pane with Alt+F1/Alt+F2 or Shift+F1/Shift+F2 (configurable, see Volume Provider Keys) or File > Left/Right volume from `VolumeProviders.All`; only the built-in Local volume provider exists so far.
 - Copying (F5) between panes and volumes, with a confirm dialog (destination, filter) and a progress dialog.
 - Moving (F6) between panes and volumes, with the same confirm and progress dialogs as copying; a single entry moved to a plain name is renamed.
@@ -226,7 +237,7 @@ The keys opening the volume provider list of the left/right pane are chosen in F
 
 ### Namespaces
 - Abstractions: `Hst.Commander.Extensions.Volume.Abstractions`
-- Core: `Hst.Commander.Core` (`NavigationContext`, `NameFilter`, `SelectGroupOptions`, `FileStarter`, `Paths`, `SettingsPaths`, `SizeFormatter`), `Hst.Commander.Core.Volumes` (volumes)
+- Core: `Hst.Commander.Core` (`AppInfo`, `NavigationContext`, `NameFilter`, `SelectGroupOptions`, `FileStarter`, `Paths`, `SettingsPaths`, `SizeFormatter`), `Hst.Commander.Core.Volumes` (volumes)
 - Tui: `Hst.Commander.Tui`
 - Gui: `Hst.Commander.Gui`
 - Tests: `Hst.Commander.Core.Tests`
@@ -290,7 +301,7 @@ Key TUI patterns already in use:
 - Entries are selected (marked) with Insert or Space, which toggles the mark of the entry under the cursor and moves the cursor down. Marked entries are drawn in yellow (also under the cursor). The marks live in `NavigationContext` (`ToggleMark`, `IsMarked`, `MarkedEntries`, `MarkedSize`, `MarkedSummary`; shared by both front-ends): `..` can't be marked, marks are cleared when the location changes and `ListEntriesAsync` drops marks of entries no longer listed. In code "marked" is used to avoid confusion with the selected row (cursor).
 - Key bindings are attached via `tableView.KeyDown += async (_, key) => { ... }`.
 - Up/Down move the selected row by one entry per key event; holding a key uses the OS/terminal's repeat rate. PageUp/PageDown move by one visible page and Home/End jump to the first/last entry.
-- A `MenuBar` at the top of `MainWindow` (panes start at row 1) has a File menu: Copy (F5), Move/rename (F6), Make directory (F7), Delete (F8 or Delete), Select group (+), Unselect group (-) and Invert selection (*) act on the active pane (the pane last focused), Left volume and Right volume (showing the configured volume provider keys as `MenuItem.Help`) choose a pane's volume provider, Location (Ctrl+L) opens the location dialog of the active pane, Settings opens the modal `SettingsDialog` and Quit calls `Application.RequestStop()`, exiting the application. F9 or Alt+F opens the menu.
+- A `MenuBar` at the top of `MainWindow` (panes start at row 1) has a File menu: Copy (F5), Move/rename (F6), Make directory (F7), Delete (F8 or Delete), Select group (+), Unselect group (-) and Invert selection (*) act on the active pane (the pane last focused), Left volume and Right volume (showing the configured volume provider keys as `MenuItem.Help`) choose a pane's volume provider, Location (Ctrl+L) opens the location dialog of the active pane, Settings opens the modal `SettingsDialog` and Quit calls `Application.RequestStop()`, exiting the application. A Help menu has About (see Versioning and About). F9 or Alt+F opens the menu.
 - A `FunctionKeyBarView` spans the full width below the panes (panes use `Dim.Fill(1)`) with the items `F3 View`, `F4 Edit`, `F5 Copy`, `F6 Move`, `F7 Mkdir` and `F8 Delete`, each getting an equal share of the width; the key is drawn in `TuiPalette.FunctionKey` and the title in `TuiPalette.Menu`. Clicking `F5 Copy`, `F6 Move`, `F7 Mkdir` or `F8 Delete` copies, moves, makes a directory or deletes in the active pane like the File menu; the other items have no action yet.
 - F5 copies the marked entries (or the entry under the cursor) to the other pane: `CopyDialog` confirms the destination (default: the other pane's path) and filter (default `*`), then `NavigationContext.CopyAsync` runs on a background thread (`Task.Run`) while the modal `CopyProgressDialog` shows the current file and total progress bars, speed and ETA. Progress is marshalled with `Application.Invoke`; existing files are confirmed with `MessageBox.Query` (Yes, No, All; Esc answers No) invoked on the UI thread from the background copy through a `TaskCompletionSource`. Cancel or Esc cancels the copy and the dialog stays open until the copy has stopped. Errors are shown with `MessageBox.ErrorQuery`, both panes are refreshed afterwards.
 - F6 moves the marked entries (or the entry under the cursor) like F5 copies: `CopyDialog` titled `Move`, then `NavigationContext.MoveAsync` in a `CopyProgressDialog` titled `Move` (see Moving and Renaming). When `GetRenameNameAsync` gives a new name, the entry is renamed with `RenameAsync` through `RunNavigationAsync` without a progress dialog, which selects it; the other pane is refreshed too. Where entries can't be moved, `MoveNotSupportedMessage` is shown with `MessageBox.ErrorQuery` instead of the dialog.
@@ -325,7 +336,7 @@ Key GUI patterns already in use:
   - Pane colors are per-theme brushes in `App.axaml` `ThemeDictionaries` (`PaneBackground`, `PaneBorder`, `HeaderForeground`, `ContainerForeground`, `ItemForeground`, `ExecutableForeground`, `PathForeground`, `ActivePathBackground`, `ActivePathForeground`, `SelectedEntryForeground`, `MarkedEntryForeground`), referenced with `DynamicResource` so theme changes apply live.
 - Settings are stored in `~/.hst-commander/gui-settings.json` (`SettingsPaths.Directory` in Core, `GuiSettings.FilePath`). A missing or invalid file falls back to defaults. The settings dialog has combo boxes for the theme and the volume provider keys, previews theme changes live, saves on OK and reverts on Cancel.
 - Errors are shown with `ErrorDialog` via `ShowDialog(owner)`.
-- A top `Menu` docked above the panes has a File menu: Copy (F5), Move/rename (F6), Make directory (F7), Delete (F8 or Delete), Select group (+), Unselect group (-) and Invert selection (*) act on the active pane (the +, - and * keys are shown in the headers, as key gestures would display as "OemPlus" etc.) (tracked with `GotFocus`), Left volume and Right volume (showing the configured volume provider keys as `InputGesture`) choose a pane's volume provider, Location (Ctrl+L) opens the location dialog of the active pane, Settings opens the modal `SettingsDialog` and Quit closes the main window (exiting the application).
+- A top `Menu` docked above the panes has a File menu: Copy (F5), Move/rename (F6), Make directory (F7), Delete (F8 or Delete), Select group (+), Unselect group (-) and Invert selection (*) act on the active pane (the +, - and * keys are shown in the headers, as key gestures would display as "OemPlus" etc.) (tracked with `GotFocus`), Left volume and Right volume (showing the configured volume provider keys as `InputGesture`) choose a pane's volume provider, Location (Ctrl+L) opens the location dialog of the active pane, Settings opens the modal `SettingsDialog` and Quit closes the main window (exiting the application). A Help menu has About, showing the modal `AboutDialog` (see Versioning and About).
 - A function key bar (`UniformGrid` of non-focusable `Button.functionKey`, so the active pane keeps focus) is docked full width below the panes with `F3 View`, `F4 Edit`, `F5 Copy`, `F6 Move`, `F7 Mkdir` and `F8 Delete`. `CopyButton`, `MoveButton`, `MkdirButton` and `DeleteButton` copy, move, make a directory or delete in the active pane like the File menu; the other buttons have no action yet.
 - F5 is handled at window level (tunnelling): `CopyDialog` confirms the destination and filter, then `CopyProgressDialog` runs `NavigationContext.CopyAsync` with `Task.Run` when opened, reporting through a `Progress<CopyProgress>` created on the UI thread. Existing files are confirmed with the modal `OverwriteDialog` (Yes, No, All; closing answers No), shown over the progress dialog via `Dispatcher.UIThread.InvokeAsync`. Cancel or closing the window cancels the copy; the dialog closes when the copy has stopped and exposes the `Exception`. `PaneView.SelectedEntry` gives the entry under the cursor and `PaneView.RefreshEntriesAsync` relists a pane after copying.
 - F6 is handled at window level (tunnelling) and moves like F5 copies: `CopyDialog` titled `Move`, then `CopyProgressDialog` titled `Move` running `NavigationContext.MoveAsync` (see Moving and Renaming). When `GetRenameNameAsync` gives a new name, `PaneView.RenameAsync` renames and selects the entry without a progress dialog; the other pane is refreshed too. Where entries can't be moved, `MoveNotSupportedMessage` is shown with `ErrorDialog` instead of the dialog.
@@ -356,7 +367,7 @@ dotnet test src/Hst.Commander.Core.Tests/Hst.Commander.Core.Tests.csproj
 dotnet test src/Hst.Commander.Core.Tests/Hst.Commander.Core.Tests.csproj --logger "console;verbosity=normal"
 ```
 
-> **Note:** Build output may land in `src/net10.0/` instead of each project's `bin/` when a `Directory.Build.props` outside the repository (e.g. in a parent folder) sets `OutputPath`. That folder is ignored by `.gitignore`; do not commit build output.
+> **Note:** `src/Directory.Build.props` stops MSBuild from importing a `Directory.Build.props` from a parent folder, so build output lands in each project's `bin/`. A leftover `src/net10.0/` folder is old build output, ignored by `.gitignore`; do not commit build output. The build prints each project's version (`<project> version: 0.1.29`) and needs `git` on the path for the commit count (otherwise the version from `Directory.Build.props` is used).
 
 ---
 

@@ -26,6 +26,9 @@
                 <Separator />
                 <MenuItem x:Name="QuitMenuItem" Header="_Quit" InputGesture="Alt+F4" />
             </MenuItem>
+            <MenuItem Header="_Help">
+                <MenuItem x:Name="AboutMenuItem" Header="_About..." />
+            </MenuItem>
         </Menu>
         <!-- function key bar; the buttons aren't focusable so the active pane keeps the focus -->
         <UniformGrid DockPanel.Dock="Bottom" Rows="1">

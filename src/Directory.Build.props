@@ -1,0 +1,14 @@
+<Project>
+  <PropertyGroup>
+    <Product>Hst Commander</Product>
+    <Copyright>Copyright © 2026</Copyright>
+  </PropertyGroup>
+  <PropertyGroup>
+    <!-- Single source of truth for app version. AssemblyVersion, FileVersion and PackageVersion are derived from it by the .NET SDK -->
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+  <PropertyGroup>
+    <Authors>Henrik Nørfjand Stengaard</Authors>
+    <Company>$(Authors)</Company>
+  </PropertyGroup>
+</Project>

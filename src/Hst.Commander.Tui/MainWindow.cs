@@ -60,6 +60,10 @@ public sealed class MainWindow : Window
                     new("_Settings...", string.Empty, ShowSettings),
                     null!,
                     new("_Quit", string.Empty, () => Application.RequestStop())
+                }),
+                new MenuBarItem("_Help", new MenuItem[]
+                {
+                    new("_About...", string.Empty, ShowAbout)
                 })
             ]
         };
@@ -204,6 +208,8 @@ public sealed class MainWindow : Window
         pane.BottomLine.ColorScheme = CreateColorScheme(normal, normal);
         pane.BottomLine.NeedsDraw = true;
     }
+
+    private static void ShowAbout() => MessageBox.Query("About", AppInfo.Current.AboutText, "OK");
 
     private void ShowSettings()
     {

@@ -19,6 +19,7 @@ public partial class MainWindow : Window
     public MainWindow(string initialPath)
     {
         InitializeComponent();
+        Title = AppInfo.Current.NameAndVersion;
 
         _activePane = LeftPane;
         ApplyVolumeProviderKeys(GuiSettings.Load().EffectiveVolumeProviderKeys);
@@ -47,6 +48,7 @@ public partial class MainWindow : Window
         RightPane.PathDoubleClicked += async (_, _) => await ShowLocationAsync(RightPane);
         SettingsMenuItem.Click += async (_, _) => await ShowSettingsAsync();
         QuitMenuItem.Click += (_, _) => Close();
+        AboutMenuItem.Click += async (_, _) => await new AboutDialog().ShowDialog(this);
 
         AddHandler(KeyDownEvent, OnWindowKeyDown, RoutingStrategies.Tunnel);
         Opened += async (_, _) =>
