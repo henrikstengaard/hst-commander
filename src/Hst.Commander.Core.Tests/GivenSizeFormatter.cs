@@ -24,6 +24,23 @@ public class GivenSizeFormatter
         Assert.Equal(expected, formatted);
     }
 
+    [Theory]
+    [InlineData(0L, "0 bytes")]
+    [InlineData(1L, "1 byte")]
+    [InlineData(512L, "512 bytes")]
+    [InlineData(1024L, "1.00 KB (1,024 bytes)")]
+    [InlineData(1234567L, "1.17 MB (1,234,567 bytes)")]
+    [InlineData(15728639L, "14.9 MB (15,728,639 bytes)")]
+    [InlineData(274877906944L, "256 GB (274,877,906,944 bytes)")]
+    public void When_FormatWithBytes_Then_SizeHasThreeDigitsAndExactBytes(long size, string expected)
+    {
+        // act
+        var formatted = SizeFormatter.FormatWithBytes(size);
+
+        // assert
+        Assert.Equal(expected, formatted);
+    }
+
     [Fact]
     public void When_FormatEntrySizeForDirectory_Then_DirIsReturned()
     {

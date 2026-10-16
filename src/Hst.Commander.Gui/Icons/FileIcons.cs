@@ -41,7 +41,6 @@ internal static class FileIcons
     public static async Task LoadAsync(IReadOnlyList<EntryItem> items, NavigationContext navigationContext, int size,
         CancellationToken cancellationToken)
     {
-        var isDriveList = navigationContext.IsDriveList;
         foreach (var item in items)
         {
             if (cancellationToken.IsCancellationRequested)
@@ -49,14 +48,7 @@ internal static class FileIcons
                 return;
             }
 
-            var localPath = navigationContext.GetLocalPath(item.Entry);
-            item.Icon = item.IsContainer
-                ? isDriveList && localPath != null
-                    ? await GetTypeIconAsync($"drive:{localPath}", provider => provider.GetDriveIcon(localPath, size),
-                        DefaultFolderIcon)
-                    : await GetTypeIconAsync("folder", provider => provider.GetFolderIcon(size), DefaultFolderIcon)
-                : await GetTypeIconAsync($"file{Path.GetExtension(item.Name)}",
-                    provider => provider.GetFileTypeIcon(Path.GetExtension(item.Name), size), DefaultFileIcon);
+            item.Icon = await GetEntryTypeIconAsync(item.Entry, navigationContext, size, string.Empty);
         }
 
         foreach (var item in items.Where(item => !item.IsContainer))
@@ -72,6 +64,40 @@ internal static class FileIcons
                 item.Icon = fileIcon;
             }
         }
+    }
+
+    /// <summary>
+    ///     Loads the icon of a single entry in another size than the pane icons, e.g. for the properties dialog: the
+    ///     icon contained in the file, otherwise its type icon. Only the type icon when <paramref name="typeOnly" />,
+    ///     e.g. for several entries of the same type.
+    /// </summary>
+    public static async Task<IImage> LoadIconAsync(IEntry entry, NavigationContext navigationContext, int size,
+        bool typeOnly, CancellationToken cancellationToken)
+    {
+        // type icons of the panes are cached without their size, so cache other sizes separately
+        var typeIcon = await GetEntryTypeIconAsync(entry, navigationContext, size, $"@{size}");
+        return !typeOnly && entry.Type != EntryType.Container &&
+               await GetFileIconAsync(entry, navigationContext, size, cancellationToken) is { } fileIcon
+            ? fileIcon
+            : typeIcon;
+    }
+
+    /// <summary>Type icon of an entry: the drive icon in the drive list, the folder icon or the file type icon.</summary>
+    private static async Task<IImage> GetEntryTypeIconAsync(IEntry entry, NavigationContext navigationContext,
+        int size, string keySuffix)
+    {
+        var localPath = navigationContext.GetLocalPath(entry);
+        if (entry.Type != EntryType.Container)
+        {
+            var extension = Path.GetExtension(entry.Name);
+            return await GetTypeIconAsync($"file{extension}{keySuffix}",
+                provider => provider.GetFileTypeIcon(extension, size), DefaultFileIcon);
+        }
+
+        return navigationContext.IsDriveList && localPath != null
+            ? await GetTypeIconAsync($"drive:{localPath}{keySuffix}", provider => provider.GetDriveIcon(localPath, size),
+                DefaultFolderIcon)
+            : await GetTypeIconAsync($"folder{keySuffix}", provider => provider.GetFolderIcon(size), DefaultFolderIcon);
     }
 
     private static async Task<IImage> GetTypeIconAsync(string key, Func<IFileIconProvider, IconImage?> getIcon,

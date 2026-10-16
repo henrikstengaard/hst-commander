@@ -39,6 +39,34 @@ public static class SizeFormatter
                Units[unitIndex];
     }
 
+    /// <summary>
+    ///     Formats a size like the properties of Windows Explorer: with three significant digits (truncated) and the
+    ///     exact number of bytes, e.g. "1.17 MB (1,234,567 bytes)", or only bytes below 1 KB, e.g. "512 bytes".
+    /// </summary>
+    public static string FormatWithBytes(long size)
+    {
+        size = Math.Max(0, size);
+        var bytes = string.Create(CultureInfo.InvariantCulture, $"{size:N0} {(size == 1 ? "byte" : "bytes")}");
+        if (size < 1024)
+        {
+            return bytes;
+        }
+
+        var value = (double)size;
+        var unitIndex = 0;
+        while (value >= 1024 && unitIndex < Units.Length - 1)
+        {
+            value /= 1024;
+            unitIndex++;
+        }
+
+        var decimals = value >= 100 ? 0 : value >= 10 ? 1 : 2;
+        var factor = Math.Pow(10, decimals);
+        var truncated = (Math.Floor(value * factor) / factor).ToString(
+            decimals == 0 ? "0" : "0." + new string('0', decimals), CultureInfo.InvariantCulture);
+        return $"{truncated} {Units[unitIndex]}B ({bytes})";
+    }
+
     /// <summary>Formats a speed in bytes per second with one decimal and a 1024-based unit, e.g. "12.3 MB/s".</summary>
     public static string FormatSpeed(double bytesPerSecond)
     {

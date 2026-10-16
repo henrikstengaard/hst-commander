@@ -681,6 +681,42 @@ public sealed class NavigationContext : IDisposable
     }
 
     /// <summary>
+    ///     Properties of entries in the current location shown in the properties dialog (Alt+Enter), e.g. of
+    ///     <see cref="GetOperationEntries" />. Local files and directories get details from the file system, drives in
+    ///     the drive list their space, entries inside images and other volumes the details of the entries. Count the
+    ///     size and contents with <see cref="CountContentsAsync" /> when <see cref="EntryProperties.HasContents" />.
+    /// </summary>
+    public EntryProperties GetProperties(IReadOnlyList<IEntry> entries)
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+
+        var localDirectory = _isoStreams.Count == 0 ? LocalPath : null;
+        return EntryProperties.Create(entries, CurrentPath, localDirectory, IsDriveList);
+    }
+
+    /// <summary>
+    ///     Counts the size and number of entries of entries in the current location for the properties dialog,
+    ///     directories recursively. Like copying, it doesn't use the pane's volume, so it can run on a background
+    ///     thread: local directories are read from the file system (with the size on disk on Windows), other
+    ///     locations with a volume of their own (see <see cref="VolumeContents.CountContentsAsync" />).
+    /// </summary>
+    public async Task<EntryContents> CountContentsAsync(IReadOnlyCollection<IEntry> entries,
+        IProgress<EntryContents>? progress = null, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+
+        if (_isoStreams.Count == 0 && _rootVolume is LocalVolume)
+        {
+            return LocalPath is { } localPath
+                ? FileSystemDetails.CountContents(localPath, entries, progress, cancellationToken)
+                : new EntryContents(0, null, 0, 0, true);
+        }
+
+        using var location = await OpenLocationAsync(cancellationToken);
+        return await location.Volume.CountContentsAsync(entries, progress, cancellationToken);
+    }
+
+    /// <summary>
     ///     Why a directory can't be created in the current location, e.g. in the local drive list or inside a read-only
     ///     image. Null when creating a directory is supported, front-ends then ask for its name.
     /// </summary>

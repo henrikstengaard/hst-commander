@@ -48,6 +48,7 @@ public sealed class MainWindow : Window
                     new("Mo_ve/rename...", "F6", MoveFromActivePane),
                     new("_Make directory...", "F7", MakeDirectoryInActivePane),
                     new("_Delete...", "F8", DeleteFromActivePane),
+                    new("_Properties...", "Ctrl+P", ShowPropertiesOfActivePane),
                     null!,
                     new("Select _group...", "+", SelectGroupInActivePane),
                     new("_Unselect group...", "-", UnselectGroupInActivePane),
@@ -353,6 +354,12 @@ public sealed class MainWindow : Window
                 key.Handled = true;
                 _ = RunNavigationAsync(pane, () => pane.NavigationContext.GoParentAsync());
             }
+            // terminals use alt+enter for full screen, so ctrl+p too
+            else if (key == Key.P.WithCtrl || key == Key.Enter.WithAlt)
+            {
+                key.Handled = true;
+                ShowProperties(pane);
+            }
             else if (key == Key.O.WithCtrl)
             {
                 key.Handled = true;
@@ -417,6 +424,49 @@ public sealed class MainWindow : Window
     private void ChooseRightVolumeProvider() => _ = ChooseVolumeProviderAsync(_rightPane);
 
     private void ShowLocationOfActivePane() => _ = ShowLocationAsync(_activePane);
+
+    private void ShowPropertiesOfActivePane() => ShowProperties(_activePane);
+
+    /// <summary>
+    ///     Shows the properties of the marked entries, or the entry under the cursor, of a pane. The size and contents
+    ///     are counted in the background while the dialog is open; closing it stops counting.
+    /// </summary>
+    private void ShowProperties(Pane pane)
+    {
+        var entries = pane.NavigationContext.GetOperationEntries(GetCurrentEntry(pane));
+        if (entries.Count == 0)
+        {
+            return;
+        }
+
+        EntryProperties properties;
+        try
+        {
+            properties = pane.NavigationContext.GetProperties(entries);
+        }
+        catch (Exception exception)
+        {
+            MessageBox.ErrorQuery("Error", exception.Message, "OK");
+            return;
+        }
+
+        var dialog = new PropertiesDialog(properties, _palette);
+        if (properties.HasContents)
+        {
+            // count in the background and update the dialog on the UI thread
+            var progress = new UiProgress<EntryContents>(value => Application.Invoke(() => dialog.Update(value)));
+            var cancellationToken = dialog.CancellationToken;
+            var countTask = Task.Run(() => pane.NavigationContext.CountContentsAsync(entries, progress,
+                cancellationToken), cancellationToken);
+            _ = countTask.ContinueWith(task => Application.Invoke(() =>
+                    dialog.ShowError(task.Exception?.GetBaseException().Message ?? "Counting failed")),
+                CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
+        }
+
+        Application.Run(dialog);
+        dialog.Dispose();
+        pane.TableView.SetFocus();
+    }
 
     /// <summary>
     ///     Marks (select) or unmarks (unselect) the entries of a pane matching the filter entered in the select group

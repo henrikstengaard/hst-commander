@@ -3,6 +3,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Hst.Commander.Core;
 using Hst.Commander.Extensions.Volume.Abstractions;
+using Hst.Commander.Gui.Icons;
 
 namespace Hst.Commander.Gui;
 
@@ -35,6 +36,7 @@ public partial class MainWindow : Window
         MoveMenuItem.Click += async (_, _) => await MoveAsync(_activePane);
         MakeDirectoryMenuItem.Click += async (_, _) => await MakeDirectoryAsync(_activePane);
         DeleteMenuItem.Click += async (_, _) => await DeleteAsync(_activePane);
+        PropertiesMenuItem.Click += async (_, _) => await ShowPropertiesAsync(_activePane);
         SelectGroupMenuItem.Click += async (_, _) => await SelectGroupAsync(_activePane, true);
         UnselectGroupMenuItem.Click += async (_, _) => await SelectGroupAsync(_activePane, false);
         InvertSelectionMenuItem.Click += (_, _) => InvertSelection(_activePane);
@@ -111,6 +113,11 @@ public partial class MainWindow : Window
             case Key.F2 when e.KeyModifiers == VolumeProviderModifier:
                 e.Handled = true;
                 await ChooseVolumeProviderAsync(RightPane);
+                break;
+            case Key.Enter when e.KeyModifiers == KeyModifiers.Alt:
+            case Key.P when e.KeyModifiers == KeyModifiers.Control:
+                e.Handled = true;
+                await ShowPropertiesAsync(_activePane);
                 break;
             case Key.L when e.KeyModifiers == KeyModifiers.Control:
                 e.Handled = true;
@@ -216,6 +223,51 @@ public partial class MainWindow : Window
     private static void InvertSelection(PaneView pane)
     {
         pane.InvertMarks();
+        pane.FocusEntries();
+    }
+
+    /// <summary>
+    ///     Shows the properties of the marked entries, or the entry under the cursor, of a pane. The size and contents
+    ///     are counted in the background while the dialog is open; closing it stops counting.
+    /// </summary>
+    private async Task ShowPropertiesAsync(PaneView pane)
+    {
+        var entries = pane.NavigationContext.GetOperationEntries(pane.SelectedEntry);
+        if (entries.Count == 0)
+        {
+            return;
+        }
+
+        EntryProperties properties;
+        try
+        {
+            properties = pane.NavigationContext.GetProperties(entries);
+        }
+        catch (Exception exception)
+        {
+            await ShowErrorAsync(exception);
+            pane.FocusEntries();
+            return;
+        }
+
+        // several entries show the type icon when they are all of the same type, e.g. folders or .txt files
+        var iconEntry = entries[0];
+        var typeOnly = entries.Count > 1;
+        var sameType = entries.All(entry => entry.Type == iconEntry.Type && (entry.Type == EntryType.Container
+            ? !pane.NavigationContext.IsDriveList
+            : Path.GetExtension(entry.Name).Equals(Path.GetExtension(iconEntry.Name),
+                StringComparison.OrdinalIgnoreCase)));
+        var initialIcon = entries.All(entry => entry.Type == EntryType.Container)
+            ? FileIcons.DefaultFolderIcon
+            : FileIcons.DefaultFileIcon;
+        await new PropertiesDialog(properties,
+            (progress, cancellationToken) =>
+                pane.NavigationContext.CountContentsAsync(entries, progress, cancellationToken),
+            initialIcon,
+            !typeOnly || sameType
+                ? (size, cancellationToken) =>
+                    FileIcons.LoadIconAsync(iconEntry, pane.NavigationContext, size, typeOnly, cancellationToken)
+                : null).ShowDialog(this);
         pane.FocusEntries();
     }
 
