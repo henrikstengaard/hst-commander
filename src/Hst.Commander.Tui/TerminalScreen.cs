@@ -83,7 +83,7 @@ public static class TerminalScreen
 
     /// <summary>
     ///     Runs the program in its directory and waits for it to exit, then returns directly so the TUI is shown again,
-    ///     like Midnight Commander. Ctrl+C stops the program, not HST Commander.
+    ///     like Midnight Commander. Ctrl+C stops the program, not Hst Commander.
     /// </summary>
     /// <returns>The error message when the program couldn't be started, otherwise null.</returns>
     public static string? Run(string path)
