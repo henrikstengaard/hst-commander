@@ -1,6 +1,6 @@
 ﻿using DiscUtils.Raw;
 using DiscUtils.Streams;
-using Hst.Commander.Extensions.Volume.Abstractions;
+using Hst.Commander.Abstractions;
 
 namespace Hst.Commander.Core.Volumes;
 

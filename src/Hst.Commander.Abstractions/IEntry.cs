@@ -1,4 +1,4 @@
-﻿namespace Hst.Commander.Extensions.Volume.Abstractions;
+﻿namespace Hst.Commander.Abstractions;
 
 public interface IEntry
 {

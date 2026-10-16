@@ -4,7 +4,7 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Hst.Commander.Core;
-using Hst.Commander.Extensions.Volume.Abstractions;
+using Hst.Commander.Abstractions;
 
 namespace Hst.Commander.Gui.Icons;
 

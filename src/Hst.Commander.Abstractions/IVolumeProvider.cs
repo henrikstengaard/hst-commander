@@ -1,4 +1,4 @@
-namespace Hst.Commander.Extensions.Volume.Abstractions;
+namespace Hst.Commander.Abstractions;
 
 /// <summary>
 /// Interface for providing volumes to Hst Commander, e.g. local drives. Volume providers are listed when choosing

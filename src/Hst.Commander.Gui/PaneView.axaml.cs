@@ -2,7 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Hst.Commander.Core;
-using Hst.Commander.Extensions.Volume.Abstractions;
+using Hst.Commander.Abstractions;
 using Hst.Commander.Gui.Icons;
 
 namespace Hst.Commander.Gui;

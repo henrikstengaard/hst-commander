@@ -8,7 +8,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hst.Commander.Core", "Hst.C
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hst.Commander.Core.Tests", "Hst.Commander.Core.Tests\Hst.Commander.Core.Tests.csproj", "{2169E3C8-C2A9-4D3B-BAF9-ED3A31DAE688}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hst.Commander.Extensions.Volume.Abstractions", "Hst.Commander.Extensions.Volume.Abstractions\Hst.Commander.Extensions.Volume.Abstractions.csproj", "{1F2AF557-EF40-4D29-8E09-5CAF1F0A1C11}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hst.Commander.Abstractions", "Hst.Commander.Abstractions\Hst.Commander.Abstractions.csproj", "{1F2AF557-EF40-4D29-8E09-5CAF1F0A1C11}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Agents", "Agents", "{AA7E033F-06BF-4297-8938-4DA1A17CF5D4}"
 	ProjectSection(SolutionItems) = preProject

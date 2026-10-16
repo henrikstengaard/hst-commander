@@ -1,4 +1,4 @@
-﻿using Hst.Commander.Extensions.Volume.Abstractions;
+﻿using Hst.Commander.Abstractions;
 
 namespace Hst.Commander.Core.Tests;
 

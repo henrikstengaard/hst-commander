@@ -34,7 +34,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\Hst.Commander.Core\Hst.Commander.Core.csproj" />
-      <ProjectReference Include="..\Hst.Commander.Extensions.Volume.Abstractions\Hst.Commander.Extensions.Volume.Abstractions.csproj" />
+      <ProjectReference Include="..\Hst.Commander.Abstractions\Hst.Commander.Abstractions.csproj" />
     </ItemGroup>
 
 </Project>

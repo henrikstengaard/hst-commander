@@ -1,6 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:abstractions="using:Hst.Commander.Extensions.Volume.Abstractions"
+        xmlns:abstractions="using:Hst.Commander.Abstractions"
         x:Class="Hst.Commander.Gui.VolumeProviderDialog"
         Title="Volume"
         Width="420"

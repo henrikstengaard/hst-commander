@@ -22,7 +22,7 @@ src/
   Directory.Build.targets                        Replaces the last version part with the git commit count
   packaging/                                     Release packaging used by build-and-release.yml: linux/package.sh (AppImage + .deb), macos/package.sh (.dmg, GUI as .app bundle in a create-dmg window with dmg-background.svg/.png, rendered by make-dmg-background.cmd, showing the drag to Applications), windows/setup.iss (Inno Setup)
   icon/                                          App icon in the style of the Hst Imager icon: hst-commander.svg source, simplified pixel aligned hst-commander-16x16.svg/-32x32.svg for the small sizes, PNGs (1024, 512, 192, 32, 16), .ico (Windows, 16-256), favicon/16x16/32x32 .ico, .icns (macOS) and make-*.cmd/make-icns.sh scripts (ImageMagick, sips/iconutil)
-  Hst.Commander.Extensions.Volume.Abstractions/  IVolumeProvider / IVolume / IEntry interfaces (no external deps)
+  Hst.Commander.Abstractions/                    IVolumeProvider / IVolume / IEntry interfaces (no external deps)
   Hst.Commander.Core/                            Volume implementations, volume providers, NavigationContext + shared utilities
   Hst.Commander.Tui/                             Terminal.Gui TUI application
     MainWindow.cs                                Dual-pane window, File menu, function key bar, columns, key bindings, theme colors, F5 copy, F6 move/rename, F7 make directory, F8/Delete delete, Ctrl+P/Alt+Enter properties
@@ -78,7 +78,7 @@ src/
 ### Layer Diagram
 
 ```
-[IVolumeProvider / IVolume / IEntry]  <- Hst.Commander.Extensions.Volume.Abstractions
+[IVolumeProvider / IVolume / IEntry]  <- Hst.Commander.Abstractions
         |
 [Volume Implementations]  <- Hst.Commander.Core
   LocalVolumeProvider (VolumeProviders.All),
@@ -96,7 +96,7 @@ src/
 
 ### Key Interfaces
 
-**`IVolume`** (`Hst.Commander.Extensions.Volume.Abstractions/IVolume.cs`)
+**`IVolume`** (`Hst.Commander.Abstractions/IVolume.cs`)
 ```csharp
 string Name { get; }
 IEnumerable<string> CurrentPathComponents { get; }
@@ -111,7 +111,7 @@ Task Rename(string name, string newName, CancellationToken cancellationToken = d
 Task SetModifiedDate(string name, DateTime modifiedDate, CancellationToken cancellationToken = default); // unspecified kind = UTC; NotSupportedException when read-only
 ```
 
-**`IVolumeProvider`** (`Hst.Commander.Extensions.Volume.Abstractions/IVolumeProvider.cs`)
+**`IVolumeProvider`** (`Hst.Commander.Abstractions/IVolumeProvider.cs`)
 ```csharp
 string Name { get; }          // shown in the Alt+F1/Alt+F2 list, e.g. "Local"
 string Description { get; }   // shown next to the name
@@ -119,7 +119,7 @@ Task<IVolume> CreateVolume(CancellationToken cancellationToken = default); // ne
 ```
 Volume providers are what a pane can show; they are intended to become the plugin system (Hst Commander scanning for `IVolumeProvider` implementations at startup). `VolumeProviders.All` (`Hst.Commander.Core`) is the list shown to the user, currently only the built-in `VolumeProviders.Local` (`LocalVolumeProvider`); discovered plugins are meant to be appended after it. Each `CreateVolume` call must return a volume of its own (copy/delete open a second one on a background thread); a volume implementing `IDisposable` is disposed when no longer used.
 
-**`IEntry`** (`Hst.Commander.Extensions.Volume.Abstractions/IEntry.cs`)
+**`IEntry`** (`Hst.Commander.Abstractions/IEntry.cs`)
 - `Name`, `Type` (`EntryType.Container` | `EntryType.Item`), `Size`, `ModifiedDate`
 
 ### Volume Implementations
@@ -260,7 +260,7 @@ The keys opening the volume provider list of the left/right pane are chosen in F
 - Test methods: `When_<action>_Then_<expectation>` (e.g., `When_ListEntries_Then_EntriesAreReturned`).
 
 ### Namespaces
-- Abstractions: `Hst.Commander.Extensions.Volume.Abstractions`
+- Abstractions: `Hst.Commander.Abstractions`
 - Core: `Hst.Commander.Core` (`AppInfo`, `EmbeddedIconReader`, `EntryProperties`, `FileSystemDetails`, `IconImage`, `NavigationContext`, `NameFilter`, `SelectGroupOptions`, `FileStarter`, `Paths`, `SettingsPaths`, `SizeFormatter`), `Hst.Commander.Core.Volumes` (volumes)
 - Tui: `Hst.Commander.Tui`
 - Gui: `Hst.Commander.Gui`, `Hst.Commander.Gui.Icons` (entry icons)

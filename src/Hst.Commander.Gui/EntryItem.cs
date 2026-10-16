@@ -2,7 +2,7 @@ using System.ComponentModel;
 using Avalonia.Media;
 using Hst.Commander.Core;
 using Hst.Commander.Gui.Icons;
-using Hst.Commander.Extensions.Volume.Abstractions;
+using Hst.Commander.Abstractions;
 
 namespace Hst.Commander.Gui;
 

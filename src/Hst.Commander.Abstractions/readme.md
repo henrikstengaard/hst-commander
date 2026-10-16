@@ -1,4 +1,4 @@
-﻿# Hst.Commander.Extensions.Volume.Abstractions
+﻿# Hst.Commander.Abstractions
 
 A class library providing volume abstractions that allows building different kinds of volumes Hst Commander can browse.
 

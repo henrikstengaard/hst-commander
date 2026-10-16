@@ -1,7 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
-using Hst.Commander.Extensions.Volume.Abstractions;
+using Hst.Commander.Abstractions;
 
 namespace Hst.Commander.Gui;
 

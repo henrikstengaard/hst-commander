@@ -1,7 +1,7 @@
 using System.Data;
 using Hst.Commander.Core;
 using Hst.Commander.Core.Volumes;
-using Hst.Commander.Extensions.Volume.Abstractions;
+using Hst.Commander.Abstractions;
 using Terminal.Gui;
 using TuiAttribute = Terminal.Gui.Attribute;
 

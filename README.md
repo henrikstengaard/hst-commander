@@ -79,7 +79,7 @@ dotnet test src/Hst.Commander.Core.Tests/Hst.Commander.Core.Tests.csproj
 
 | Project | Description |
 |---|---|
-| `Hst.Commander.Extensions.Volume.Abstractions` | `IVolumeProvider`, `IVolume` and `IEntry` interfaces for volume plugins |
+| `Hst.Commander.Abstractions` | `IVolumeProvider`, `IVolume` and `IEntry` interfaces for volume plugins |
 | `Hst.Commander.Core` | Volume implementations (local, ISO 9660, nested volumes), copy/move/delete and the shared navigation logic used by both front-ends |
 | `Hst.Commander.Tui` | Terminal UI application |
 | `Hst.Commander.Gui` | Desktop GUI application |
