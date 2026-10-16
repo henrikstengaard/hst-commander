@@ -100,6 +100,13 @@ public partial class PaneView : UserControl
 
     private async void OnEntriesKeyDown(object? sender, KeyEventArgs e)
     {
+        if (IsGoRootKey(e))
+        {
+            e.Handled = true;
+            await RunNavigationAsync(() => NavigationContext.GoRootAsync());
+            return;
+        }
+
         switch (e.Key)
         {
             case Key.Enter:
@@ -139,6 +146,14 @@ public partial class PaneView : UserControl
                 break;
         }
     }
+
+    /// <summary>
+    ///     Ctrl+\ going to the root of the volume, matched by the typed character or the backslash keys (on some
+    ///     layouts, e.g. Danish, the key with backslash is the 102nd key).
+    /// </summary>
+    private static bool IsGoRootKey(KeyEventArgs e) =>
+        e.KeyModifiers == KeyModifiers.Control &&
+        (e.KeySymbol is "\\" or "\u001C" || e.Key is Key.OemPipe or Key.OemBackslash);
 
     private int GetPageSize()
     {

@@ -14,6 +14,7 @@ public sealed class NavigationContext : IDisposable
     private readonly Action<string> _startFile;
     private readonly IReadOnlyList<IFileVolumeProvider> _fileVolumeProviders;
     private string? _newEntryName;
+    private bool _selectFirstEntry;
 
     /// <param name="initialPath">Local directory to start in, empty for the drive list.</param>
     /// <param name="startFile">
@@ -528,6 +529,13 @@ public sealed class NavigationContext : IDisposable
             return -1;
         }
 
+        // going to the root selects the first entry once, also when the location is unchanged
+        if (_selectFirstEntry)
+        {
+            _selectFirstEntry = false;
+            return 0;
+        }
+
         if (CurrentPath.Equals(previousPath, StringComparison.Ordinal))
         {
             // a directory just created or an entry just renamed is selected once
@@ -743,6 +751,51 @@ public sealed class NavigationContext : IDisposable
         }
 
         PreviousEntryName = previousEntryName;
+        _markedEntries.Clear();
+    }
+
+    /// <summary>
+    ///     Goes to the root of the current volume (Ctrl+\): the root of the local drive, e.g. "c:\" or "/", the root of
+    ///     an image or the root of another volume provider's volume. At the root of an image, it goes to the root of the
+    ///     drive or volume the image is in. The location is unchanged in the drive list or at the root. Either way the
+    ///     first entry is selected once by <see cref="GetSelectedIndex" />.
+    /// </summary>
+    public async Task GoRootAsync(CancellationToken cancellationToken = default)
+    {
+        _selectFirstEntry = true;
+
+        if (IsInImage && !_nestedVolume.CurrentVolumeIsAtRoot)
+        {
+            await _images.Peek().Volume.ChangeDirectory([Paths.Root], cancellationToken);
+        }
+        else if (_rootVolume is LocalVolume)
+        {
+            if (LocalPath is not { } localPath || Path.GetPathRoot(localPath) is not { Length: > 0 } driveRoot ||
+                (!IsInImage && Path.TrimEndingDirectorySeparator(localPath)
+                    .Equals(Path.TrimEndingDirectorySeparator(driveRoot), StringComparison.Ordinal)))
+            {
+                return;
+            }
+
+            SetRootVolume(_volumeProvider, new LocalVolume(driveRoot));
+        }
+        else
+        {
+            if (!IsInImage && !HasParent)
+            {
+                return;
+            }
+
+            while (IsInImage)
+            {
+                _nestedVolume.PopVolume();
+                _images.Pop().Dispose();
+            }
+
+            await _rootVolume.ChangeDirectory([Paths.Root], cancellationToken);
+        }
+
+        PreviousEntryName = null;
         _markedEntries.Clear();
     }
 

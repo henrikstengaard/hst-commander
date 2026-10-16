@@ -111,6 +111,39 @@ public class GivenNavigationContextOpeningImages
     }
 
     [Fact]
+    public async Task When_GoRootInZip_Then_ZipRootAndThenDriveRootIsListed()
+    {
+        // arrange
+        var rootPath = CreateTempDirectory();
+        var zipPath = Path.Combine(rootPath, "archive.zip");
+        await File.WriteAllBytesAsync(zipPath, ZipTestData.CreateZipWithDirectoriesAndFiles());
+        var driveRoot = Path.GetPathRoot(Path.GetFullPath(rootPath))!;
+        try
+        {
+            using var navigationContext = new NavigationContext(rootPath);
+            await OpenAsync(navigationContext, "archive.zip");
+            await OpenAsync(navigationContext, "dir1");
+
+            // act
+            await navigationContext.GoRootAsync();
+            var zipRootPath = navigationContext.CurrentPath;
+            var zipPreviousEntryName = navigationContext.PreviousEntryName;
+            await navigationContext.GoRootAsync();
+
+            // assert - the file is closed, so it can be deleted
+            Assert.Equal(zipPath, zipRootPath);
+            Assert.Null(zipPreviousEntryName);
+            Assert.False(navigationContext.IsInImage);
+            Assert.Equal(driveRoot, navigationContext.CurrentPath);
+            File.Delete(zipPath);
+        }
+        finally
+        {
+            Directory.Delete(rootPath, true);
+        }
+    }
+
+    [Fact]
     public async Task When_GoParentFromZipRoot_Then_ZipIsClosedAndSelected()
     {
         // arrange

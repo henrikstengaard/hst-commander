@@ -62,6 +62,54 @@ public class GivenNavigationContext
     }
 
     [Fact]
+    public async Task When_GoRoot_Then_DriveRootIsListedAndFirstEntryIsSelected()
+    {
+        // arrange
+        var rootPath = Path.Combine(Path.GetTempPath(), $"hst-commander-{Guid.NewGuid()}");
+        var dirPath = Path.Combine(rootPath, "dir1", "dir2");
+        Directory.CreateDirectory(dirPath);
+        var driveRoot = Path.GetPathRoot(Path.GetFullPath(rootPath))!;
+        try
+        {
+            using var navigationContext = new NavigationContext(dirPath);
+            var previousPath = navigationContext.CurrentPath;
+
+            // act
+            await navigationContext.GoRootAsync();
+            var entries = await navigationContext.ListEntriesAsync();
+            var selectedIndex = navigationContext.GetSelectedIndex(entries, previousPath, 5);
+
+            // assert
+            Assert.Equal(driveRoot, navigationContext.CurrentPath);
+            Assert.Null(navigationContext.PreviousEntryName);
+            Assert.Equal(0, selectedIndex);
+        }
+        finally
+        {
+            Directory.Delete(rootPath, true);
+        }
+    }
+
+    [Fact]
+    public async Task When_GoRootAtDriveList_Then_DriveListIsKeptAndFirstEntryIsSelected()
+    {
+        // arrange
+        using var navigationContext = new NavigationContext(string.Empty);
+        var previousPath = navigationContext.CurrentPath;
+        var entries = await navigationContext.ListEntriesAsync();
+
+        // act
+        await navigationContext.GoRootAsync();
+        var selectedIndex = navigationContext.GetSelectedIndex(entries, previousPath, entries.Count - 1);
+        var nextSelectedIndex = navigationContext.GetSelectedIndex(entries, previousPath, entries.Count - 1);
+
+        // assert - the first entry is selected once
+        Assert.Equal("Computer", navigationContext.CurrentPath);
+        Assert.Equal(0, selectedIndex);
+        Assert.Equal(entries.Count - 1, nextSelectedIndex);
+    }
+
+    [Fact]
     public async Task When_OpenDirectory_Then_NoPreviousEntry()
     {
         // arrange

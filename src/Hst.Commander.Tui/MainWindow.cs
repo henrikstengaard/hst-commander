@@ -360,6 +360,11 @@ public sealed class MainWindow : Window
                 key.Handled = true;
                 _ = RunNavigationAsync(pane, () => pane.NavigationContext.GoParentAsync());
             }
+            else if (IsGoRootKey(key))
+            {
+                key.Handled = true;
+                _ = RunNavigationAsync(pane, () => pane.NavigationContext.GoRootAsync());
+            }
             // terminals use alt+enter for full screen, so ctrl+p too
             else if (key == Key.P.WithCtrl || key == Key.Enter.WithAlt)
             {
@@ -961,6 +966,14 @@ public sealed class MainWindow : Window
     }
 
     private static int GetPageSize(Pane pane) => pane.TableView.VisibleRows;
+
+    /// <summary>
+    ///     Ctrl+\ going to the root of the volume. Terminals send it as the control character 0x1C, also sent for
+    ///     Ctrl+4, which may be decoded as either key.
+    /// </summary>
+    private static bool IsGoRootKey(Key key) =>
+        key == new Key('\\').WithCtrl || key == Key.D4.WithCtrl || key.KeyCode == (KeyCode)0x1C ||
+        key.KeyCode == ((KeyCode)0x1C | KeyCode.CtrlMask);
 
     private static void MoveSelection(Pane pane, int offset, bool absolute = false)
     {

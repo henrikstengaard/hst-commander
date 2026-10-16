@@ -95,6 +95,28 @@ public class GivenNavigationContextWithTestVolumeProvider
     }
 
     [Fact]
+    public async Task When_GoRoot_Then_RootIsListed()
+    {
+        // arrange
+        using var navigationContext = new NavigationContext(string.Empty);
+        await navigationContext.ChangeVolumeProviderAsync(volumeProvider);
+        var dirEntry = (await navigationContext.ListEntriesAsync()).Single(entry => entry.Name == "dir1");
+        await navigationContext.OpenEntryAsync(dirEntry);
+
+        var previousPath = navigationContext.CurrentPath;
+
+        // act
+        await navigationContext.GoRootAsync();
+        var rootEntries = await navigationContext.ListEntriesAsync();
+        var selectedIndex = navigationContext.GetSelectedIndex(rootEntries, previousPath, 1);
+
+        // assert
+        Assert.Equal("Test", navigationContext.CurrentPath);
+        Assert.Equal(0, selectedIndex);
+        Assert.Equal(["dir1", "file1.txt"], rootEntries.Select(entry => entry.Name));
+    }
+
+    [Fact]
     public async Task When_CopyFromVolumeToLocalDirectory_Then_ItemIsCopied()
     {
         // arrange
