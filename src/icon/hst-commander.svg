@@ -1,0 +1,31 @@
+<?xml version="1.0" ?><!DOCTYPE svg  PUBLIC '-//W3C//DTD SVG 1.1//EN'  'http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd'>
+<svg enable-background="new 0 0 512 512" height="512px" id="Layer_1" version="1.1" viewBox="0 0 512 512" width="512px" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <g>
+<rect x="56" y="96" rx="10" ry="10" width="400" height="320" style="fill:#ffffff; stroke-width: 10; stroke:#606060;" />
+
+    <line x1="56" y1="141" x2="456" y2="141" stroke="#606060" stroke-width="10" />
+    <circle cx="86" cy="118" r="8" stroke="#606060" stroke-width="8" fill="none" />
+    <circle cx="116" cy="118" r="8" stroke="#606060" stroke-width="8" fill="none" />
+
+    <rect x="86" y="166" rx="6" ry="6" width="160" height="220" fill="none" stroke="#606060" stroke-width="12" />
+    <rect x="266" y="166" rx="6" ry="6" width="160" height="220" fill="none" stroke="#606060" stroke-width="12" />
+
+    <line x1="200" y1="166" x2="200" y2="386" stroke="#606060" stroke-width="8" />
+    <line x1="380" y1="166" x2="380" y2="386" stroke="#606060" stroke-width="8" />
+
+    <g stroke="#606060" stroke-width="15" stroke-linecap="round">
+      <line x1="110" y1="200" x2="170" y2="200" />
+      <line x1="110" y1="236" x2="180" y2="236" />
+      <line x1="110" y1="272" x2="155" y2="272" />
+      <line x1="110" y1="308" x2="175" y2="308" />
+      <line x1="218" y1="272" x2="228" y2="272" />
+      <line x1="218" y1="308" x2="228" y2="308" />
+
+      <line x1="290" y1="200" x2="345" y2="200" />
+      <line x1="290" y1="236" x2="360" y2="236" />
+      <line x1="290" y1="272" x2="350" y2="272" />
+      <line x1="398" y1="236" x2="408" y2="236" />
+      <line x1="398" y1="272" x2="408" y2="272" />
+    </g>
+  </g>
+</svg>

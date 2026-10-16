@@ -5,6 +5,7 @@
         <TargetFramework>net10.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <ApplicationIcon>..\icon\hst-commander.ico</ApplicationIcon>
     </PropertyGroup>
 
     <ItemGroup>

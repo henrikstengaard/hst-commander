@@ -6,12 +6,17 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+        <ApplicationIcon>..\icon\hst-commander.ico</ApplicationIcon>
     </PropertyGroup>
 
     <ItemGroup>
       <PackageReference Include="Avalonia" Version="12.1.4" />
       <PackageReference Include="Avalonia.Desktop" Version="12.1.4" />
       <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.4" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <AvaloniaResource Include="..\icon\hst-commander.ico" Link="Assets\hst-commander.ico" />
     </ItemGroup>
 
     <ItemGroup>

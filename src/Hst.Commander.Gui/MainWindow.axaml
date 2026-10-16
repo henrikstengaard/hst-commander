@@ -3,6 +3,7 @@
         xmlns:local="using:Hst.Commander.Gui"
         x:Class="Hst.Commander.Gui.MainWindow"
         Title="Hst Commander"
+        Icon="avares://Hst.Commander.Gui/Assets/hst-commander.ico"
         Width="1200" Height="750"
         WindowStartupLocation="CenterScreen">
     <DockPanel>
