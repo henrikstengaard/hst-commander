@@ -1,4 +1,3 @@
-using DiscUtils.Iso9660;
 using Hst.Commander.Core.Volumes;
 using Hst.Commander.Abstractions;
 
@@ -9,12 +8,11 @@ public sealed class NavigationContext : IDisposable
     private IVolumeProvider _volumeProvider;
     private IVolume _rootVolume;
     private NestedVolume _nestedVolume;
-    private readonly Stack<Stream> _isoStreams = new();
+    private readonly Stack<OpenedImage> _images = new();
     private readonly Dictionary<string, IEntry> _markedEntries = new(StringComparer.Ordinal);
     private readonly HashSet<string> _executableNames = new(StringComparer.Ordinal);
     private readonly Action<string> _startFile;
-    private Iso9660Volume? _isoVolume;
-    private string? _isoPath;
+    private readonly IReadOnlyList<IFileVolumeProvider> _fileVolumeProviders;
     private string? _newEntryName;
 
     /// <param name="initialPath">Local directory to start in, empty for the drive list.</param>
@@ -22,9 +20,15 @@ public sealed class NavigationContext : IDisposable
     ///     Starts a local file opened with <see cref="OpenEntryAsync" />, given its full path. Defaults to starting it
     ///     with the shell, which executes programs and opens other files with their associated application.
     /// </param>
-    public NavigationContext(string initialPath, Action<string>? startFile = null)
+    /// <param name="fileVolumeProviders">
+    ///     File volume providers asked in order whether a file opened with <see cref="OpenEntryAsync" /> is browsed as a
+    ///     volume (an image), e.g. an ISO image or a zip archive. Defaults to <see cref="VolumeProviders.Files" />.
+    /// </param>
+    public NavigationContext(string initialPath, Action<string>? startFile = null,
+        IReadOnlyList<IFileVolumeProvider>? fileVolumeProviders = null)
     {
         _startFile = startFile ?? FileStarter.StartWithShell;
+        _fileVolumeProviders = fileVolumeProviders ?? VolumeProviders.Files;
         _volumeProvider = VolumeProviders.Local;
         _rootVolume = new LocalVolume(initialPath);
         _nestedVolume = new NestedVolume(_rootVolume);
@@ -51,7 +55,10 @@ public sealed class NavigationContext : IDisposable
     ///     <list type="bullet">
     ///         <item>empty or "Computer" (in a local volume): the local drive list;</item>
     ///         <item>a local directory, relative paths relative to the current local directory;</item>
-    ///         <item>a local path going into an ISO image, e.g. "c:\images\disk.iso\dir1";</item>
+    ///         <item>
+    ///             a local path going into an image (a file opened as a volume), e.g. "c:\images\disk.iso\dir1" or
+    ///             "c:\images\disk.iso\archive.zip\dir1";
+    ///         </item>
     ///         <item>
     ///             otherwise, when another volume provider is shown, a path in its volume from the root, e.g. "dir1"
     ///             or the provider name for the root.
@@ -117,7 +124,7 @@ public sealed class NavigationContext : IDisposable
         SetRootVolume(_volumeProvider, volume);
     }
 
-    /// <summary>Changes to a local directory or a directory inside a local ISO image.</summary>
+    /// <summary>Changes to a local directory or a directory inside a local image.</summary>
     private async Task ChangeLocalLocationAsync(string fullPath, CancellationToken cancellationToken)
     {
         if (Directory.Exists(fullPath))
@@ -134,37 +141,47 @@ public sealed class NavigationContext : IDisposable
             imagePath = Path.GetDirectoryName(imagePath);
         }
 
-        if (imagePath == null || !File.Exists(imagePath) ||
-            !imagePath.EndsWith(".iso", StringComparison.OrdinalIgnoreCase))
+        if (imagePath == null || !File.Exists(imagePath) || Path.GetDirectoryName(imagePath) is not { } imageDirectory)
         {
             throw new IOException($"Location '{fullPath}' not found");
         }
 
-        var imageDirectory = Path.GetDirectoryName(imagePath) ??
-                             throw new IOException($"Location '{fullPath}' not found");
-        var pathComponents = SplitPath(Path.GetRelativePath(imagePath, fullPath))
-            .Where(pathComponent => pathComponent != ".")
-            .ToList();
-        var isoStream = File.OpenRead(imagePath);
+        // the path is opened in a context of its own, so the location is unchanged when it fails. Path components
+        // inside the image are directories or images, e.g. "archive.zip" of "c:\images\disk.iso\archive.zip\dir1",
+        // detected regardless of their extension like opening them as volumes
+        List<string> pathComponents =
+        [
+            Path.GetFileName(imagePath),
+            ..SplitPath(Path.GetRelativePath(imagePath, fullPath)).Where(pathComponent => pathComponent != ".")
+        ];
+        var context = new NavigationContext(imageDirectory, _startFile, _fileVolumeProviders);
         try
         {
-            var isoVolume = new Iso9660Volume(new CDReader(isoStream, true));
-            if (pathComponents.Count > 0)
+            foreach (var pathComponent in pathComponents)
             {
-                await isoVolume.ChangeDirectory(pathComponents, cancellationToken);
+                var entry = await context.FindEntryAsync(pathComponent, cancellationToken);
+                if (entry is { Type: EntryType.Container })
+                {
+                    await context._nestedVolume.ChangeDirectory([entry.Name], cancellationToken);
+                }
+                else if (entry == null ||
+                         !await context.OpenImageAsync(entry, _fileVolumeProviders, cancellationToken))
+                {
+                    throw new IOException($"Location '{fullPath}' not found");
+                }
             }
-
-            SetRootVolume(VolumeProviders.Local, new LocalVolume(imageDirectory));
-            _nestedVolume.PushVolume(new EntryVolumeProvider(
-                new Entry(Path.GetFileName(imagePath), EntryType.Item), isoVolume));
-            _isoStreams.Push(isoStream);
-            _isoVolume = isoVolume;
-            _isoPath = imagePath;
         }
         catch
         {
-            await isoStream.DisposeAsync();
+            context.Dispose();
             throw;
+        }
+
+        SetRootVolume(context._volumeProvider, context._rootVolume);
+        _nestedVolume = context._nestedVolume;
+        foreach (var image in context._images.Reverse())
+        {
+            _images.Push(image);
         }
     }
 
@@ -349,6 +366,11 @@ public sealed class NavigationContext : IDisposable
         }
     }
 
+    /// <summary>
+    ///     True inside an image: a file opened as a volume by a file volume provider, e.g. an ISO image or a zip archive.
+    /// </summary>
+    public bool IsInImage => _images.Count > 0;
+
     /// <summary>Local directory of the current path or containing the current image. Null in the drive list.</summary>
     private string? LocalPath => _rootVolume is LocalVolume localVolume && localVolume.CurrentPathComponents.Any()
         ? string.Join(Path.DirectorySeparatorChar, localVolume.CurrentPathComponents)
@@ -362,7 +384,7 @@ public sealed class NavigationContext : IDisposable
     {
         get
         {
-            if (_isoStreams.Count > 0 || LocalPath is not { } localPath)
+            if (IsInImage || LocalPath is not { } localPath)
             {
                 return null;
             }
@@ -406,7 +428,7 @@ public sealed class NavigationContext : IDisposable
     /// </summary>
     public string? GetLocalPath(IEntry entry)
     {
-        if (_isoStreams.Count > 0 || _rootVolume is not LocalVolume ||
+        if (IsInImage || _rootVolume is not LocalVolume ||
             entry.Name.Equals(Paths.Parent, StringComparison.Ordinal))
         {
             return null;
@@ -454,7 +476,7 @@ public sealed class NavigationContext : IDisposable
         _executableNames.Clear();
 
         // files inside images can't be executed
-        var localPath = _isoStreams.Count == 0 ? LocalPath : null;
+        var localPath = !IsInImage ? LocalPath : null;
         if (localPath == null)
         {
             return;
@@ -536,40 +558,171 @@ public sealed class NavigationContext : IDisposable
             return;
         }
 
-        if (!entry.Name.EndsWith(".iso", StringComparison.OrdinalIgnoreCase))
+        // files with an extension of a file volume provider detecting them, e.g. ISO images or zip archives, are
+        // browsed as images
+        var extension = Path.GetExtension(entry.Name);
+        if (await OpenImageAsync(entry, _fileVolumeProviders.Where(fileVolumeProvider =>
+                fileVolumeProvider.Extensions.Contains(extension, StringComparer.OrdinalIgnoreCase)), cancellationToken))
         {
-            // local files are started, e.g. executing a program; files inside images can't be started
-            if (_isoStreams.Count == 0 && LocalPath is { } localPath)
-            {
-                _startFile(Path.Combine(localPath, entry.Name));
-            }
-
             return;
         }
 
-        if (_isoStreams.Count > 0)
+        // local files are started, e.g. executing a program; files inside images can't be started
+        if (!IsInImage && LocalPath is { } localPath)
         {
-            throw new IOException("Opening ISO files from inside another ISO image is not supported.");
+            _startFile(Path.Combine(localPath, entry.Name));
+        }
+    }
+
+    /// <summary>
+    ///     Opens an entry as a volume (Ctrl+PageDown): a file detected by any file volume provider is browsed as an
+    ///     image regardless of its extension, e.g. a .docx document as a zip archive. Directories and ".." are opened
+    ///     like <see cref="OpenEntryAsync" />. Throws <see cref="IOException" /> when no file volume provider detects
+    ///     the file.
+    /// </summary>
+    public async Task OpenAsVolumeAsync(IEntry entry, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+
+        if (entry.Type == EntryType.Container || entry.Name.Equals(Paths.Parent, StringComparison.Ordinal))
+        {
+            await OpenEntryAsync(entry, cancellationToken);
+            return;
         }
 
-        var currentPath = LocalPath ?? throw new IOException("Opening ISO images is only supported for local files.");
-        var isoPath = Path.Combine(currentPath, entry.Name);
-        var isoStream = File.OpenRead(isoPath);
+        if (!await OpenImageAsync(entry, _fileVolumeProviders, cancellationToken))
+        {
+            throw new IOException($"'{entry.Name}' can't be opened as a volume");
+        }
+    }
 
+    /// <summary>
+    ///     Opens an item in the current location as an image when one of the file volume providers detects it, e.g.
+    ///     by its magic signature, and pushes its volume. Returns false when none detects it.
+    /// </summary>
+    private async Task<bool> OpenImageAsync(IEntry entry, IEnumerable<IFileVolumeProvider> fileVolumeProviders,
+        CancellationToken cancellationToken)
+    {
+        var volume = _nestedVolume;
+        var fileVolumeProvider = await DetectFileVolumeProviderAsync(entry.Name, fileVolumeProviders.ToList(),
+            token => volume.OpenRead(entry.Name, token), cancellationToken);
+        if (fileVolumeProvider == null)
+        {
+            return false;
+        }
+
+        // an image inside another image is opened again from the directory it's in, e.g. for copying
+        var parentPathComponents = IsInImage ? _images.Peek().Volume.CurrentPathComponents.ToList() : [];
+        var image = await OpenImageAsync(fileVolumeProvider, entry.Name, parentPathComponents,
+            token => volume.OpenRead(entry.Name, token), cancellationToken);
+        _nestedVolume.PushVolume(new EntryVolumeProvider(entry, image.Volume));
+        _images.Push(image);
+        PreviousEntryName = null;
+        _markedEntries.Clear();
+        return true;
+    }
+
+    /// <summary>
+    ///     The first file volume provider detecting a file, null when none does. Files that can't be read, e.g. locked
+    ///     by another process, are not detected, so they are started as usual.
+    /// </summary>
+    private static async Task<IFileVolumeProvider?> DetectFileVolumeProviderAsync(string name,
+        IReadOnlyList<IFileVolumeProvider> fileVolumeProviders, Func<CancellationToken, Task<Stream>> openRead,
+        CancellationToken cancellationToken)
+    {
+        if (fileVolumeProviders.Count == 0)
+        {
+            return null;
+        }
+
+        Stream? stream = null;
         try
         {
-            var isoVolume = new Iso9660Volume(new CDReader(isoStream, true));
-            _nestedVolume.PushVolume(new EntryVolumeProvider(entry, isoVolume));
-            _isoStreams.Push(isoStream);
-            _isoVolume = isoVolume;
-            _isoPath = isoPath;
-            PreviousEntryName = null;
-            _markedEntries.Clear();
+            foreach (var fileVolumeProvider in fileVolumeProviders)
+            {
+                // a seekable stream is read again from the start, otherwise the file is opened again
+                if (stream is { CanSeek: true })
+                {
+                    stream.Position = 0;
+                }
+                else
+                {
+                    if (stream != null)
+                    {
+                        await stream.DisposeAsync();
+                    }
+
+                    stream = await openRead(cancellationToken);
+                }
+
+                if (await fileVolumeProvider.IsMatch(name, stream, cancellationToken))
+                {
+                    return fileVolumeProvider;
+                }
+            }
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException
+                                              or NotSupportedException)
+        {
+            return null;
+        }
+        finally
+        {
+            if (stream != null)
+            {
+                await stream.DisposeAsync();
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>Opens a file as an image with a file volume provider.</summary>
+    private static async Task<OpenedImage> OpenImageAsync(IFileVolumeProvider fileVolumeProvider, string name,
+        IReadOnlyList<string> parentPathComponents, Func<CancellationToken, Task<Stream>> openRead,
+        CancellationToken cancellationToken)
+    {
+        var stream = await OpenSeekableAsync(openRead, cancellationToken);
+        try
+        {
+            var volume = await fileVolumeProvider.CreateVolume(stream, cancellationToken);
+            return new OpenedImage(fileVolumeProvider, name, parentPathComponents, volume, stream);
         }
         catch
         {
-            isoStream.Dispose();
+            await stream.DisposeAsync();
             throw;
+        }
+    }
+
+    /// <summary>
+    ///     Opens a file as a seekable stream for a file volume provider. A stream that isn't seekable, e.g. of a file
+    ///     inside a zip archive, is copied to a temporary file deleted when the stream is closed.
+    /// </summary>
+    private static async Task<Stream> OpenSeekableAsync(Func<CancellationToken, Task<Stream>> openRead,
+        CancellationToken cancellationToken)
+    {
+        var stream = await openRead(cancellationToken);
+        if (stream.CanSeek)
+        {
+            return stream;
+        }
+
+        await using (stream)
+        {
+            var temporaryStream = new FileStream(Path.GetTempFileName(), FileMode.Create, FileAccess.ReadWrite,
+                FileShare.None, 81920, FileOptions.DeleteOnClose | FileOptions.Asynchronous);
+            try
+            {
+                await stream.CopyToAsync(temporaryStream, cancellationToken);
+                temporaryStream.Position = 0;
+                return temporaryStream;
+            }
+            catch
+            {
+                await temporaryStream.DisposeAsync();
+                throw;
+            }
         }
     }
 
@@ -579,12 +732,10 @@ public sealed class NavigationContext : IDisposable
         var previousEntryName = _nestedVolume.CurrentPathComponents
             .LastOrDefault(pathComponent => pathComponent.Length > 0);
 
-        if (_isoStreams.Count > 0 && _nestedVolume.CurrentVolumeIsAtRoot)
+        if (IsInImage && _nestedVolume.CurrentVolumeIsAtRoot)
         {
             _nestedVolume.PopVolume();
-            _isoStreams.Pop().Dispose();
-            _isoVolume = null;
-            _isoPath = null;
+            _images.Pop().Dispose();
         }
         else
         {
@@ -597,26 +748,50 @@ public sealed class NavigationContext : IDisposable
 
     /// <summary>
     ///     Opens a volume of its own at the current location, so it can be used, e.g. for copying, without changing the
-    ///     current directory of this context. An image is opened again from its file.
+    ///     current directory of this context. Images are opened again from their files, images inside images from the
+    ///     image they are in.
     /// </summary>
     public async Task<VolumeLocation> OpenLocationAsync(CancellationToken cancellationToken = default)
     {
-        if (_isoVolume != null && _isoPath != null)
+        var rootLocation = await OpenRootLocationAsync(cancellationToken);
+        if (!IsInImage)
         {
-            var isoStream = File.OpenRead(_isoPath);
-            try
-            {
-                var isoVolume = new Iso9660Volume(new CDReader(isoStream, true));
-                await isoVolume.ChangeDirectory(_isoVolume.CurrentPathComponents.ToList(), cancellationToken);
-                return new VolumeLocation(isoVolume, CurrentPath, isoStream);
-            }
-            catch
-            {
-                await isoStream.DisposeAsync();
-                throw;
-            }
+            return rootLocation;
         }
 
+        var resources = new Stack<IDisposable>([rootLocation]);
+        try
+        {
+            var volume = rootLocation.Volume;
+            foreach (var image in _images.Reverse())
+            {
+                // the first image is in the root location, the others in a directory of the image before
+                if (resources.Count > 1)
+                {
+                    await volume.ChangeDirectory([Paths.Root, ..image.ParentPathComponents], cancellationToken);
+                }
+
+                var parentVolume = volume;
+                var openedImage = await OpenImageAsync(image.FileVolumeProvider, image.Name,
+                    image.ParentPathComponents, token => parentVolume.OpenRead(image.Name, token), cancellationToken);
+                resources.Push(openedImage);
+                volume = openedImage.Volume;
+            }
+
+            await volume.ChangeDirectory([Paths.Root, .._images.Peek().Volume.CurrentPathComponents],
+                cancellationToken);
+            return new VolumeLocation(volume, CurrentPath, new Resources(resources));
+        }
+        catch
+        {
+            new Resources(resources).Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>Opens a volume of its own at the current location of the root volume, e.g. the directory of an image.</summary>
+    private async Task<VolumeLocation> OpenRootLocationAsync(CancellationToken cancellationToken)
+    {
         if (_rootVolume is LocalVolume)
         {
             var localPath = LocalPath ?? throw new IOException("The drive list is not a directory");
@@ -690,7 +865,7 @@ public sealed class NavigationContext : IDisposable
     {
         ArgumentNullException.ThrowIfNull(entries);
 
-        var localDirectory = _isoStreams.Count == 0 ? LocalPath : null;
+        var localDirectory = !IsInImage ? LocalPath : null;
         return EntryProperties.Create(entries, CurrentPath, localDirectory, IsDriveList);
     }
 
@@ -705,7 +880,7 @@ public sealed class NavigationContext : IDisposable
     {
         ArgumentNullException.ThrowIfNull(entries);
 
-        if (_isoStreams.Count == 0 && _rootVolume is LocalVolume)
+        if (!IsInImage && _rootVolume is LocalVolume)
         {
             return LocalPath is { } localPath
                 ? FileSystemDetails.CountContents(localPath, entries, progress, cancellationToken)
@@ -723,7 +898,7 @@ public sealed class NavigationContext : IDisposable
     public string? CreateDirectoryNotSupportedMessage =>
         _rootVolume is LocalVolume && !_nestedVolume.CurrentPathComponents.Any()
             ? "Creating a directory is not supported in the drive list"
-            : _isoStreams.Count > 0
+            : IsInImage
                 ? "Creating a directory is not supported in an image, images are read-only"
                 : null;
 
@@ -759,7 +934,7 @@ public sealed class NavigationContext : IDisposable
     public string? MoveNotSupportedMessage =>
         _rootVolume is LocalVolume && !_nestedVolume.CurrentPathComponents.Any()
             ? "Moving is not supported in the drive list"
-            : _isoStreams.Count > 0
+            : IsInImage
                 ? "Moving is not supported in an image, images are read-only"
                 : null;
 
@@ -1028,15 +1203,53 @@ public sealed class NavigationContext : IDisposable
     /// <summary>Closes images opened in the current volume and the volume itself, when disposable.</summary>
     private void CloseVolumes()
     {
-        while (_isoStreams.Count > 0)
+        while (IsInImage)
         {
-            _isoStreams.Pop().Dispose();
+            _images.Pop().Dispose();
         }
 
-        _isoVolume = null;
-        _isoPath = null;
         (_rootVolume as IDisposable)?.Dispose();
     }
 
     public void Dispose() => CloseVolumes();
+
+    /// <summary>
+    ///     A file opened as a volume (an image) by a file volume provider.
+    /// </summary>
+    /// <param name="fileVolumeProvider">File volume provider that detected the file and created the volume.</param>
+    /// <param name="name">Name of the file.</param>
+    /// <param name="parentPathComponents">
+    ///     Directory of the file in the image it's in, used to open it again. Empty for a file in the root volume.
+    /// </param>
+    /// <param name="volume">Volume of the image.</param>
+    /// <param name="stream">Stream of the file, closed after the volume.</param>
+    private sealed class OpenedImage(IFileVolumeProvider fileVolumeProvider, string name,
+        IReadOnlyList<string> parentPathComponents, IVolume volume, Stream stream) : IDisposable
+    {
+        public IFileVolumeProvider FileVolumeProvider { get; } = fileVolumeProvider;
+
+        public string Name { get; } = name;
+
+        public IReadOnlyList<string> ParentPathComponents { get; } = parentPathComponents;
+
+        public IVolume Volume { get; } = volume;
+
+        public void Dispose()
+        {
+            (Volume as IDisposable)?.Dispose();
+            stream.Dispose();
+        }
+    }
+
+    /// <summary>Resources disposed in reverse order of opening, e.g. images inside images.</summary>
+    private sealed class Resources(Stack<IDisposable> resources) : IDisposable
+    {
+        public void Dispose()
+        {
+            while (resources.Count > 0)
+            {
+                resources.Pop().Dispose();
+            }
+        }
+    }
 }

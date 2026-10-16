@@ -14,6 +14,7 @@
                 <MenuItem x:Name="MakeDirectoryMenuItem" Header="_Make directory..." InputGesture="F7" />
                 <MenuItem x:Name="DeleteMenuItem" Header="_Delete..." InputGesture="F8" />
                 <MenuItem x:Name="PropertiesMenuItem" Header="_Properties..." InputGesture="Alt+Enter" />
+                <MenuItem x:Name="OpenAsVolumeMenuItem" Header="Ope_n as volume" InputGesture="Ctrl+PageDown" />
                 <Separator />
                 <!-- +, - and * are matched by their symbol in MainWindow, key gestures would be shown as "OemPlus" etc. -->
                 <MenuItem x:Name="SelectGroupMenuItem" Header="Select _group... (+)" />

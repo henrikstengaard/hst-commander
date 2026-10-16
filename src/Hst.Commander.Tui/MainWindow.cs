@@ -49,6 +49,7 @@ public sealed class MainWindow : Window
                     new("_Make directory...", "F7", MakeDirectoryInActivePane),
                     new("_Delete...", "F8", DeleteFromActivePane),
                     new("_Properties...", "Ctrl+P", ShowPropertiesOfActivePane),
+                    new("Ope_n as volume", "Ctrl+PgDn", OpenAsVolumeInActivePane),
                     null!,
                     new("Select _group...", "+", SelectGroupInActivePane),
                     new("_Unselect group...", "-", UnselectGroupInActivePane),
@@ -317,6 +318,11 @@ public sealed class MainWindow : Window
             {
                 MoveSelection(pane, key.KeyCode == KeyCode.CursorUp ? -1 : 1);
                 key.Handled = true;
+            }
+            else if (key == Key.PageDown.WithCtrl)
+            {
+                key.Handled = true;
+                _ = OpenSelectedEntryAsVolumeAsync(pane);
             }
             else if (key.KeyCode == KeyCode.PageUp || key.KeyCode == KeyCode.PageDown)
             {
@@ -786,6 +792,22 @@ public sealed class MainWindow : Window
         }
 
         await RunNavigationAsync(pane, () => pane.NavigationContext.OpenEntryAsync(pane.Entries[selectedRow]));
+    }
+
+    private void OpenAsVolumeInActivePane() => _ = OpenSelectedEntryAsVolumeAsync(_activePane);
+
+    /// <summary>
+    ///     Opens the entry under the cursor as a volume (Ctrl+PageDown), e.g. a .docx document as a zip archive.
+    /// </summary>
+    private async Task OpenSelectedEntryAsVolumeAsync(Pane pane)
+    {
+        var selectedRow = pane.TableView.SelectedRow;
+        if (selectedRow < 0 || selectedRow >= pane.Entries.Count)
+        {
+            return;
+        }
+
+        await RunNavigationAsync(pane, () => pane.NavigationContext.OpenAsVolumeAsync(pane.Entries[selectedRow]));
     }
 
     private async Task RunNavigationAsync(Pane pane, Func<Task> action)

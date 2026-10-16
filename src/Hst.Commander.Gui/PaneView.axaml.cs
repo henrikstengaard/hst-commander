@@ -115,6 +115,10 @@ public partial class PaneView : UserControl
                 e.Handled = true;
                 await RunNavigationAsync(() => NavigationContext.GoParentAsync());
                 break;
+            case Key.PageDown when e.KeyModifiers == KeyModifiers.Control:
+                e.Handled = true;
+                await OpenSelectedEntryAsVolumeAsync();
+                break;
             // the list box scroll viewer handles these keys by only scrolling the view,
             // so move the selection instead
             case Key.PageUp:
@@ -220,6 +224,20 @@ public partial class PaneView : UserControl
         }
 
         await RunNavigationAsync(() => NavigationContext.OpenEntryAsync(item.Entry));
+    }
+
+    /// <summary>
+    ///     Opens the entry under the cursor as a volume (Ctrl+PageDown), e.g. a .docx document as a zip archive, see
+    ///     <see cref="NavigationContext.OpenAsVolumeAsync" />.
+    /// </summary>
+    public async Task OpenSelectedEntryAsVolumeAsync()
+    {
+        if (EntriesList.SelectedItem is not EntryItem item)
+        {
+            return;
+        }
+
+        await RunNavigationAsync(() => NavigationContext.OpenAsVolumeAsync(item.Entry));
     }
 
     private async Task RunNavigationAsync(Func<Task> action)

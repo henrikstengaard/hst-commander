@@ -37,6 +37,11 @@ public partial class MainWindow : Window
         MakeDirectoryMenuItem.Click += async (_, _) => await MakeDirectoryAsync(_activePane);
         DeleteMenuItem.Click += async (_, _) => await DeleteAsync(_activePane);
         PropertiesMenuItem.Click += async (_, _) => await ShowPropertiesAsync(_activePane);
+        OpenAsVolumeMenuItem.Click += async (_, _) =>
+        {
+            await _activePane.OpenSelectedEntryAsVolumeAsync();
+            _activePane.FocusEntries();
+        };
         SelectGroupMenuItem.Click += async (_, _) => await SelectGroupAsync(_activePane, true);
         UnselectGroupMenuItem.Click += async (_, _) => await SelectGroupAsync(_activePane, false);
         InvertSelectionMenuItem.Click += (_, _) => InvertSelection(_activePane);

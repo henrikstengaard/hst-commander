@@ -8,6 +8,8 @@
 
     <ItemGroup>
       <ProjectReference Include="..\Hst.Commander.Abstractions\Hst.Commander.Abstractions.csproj" />
+      <!-- plugin included with Hst Commander by default, see Plugins -->
+      <ProjectReference Include="..\Hst.Commander.Plugins.Zip\Hst.Commander.Plugins.Zip.csproj" />
     </ItemGroup>
 
     <ItemGroup>
