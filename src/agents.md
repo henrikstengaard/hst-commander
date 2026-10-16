@@ -13,10 +13,14 @@ There are two front-ends with the same functionality: a terminal UI (TUI) built 
 ## Repository Layout
 
 ```
+.github/workflows/
+  build-and-test.yml                             Builds and tests the solution on Windows, macOS and Linux on every push
+  build-and-release.yml                          Manual: publishes and packages TUI and GUI per runtime (setup/portable zip, dmg, AppImage/deb) and creates a draft prerelease
 src/
   Hst.Commander.sln                              Solution file (5 projects)
   Directory.Build.props                          Shared product name, version, authors and copyright for all projects
   Directory.Build.targets                        Replaces the last version part with the git commit count
+  packaging/                                     Release packaging used by build-and-release.yml: linux/package.sh (AppImage + .deb), macos/package.sh (.dmg, GUI as .app bundle in a create-dmg window with dmg-background.svg/.png, rendered by make-dmg-background.cmd, showing the drag to Applications), windows/setup.iss (Inno Setup)
   icon/                                          App icon in the style of the Hst Imager icon: hst-commander.svg source, simplified pixel aligned hst-commander-16x16.svg/-32x32.svg for the small sizes, PNGs (1024, 512, 192, 32, 16), .ico (Windows, 16-256), favicon/16x16/32x32 .ico, .icns (macOS) and make-*.cmd/make-icns.sh scripts (ImageMagick, sips/iconutil)
   Hst.Commander.Extensions.Volume.Abstractions/  IVolumeProvider / IVolume / IEntry interfaces (no external deps)
   Hst.Commander.Core/                            Volume implementations, volume providers, NavigationContext + shared utilities
@@ -199,6 +203,7 @@ The keys opening the volume provider list of the left/right pane are chosen in F
 ### Versioning and About
 
 - Like Hst Imager, `src/Directory.Build.props` is the single source of truth for the version (`<Version>`, e.g. `0.1.0`) and sets `Product` (`Hst Commander`), `Authors`/`Company` and `Copyright` for all projects. `src/Directory.Build.targets` (`SetVersionFromGitCommitCount`) replaces the last version part with `git rev-list --count HEAD` (e.g. `0.1.29`), unless the version is passed with `-p:Version=...`; the .NET SDK appends the commit sha to the product version (`0.1.29+98d7be8...`). Bump the major/minor version in `Directory.Build.props`.
+- GitHub workflows (like Hst Imager): `build-and-test.yml` runs `dotnet build`/`dotnet test` on Windows, macOS and Linux for every push. `build-and-release.yml` (run manually) publishes `Hst.Commander.Tui` and `Hst.Commander.Gui` as self-contained, single-file, ReadyToRun executables (renamed `hst.commander`/`hst.commander.gui`), passing `-p:Version=<major>.<minor>.<commit count>`, and packages them with the scripts in `src/packaging`: on Windows (`win-x64`, `win-x86`, `win-arm64`) an Inno Setup installer (`setup.iss`, installed if missing) and a portable zip; on macOS (`osx-x64`, `osx-arm64`, built on a macOS runner to sign ad hoc) a `.dmg` with the GUI as `Hst Commander.app` in a styled window to drag to Applications (`create-dmg` from brew; icon positions match the arrow in `dmg-background.svg`) and one with the TUI executable (`hdiutil`); on Linux (`linux-x64`, `linux-arm`, `linux-arm64`) an AppImage (appimagetool 1.9.1) and a `.deb` (packages `hst-commander`/`hst-commander-gui`, installed in `/usr/lib/<package>` with a `/usr/bin` link, desktop file and icon). It creates a draft prerelease tagged with the version with files named e.g. `hst-commander_v0.1.29-98d7be8_tui_windows_x64_setup.exe`, `..._gui_macos_arm64.dmg` or `..._gui_linux_amd64.deb`. Windows files are signed with SignPath only when the repository variable `SIGNPATH_ENABLED` is `true`.
 - `AppInfo` (`Hst.Commander.Core`) reads the name (`AssemblyProductAttribute`), author (`AssemblyCompanyAttribute`) and version (`Major.Minor.Build`) of the entry assembly: `AppInfo.Current`, `NameAndVersion` (e.g. `Hst Commander v0.1.29`) and `AboutText`.
 - The GUI main window title is `AppInfo.NameAndVersion` (e.g. `Hst Commander v0.1.29`).
 - Both front-ends have a Help menu with About: the TUI shows `AppInfo.AboutText` with `MessageBox.Query`, the GUI shows the modal `AboutDialog`.

@@ -1,0 +1,40 @@
+name: Build and test
+
+on:
+    push:
+      branches: '**'
+    workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            10.0.x
+
+      - name: Restore dependencies
+        working-directory: ./src
+        shell: pwsh
+        run: dotnet restore Hst.Commander.sln
+
+      - name: Build
+        working-directory: ./src
+        shell: pwsh
+        run: dotnet build Hst.Commander.sln --no-restore
+
+      - name: Test
+        working-directory: ./src
+        shell: pwsh
+        run: >
+          dotnet test Hst.Commander.sln --no-build --no-restore --verbosity normal -m:1 --logger "trx;LogFileName=test-results.trx" --blame-crash --blame-hang --blame-hang-timeout 60s

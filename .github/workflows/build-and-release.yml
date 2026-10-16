@@ -1,0 +1,285 @@
+name: Build and release
+
+on: [workflow_dispatch]
+
+env:
+  PUBLISH_ARGS: --configuration Release -p:PublishSingleFile=True -p:SelfContained=True -p:PublishReadyToRun=True -p:IncludeNativeLibrariesForSelfExtract=true
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      build_version: ${{ steps.version.outputs.build_version }}
+      release_tag: ${{ steps.version.outputs.release_tag }}
+      release_version: ${{ steps.version.outputs.release_version }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set version and tag
+        id: version
+        shell: pwsh
+        run: |
+          $commitCount = (git rev-list --count $env:GITHUB_REF)
+          $commitSha = (git log --pretty=format:'%h' -n 1 $env:GITHUB_REF)
+          $version = (Select-Xml -Path ./src/Directory.Build.props -XPath '/Project/PropertyGroup/Version').Node.InnerXML
+          $buildVersion = $version -replace '^(.*)\.\d+.*$', "`$1.$commitCount"
+          "VERSION: $version"
+          "BUILD_VERSION: $buildVersion"
+          "BUILD_VERSION_SHA: $commitSha"
+          "build_version=$buildVersion" >> $env:GITHUB_OUTPUT
+          "release_tag=$buildVersion" >> $env:GITHUB_OUTPUT
+          "release_version=hst-commander_v$buildVersion-$commitSha" >> $env:GITHUB_OUTPUT
+
+  # setup exe (inno setup) and portable zip
+  build-windows:
+    needs: [version]
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        target: [win-x64, win-x86, win-arm64]
+        app:
+          - name: tui
+            project: Hst.Commander.Tui
+            exe: hst.commander
+          - name: gui
+            project: Hst.Commander.Gui
+            exe: hst.commander.gui
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            10.0.x
+
+      # version is passed explicitly, so Directory.Build.targets doesn't replace it with the git commit count again
+      - name: Build ${{ matrix.app.name }} app
+        shell: pwsh
+        run: |
+          dotnet publish src/${{ matrix.app.project }}/${{ matrix.app.project }}.csproj ${{ env.PUBLISH_ARGS }} -p:Version=${{ needs.version.outputs.build_version }} -p:RuntimeIdentifier=${{ matrix.target }} -p:PublishDir=${{ github.workspace }}/publish
+
+      - name: Prepare ${{ matrix.app.name }} app output
+        working-directory: ./publish
+        shell: pwsh
+        run: |
+          Remove-Item -Path *.pdb
+          $exeFileName=((Get-ChildItem -Filter '${{ matrix.app.project }}*') | Select -First 1).Name
+          Rename-Item -Path $exeFileName -NewName ($exeFileName -replace '${{ matrix.app.project }}', '${{ matrix.app.exe }}')
+          Get-ChildItem -recurse
+
+      - name: Build portable zip
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Compress-Archive -Path publish/* -DestinationPath 'dist/hst-commander.${{ matrix.app.name }}.${{ matrix.target }}.portable.zip'
+
+      - name: Build setup
+        shell: pwsh
+        run: |
+          $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress }
+          & $iscc /DApp=${{ matrix.app.name }} /DVersion=${{ needs.version.outputs.build_version }} /DArch=$('${{ matrix.target }}' -replace '^win-', '') `
+            "/DSourceDir=$(Resolve-Path publish)" "/DOutputDir=$(Resolve-Path dist)" '/DOutputName=hst-commander.${{ matrix.app.name }}.${{ matrix.target }}.setup' `
+            src/packaging/windows/setup.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Get-ChildItem dist
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: hst-commander.${{ matrix.app.name }}.${{ matrix.target }}
+          path: dist/*
+          retention-days: 3
+
+  # dmg, built on macOS to sign the apps
+  build-macos:
+    needs: [version]
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        target: [osx-x64, osx-arm64]
+        app:
+          - name: tui
+            project: Hst.Commander.Tui
+            exe: hst.commander
+          - name: gui
+            project: Hst.Commander.Gui
+            exe: hst.commander.gui
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            10.0.x
+
+      - name: Build ${{ matrix.app.name }} app
+        shell: pwsh
+        run: |
+          dotnet publish src/${{ matrix.app.project }}/${{ matrix.app.project }}.csproj ${{ env.PUBLISH_ARGS }} -p:Version=${{ needs.version.outputs.build_version }} -p:RuntimeIdentifier=${{ matrix.target }} -p:PublishDir=${{ github.workspace }}/publish
+
+      - name: Prepare ${{ matrix.app.name }} app output
+        working-directory: ./publish
+        shell: pwsh
+        run: |
+          Remove-Item -Path *.pdb
+          $exeFileName=((Get-ChildItem -Filter '${{ matrix.app.project }}*') | Select -First 1).Name
+          Rename-Item -Path $exeFileName -NewName ($exeFileName -replace '${{ matrix.app.project }}', '${{ matrix.app.exe }}')
+          Get-ChildItem -recurse
+
+      - name: Install create-dmg
+        run: brew install create-dmg
+
+      - name: Build dmg
+        run: bash src/packaging/macos/package.sh ${{ matrix.app.name }} ${{ matrix.target }} ${{ needs.version.outputs.build_version }} publish dist
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: hst-commander.${{ matrix.app.name }}.${{ matrix.target }}
+          path: dist/*
+          retention-days: 3
+
+  # appimage and deb
+  build-linux:
+    needs: [version]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [linux-x64, linux-arm, linux-arm64]
+        app:
+          - name: tui
+            project: Hst.Commander.Tui
+            exe: hst.commander
+          - name: gui
+            project: Hst.Commander.Gui
+            exe: hst.commander.gui
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            10.0.x
+
+      - name: Install appimagetool
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/appimagetool" https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage
+          chmod +x "$RUNNER_TEMP/appimagetool"
+          echo "APPIMAGETOOL=$RUNNER_TEMP/appimagetool" >> $GITHUB_ENV
+          echo "APPIMAGE_EXTRACT_AND_RUN=1" >> $GITHUB_ENV
+
+      - name: Build ${{ matrix.app.name }} app
+        shell: pwsh
+        run: |
+          dotnet publish src/${{ matrix.app.project }}/${{ matrix.app.project }}.csproj ${{ env.PUBLISH_ARGS }} -p:Version=${{ needs.version.outputs.build_version }} -p:RuntimeIdentifier=${{ matrix.target }} -p:PublishDir=${{ github.workspace }}/publish
+
+      - name: Prepare ${{ matrix.app.name }} app output
+        working-directory: ./publish
+        shell: pwsh
+        run: |
+          Remove-Item -Path *.pdb
+          $exeFileName=((Get-ChildItem -Filter '${{ matrix.app.project }}*') | Select -First 1).Name
+          Rename-Item -Path $exeFileName -NewName ($exeFileName -replace '${{ matrix.app.project }}', '${{ matrix.app.exe }}')
+          Get-ChildItem -recurse
+
+      - name: Build AppImage and deb
+        run: bash src/packaging/linux/package.sh ${{ matrix.app.name }} ${{ matrix.target }} ${{ needs.version.outputs.build_version }} publish dist
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: hst-commander.${{ matrix.app.name }}.${{ matrix.target }}
+          path: dist/*
+          retention-days: 3
+
+  publish:
+    needs: [version, build-windows, build-macos, build-linux]
+    runs-on: windows-latest
+    env:
+      RELEASE_TAG: ${{ needs.version.outputs.release_tag }}
+      RELEASE_VERSION: ${{ needs.version.outputs.release_version }}
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: hst-commander.?ui.*
+          merge-multiple: true
+
+      - name: List artifacts
+        shell: pwsh
+        run: |
+          Get-ChildItem -Filter 'hst-commander.*' -name
+
+        # code signing windows artifacts with signpath.
+        # skipped until code signing certificate is ready and repository variable SIGNPATH_ENABLED is set to 'true'.
+        # requires repository variable SIGNPATH_ORGANIZATION_ID and secret SIGNPATH_API_TOKEN.
+      - name: Upload unsigned Windows artifacts
+        id: upload_unsigned_windows_artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: hst-commander.windows-unsigned
+          path: |
+            hst-commander.*.win-*.setup.exe
+            hst-commander.*.win-*.portable.zip
+          retention-days: 3
+        if: vars.SIGNPATH_ENABLED == 'true'
+
+      - name: Sign Windows artifacts with SignPath
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: hst-commander
+          signing-policy-slug: release-signing
+          github-artifact-id: ${{ steps.upload_unsigned_windows_artifacts.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed
+        if: vars.SIGNPATH_ENABLED == 'true'
+
+      - name: Replace Windows artifacts with signed artifacts
+        shell: pwsh
+        run: |
+          Get-ChildItem -Path signed -Recurse -File | ForEach-Object { Copy-Item -Path $_.FullName -Destination . -Force }
+        if: vars.SIGNPATH_ENABLED == 'true'
+
+      # e.g. hst-commander.tui.win-x64.setup.exe -> hst-commander_v0.1.29-98d7be8_tui_windows_x64_setup.exe,
+      # hst-commander.gui.linux-amd64.deb -> hst-commander_v0.1.29-98d7be8_gui_linux_amd64.deb
+      - name: Version artifacts
+        shell: pwsh
+        run: |
+          $osNames = @{ win = 'windows'; osx = 'macos'; linux = 'linux' }
+          Get-ChildItem -File -Filter 'hst-commander.*' | ForEach-Object {
+            if ($_.Name -notmatch '^hst-commander\.(tui|gui)\.(win|osx|linux)-([^.]+)\.(.+)$') { throw "Unexpected artifact '$($_.Name)'" }
+            $app, $os, $arch, $kind = $Matches[1], $osNames[$Matches[2]], $Matches[3], $Matches[4]
+            $suffix = if ($kind -match '^(setup|portable)\.(.+)$') { '_{0}.{1}' -f $Matches[1], $Matches[2] } else { '.' + $kind }
+            $newName = '{0}_{1}_{2}_{3}{4}' -f $env:RELEASE_VERSION, $app, $os, $arch, $suffix
+            Rename-Item -Path $_.FullName -NewName $newName
+          }
+          Get-ChildItem -Filter "$($env:RELEASE_VERSION)_*" -name
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ env.RELEASE_VERSION }}_*
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: ${{ env.RELEASE_VERSION }}
+          body: Prerelease of ${{ env.RELEASE_VERSION }}
+          draft: true
+          prerelease: true
