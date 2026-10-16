@@ -1,7 +1,14 @@
+using Hst.Commander.Core;
 using Hst.Commander.Tui;
 using Terminal.Gui;
 
+// plugins are loaded before the panes are created, so their volume providers are used
+var pluginErrors = Plugins.FormatErrors(Plugins.Load());
 var mainWindow = new MainWindow(Environment.CurrentDirectory, TuiSettings.Load());
+if (pluginErrors != null)
+{
+    mainWindow.ShowErrorWhenLoaded(pluginErrors);
+}
 
 try
 {

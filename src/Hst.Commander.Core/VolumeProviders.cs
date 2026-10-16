@@ -9,16 +9,37 @@ namespace Hst.Commander.Core;
 /// </summary>
 public static class VolumeProviders
 {
+    // the lists are created again when the plugins change, i.e. after plugins are loaded at startup
+    private static Lists? _lists;
+
     public static IVolumeProvider Local { get; } = new LocalVolumeProvider();
 
     public static IFileVolumeProvider Iso9660 { get; } = new Iso9660FileVolumeProvider();
 
-    public static IReadOnlyList<IVolumeProvider> All { get; } =
-        [Local, ..Plugins.All.SelectMany(plugin => plugin.VolumeProviders)];
+    public static IReadOnlyList<IVolumeProvider> All => GetLists().All;
 
     /// <summary>
     ///     File volume providers asked in order whether an opened file is a volume, e.g. an ISO image or a zip archive.
     /// </summary>
-    public static IReadOnlyList<IFileVolumeProvider> Files { get; } =
-        [Iso9660, ..Plugins.All.SelectMany(plugin => plugin.FileVolumeProviders)];
+    public static IReadOnlyList<IFileVolumeProvider> Files => GetLists().Files;
+
+    private static Lists GetLists()
+    {
+        var plugins = Plugins.All;
+        if (_lists is { } lists && ReferenceEquals(lists.Plugins, plugins))
+        {
+            return lists;
+        }
+
+        lists = new Lists(plugins,
+            [Local, ..plugins.SelectMany(plugin => plugin.VolumeProviders)],
+            [Iso9660, ..plugins.SelectMany(plugin => plugin.FileVolumeProviders)]);
+        _lists = lists;
+        return lists;
+    }
+
+    private sealed record Lists(
+        IReadOnlyList<IPlugin> Plugins,
+        IReadOnlyList<IVolumeProvider> All,
+        IReadOnlyList<IFileVolumeProvider> Files);
 }

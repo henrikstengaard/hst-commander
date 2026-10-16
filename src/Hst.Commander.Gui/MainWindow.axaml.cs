@@ -64,6 +64,12 @@ public partial class MainWindow : Window
             await LeftPane.InitializeAsync();
             await RightPane.InitializeAsync();
             LeftPane.FocusEntries();
+            if (StartupError is { } startupError)
+            {
+                StartupError = null;
+                await new ErrorDialog(startupError).ShowDialog(this);
+                LeftPane.FocusEntries();
+            }
         };
         Closed += (_, _) =>
         {
@@ -71,6 +77,9 @@ public partial class MainWindow : Window
             RightPane.NavigationContext.Dispose();
         };
     }
+
+    /// <summary>Error shown when the window is opened, e.g. plugins that failed to load.</summary>
+    public string? StartupError { get; set; }
 
     /// <summary>Makes a pane the active pane, only the active pane shows the current entry.</summary>
     private void SetActivePane(PaneView pane)

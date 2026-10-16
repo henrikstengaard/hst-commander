@@ -24,7 +24,7 @@ src/
   icon/                                          App icon in the style of the Hst Imager icon: hst-commander.svg source, simplified pixel aligned hst-commander-16x16.svg/-32x32.svg for the small sizes, PNGs (1024, 512, 192, 32, 16), .ico (Windows, 16-256), favicon/16x16/32x32 .ico, .icns (macOS) and make-*.cmd/make-icns.sh scripts (ImageMagick, sips/iconutil)
   Hst.Commander.Abstractions/                    IVolumeProvider / IFileVolumeProvider / IPlugin / IVolume / IEntry interfaces and Paths (no external deps)
   Hst.Commander.Plugins.Zip/                     Zip plugin included by default (ZipPlugin, ZipFileVolumeProvider, ZipVolume), references only Abstractions
-  Hst.Commander.Core/                            Volume implementations, volume providers, file volume providers, Plugins, NavigationContext + shared utilities
+  Hst.Commander.Core/                            Volume implementations, volume providers, file volume providers, Plugins + PluginLoader, NavigationContext + shared utilities
   Hst.Commander.Tui/                             Terminal.Gui TUI application
     MainWindow.cs                                Dual-pane window, File menu, function key bar, columns, key bindings, theme colors, F5 copy, F6 move/rename, F7 make directory, F8/Delete delete, Ctrl+P/Alt+Enter properties
     FunctionKeyBarView.cs                        Function key bar at the bottom (F3 View ... F8 Delete), clickable items
@@ -139,10 +139,18 @@ string Name { get; }
 IEnumerable<IVolumeProvider> VolumeProviders => [];          // appended to VolumeProviders.All
 IEnumerable<IFileVolumeProvider> FileVolumeProviders => [];  // appended to VolumeProviders.Files
 ```
-A plugin is a project referencing only `Hst.Commander.Abstractions` (`Paths` is there for plugins too). `Plugins.All` (`Hst.Commander.Core`) lists the plugins included by default, currently `ZipPlugin` (`Hst.Commander.Plugins.Zip`, referenced by `Hst.Commander.Core`); plugins found at startup are meant to be appended after them (not implemented).
+A plugin is a project referencing only `Hst.Commander.Abstractions` (`Paths` is there for plugins too). Plugins are included by default (`Plugins.BuiltIn`) or loaded from the plugin directories at startup, see Plugins.
 
 **`IEntry`** (`Hst.Commander.Abstractions/IEntry.cs`)
 - `Name`, `Type` (`EntryType.Container` | `EntryType.Item`), `Size`, `ModifiedDate`
+
+### Plugins
+
+- `Plugins.BuiltIn` (`Hst.Commander.Core`) lists the plugins included by default, currently `ZipPlugin` (`Hst.Commander.Plugins.Zip`, referenced by `Hst.Commander.Core`). `Plugins.All` is the built-in plugins followed by the plugins loaded from disk; `VolumeProviders.All`/`Files` are created again from it when it changes.
+- Both front-ends call `Plugins.Load()` at startup, before the panes (and their `NavigationContext`s, which take `VolumeProviders.Files` when created) are created: the TUI in `Program.cs`, the GUI in `App.OnFrameworkInitializationCompleted` (fully qualified as `Hst.Commander.Core.Plugins`, since `Plugins` in `Hst.Commander.Gui` resolves to the `Hst.Commander.Plugins` namespace). It loads once and returns the errors of plugins that failed to load; `Plugins.FormatErrors` joins them into one message (null when none), shown once the main window is loaded (TUI `MainWindow.ShowErrorWhenLoaded`, GUI `MainWindow.StartupError` shown with `ErrorDialog` when opened). Other plugins still load.
+- `PluginLoader.Directories` are scanned in order: `~/.hst-commander/plugins` (`SettingsPaths.Directory`) and `plugins` in the directory Hst Commander is executed from (`AppContext.BaseDirectory`); missing directories are skipped and a directory listed twice is scanned once.
+- In a plugin directory, `PluginLoader.Load(directories, loadedPlugins)` loads `Name/Name.dll` (a plugin in a directory of its own with its dependencies, the recommended layout) and then single assemblies `*.dll`, ordered by path. Public non-abstract classes implementing `IPlugin` with a parameterless constructor are created. Assemblies without plugins are skipped (e.g. dependencies; a `BadImageFormatException`, e.g. a native library, is ignored for single assemblies but reported for `Name/Name.dll`), as are plugins whose type full name is already loaded (e.g. a copy of the built-in Zip plugin). Errors are reported per assembly in `PluginLoadResult.Errors`.
+- Each plugin assembly is loaded in an `AssemblyLoadContext` of its own (`PluginLoadContext`) that shares `Hst.Commander.Abstractions` with Hst Commander (the default load context, so `IPlugin` etc. are the same types; a plugin's own copy of it is ignored) and resolves other dependencies with the plugin's `.deps.json` (`AssemblyDependencyResolver`), or from the plugin's directory when the resolver isn't available; framework assemblies come from the default context. This works in the single-file published apps. Loaded plugin assemblies can't be unloaded and stay locked while Hst Commander runs.
 
 ### Volume Implementations
 
@@ -264,12 +272,13 @@ The keys opening the volume provider list of the left/right pane are chosen in F
 - Making a directory (F7) in the active pane, with a dialog for the directory name.
 - Deleting (F8 or Delete) the marked entries or the entry under the cursor, with a confirm dialog and a progress dialog.
 - Showing the properties of entries and drives (Ctrl+P, Alt+Enter or File > Properties), with the size and contents counted in the background.
+- Loading plugins at startup from `~/.hst-commander/plugins` and `plugins` next to the executable in both front-ends, showing load errors.
 - Selecting (marking) or unselecting a group of entries with + or - (File > Select group / Unselect group), using wildcards or a regular expression, and inverting the selection with * (File > Invert selection).
 
 **Not implemented:**
 - View (F3), edit (F4) and other file-management operations.
 - Writing to images; ISO images and zip archives are read-only.
-- Loading plugins (`IPlugin`) from disk at startup; `Plugins.All` only lists the plugins included by default.
+- Unloading or reloading plugins while running, and a list of loaded plugins in the UI.
 - `DiskImageVolume` remains an intentional stub.
 
 ---
@@ -291,7 +300,7 @@ The keys opening the volume provider list of the left/right pane are chosen in F
 ### Namespaces
 - Abstractions: `Hst.Commander.Abstractions` (interfaces, `Paths`)
 - Zip plugin: `Hst.Commander.Plugins.Zip`
-- Core: `Hst.Commander.Core` (`AppInfo`, `EmbeddedIconReader`, `EntryProperties`, `FileSystemDetails`, `IconImage`, `NavigationContext`, `NameFilter`, `Plugins`, `SelectGroupOptions`, `FileStarter`, `SettingsPaths`, `SizeFormatter`), `Hst.Commander.Core.Volumes` (volumes)
+- Core: `Hst.Commander.Core` (`AppInfo`, `EmbeddedIconReader`, `EntryProperties`, `FileSystemDetails`, `IconImage`, `NavigationContext`, `NameFilter`, `PluginLoader`, `Plugins`, `SelectGroupOptions`, `FileStarter`, `SettingsPaths`, `SizeFormatter`), `Hst.Commander.Core.Volumes` (volumes)
 - Tui: `Hst.Commander.Tui`
 - Gui: `Hst.Commander.Gui`, `Hst.Commander.Gui.Icons` (entry icons)
 - Tests: `Hst.Commander.Core.Tests`
@@ -312,7 +321,7 @@ The keys opening the volume provider list of the left/right pane are chosen in F
 5. **To make it selectable with Alt+F1/Alt+F2**, implement `IVolumeProvider` (see `LocalVolumeProvider`) and add it to `VolumeProviders.All`.
 6. **Or open files as the volume** (images): implement `IFileVolumeProvider` with `Extensions` (opened with Enter) and `IsMatch` checking the file's magic signature (see `Iso9660FileVolumeProvider` and `ZipFileVolumeProvider`) and add it to `VolumeProviders.Files`, or return it from `IPlugin.FileVolumeProviders` of a plugin. `NavigationContext` then opens matching files as images (see Images).
 
-Plugins are separate projects referencing only `Hst.Commander.Abstractions`, e.g. `Hst.Commander.Plugins.Zip`: implement `IPlugin` returning the plugin's volume providers and file volume providers, and add it to `Plugins.All` (`Hst.Commander.Core`, which references the plugins included by default).
+Plugins are separate projects referencing only `Hst.Commander.Abstractions`, e.g. `Hst.Commander.Plugins.Zip`: implement `IPlugin` returning the plugin's volume providers and file volume providers, and either add it to `Plugins.BuiltIn` (`Hst.Commander.Core`, which references the plugins included by default) or build it and copy its output to `~/.hst-commander/plugins/<Name>/` or `plugins/<Name>/` next to the executable, with `<Name>.dll` as the plugin assembly (reference `Hst.Commander.Abstractions` with `<Private>false</Private>` and `<ExcludeAssets>runtime</ExcludeAssets>` so it isn't copied; a copy is ignored anyway).
 
 Example test pattern (from `GivenNestedVolumeWithTestVolume.cs`):
 ```csharp

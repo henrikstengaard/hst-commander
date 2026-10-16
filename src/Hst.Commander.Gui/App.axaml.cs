@@ -14,7 +14,9 @@ public partial class App : Application
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            desktop.MainWindow = new MainWindow(Environment.CurrentDirectory);
+            // plugins are loaded before the panes are created, so their volume providers are used
+            var pluginErrors = Hst.Commander.Core.Plugins.FormatErrors(Hst.Commander.Core.Plugins.Load());
+            desktop.MainWindow = new MainWindow(Environment.CurrentDirectory) { StartupError = pluginErrors };
         }
 
         base.OnFrameworkInitializationCompleted();
