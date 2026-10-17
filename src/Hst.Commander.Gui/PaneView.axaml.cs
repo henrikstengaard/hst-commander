@@ -227,8 +227,8 @@ public partial class PaneView : UserControl
 
     private void UpdateSummary()
     {
-        SummaryText.Text = NavigationContext.MarkedSummary;
-        SummaryText.IsVisible = SummaryText.Text != null;
+        // kept visible with empty text, so the panel's second line keeps its height
+        SummaryText.Text = NavigationContext.MarkedSummary ?? string.Empty;
     }
 
     private async Task ActivateSelectedEntryAsync()
@@ -281,8 +281,7 @@ public partial class PaneView : UserControl
         var previousPath = PathText.Text;
 
         PathText.Text = NavigationContext.CurrentPath;
-        DiskSpaceText.Text = NavigationContext.DiskSpace;
-        DiskSpaceText.IsVisible = DiskSpaceText.Text != null;
+        DiskSpaceText.Text = NavigationContext.DiskSpace ?? string.Empty;
         UpdateSummary();
         EntriesList.ItemsSource = entries;
         EntriesList.SelectedIndex = NavigationContext.GetSelectedIndex(navigationEntries, previousPath, selectedIndex);
