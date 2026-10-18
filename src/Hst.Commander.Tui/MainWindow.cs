@@ -969,10 +969,12 @@ public sealed class MainWindow : Window
 
     /// <summary>
     ///     Ctrl+\ going to the root of the volume. Terminals send it as the control character 0x1C, also sent for
-    ///     Ctrl+4, which may be decoded as either key.
+    ///     Ctrl+4, which may be decoded as either key. The Windows driver decodes Ctrl with the key's character in the
+    ///     current layout, so the key left of Z (the \ key on US layouts) is Ctrl+&lt; on e.g. Danish and German layouts.
     /// </summary>
     private static bool IsGoRootKey(Key key) =>
-        key == new Key('\\').WithCtrl || key == Key.D4.WithCtrl || key.KeyCode == (KeyCode)0x1C ||
+        key == new Key('\\').WithCtrl || key == new Key('<').WithCtrl || key == Key.D4.WithCtrl ||
+        key.KeyCode == (KeyCode)0x1C ||
         key.KeyCode == ((KeyCode)0x1C | KeyCode.CtrlMask);
 
     private static void MoveSelection(Pane pane, int offset, bool absolute = false)
