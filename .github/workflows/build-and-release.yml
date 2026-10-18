@@ -37,6 +37,10 @@ jobs:
   build-windows:
     needs: [version]
     runs-on: windows-latest
+    # id-token is used to log in to azure with openid connect for code signing
+    permissions:
+      id-token: write
+      contents: read
     strategy:
       matrix:
         target: [win-x64, win-x86, win-arm64]
@@ -74,6 +78,33 @@ jobs:
           Rename-Item -Path $exeFileName -NewName ($exeFileName -replace '${{ matrix.app.project }}', '${{ matrix.app.exe }}')
           Get-ChildItem -recurse
 
+        # code signing windows artifacts with azure artifact signing.
+        # skipped until repository variable AZURE_SIGNING_ENABLED is set to 'true'.
+        # requires repository variables AZURE_SIGNING_ENDPOINT, AZURE_SIGNING_ACCOUNT_NAME and AZURE_SIGNING_CERTIFICATE_PROFILE_NAME
+        # and secrets AZURE_CLIENT_ID, AZURE_TENANT_ID and AZURE_SUBSCRIPTION_ID of an app registration with a federated credential
+        # for this repository and the role Artifact Signing Certificate Profile Signer.
+      - name: Azure login
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        if: vars.AZURE_SIGNING_ENABLED == 'true'
+
+      # the app is signed before packaging, so the portable zip and setup contain the signed app
+      - name: Sign ${{ matrix.app.name }} app
+        uses: azure/artifact-signing-action@v2
+        with:
+          endpoint: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ vars.AZURE_SIGNING_ACCOUNT_NAME }}
+          certificate-profile-name: ${{ vars.AZURE_SIGNING_CERTIFICATE_PROFILE_NAME }}
+          files-folder: ${{ github.workspace }}\publish
+          files-folder-filter: exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+        if: vars.AZURE_SIGNING_ENABLED == 'true'
+
       - name: Build portable zip
         shell: pwsh
         run: |
@@ -90,6 +121,18 @@ jobs:
             src/packaging/windows/setup.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Get-ChildItem dist
+
+      - name: Sign ${{ matrix.app.name }} setup
+        uses: azure/artifact-signing-action@v2
+        with:
+          endpoint: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ vars.AZURE_SIGNING_ACCOUNT_NAME }}
+          certificate-profile-name: ${{ vars.AZURE_SIGNING_CERTIFICATE_PROFILE_NAME }}
+          files: ${{ github.workspace }}\dist\hst-commander.${{ matrix.app.name }}.${{ matrix.target }}.setup.exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+        if: vars.AZURE_SIGNING_ENABLED == 'true'
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -225,38 +268,6 @@ jobs:
         shell: pwsh
         run: |
           Get-ChildItem -Filter 'hst-commander.*' -name
-
-        # code signing windows artifacts with signpath.
-        # skipped until code signing certificate is ready and repository variable SIGNPATH_ENABLED is set to 'true'.
-        # requires repository variable SIGNPATH_ORGANIZATION_ID and secret SIGNPATH_API_TOKEN.
-      - name: Upload unsigned Windows artifacts
-        id: upload_unsigned_windows_artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: hst-commander.windows-unsigned
-          path: |
-            hst-commander.*.win-*.setup.exe
-            hst-commander.*.win-*.portable.zip
-          retention-days: 3
-        if: vars.SIGNPATH_ENABLED == 'true'
-
-      - name: Sign Windows artifacts with SignPath
-        uses: signpath/github-action-submit-signing-request@v1
-        with:
-          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
-          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
-          project-slug: hst-commander
-          signing-policy-slug: release-signing
-          github-artifact-id: ${{ steps.upload_unsigned_windows_artifacts.outputs.artifact-id }}
-          wait-for-completion: true
-          output-artifact-directory: signed
-        if: vars.SIGNPATH_ENABLED == 'true'
-
-      - name: Replace Windows artifacts with signed artifacts
-        shell: pwsh
-        run: |
-          Get-ChildItem -Path signed -Recurse -File | ForEach-Object { Copy-Item -Path $_.FullName -Destination . -Force }
-        if: vars.SIGNPATH_ENABLED == 'true'
 
       # e.g. hst-commander.tui.win-x64.setup.exe -> hst-commander_v0.1.29-98d7be8_tui_windows_x64_setup.exe,
       # hst-commander.gui.linux-amd64.deb -> hst-commander_v0.1.29-98d7be8_gui_linux_amd64.deb
