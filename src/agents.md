@@ -471,6 +471,7 @@ dotnet test src/Hst.Commander.Core.Tests/Hst.Commander.Core.Tests.csproj --logge
 | `System.Linq.Async` | 6.0.1 | `Hst.Commander.Core` — async LINQ |
 | `Hst.Compression` | 0.4.96 | `Hst.Commander.Plugins.LhaLzx` — lha and lzx archive reading |
 | `Terminal.Gui` | 2.0.0-prealpha.1895 | `Hst.Commander.Tui` — TUI framework |
+| `Microsoft.Build.Tasks.Git` | 10.0.402 | `Hst.Commander.Tui` — build only (`PrivateAssets="all"`), overrides the vulnerable 8.0.0 (GHSA-23fw-v26w-5fgq) pulled in by Terminal.Gui's `Microsoft.SourceLink.GitHub` 8.0.0 dependency |
 | `Avalonia`, `Avalonia.Desktop`, `Avalonia.Themes.Fluent` | 12.1.4 | `Hst.Commander.Gui` — desktop GUI framework |
 | `xunit` | 2.5.3 | `Hst.Commander.Core.Tests` |
 | `coverlet.collector` | 6.0.0 | `Hst.Commander.Core.Tests` — coverage |

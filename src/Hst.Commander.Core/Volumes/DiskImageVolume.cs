@@ -4,15 +4,15 @@ using Hst.Commander.Abstractions;
 
 namespace Hst.Commander.Core.Volumes;
 
-public class DiskImageVolume(Stream stream) : IVolume
+public class DiskImageVolume(Stream stream, IEnumerable<string> currentPathComponents) : IVolume
 {
     private readonly Disk disk = new(stream, Ownership.None);
     private IList<string> _currentPathComponents = [];
 
     public string Name => "Disk Image";
     
-    public IEnumerable<string> CurrentPathComponents { get; }
-    
+    public IEnumerable<string> CurrentPathComponents { get; } = currentPathComponents;
+
     public IAsyncEnumerable<IEntry> ListEntries(CancellationToken cancellationToken = default)
     {
         // list partition tables at top level: MBR, GPT, RDB

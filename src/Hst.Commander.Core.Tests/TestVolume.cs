@@ -110,7 +110,7 @@ public class TestVolume : IVolume
             throw new IOException("Dir not found");
         }
 
-        IEntry entry = entries[path].FirstOrDefault(entry => entry.Name.Equals(name));
+        IEntry? entry = entries[path].FirstOrDefault(entry => entry.Name.Equals(name));
 
         if (entry == null)
         {
