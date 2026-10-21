@@ -17,13 +17,14 @@ There are two front-ends with the same functionality: a terminal UI (TUI) built 
   build-and-test.yml                             Builds and tests the solution on Windows, macOS and Linux on every push
   build-and-release.yml                          Manual: publishes and packages TUI and GUI per runtime (setup/portable zip, dmg, AppImage/deb) and creates a draft prerelease
 src/
-  Hst.Commander.sln                              Solution file (6 projects)
+  Hst.Commander.sln                              Solution file (7 projects)
   Directory.Build.props                          Shared product name, version, authors and copyright for all projects
   Directory.Build.targets                        Replaces the last version part with the git commit count
   packaging/                                     Release packaging used by build-and-release.yml: linux/package.sh (AppImage + .deb), macos/package.sh (.dmg, GUI as .app bundle in a create-dmg window with dmg-background.svg/.png, rendered by make-dmg-background.cmd, showing the drag to Applications), windows/setup.iss (Inno Setup)
   icon/                                          App icon in the style of the Hst Imager icon: hst-commander.svg source, simplified pixel aligned hst-commander-16x16.svg/-32x32.svg for the small sizes, PNGs (1024, 512, 192, 32, 16), .ico (Windows, 16-256), favicon/16x16/32x32 .ico, .icns (macOS) and make-*.cmd/make-icns.sh scripts (ImageMagick, sips/iconutil)
   Hst.Commander.Abstractions/                    IVolumeProvider / IFileVolumeProvider / IPlugin / IVolume / IEntry interfaces and Paths (no external deps)
   Hst.Commander.Plugins.Zip/                     Zip plugin included by default (ZipPlugin, ZipFileVolumeProvider, ZipVolume), references only Abstractions
+  Hst.Commander.Plugins.LhaLzx/                  Lha and lzx plugin included by default (LhaLzxPlugin, LhaFileVolumeProvider, LzxFileVolumeProvider, ArchiveVolume, LhaVolume, LzxVolume) using the Hst.Compression package, references only Abstractions
   Hst.Commander.Core/                            Volume implementations, volume providers, file volume providers, Plugins + PluginLoader, NavigationContext + shared utilities
   Hst.Commander.Tui/                             Terminal.Gui TUI application
     MainWindow.cs                                Dual-pane window, File menu, function key bar, columns, key bindings, theme colors, F5 copy, F6 move/rename, F7 make directory, F8/Delete delete, Ctrl+P/Alt+Enter properties
@@ -82,7 +83,9 @@ src/
 [IVolumeProvider / IFileVolumeProvider / IPlugin / IVolume / IEntry / Paths]  <- Hst.Commander.Abstractions
         |                                    \
         |                          [ZipPlugin, ZipFileVolumeProvider, ZipVolume]  <- Hst.Commander.Plugins.Zip
-        |                                    /    (default plugin, Plugins.All)
+        |                          [LhaLzxPlugin, Lha/LzxFileVolumeProvider,
+        |                           LhaVolume, LzxVolume]  <- Hst.Commander.Plugins.LhaLzx
+        |                                    /    (default plugins, Plugins.All)
 [Volume Implementations]  <- Hst.Commander.Core
   LocalVolumeProvider (VolumeProviders.All),
   Iso9660FileVolumeProvider (VolumeProviders.Files),
@@ -146,7 +149,7 @@ A plugin is a project referencing only `Hst.Commander.Abstractions` (`Paths` is 
 
 ### Plugins
 
-- `Plugins.BuiltIn` (`Hst.Commander.Core`) lists the plugins included by default, currently `ZipPlugin` (`Hst.Commander.Plugins.Zip`, referenced by `Hst.Commander.Core`). `Plugins.All` is the built-in plugins followed by the plugins loaded from disk; `VolumeProviders.All`/`Files` are created again from it when it changes.
+- `Plugins.BuiltIn` (`Hst.Commander.Core`) lists the plugins included by default, currently `ZipPlugin` (`Hst.Commander.Plugins.Zip`) and `LhaLzxPlugin` (`Hst.Commander.Plugins.LhaLzx`), both referenced by `Hst.Commander.Core`. `Plugins.All` is the built-in plugins followed by the plugins loaded from disk; `VolumeProviders.All`/`Files` are created again from it when it changes.
 - Both front-ends call `Plugins.Load()` at startup, before the panes (and their `NavigationContext`s, which take `VolumeProviders.Files` when created) are created: the TUI in `Program.cs`, the GUI in `App.OnFrameworkInitializationCompleted` (fully qualified as `Hst.Commander.Core.Plugins`, since `Plugins` in `Hst.Commander.Gui` resolves to the `Hst.Commander.Plugins` namespace). It loads once and returns the errors of plugins that failed to load; `Plugins.FormatErrors` joins them into one message (null when none), shown once the main window is loaded (TUI `MainWindow.ShowErrorWhenLoaded`, GUI `MainWindow.StartupError` shown with `ErrorDialog` when opened). Other plugins still load.
 - `PluginLoader.Directories` are scanned in order: `~/.hst-commander/plugins` (`SettingsPaths.Directory`) and `plugins` in the directory Hst Commander is executed from (`AppContext.BaseDirectory`); missing directories are skipped and a directory listed twice is scanned once.
 - In a plugin directory, `PluginLoader.Load(directories, loadedPlugins)` loads `Name/Name.dll` (a plugin in a directory of its own with its dependencies, the recommended layout) and then single assemblies `*.dll`, ordered by path. Public non-abstract classes implementing `IPlugin` with a parameterless constructor are created. Assemblies without plugins are skipped (e.g. dependencies; a `BadImageFormatException`, e.g. a native library, is ignored for single assemblies but reported for `Name/Name.dll`), as are plugins whose type full name is already loaded (e.g. a copy of the built-in Zip plugin). Errors are reported per assembly in `PluginLoadResult.Errors`.
@@ -160,12 +163,15 @@ A plugin is a project referencing only `Hst.Commander.Abstractions` (`Paths` is 
 | `LocalVolume` | Browses the real file system; lists drives when at root |
 | `Iso9660Volume` | Reads ISO 9660 / CD-ROM images via `LTRData.DiscUtils.Iso9660`, created by `Iso9660FileVolumeProvider` |
 | `ZipVolume` | `Hst.Commander.Plugins.Zip`: reads zip archives via `System.IO.Compression.ZipArchive`, created by `ZipFileVolumeProvider` (signatures `PK\3\4`, `PK\5\6` for empty and `PK\7\8` for spanned archives). Directories are the archive's directory entries plus the directories in file paths; `/` and `\` separate path components, empty, `.` and `..` components are skipped. Names are matched exactly, otherwise case-insensitive. Disposes its `ZipArchive` |
+| `LhaVolume` | `Hst.Commander.Plugins.LhaLzx`: reads lha archives (`.lha`, `.lzh`) via `Hst.Compression.Lha.LhaArchive` (Amiga ISO-8859-1 names), created by `LhaFileVolumeProvider` (method `-lh?-`, `-lz?-` or `-pm?-` at offset 2). Entries are decompressed while read with `LhaArchive.OpenEntry`. Names are cut at a zero character (Amiga comments follow it); `-lhd-` entries without a trailing separator (symbolic links) are skipped |
+| `LzxVolume` | `Hst.Commander.Plugins.LhaLzx`: reads Amiga lzx archives (`.lzx`) via `Hst.Compression.Lzx.LzxArchive`, created by `LzxFileVolumeProvider` (signature `LZX`). Entries are decompressed while read with `LzxArchive.OpenEntry`; dates in local time are converted to UTC |
+| `ArchiveVolume<T>` | `Hst.Commander.Plugins.LhaLzx`: read-only base of `LhaVolume` and `LzxVolume`, building the directory tree like `ZipVolume` (directory entries end with `/` or `\`, plus the directories in file paths, same skipping and name matching). The archives aren't disposed, as `LhaArchive`/`LzxArchive.Dispose` would dispose the stream owned by Hst Commander |
 | `NestedVolume` | Compositor — holds a `LinkedList<IVolume>`. Drilling into a file pushes a new volume; going up pops it. The combined `CurrentPathComponents` spans all nested volumes |
 | `EntryVolumeProvider` | Adapter that presents a child `IVolume` as if it starts at the path of the opening `IEntry`. Used when pushing volumes into `NestedVolume` |
 | `DiskImageVolume` | **Stub** — all methods throw `NotImplementedException`. Intended for raw disk images (MBR/GPT/RDB partition tables) |
 | `NullVolume` | Null object — returns an empty entry list, safe fallback |
 
-`Iso9660Volume` and `ZipVolume` are read-only: `OpenWrite`, `CreateContainer`, `Delete`, `Rename` and `SetModifiedDate` throw `NotSupportedException`. `LocalVolume.CreateContainer` throws `NotSupportedException` in the drive list.
+`Iso9660Volume`, `ZipVolume`, `LhaVolume` and `LzxVolume` are read-only: `OpenWrite`, `CreateContainer`, `Delete`, `Rename` and `SetModifiedDate` throw `NotSupportedException`. `LocalVolume.CreateContainer` throws `NotSupportedException` in the drive list.
 
 ### Copying
 
@@ -262,10 +268,10 @@ The keys opening the volume provider list of the left/right pane are chosen in F
 
 **Working:**
 - The Terminal.Gui v2 TUI and Avalonia 12 GUI dual-pane browsers, with per-pane navigation and current-directory startup.
-- Local drive/directory listing, parent navigation, and read-only browsing of ISO images and zip archives (the default Zip plugin) as nested volumes, detected by their magic signature, also inside other images.
+- Local drive/directory listing, parent navigation, and read-only browsing of ISO images, zip archives (the default Zip plugin) and lha/lzx archives (the default LhaLzx plugin) as nested volumes, detected by their magic signature, also inside other images.
 - Starting/executing local files with Enter or double-click, with executables drawn in green.
 - GUI entry icons: icons contained in programs and .ico files (also inside images), otherwise the host OS icons for file types, folders and drives.
-- The volume abstraction layer and implementations: `LocalVolume`, `Iso9660Volume`, `ZipVolume`, `NestedVolume`, `EntryVolumeProvider`, and `NullVolume`.
+- The volume abstraction layer and implementations: `LocalVolume`, `Iso9660Volume`, `ZipVolume`, `LhaVolume`, `LzxVolume`, `NestedVolume`, `EntryVolumeProvider`, and `NullVolume`.
 - All unit tests in `Hst.Commander.Core.Tests`.
 
 - Going to the root of the volume with Ctrl+\ in both front-ends.
@@ -282,7 +288,7 @@ The keys opening the volume provider list of the left/right pane are chosen in F
 
 **Not implemented:**
 - View (F3), edit (F4) and other file-management operations.
-- Writing to images; ISO images and zip archives are read-only.
+- Writing to images; ISO images and zip, lha and lzx archives are read-only.
 - Unloading or reloading plugins while running, and a list of loaded plugins in the UI.
 - `DiskImageVolume` remains an intentional stub.
 
@@ -305,6 +311,7 @@ The keys opening the volume provider list of the left/right pane are chosen in F
 ### Namespaces
 - Abstractions: `Hst.Commander.Abstractions` (interfaces, `Paths`)
 - Zip plugin: `Hst.Commander.Plugins.Zip`
+- Lha and lzx plugin: `Hst.Commander.Plugins.LhaLzx`
 - Core: `Hst.Commander.Core` (`AppInfo`, `EmbeddedIconReader`, `EntryProperties`, `FileSystemDetails`, `IconImage`, `NavigationContext`, `NameFilter`, `PluginLoader`, `Plugins`, `SelectGroupOptions`, `FileStarter`, `SettingsPaths`, `SizeFormatter`), `Hst.Commander.Core.Volumes` (volumes)
 - Tui: `Hst.Commander.Tui`
 - Gui: `Hst.Commander.Gui`, `Hst.Commander.Gui.Icons` (entry icons)
@@ -353,6 +360,7 @@ public async Task When_VolumeIsPushed_Then_NestedVolumeListsEntriesFromNewVolume
 - `TestEntry` (`Hst.Commander.Core.Tests/TestEntry.cs`): in-memory `IEntry` with optional `byte[]? Data`.
 - Use `AddEntry(pathComponents, entry)` to build the in-memory tree.
 - `ZipTestData` (`Hst.Commander.Core.Tests/ZipTestData.cs`): creates zip archives in memory (`CreateZip((name, content)...)`, names ending with `/` are directories).
+- `ArchiveTestData` (`Hst.Commander.Core.Tests/ArchiveTestData.cs`): lha and lzx archives in `TestData/Archives` (from the Hst.Compression tests), e.g. `dirs-files.lha`/`.lzx` (`ArchiveTestData.DirsFiles`).
 
 ---
 
@@ -458,6 +466,7 @@ dotnet test src/Hst.Commander.Core.Tests/Hst.Commander.Core.Tests.csproj --logge
 | `LTRData.DiscUtils` | 1.0.54 | `Hst.Commander.Core` — raw disk image support |
 | `LTRData.DiscUtils.Iso9660` | 1.0.54 | `Hst.Commander.Core` — ISO 9660 reading |
 | `System.Linq.Async` | 6.0.1 | `Hst.Commander.Core` — async LINQ |
+| `Hst.Compression` | 0.4.96 | `Hst.Commander.Plugins.LhaLzx` — lha and lzx archive reading |
 | `Terminal.Gui` | 2.0.0-prealpha.1895 | `Hst.Commander.Tui` — TUI framework |
 | `Avalonia`, `Avalonia.Desktop`, `Avalonia.Themes.Fluent` | 12.1.4 | `Hst.Commander.Gui` — desktop GUI framework |
 | `xunit` | 2.5.3 | `Hst.Commander.Core.Tests` |

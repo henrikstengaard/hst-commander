@@ -52,6 +52,39 @@ public class GivenNavigationContextOpeningImages
         }
     }
 
+    [Theory]
+    [InlineData("archive.lha", "dirs-files.lha")]
+    [InlineData("archive.lzx", "dirs-files.lzx")]
+    public async Task When_OpenLhaOrLzxFile_Then_ArchiveIsDetectedBySignatureAndBrowsed(string name,
+        string testDataFileName)
+    {
+        // arrange
+        var rootPath = CreateTempDirectory();
+        File.Copy(ArchiveTestData.GetPath(testDataFileName), Path.Combine(rootPath, name));
+        var startedFiles = new List<string>();
+        try
+        {
+            using var navigationContext = new NavigationContext(rootPath, startedFiles.Add);
+
+            // act
+            await OpenAsync(navigationContext, name);
+            var rootNames = await ListNamesAsync(navigationContext);
+            await OpenAsync(navigationContext, "dir1");
+            var dirNames = await ListNamesAsync(navigationContext);
+
+            // assert
+            Assert.Empty(startedFiles);
+            Assert.True(navigationContext.IsInImage);
+            Assert.Equal([Paths.Parent, "dir1", "dir2"], rootNames);
+            Assert.Equal([Paths.Parent, "dir3", "file1.txt"], dirNames);
+            Assert.Equal(Path.Combine(rootPath, name, "dir1"), navigationContext.CurrentPath);
+        }
+        finally
+        {
+            Directory.Delete(rootPath, true);
+        }
+    }
+
     [Fact]
     public async Task When_OpenZipFileWithOtherExtension_Then_FileIsStarted()
     {
