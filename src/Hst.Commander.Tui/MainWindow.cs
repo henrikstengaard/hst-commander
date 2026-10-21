@@ -92,6 +92,7 @@ public sealed class MainWindow : Window
         Add(_menuBar, _leftPane.View, _rightPane.View, _functionKeyBar);
         ApplyTheme(theme);
         ApplyVolumeProviderKeys(settings.EffectiveVolumeProviderKeys);
+        ApplyEnterFileAction(settings.EnterFileAction);
         ConfigurePaneKeys(_leftPane, _rightPane);
         ConfigurePaneKeys(_rightPane, _leftPane);
         // also when run again after a program has run in the terminal
@@ -186,6 +187,13 @@ public sealed class MainWindow : Window
         _rightVolumeMenuItem.Help = VolumeProviderKeyBindings.GetRightKeyText(keys);
     }
 
+    /// <summary>Sets what Enter does with files in both panes.</summary>
+    private void ApplyEnterFileAction(EnterFileAction action)
+    {
+        _leftPane.NavigationContext.EnterFileAction = action;
+        _rightPane.NavigationContext.EnterFileAction = action;
+    }
+
     private Key LeftVolumeProviderKey => WithVolumeProviderModifier(Key.F1);
 
     private Key RightVolumeProviderKey => WithVolumeProviderModifier(Key.F2);
@@ -229,6 +237,7 @@ public sealed class MainWindow : Window
 
         ApplyTheme(result.Theme);
         ApplyVolumeProviderKeys(result.EffectiveVolumeProviderKeys);
+        ApplyEnterFileAction(result.EnterFileAction);
         try
         {
             result.Save();

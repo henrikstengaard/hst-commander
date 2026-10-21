@@ -1,20 +1,14 @@
 namespace Hst.Commander.Abstractions;
 
 /// <summary>
-/// Interface for opening files as volumes, e.g. ISO images or zip archives. When a file with one of the
-/// <see cref="Extensions" /> is opened (Enter or double-click), Hst Commander asks the file volume provider whether the
-/// file is one of its files, typically by its magic signature, and browses the volume created instead of starting the
-/// file. Opening a file as a volume (Ctrl+PageDown) asks all file volume providers regardless of the extension, e.g.
-/// to browse a .docx document as a zip archive. Files are detected both in local directories and inside other volumes,
-/// so e.g. a zip archive inside an ISO image can be opened.
+/// Interface for opening files as volumes, e.g. ISO images or zip archives. When a file is opened (Enter or
+/// double-click, or Ctrl+PageDown to open it as a volume), Hst Commander asks the file volume providers whether the
+/// file is one of their files, typically by its magic signature, regardless of its extension, e.g. browsing a .nupkg
+/// package as a zip archive, and browses the volume created instead of starting the file. Files are detected both in
+/// local directories and inside other volumes, so e.g. a zip archive inside an ISO image can be opened.
 /// </summary>
 public interface IFileVolumeProvider
 {
-    /// <summary>
-    /// Extensions of files opened as volumes with Enter when <see cref="IsMatch" /> detects them, e.g. ".zip".
-    /// </summary>
-    IReadOnlyCollection<string> Extensions { get; }
-
     /// <summary>
     /// Name of the file volume provider, e.g. "Zip".
     /// </summary>

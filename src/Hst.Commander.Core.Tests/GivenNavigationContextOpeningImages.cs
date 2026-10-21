@@ -52,12 +52,45 @@ public class GivenNavigationContextOpeningImages
         }
     }
 
-    [Fact]
-    public async Task When_OpenZipFileWithOtherExtension_Then_FileIsStarted()
+    [Theory]
+    [InlineData("archive.lha", "dirs-files.lha")]
+    [InlineData("archive.lzx", "dirs-files.lzx")]
+    public async Task When_OpenLhaOrLzxFile_Then_ArchiveIsDetectedBySignatureAndBrowsed(string name,
+        string testDataFileName)
     {
-        // arrange - e.g. a .docx document is a zip archive started with its application
+        // arrange
         var rootPath = CreateTempDirectory();
-        await File.WriteAllBytesAsync(Path.Combine(rootPath, "document.docx"),
+        File.Copy(ArchiveTestData.GetPath(testDataFileName), Path.Combine(rootPath, name));
+        var startedFiles = new List<string>();
+        try
+        {
+            using var navigationContext = new NavigationContext(rootPath, startedFiles.Add);
+
+            // act
+            await OpenAsync(navigationContext, name);
+            var rootNames = await ListNamesAsync(navigationContext);
+            await OpenAsync(navigationContext, "dir1");
+            var dirNames = await ListNamesAsync(navigationContext);
+
+            // assert
+            Assert.Empty(startedFiles);
+            Assert.True(navigationContext.IsInImage);
+            Assert.Equal([Paths.Parent, "dir1", "dir2"], rootNames);
+            Assert.Equal([Paths.Parent, "dir3", "file1.txt"], dirNames);
+            Assert.Equal(Path.Combine(rootPath, name, "dir1"), navigationContext.CurrentPath);
+        }
+        finally
+        {
+            Directory.Delete(rootPath, true);
+        }
+    }
+
+    [Fact]
+    public async Task When_OpenZipFileWithOtherExtension_Then_ZipIsDetectedBySignatureAndBrowsed()
+    {
+        // arrange - e.g. a .nupkg package is a zip archive
+        var rootPath = CreateTempDirectory();
+        await File.WriteAllBytesAsync(Path.Combine(rootPath, "package.nupkg"),
             ZipTestData.CreateZipWithDirectoriesAndFiles());
         var startedFiles = new List<string>();
         try
@@ -65,11 +98,100 @@ public class GivenNavigationContextOpeningImages
             using var navigationContext = new NavigationContext(rootPath, startedFiles.Add);
 
             // act
-            await OpenAsync(navigationContext, "document.docx");
+            await OpenAsync(navigationContext, "package.nupkg");
+            var names = await ListNamesAsync(navigationContext);
+
+            // assert
+            Assert.Empty(startedFiles);
+            Assert.True(navigationContext.IsInImage);
+            Assert.Equal([Paths.Parent, "dir1", "dir2", "file1.txt"], names);
+        }
+        finally
+        {
+            Directory.Delete(rootPath, true);
+        }
+    }
+
+    [Fact]
+    public async Task When_OpenZipFileSetToStartWithHost_Then_FileIsStarted()
+    {
+        // arrange
+        var rootPath = CreateTempDirectory();
+        await File.WriteAllBytesAsync(Path.Combine(rootPath, "archive.zip"),
+            ZipTestData.CreateZipWithDirectoriesAndFiles());
+        var startedFiles = new List<string>();
+        try
+        {
+            using var navigationContext = new NavigationContext(rootPath, startedFiles.Add)
+            {
+                EnterFileAction = EnterFileAction.StartWithHost
+            };
+
+            // act
+            await OpenAsync(navigationContext, "archive.zip");
 
             // assert
             Assert.False(navigationContext.IsInImage);
-            Assert.Equal([Path.Combine(rootPath, "document.docx")], startedFiles);
+            Assert.Equal([Path.Combine(rootPath, "archive.zip")], startedFiles);
+        }
+        finally
+        {
+            Directory.Delete(rootPath, true);
+        }
+    }
+
+    [Fact]
+    public async Task When_OpenZipFileSetToStartWithHostAsVolume_Then_ZipIsBrowsed()
+    {
+        // arrange
+        var rootPath = CreateTempDirectory();
+        await File.WriteAllBytesAsync(Path.Combine(rootPath, "archive.zip"),
+            ZipTestData.CreateZipWithDirectoriesAndFiles());
+        var startedFiles = new List<string>();
+        try
+        {
+            using var navigationContext = new NavigationContext(rootPath, startedFiles.Add)
+            {
+                EnterFileAction = EnterFileAction.StartWithHost
+            };
+
+            // act
+            await navigationContext.OpenAsVolumeAsync(
+                (await navigationContext.ListEntriesAsync()).First(entry => entry.Name == "archive.zip"));
+
+            // assert
+            Assert.Empty(startedFiles);
+            Assert.True(navigationContext.IsInImage);
+        }
+        finally
+        {
+            Directory.Delete(rootPath, true);
+        }
+    }
+
+    [Fact]
+    public async Task When_OpenZipInsideZipSetToStartWithHost_Then_InnerZipIsBrowsed()
+    {
+        // arrange - files inside images can't be started, so they are still opened as images
+        var rootPath = CreateTempDirectory();
+        await File.WriteAllBytesAsync(Path.Combine(rootPath, "outer.zip"),
+            CreateZipWithBinaryEntry("inner.zip", ZipTestData.CreateZipWithDirectoriesAndFiles()));
+        var startedFiles = new List<string>();
+        try
+        {
+            using var navigationContext = new NavigationContext(rootPath, startedFiles.Add)
+            {
+                EnterFileAction = EnterFileAction.StartWithHost
+            };
+            await navigationContext.OpenAsVolumeAsync(
+                (await navigationContext.ListEntriesAsync()).First(entry => entry.Name == "outer.zip"));
+
+            // act
+            await OpenAsync(navigationContext, "inner.zip");
+
+            // assert
+            Assert.Empty(startedFiles);
+            Assert.Equal(Path.Combine(rootPath, "outer.zip", "inner.zip"), navigationContext.CurrentPath);
         }
         finally
         {
@@ -373,8 +495,6 @@ public class GivenNavigationContextOpeningImages
         public string Name => "Test";
 
         public string Description => "Test files";
-
-        public IReadOnlyCollection<string> Extensions { get; } = [".bin"];
 
         public async Task<bool> IsMatch(string name, Stream stream, CancellationToken cancellationToken = default)
         {

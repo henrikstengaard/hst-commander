@@ -17,6 +17,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Agents", "Agents", "{AA7E03
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hst.Commander.Plugins.Zip", "Hst.Commander.Plugins.Zip\Hst.Commander.Plugins.Zip.csproj", "{558D5BA8-FF7A-4BAC-90F4-380F210CDF28}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hst.Commander.Plugins.LhaLzx", "Hst.Commander.Plugins.LhaLzx\Hst.Commander.Plugins.LhaLzx.csproj", "{33251149-C8A7-4E8F-9F6F-AB73E4781F54}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -99,6 +101,18 @@ Global
 		{558D5BA8-FF7A-4BAC-90F4-380F210CDF28}.Release|x64.Build.0 = Release|Any CPU
 		{558D5BA8-FF7A-4BAC-90F4-380F210CDF28}.Release|x86.ActiveCfg = Release|Any CPU
 		{558D5BA8-FF7A-4BAC-90F4-380F210CDF28}.Release|x86.Build.0 = Release|Any CPU
+		{33251149-C8A7-4E8F-9F6F-AB73E4781F54}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{33251149-C8A7-4E8F-9F6F-AB73E4781F54}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{33251149-C8A7-4E8F-9F6F-AB73E4781F54}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{33251149-C8A7-4E8F-9F6F-AB73E4781F54}.Debug|x64.Build.0 = Debug|Any CPU
+		{33251149-C8A7-4E8F-9F6F-AB73E4781F54}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{33251149-C8A7-4E8F-9F6F-AB73E4781F54}.Debug|x86.Build.0 = Debug|Any CPU
+		{33251149-C8A7-4E8F-9F6F-AB73E4781F54}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{33251149-C8A7-4E8F-9F6F-AB73E4781F54}.Release|Any CPU.Build.0 = Release|Any CPU
+		{33251149-C8A7-4E8F-9F6F-AB73E4781F54}.Release|x64.ActiveCfg = Release|Any CPU
+		{33251149-C8A7-4E8F-9F6F-AB73E4781F54}.Release|x64.Build.0 = Release|Any CPU
+		{33251149-C8A7-4E8F-9F6F-AB73E4781F54}.Release|x86.ActiveCfg = Release|Any CPU
+		{33251149-C8A7-4E8F-9F6F-AB73E4781F54}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

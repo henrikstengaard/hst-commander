@@ -16,8 +16,6 @@ public class Iso9660FileVolumeProvider : IFileVolumeProvider
 
     public string Description => "ISO 9660 / CD-ROM images";
 
-    public IReadOnlyCollection<string> Extensions { get; } = [".iso"];
-
     public async Task<bool> IsMatch(string name, Stream stream, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(stream);

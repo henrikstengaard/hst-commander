@@ -24,12 +24,14 @@ public partial class MainWindow : Window
 
         _activePane = LeftPane;
         LeftPane.IsActive = true;
-        ApplyVolumeProviderKeys(GuiSettings.Load().EffectiveVolumeProviderKeys);
+        var settings = GuiSettings.Load();
+        ApplyVolumeProviderKeys(settings.EffectiveVolumeProviderKeys);
         LeftPane.GotFocus += (_, _) => SetActivePane(LeftPane);
         RightPane.GotFocus += (_, _) => SetActivePane(RightPane);
 
         LeftPane.NavigationContext = new NavigationContext(initialPath);
         RightPane.NavigationContext = new NavigationContext(initialPath);
+        ApplyEnterFileAction(settings.EnterFileAction);
         LeftPane.NavigationFailed += async (_, exception) => await ShowErrorAsync(exception);
         RightPane.NavigationFailed += async (_, exception) => await ShowErrorAsync(exception);
         CopyMenuItem.Click += async (_, _) => await CopyAsync(_activePane);
@@ -167,6 +169,13 @@ public partial class MainWindow : Window
         _volumeProviderKeys = keys;
         LeftVolumeMenuItem.InputGesture = KeyGesture.Parse(VolumeProviderKeyBindings.GetLeftKeyText(keys));
         RightVolumeMenuItem.InputGesture = KeyGesture.Parse(VolumeProviderKeyBindings.GetRightKeyText(keys));
+    }
+
+    /// <summary>Sets what Enter does with files in both panes.</summary>
+    private void ApplyEnterFileAction(EnterFileAction action)
+    {
+        LeftPane.NavigationContext.EnterFileAction = action;
+        RightPane.NavigationContext.EnterFileAction = action;
     }
 
     /// <summary>
@@ -474,6 +483,7 @@ public partial class MainWindow : Window
 
         ThemeManager.Apply(settings.Theme);
         ApplyVolumeProviderKeys(settings.EffectiveVolumeProviderKeys);
+        ApplyEnterFileAction(settings.EnterFileAction);
         try
         {
             settings.Save();

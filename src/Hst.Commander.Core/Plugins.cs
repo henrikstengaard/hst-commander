@@ -1,4 +1,5 @@
 using Hst.Commander.Abstractions;
+using Hst.Commander.Plugins.LhaLzx;
 using Hst.Commander.Plugins.Zip;
 
 namespace Hst.Commander.Core;
@@ -15,7 +16,7 @@ public static class Plugins
     private static PluginLoadResult? _loadResult;
 
     /// <summary>Plugins included with Hst Commander.</summary>
-    public static IReadOnlyList<IPlugin> BuiltIn { get; } = [new ZipPlugin()];
+    public static IReadOnlyList<IPlugin> BuiltIn { get; } = [new ZipPlugin(), new LhaLzxPlugin()];
 
     /// <summary>All plugins: the built-in plugins and, once loaded, the plugins found in the plugin directories.</summary>
     public static IReadOnlyList<IPlugin> All => _loaded ?? BuiltIn;

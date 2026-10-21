@@ -17,18 +17,19 @@ There are two front-ends with the same functionality: a terminal UI (TUI) built 
   build-and-test.yml                             Builds and tests the solution on Windows, macOS and Linux on every push
   build-and-release.yml                          Manual: publishes and packages TUI and GUI per runtime (setup/portable zip, dmg, AppImage/deb) and creates a draft prerelease
 src/
-  Hst.Commander.sln                              Solution file (6 projects)
+  Hst.Commander.sln                              Solution file (7 projects)
   Directory.Build.props                          Shared product name, version, authors and copyright for all projects
   Directory.Build.targets                        Replaces the last version part with the git commit count
   packaging/                                     Release packaging used by build-and-release.yml: linux/package.sh (AppImage + .deb), macos/package.sh (.dmg, GUI as .app bundle in a create-dmg window with dmg-background.svg/.png, rendered by make-dmg-background.cmd, showing the drag to Applications), windows/setup.iss (Inno Setup)
   icon/                                          App icon in the style of the Hst Imager icon: hst-commander.svg source, simplified pixel aligned hst-commander-16x16.svg/-32x32.svg for the small sizes, PNGs (1024, 512, 192, 32, 16), .ico (Windows, 16-256), favicon/16x16/32x32 .ico, .icns (macOS) and make-*.cmd/make-icns.sh scripts (ImageMagick, sips/iconutil)
   Hst.Commander.Abstractions/                    IVolumeProvider / IFileVolumeProvider / IPlugin / IVolume / IEntry interfaces and Paths (no external deps)
   Hst.Commander.Plugins.Zip/                     Zip plugin included by default (ZipPlugin, ZipFileVolumeProvider, ZipVolume), references only Abstractions
+  Hst.Commander.Plugins.LhaLzx/                  Lha and lzx plugin included by default (LhaLzxPlugin, LhaFileVolumeProvider, LzxFileVolumeProvider, ArchiveVolume, LhaVolume, LzxVolume) using the Hst.Compression package, references only Abstractions
   Hst.Commander.Core/                            Volume implementations, volume providers, file volume providers, Plugins + PluginLoader, NavigationContext + shared utilities
   Hst.Commander.Tui/                             Terminal.Gui TUI application
     MainWindow.cs                                Dual-pane window, File menu, function key bar, columns, key bindings, theme colors, F5 copy, F6 move/rename, F7 make directory, F8/Delete delete, Ctrl+P/Alt+Enter properties
     FunctionKeyBarView.cs                        Function key bar at the bottom (F3 View ... F8 Delete), clickable items
-    SettingsDialog.cs                            Modal settings dialog (theme selection with live preview, volume provider keys)
+    SettingsDialog.cs                            Modal settings dialog (theme selection with live preview, volume provider keys, Enter on file)
     CopyDialog.cs                                Modal copy/move confirm dialog (destination and filter), titled Copy or Move
     CopyProgressDialog.cs                        Modal copy/move progress dialog (2 progress bars, speed, ETA, cancel)
     DeleteProgressDialog.cs                      Modal delete progress dialog (current entry, total progress bar, cancel)
@@ -54,7 +55,7 @@ src/
     Icons/FreedesktopFileIconProvider.cs         Linux/freedesktop icons (shared MIME database + PNG icon themes)
     Icons/MacFileIconProvider.cs                 macOS icons (NSWorkspace via the Objective-C runtime)
     ErrorDialog.axaml(.cs)                       Modal error dialog
-    SettingsDialog.axaml(.cs)                    Modal settings view (theme selection with live preview, volume provider keys)
+    SettingsDialog.axaml(.cs)                    Modal settings view (theme selection with live preview, volume provider keys, Enter on file)
     CopyDialog.axaml(.cs)                        Modal copy/move confirm dialog (destination and filter), titled Copy or Move
     CopyProgressDialog.axaml(.cs)                Modal copy/move progress dialog running the copy or move (2 progress bars, speed, ETA, cancel)
     OverwriteDialog.axaml(.cs)                   Modal confirm overwriting an existing file (Yes, No, All)
@@ -82,7 +83,9 @@ src/
 [IVolumeProvider / IFileVolumeProvider / IPlugin / IVolume / IEntry / Paths]  <- Hst.Commander.Abstractions
         |                                    \
         |                          [ZipPlugin, ZipFileVolumeProvider, ZipVolume]  <- Hst.Commander.Plugins.Zip
-        |                                    /    (default plugin, Plugins.All)
+        |                          [LhaLzxPlugin, Lha/LzxFileVolumeProvider,
+        |                           LhaVolume, LzxVolume]  <- Hst.Commander.Plugins.LhaLzx
+        |                                    /    (default plugins, Plugins.All)
 [Volume Implementations]  <- Hst.Commander.Core
   LocalVolumeProvider (VolumeProviders.All),
   Iso9660FileVolumeProvider (VolumeProviders.Files),
@@ -127,7 +130,6 @@ Volume providers are what a pane can show. `VolumeProviders.All` (`Hst.Commander
 ```csharp
 string Name { get; }          // e.g. "Zip"
 string Description { get; }   // e.g. "Zip archives"
-IReadOnlyCollection<string> Extensions { get; } // e.g. ".zip": opened with Enter when IsMatch; any file with Ctrl+PageDown
 Task<bool> IsMatch(string name, Stream stream, CancellationToken cancellationToken = default); // magic signature check; stream at the start, may not be seekable
 Task<IVolume> CreateVolume(Stream stream, CancellationToken cancellationToken = default);     // new volume at its root over a seekable stream
 ```
@@ -146,7 +148,7 @@ A plugin is a project referencing only `Hst.Commander.Abstractions` (`Paths` is 
 
 ### Plugins
 
-- `Plugins.BuiltIn` (`Hst.Commander.Core`) lists the plugins included by default, currently `ZipPlugin` (`Hst.Commander.Plugins.Zip`, referenced by `Hst.Commander.Core`). `Plugins.All` is the built-in plugins followed by the plugins loaded from disk; `VolumeProviders.All`/`Files` are created again from it when it changes.
+- `Plugins.BuiltIn` (`Hst.Commander.Core`) lists the plugins included by default, currently `ZipPlugin` (`Hst.Commander.Plugins.Zip`) and `LhaLzxPlugin` (`Hst.Commander.Plugins.LhaLzx`), both referenced by `Hst.Commander.Core`. `Plugins.All` is the built-in plugins followed by the plugins loaded from disk; `VolumeProviders.All`/`Files` are created again from it when it changes.
 - Both front-ends call `Plugins.Load()` at startup, before the panes (and their `NavigationContext`s, which take `VolumeProviders.Files` when created) are created: the TUI in `Program.cs`, the GUI in `App.OnFrameworkInitializationCompleted` (fully qualified as `Hst.Commander.Core.Plugins`, since `Plugins` in `Hst.Commander.Gui` resolves to the `Hst.Commander.Plugins` namespace). It loads once and returns the errors of plugins that failed to load; `Plugins.FormatErrors` joins them into one message (null when none), shown once the main window is loaded (TUI `MainWindow.ShowErrorWhenLoaded`, GUI `MainWindow.StartupError` shown with `ErrorDialog` when opened). Other plugins still load.
 - `PluginLoader.Directories` are scanned in order: `~/.hst-commander/plugins` (`SettingsPaths.Directory`) and `plugins` in the directory Hst Commander is executed from (`AppContext.BaseDirectory`); missing directories are skipped and a directory listed twice is scanned once.
 - In a plugin directory, `PluginLoader.Load(directories, loadedPlugins)` loads `Name/Name.dll` (a plugin in a directory of its own with its dependencies, the recommended layout) and then single assemblies `*.dll`, ordered by path. Public non-abstract classes implementing `IPlugin` with a parameterless constructor are created. Assemblies without plugins are skipped (e.g. dependencies; a `BadImageFormatException`, e.g. a native library, is ignored for single assemblies but reported for `Name/Name.dll`), as are plugins whose type full name is already loaded (e.g. a copy of the built-in Zip plugin). Errors are reported per assembly in `PluginLoadResult.Errors`.
@@ -160,12 +162,15 @@ A plugin is a project referencing only `Hst.Commander.Abstractions` (`Paths` is 
 | `LocalVolume` | Browses the real file system; lists drives when at root |
 | `Iso9660Volume` | Reads ISO 9660 / CD-ROM images via `LTRData.DiscUtils.Iso9660`, created by `Iso9660FileVolumeProvider` |
 | `ZipVolume` | `Hst.Commander.Plugins.Zip`: reads zip archives via `System.IO.Compression.ZipArchive`, created by `ZipFileVolumeProvider` (signatures `PK\3\4`, `PK\5\6` for empty and `PK\7\8` for spanned archives). Directories are the archive's directory entries plus the directories in file paths; `/` and `\` separate path components, empty, `.` and `..` components are skipped. Names are matched exactly, otherwise case-insensitive. Disposes its `ZipArchive` |
+| `LhaVolume` | `Hst.Commander.Plugins.LhaLzx`: reads lha archives (`.lha`, `.lzh`) via `Hst.Compression.Lha.LhaArchive` (Amiga ISO-8859-1 names), created by `LhaFileVolumeProvider` (method `-lh?-`, `-lz?-` or `-pm?-` at offset 2). Entries are decompressed while read with `LhaArchive.OpenEntry`. Names are cut at a zero character (Amiga comments follow it); `-lhd-` entries without a trailing separator (symbolic links) are skipped |
+| `LzxVolume` | `Hst.Commander.Plugins.LhaLzx`: reads Amiga lzx archives (`.lzx`) via `Hst.Compression.Lzx.LzxArchive`, created by `LzxFileVolumeProvider` (signature `LZX`). Entries are decompressed while read with `LzxArchive.OpenEntry`; dates in local time are converted to UTC |
+| `ArchiveVolume<T>` | `Hst.Commander.Plugins.LhaLzx`: read-only base of `LhaVolume` and `LzxVolume`, building the directory tree like `ZipVolume` (directory entries end with `/` or `\`, plus the directories in file paths, same skipping and name matching). The archives aren't disposed, as `LhaArchive`/`LzxArchive.Dispose` would dispose the stream owned by Hst Commander |
 | `NestedVolume` | Compositor — holds a `LinkedList<IVolume>`. Drilling into a file pushes a new volume; going up pops it. The combined `CurrentPathComponents` spans all nested volumes |
 | `EntryVolumeProvider` | Adapter that presents a child `IVolume` as if it starts at the path of the opening `IEntry`. Used when pushing volumes into `NestedVolume` |
 | `DiskImageVolume` | **Stub** — all methods throw `NotImplementedException`. Intended for raw disk images (MBR/GPT/RDB partition tables) |
 | `NullVolume` | Null object — returns an empty entry list, safe fallback |
 
-`Iso9660Volume` and `ZipVolume` are read-only: `OpenWrite`, `CreateContainer`, `Delete`, `Rename` and `SetModifiedDate` throw `NotSupportedException`. `LocalVolume.CreateContainer` throws `NotSupportedException` in the drive list.
+`Iso9660Volume`, `ZipVolume`, `LhaVolume` and `LzxVolume` are read-only: `OpenWrite`, `CreateContainer`, `Delete`, `Rename` and `SetModifiedDate` throw `NotSupportedException`. `LocalVolume.CreateContainer` throws `NotSupportedException` in the drive list.
 
 ### Copying
 
@@ -212,8 +217,8 @@ Each UI pane has a `NavigationContext` that owns a `NestedVolume` over a root vo
 
 #### Images
 
-Opening a file (Enter or double-click in both front-ends, `NavigationContext.OpenEntryAsync`) first detects whether it is an image, a file browsed as a volume, by its magic signature, asking only the file volume providers registering its extension (`IFileVolumeProvider.Extensions`, e.g. `.zip`, `.iso`). Opening it as a volume (Ctrl+PageDown or File > Open as volume in both front-ends, `NavigationContext.OpenAsVolumeAsync`, like Total Commander) asks all file volume providers regardless of the extension, e.g. to browse a `.docx` document or `.jar` as a zip archive, and throws `IOException` (`'name' can't be opened as a volume`) when none detects it; directories and `..` are opened like Enter. Images are detected in any location (local directories, other volume providers and inside images, so e.g. a zip archive inside an ISO image or another zip archive opens too):
-1. The file volume providers (`NavigationContext` constructor's optional `fileVolumeProviders`, default `VolumeProviders.Files`, filtered by extension for Enter) are asked in order with `IFileVolumeProvider.IsMatch`, reading the file with `IVolume.OpenRead` of the current volume. A seekable stream is reset to the start for the next provider, otherwise the file is opened again. Files that can't be read (`IOException`, `UnauthorizedAccessException`, `NotSupportedException`, e.g. locked) are not images.
+Opening a file (Enter or double-click in both front-ends, `NavigationContext.OpenEntryAsync`) first detects whether it is an image, a file browsed as a volume, by its magic signature, asking all file volume providers regardless of the extension, so e.g. a `.nupkg` package, `.jar` or `.docx` document opens as a zip archive; a file no provider detects is started (see Enter on Files). Opening it as a volume (Ctrl+PageDown or File > Open as volume in both front-ends, `NavigationContext.OpenAsVolumeAsync`, like Total Commander) asks the file volume providers the same way, also when Enter is set to start files with the host OS, and throws `IOException` (`'name' can't be opened as a volume`) when none detects it; directories and `..` are opened like Enter. Images are detected in any location (local directories, other volume providers and inside images, so e.g. a zip archive inside an ISO image or another zip archive opens too):
+1. The file volume providers (`NavigationContext` constructor's optional `fileVolumeProviders`, default `VolumeProviders.Files`) are asked in order with `IFileVolumeProvider.IsMatch`, reading the file with `IVolume.OpenRead` of the current volume. A seekable stream is reset to the start for the next provider, otherwise the file is opened again. Files that can't be read (`IOException`, `UnauthorizedAccessException`, `NotSupportedException`, e.g. locked) are not images.
 2. The first matching provider's `CreateVolume` gets the file opened again as a seekable stream; a stream that isn't seekable (e.g. a file inside a zip archive) is first copied to a temporary file deleted on close.
 3. The volume is wrapped in an `EntryVolumeProvider` and pushed with `nestedVolume.PushVolume`, and the image (provider, file name, directory of the file inside the image it's in, volume and stream) is pushed on the `NavigationContext`'s image stack, used by `OpenLocationAsync` to open the images again. `NavigationContext.IsInImage` is true while an image is open.
 
@@ -223,7 +228,7 @@ Going up when at the root of an image calls `PopVolume()` and disposes the image
 
 Ctrl+\ in a pane of both front-ends calls `NavigationContext.GoRootAsync`, going to the root of the current volume: the local drive root (e.g. `c:\temp\test` goes to `c:\`, `/home/user` goes to `/`; a new `LocalVolume` at `Path.GetPathRoot`), the root of the image when inside one (pressing again at the image root closes the images and goes to the root of the drive or volume they are in) or the root of another volume provider's volume. The location is unchanged in the drive list or at the root. Either way the first entry (`..` when there is a parent) is selected once by `GetSelectedIndex`, also when the location is unchanged.
 
-With Enter, a file with a registered extension that isn't detected (e.g. a text file named `text.zip`) and files with other extensions (e.g. `.docx`, which has the zip format) are started as usual. Paths typed in the location dialog are detected like opening as a volume, regardless of the extension.
+With Enter set to start files with the host OS (see Enter on Files), local files are started without detecting images. With Enter, a file no file volume provider detects (e.g. a text file named `text.zip`) is started as usual. Paths typed in the location dialog are detected like opening as a volume, regardless of the extension.
 
 Opening any other local file (Enter or double-click in both front-ends) calls the `NavigationContext` constructor's optional `startFile` callback with the full path, defaulting to `FileStarter.StartWithShell` (`Process.Start` with `UseShellExecute`, working directory = the file's directory): programs are executed and other files open in their associated application. Files inside images are not started. The GUI uses the default; the TUI runs terminal programs itself (see Adding TUI Features). Errors (e.g. no associated application) are shown like navigation errors.
 
@@ -240,6 +245,10 @@ Ctrl+L, double-clicking the path of a pane or File > Location opens the location
 ### Volume Provider Keys
 
 The keys opening the volume provider list of the left/right pane are chosen in File > Settings of both front-ends (`Volume keys`): `VolumeProviderKeys.AltFunctionKeys` (Alt+F1/Alt+F2) or `ShiftFunctionKeys` (Shift+F1/Shift+F2). `TuiSettings`/`GuiSettings.VolumeProviderKeys` is null until chosen, and `EffectiveVolumeProviderKeys` then falls back to `VolumeProviderKeyBindings.Default`, the best fit for the host OS: Alt on Windows, Shift elsewhere (Linux desktops take Alt+F1/Alt+F2, e.g. Alt+F2 opens the run dialog on GNOME/KDE/XFCE, and macOS terminals only send Alt with Option set as Meta key). `WithVolumeProviderKeys` keeps the setting unset when the keys already in effect are chosen. The settings dialogs mark the OS default with `(default)`; the File menu shows the keys in effect (`GetLeftKeyText`/`GetRightKeyText`) and changes apply on OK.
+
+### Enter on Files
+
+What opening a file with Enter or double-click does is chosen in File > Settings of both front-ends (`Enter on file`): `EnterFileAction.OpenAsVolume` (`Open as volume`, the default: files detected by any file volume provider of the built-in volume types and plugins are browsed as images regardless of their extension, e.g. `.nupkg` as a zip archive, and files none of them detects fall back to being started by the host OS, see Images) or `StartWithHost` (`Start with host OS`: local files are always started with the `startFile` callback without detecting images, e.g. a zip archive opens in its associated application; files inside images can't be started and are still opened as images when detected; Ctrl+PageDown still opens a file as a volume). `EnterFileActions` (`Hst.Commander.Core`) lists the actions and their names. `TuiSettings`/`GuiSettings.EnterFileAction` is stored in the settings file and both front-ends set `NavigationContext.EnterFileAction` of both panes at startup and on OK in the settings dialog.
 
 ### Versioning and About
 
@@ -262,10 +271,10 @@ The keys opening the volume provider list of the left/right pane are chosen in F
 
 **Working:**
 - The Terminal.Gui v2 TUI and Avalonia 12 GUI dual-pane browsers, with per-pane navigation and current-directory startup.
-- Local drive/directory listing, parent navigation, and read-only browsing of ISO images and zip archives (the default Zip plugin) as nested volumes, detected by their magic signature, also inside other images.
+- Local drive/directory listing, parent navigation, and read-only browsing of ISO images, zip archives (the default Zip plugin) and lha/lzx archives (the default LhaLzx plugin) as nested volumes, detected by their magic signature, also inside other images.
 - Starting/executing local files with Enter or double-click, with executables drawn in green.
 - GUI entry icons: icons contained in programs and .ico files (also inside images), otherwise the host OS icons for file types, folders and drives.
-- The volume abstraction layer and implementations: `LocalVolume`, `Iso9660Volume`, `ZipVolume`, `NestedVolume`, `EntryVolumeProvider`, and `NullVolume`.
+- The volume abstraction layer and implementations: `LocalVolume`, `Iso9660Volume`, `ZipVolume`, `LhaVolume`, `LzxVolume`, `NestedVolume`, `EntryVolumeProvider`, and `NullVolume`.
 - All unit tests in `Hst.Commander.Core.Tests`.
 
 - Going to the root of the volume with Ctrl+\ in both front-ends.
@@ -282,7 +291,7 @@ The keys opening the volume provider list of the left/right pane are chosen in F
 
 **Not implemented:**
 - View (F3), edit (F4) and other file-management operations.
-- Writing to images; ISO images and zip archives are read-only.
+- Writing to images; ISO images and zip, lha and lzx archives are read-only.
 - Unloading or reloading plugins while running, and a list of loaded plugins in the UI.
 - `DiskImageVolume` remains an intentional stub.
 
@@ -305,7 +314,8 @@ The keys opening the volume provider list of the left/right pane are chosen in F
 ### Namespaces
 - Abstractions: `Hst.Commander.Abstractions` (interfaces, `Paths`)
 - Zip plugin: `Hst.Commander.Plugins.Zip`
-- Core: `Hst.Commander.Core` (`AppInfo`, `EmbeddedIconReader`, `EntryProperties`, `FileSystemDetails`, `IconImage`, `NavigationContext`, `NameFilter`, `PluginLoader`, `Plugins`, `SelectGroupOptions`, `FileStarter`, `SettingsPaths`, `SizeFormatter`), `Hst.Commander.Core.Volumes` (volumes)
+- Lha and lzx plugin: `Hst.Commander.Plugins.LhaLzx`
+- Core: `Hst.Commander.Core` (`AppInfo`, `EmbeddedIconReader`, `EnterFileAction`, `EntryProperties`, `FileSystemDetails`, `IconImage`, `NavigationContext`, `NameFilter`, `PluginLoader`, `Plugins`, `SelectGroupOptions`, `FileStarter`, `SettingsPaths`, `SizeFormatter`), `Hst.Commander.Core.Volumes` (volumes)
 - Tui: `Hst.Commander.Tui`
 - Gui: `Hst.Commander.Gui`, `Hst.Commander.Gui.Icons` (entry icons)
 - Tests: `Hst.Commander.Core.Tests`
@@ -324,7 +334,7 @@ The keys opening the volume provider list of the left/right pane are chosen in F
 3. **Handle `Paths.Root` and `Paths.Parent`** in `ChangeDirectory` — both are case-insensitive string comparisons.
 4. **Add unit tests** in `Hst.Commander.Core.Tests/` using the `Given<YourVolume>` naming pattern.
 5. **To make it selectable with Alt+F1/Alt+F2**, implement `IVolumeProvider` (see `LocalVolumeProvider`) and add it to `VolumeProviders.All`.
-6. **Or open files as the volume** (images): implement `IFileVolumeProvider` with `Extensions` (opened with Enter) and `IsMatch` checking the file's magic signature (see `Iso9660FileVolumeProvider` and `ZipFileVolumeProvider`) and add it to `VolumeProviders.Files`, or return it from `IPlugin.FileVolumeProviders` of a plugin. `NavigationContext` then opens matching files as images (see Images).
+6. **Or open files as the volume** (images): implement `IFileVolumeProvider` with `IsMatch` checking the file's magic signature (see `Iso9660FileVolumeProvider` and `ZipFileVolumeProvider`) and add it to `VolumeProviders.Files`, or return it from `IPlugin.FileVolumeProviders` of a plugin. `NavigationContext` then opens matching files as images (see Images).
 
 Plugins are separate projects referencing only `Hst.Commander.Abstractions`, e.g. `Hst.Commander.Plugins.Zip`: implement `IPlugin` returning the plugin's volume providers and file volume providers, and either add it to `Plugins.BuiltIn` (`Hst.Commander.Core`, which references the plugins included by default) or build it and copy its output to `~/.hst-commander/plugins/<Name>/` or `plugins/<Name>/` next to the executable, with `<Name>.dll` as the plugin assembly (reference `Hst.Commander.Abstractions` with `<Private>false</Private>` and `<ExcludeAssets>runtime</ExcludeAssets>` so it isn't copied; a copy is ignored anyway).
 
@@ -353,6 +363,7 @@ public async Task When_VolumeIsPushed_Then_NestedVolumeListsEntriesFromNewVolume
 - `TestEntry` (`Hst.Commander.Core.Tests/TestEntry.cs`): in-memory `IEntry` with optional `byte[]? Data`.
 - Use `AddEntry(pathComponents, entry)` to build the in-memory tree.
 - `ZipTestData` (`Hst.Commander.Core.Tests/ZipTestData.cs`): creates zip archives in memory (`CreateZip((name, content)...)`, names ending with `/` are directories).
+- `ArchiveTestData` (`Hst.Commander.Core.Tests/ArchiveTestData.cs`): lha and lzx archives in `TestData/Archives` (from the Hst.Compression tests), e.g. `dirs-files.lha`/`.lzx` (`ArchiveTestData.DirsFiles`).
 
 ---
 
@@ -385,7 +396,7 @@ Key TUI patterns already in use:
 - Ctrl+L (panes' `KeyDown`) and double-clicking the path line (`PathPanelView.PathDoubleClicked`, raised from `OnMouseEvent`) open `LocationDialog` for that pane; its Volumes button runs the `VolumeProviderDialog` on top (see Changing Location).
 - The volume provider keys (Alt+F1/Alt+F2 or Shift+F1/Shift+F2, see Volume Provider Keys; handled in the panes' `KeyDown`, so from either pane) open the modal `VolumeProviderDialog` for the left/right pane, titled `Left`/`Right` and centered over that pane: a `ListView` of `VolumeProviders.All` (`Name  Description`) with the pane's current provider selected; Enter or double-click chooses, Esc cancels. The chosen provider is shown with `NavigationContext.ChangeVolumeProviderAsync` and the pane gets the focus.
 - Three themes, selected in File > Settings, same as the GUI: **Midnight Commander** (default), **Light** and **Dark**. Colors come from `TuiPalette` (16 legacy colors); `MainWindow.ApplyTheme` reapplies them to the menu bar and panes. Midnight Commander uses blue panes with directories in white, files in gray, executables in bright green, marked entries in yellow, the current row in black on gray and a cyan menu bar.
-- Settings are stored in `~/.hst-commander/tui-settings.json` (`SettingsPaths.Directory`, `TuiSettings.FilePath`), separate from the GUI settings. A missing or invalid file falls back to defaults. The settings dialog uses a `RadioGroup` for the theme and one for the volume provider keys, previews theme changes live, saves on OK and reverts on Cancel/Esc.
+- Settings are stored in `~/.hst-commander/tui-settings.json` (`SettingsPaths.Directory`, `TuiSettings.FilePath`), separate from the GUI settings. A missing or invalid file falls back to defaults. The settings dialog uses a `RadioGroup` for the theme, one for the volume provider keys and one for what Enter does with files (see Enter on Files), previews theme changes live, saves on OK and reverts on Cancel/Esc.
 - Directory names have no slash prefix.
 - Opening a program that runs in the terminal (`FileStarter.IsTerminalProgram`: on Windows console-subsystem `.exe` (`FileStarter.IsConsoleExecutable` reads the PE header), `.com`, `.bat`, `.cmd`; elsewhere files with execute permission) suspends the TUI like Midnight Commander: `MainWindow.StartFile` requests a `TerminalAction.RunProgram`, which stores the action and stops the window with `Application.RequestStop`. `Program.cs` loops: `TerminalScreen.EnterTui`, `Application.Init`, refresh both panes, `Application.Run(mainWindow)`, `Application.Shutdown`, `TerminalScreen.LeaveTui`, then does `MainWindow.TakePendingTerminalAction` (null when quitting) and runs the same `MainWindow` again. `TerminalScreen.Run` runs the program in the terminal in its directory below the previous output (Ctrl+C is ignored by Hst Commander) and returns directly when it exits, without a pause; an error starting it is shown with `MessageBox.ErrorQuery` once the window is loaded again (`MainWindow.ShowErrorWhenLoaded`). The `Loaded` event focuses the active pane on every run. Other files, including GUI programs on Windows, are started with the shell without suspending.
 - Ctrl+O shows the output screen like Midnight Commander (`TerminalAction.ShowOutput`): the TUI is shut down the same way and `TerminalScreen.ShowOutput` waits for any key before the TUI returns. TUI only, the GUI has no terminal. The output screen is kept because Windows Terminal and Unix terminals draw the TUI on the alternate screen; the classic Windows console (no `WT_SESSION`) draws it on the standard output's screen buffer, so `EnterTui` gives the TUI a screen buffer of its own there (`CreateConsoleScreenBuffer` + `SetStdHandle`). `LeaveTui` restores the standard output handle and makes its screen buffer active again, also needed because Terminal.Gui's `WindowsConsole.Cleanup` activates a new empty buffer on shutdown.
@@ -412,7 +423,7 @@ Key GUI patterns already in use:
   - Midnight Commander uses the same palette as the TUI: blue panes, directories in white, files in gray, executables in green, current row in black on gray and the active pane's path highlighted. Only the panes are colored: the menu, function key bar and dialogs use the normal Fluent dark styling. It is a custom `ThemeVariant` (`ThemeManager.MidnightCommanderVariant`, inheriting Dark) plus `MidnightCommanderStyles` (the current row colors only), which `ThemeManager` adds to `Application.Styles` only for this theme.
   - Light and Dark use the normal Fluent control styling (including list selection) in light/dark colors.
   - Pane colors are per-theme brushes in `App.axaml` `ThemeDictionaries` (`PaneBackground`, `PaneBorder`, `HeaderForeground`, `ContainerForeground`, `ItemForeground`, `ExecutableForeground`, `PathForeground`, `ActivePathBackground`, `ActivePathForeground`, `SelectedEntryForeground`, `MarkedEntryForeground`), referenced with `DynamicResource` so theme changes apply live.
-- Settings are stored in `~/.hst-commander/gui-settings.json` (`SettingsPaths.Directory` in Core, `GuiSettings.FilePath`). A missing or invalid file falls back to defaults. The settings dialog has combo boxes for the theme and the volume provider keys, previews theme changes live, saves on OK and reverts on Cancel.
+- Settings are stored in `~/.hst-commander/gui-settings.json` (`SettingsPaths.Directory` in Core, `GuiSettings.FilePath`). A missing or invalid file falls back to defaults. The settings dialog has combo boxes for the theme, the volume provider keys and what Enter does with files (see Enter on Files), previews theme changes live, saves on OK and reverts on Cancel.
 - The application icon is `src/icon/hst-commander.ico`: `ApplicationIcon` of both the GUI and TUI executables, and the GUI main window `Icon`, linked as the Avalonia resource `avares://Hst.Commander.Gui/Assets/hst-commander.ico`.
 - Errors are shown with `ErrorDialog` via `ShowDialog(owner)`.
 - A top `Menu` docked above the panes has a File menu: Copy (F5), Move/rename (F6), Make directory (F7), Delete (F8 or Delete), Properties (Alt+Enter), Open as volume (Ctrl+PageDown), Select group (+), Unselect group (-) and Invert selection (*) act on the active pane (the +, - and * keys are shown in the headers, as key gestures would display as "OemPlus" etc.) (tracked with `GotFocus`), Left volume and Right volume (showing the configured volume provider keys as `InputGesture`) choose a pane's volume provider, Location (Ctrl+L) opens the location dialog of the active pane, Settings opens the modal `SettingsDialog` and Quit closes the main window (exiting the application). A Help menu has About, showing the modal `AboutDialog` (see Versioning and About).
@@ -458,6 +469,7 @@ dotnet test src/Hst.Commander.Core.Tests/Hst.Commander.Core.Tests.csproj --logge
 | `LTRData.DiscUtils` | 1.0.54 | `Hst.Commander.Core` — raw disk image support |
 | `LTRData.DiscUtils.Iso9660` | 1.0.54 | `Hst.Commander.Core` — ISO 9660 reading |
 | `System.Linq.Async` | 6.0.1 | `Hst.Commander.Core` — async LINQ |
+| `Hst.Compression` | 0.4.96 | `Hst.Commander.Plugins.LhaLzx` — lha and lzx archive reading |
 | `Terminal.Gui` | 2.0.0-prealpha.1895 | `Hst.Commander.Tui` — TUI framework |
 | `Avalonia`, `Avalonia.Desktop`, `Avalonia.Themes.Fluent` | 12.1.4 | `Hst.Commander.Gui` — desktop GUI framework |
 | `xunit` | 2.5.3 | `Hst.Commander.Core.Tests` |
