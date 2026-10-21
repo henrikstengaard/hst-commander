@@ -1,0 +1,22 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Hst.Commander.Gui.CreateVolumeFieldsDialog"
+        Title="Create"
+        Width="440"
+        SizeToContent="Height"
+        CanResize="False"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner">
+    <StackPanel Margin="16" Spacing="8">
+        <TextBlock x:Name="FileNameLabel" Text="File name *:" />
+        <TextBox x:Name="FileNameTextBox" />
+        <!-- a text box or check box per field of the volume creator, added in code -->
+        <StackPanel x:Name="FieldsPanel" Spacing="8" />
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,8,0,0">
+            <Button x:Name="OkButton" Content="OK" MinWidth="80" HorizontalContentAlignment="Center"
+                    IsDefault="True" />
+            <Button x:Name="CancelButton" Content="Cancel" MinWidth="80" HorizontalContentAlignment="Center"
+                    IsCancel="True" />
+        </StackPanel>
+    </StackPanel>
+</Window>

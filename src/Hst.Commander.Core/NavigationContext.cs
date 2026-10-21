@@ -1012,6 +1012,131 @@ public sealed class NavigationContext : IDisposable
     }
 
     /// <summary>
+    ///     Why a volume can't be created in the current location, e.g. in the local drive list, inside a read-only image
+    ///     or when no plugin can create volumes. Null when supported, front-ends then show the create dialog.
+    /// </summary>
+    public string? GetCreateVolumeNotSupportedMessage(IReadOnlyCollection<IVolumeCreator> creators)
+    {
+        ArgumentNullException.ThrowIfNull(creators);
+
+        return creators.Count == 0
+            ? "No plugin can create volumes"
+            : _rootVolume is LocalVolume && !_nestedVolume.CurrentPathComponents.Any()
+                ? "Creating a volume is not supported in the drive list"
+                : IsInImage && !_images.Peek().IsWritable
+                    ? "Creating a volume is not supported in a read-only image"
+                    : null;
+    }
+
+    /// <summary>
+    ///     Creates a volume as a file in the current location with a volume creator, e.g. an empty Amiga disk file. The
+    ///     file name gets the creator's extension when missing (see <see cref="VolumeCreation.GetFileName" />) and the
+    ///     input entered for the creator's fields is checked (see <see cref="VolumeCreation.GetValues" />). Local files are
+    ///     written directly, otherwise the volume is created in a temporary file and copied. The created file is selected
+    ///     by <see cref="GetSelectedIndex" /> when the entries are listed again. Throws <see cref="NotSupportedException" />
+    ///     when the location doesn't support it and <see cref="IOException" /> when the name or input is invalid or an
+    ///     entry with the name already exists; a partially created file is deleted.
+    /// </summary>
+    public async Task CreateVolumeAsync(IVolumeCreator creator, string fileName,
+        IReadOnlyDictionary<string, object?> input, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(creator);
+        ArgumentNullException.ThrowIfNull(fileName);
+        ArgumentNullException.ThrowIfNull(input);
+
+        if (GetCreateVolumeNotSupportedMessage([creator]) is { } message)
+        {
+            throw new NotSupportedException(message);
+        }
+
+        var name = ValidateName(VolumeCreation.GetFileName(creator, fileName), "File name");
+        var values = VolumeCreation.GetValues(creator, input);
+        if (await FindEntryAsync(name, cancellationToken) is { } existingEntry)
+        {
+            throw new IOException($"'{existingEntry.Name}' already exists");
+        }
+
+        if (!IsInImage && LocalPath is { } localPath)
+        {
+            await CreateLocalVolumeAsync(creator, Path.Combine(localPath, name), values, cancellationToken);
+        }
+        else
+        {
+            await CreateVolumeInVolumeAsync(creator, name, values, cancellationToken);
+        }
+
+        _newEntryName = name;
+    }
+
+    /// <summary>Creates a volume in a new local file, on the thread pool as creating may take a while.</summary>
+    private static async Task CreateLocalVolumeAsync(IVolumeCreator creator, string path, VolumeCreatorValues values,
+        CancellationToken cancellationToken)
+    {
+        await Task.Run(async () =>
+        {
+            var stream = new FileStream(path, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None);
+            try
+            {
+                await using (stream)
+                {
+                    await creator.Create(stream, values, cancellationToken);
+                }
+            }
+            catch (Exception)
+            {
+                TryDeleteFile(path);
+                throw;
+            }
+        }, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Creates a volume in a temporary file and copies it to the current volume, e.g. a writable image, as the
+    ///     volume's streams may not be seekable.
+    /// </summary>
+    private async Task CreateVolumeInVolumeAsync(IVolumeCreator creator, string name, VolumeCreatorValues values,
+        CancellationToken cancellationToken)
+    {
+        await using var temporaryStream = new FileStream(Path.GetTempFileName(), FileMode.Create,
+            FileAccess.ReadWrite, FileShare.None, 4096, FileOptions.DeleteOnClose);
+        await Task.Run(() => creator.Create(temporaryStream, values, cancellationToken), cancellationToken);
+        temporaryStream.Position = 0;
+
+        var written = false;
+        try
+        {
+            await using var stream = await _nestedVolume.OpenWrite(name, cancellationToken);
+            written = true;
+            await temporaryStream.CopyToAsync(stream, cancellationToken);
+        }
+        catch (Exception) when (written)
+        {
+            try
+            {
+                await _nestedVolume.Delete(name, CancellationToken.None);
+            }
+            catch (Exception)
+            {
+                // keep the original error
+            }
+
+            throw;
+        }
+    }
+
+    private static void TryDeleteFile(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (Exception)
+        {
+            // keep the original error
+        }
+    }
+
+    /// <summary>
     ///     Why entries can't be moved from the current location, e.g. in the local drive list or inside a read-only
     ///     image. Null when moving is supported, front-ends then show the move dialog.
     /// </summary>

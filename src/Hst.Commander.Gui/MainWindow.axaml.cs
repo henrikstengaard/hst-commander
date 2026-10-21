@@ -38,6 +38,7 @@ public partial class MainWindow : Window
         MoveMenuItem.Click += async (_, _) => await MoveAsync(_activePane);
         MakeDirectoryMenuItem.Click += async (_, _) => await MakeDirectoryAsync(_activePane);
         DeleteMenuItem.Click += async (_, _) => await DeleteAsync(_activePane);
+        CreateVolumeMenuItem.Click += async (_, _) => await CreateVolumeAsync(_activePane);
         PropertiesMenuItem.Click += async (_, _) => await ShowPropertiesAsync(_activePane);
         OpenAsVolumeMenuItem.Click += async (_, _) =>
         {
@@ -51,6 +52,7 @@ public partial class MainWindow : Window
         MoveButton.Click += async (_, _) => await MoveAsync(_activePane);
         MkdirButton.Click += async (_, _) => await MakeDirectoryAsync(_activePane);
         DeleteButton.Click += async (_, _) => await DeleteAsync(_activePane);
+        CreateButton.Click += async (_, _) => await CreateVolumeAsync(_activePane);
         LeftVolumeMenuItem.Click += async (_, _) => await ChooseVolumeProviderAsync(LeftPane);
         RightVolumeMenuItem.Click += async (_, _) => await ChooseVolumeProviderAsync(RightPane);
         LocationMenuItem.Click += async (_, _) => await ShowLocationAsync(_activePane);
@@ -155,6 +157,10 @@ public partial class MainWindow : Window
             case Key.Delete:
                 e.Handled = true;
                 await DeleteAsync(_activePane);
+                break;
+            case Key.F9:
+                e.Handled = true;
+                await CreateVolumeAsync(_activePane);
                 break;
         }
     }
@@ -313,6 +319,52 @@ public partial class MainWindow : Window
         {
             await pane.CreateDirectoryAsync(name);
             await otherPane.RefreshEntriesAsync();
+        }
+
+        pane.FocusEntries();
+    }
+
+    /// <summary>
+    ///     Creates a volume as a file in the current location of a pane: the volume to create is chosen in the create
+    ///     dialog, then its file name and fields are entered. When creating fails, the error is shown and the fields are
+    ///     asked again with the input entered. The created file is selected and the other pane is refreshed too, as it
+    ///     may show the same location.
+    /// </summary>
+    private async Task CreateVolumeAsync(PaneView pane)
+    {
+        var otherPane = pane == LeftPane ? RightPane : LeftPane;
+        var creators = VolumeProviders.Creators;
+        if (pane.NavigationContext.GetCreateVolumeNotSupportedMessage(creators) is { } message)
+        {
+            await new ErrorDialog(message).ShowDialog(this);
+            pane.FocusEntries();
+            return;
+        }
+
+        var creator = await new CreateVolumeDialog(creators).ShowDialog<IVolumeCreator?>(this);
+        VolumeCreatorInput? input = null;
+        while (creator != null)
+        {
+            input = await new CreateVolumeFieldsDialog(creator, input).ShowDialog<VolumeCreatorInput?>(this);
+            if (input == null)
+            {
+                // icons may have been stopped by a failed attempt
+                await pane.RefreshEntriesAsync();
+                break;
+            }
+
+            try
+            {
+                await pane.CreateVolumeAsync(creator, input);
+            }
+            catch (Exception exception)
+            {
+                await ShowErrorAsync(exception);
+                continue;
+            }
+
+            await otherPane.RefreshEntriesAsync();
+            break;
         }
 
         pane.FocusEntries();

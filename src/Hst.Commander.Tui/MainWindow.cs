@@ -47,6 +47,7 @@ public sealed class MainWindow : Window
                     new("_Copy...", "F5", CopyFromActivePane),
                     new("Mo_ve/rename...", "F6", MoveFromActivePane),
                     new("_Make directory...", "F7", MakeDirectoryInActivePane),
+                    new("Cr_eate volume...", "F9", CreateVolumeInActivePane),
                     new("_Delete...", "F8", DeleteFromActivePane),
                     new("_Properties...", "Ctrl+P", ShowPropertiesOfActivePane),
                     new("Ope_n as volume", "Ctrl+PgDn", OpenAsVolumeInActivePane),
@@ -82,9 +83,12 @@ public sealed class MainWindow : Window
                 new FunctionKeyItem("F5", "Copy", CopyFromActivePane),
                 new FunctionKeyItem("F6", "Move", MoveFromActivePane),
                 new FunctionKeyItem("F7", "Mkdir", MakeDirectoryInActivePane),
-                new FunctionKeyItem("F8", "Delete", DeleteFromActivePane)
+                new FunctionKeyItem("F8", "Delete", DeleteFromActivePane),
+                new FunctionKeyItem("F9", "Create", CreateVolumeInActivePane)
             ]
         };
+        // f9 creates a volume, so f10 opens the menu (alt+f too)
+        _menuBar.Key = Key.F10;
         _leftPane = CreatePane(new NavigationContext(initialPath, StartFile), 0);
         _rightPane = CreatePane(new NavigationContext(initialPath, StartFile), 50);
         _activePane = _leftPane;
@@ -420,6 +424,11 @@ public sealed class MainWindow : Window
                 key.Handled = true;
                 _ = DeleteAsync(pane, otherPane);
             }
+            else if (key.KeyCode == KeyCode.F9)
+            {
+                key.Handled = true;
+                _ = CreateVolumeAsync(pane, otherPane);
+            }
         };
     }
 
@@ -432,6 +441,9 @@ public sealed class MainWindow : Window
 
     private void MakeDirectoryInActivePane() =>
         _ = MakeDirectoryAsync(_activePane, _activePane == _leftPane ? _rightPane : _leftPane);
+
+    private void CreateVolumeInActivePane() =>
+        _ = CreateVolumeAsync(_activePane, _activePane == _leftPane ? _rightPane : _leftPane);
 
     private void SelectGroupInActivePane() => SelectGroup(_activePane, true);
 
@@ -661,6 +673,57 @@ public sealed class MainWindow : Window
 
         await RunNavigationAsync(pane, () => pane.NavigationContext.CreateDirectoryAsync(name));
         await InitializePaneAsync(otherPane);
+    }
+
+    /// <summary>
+    ///     Creates a volume as a file in the current location of a pane: the volume to create is chosen in the create
+    ///     dialog, then its file name and fields are entered. When creating fails, the error is shown and the fields are
+    ///     asked again with the input entered. The created file is selected and the other pane is refreshed too, as it
+    ///     may show the same location.
+    /// </summary>
+    private async Task CreateVolumeAsync(Pane pane, Pane otherPane)
+    {
+        var creators = VolumeProviders.Creators;
+        if (pane.NavigationContext.GetCreateVolumeNotSupportedMessage(creators) is { } message)
+        {
+            MessageBox.ErrorQuery("Error", message, "OK");
+            pane.TableView.SetFocus();
+            return;
+        }
+
+        var dialog = new CreateVolumeDialog(creators, _palette);
+        Application.Run(dialog);
+        var creator = dialog.Result;
+        dialog.Dispose();
+
+        VolumeCreatorInput? input = null;
+        while (creator != null)
+        {
+            var fieldsDialog = new CreateVolumeFieldsDialog(creator, input, _palette);
+            Application.Run(fieldsDialog);
+            input = fieldsDialog.Result;
+            fieldsDialog.Dispose();
+            if (input == null)
+            {
+                break;
+            }
+
+            try
+            {
+                await pane.NavigationContext.CreateVolumeAsync(creator, input.FileName, input.Values);
+            }
+            catch (Exception exception)
+            {
+                MessageBox.ErrorQuery("Error", exception.Message, "OK");
+                continue;
+            }
+
+            await InitializePaneAsync(pane);
+            await InitializePaneAsync(otherPane);
+            break;
+        }
+
+        pane.TableView.SetFocus();
     }
 
     private static IEntry? GetCurrentEntry(Pane pane)

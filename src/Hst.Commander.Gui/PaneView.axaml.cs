@@ -70,6 +70,19 @@ public partial class PaneView : UserControl
     public Task CreateDirectoryAsync(string name) =>
         RunNavigationAsync(() => NavigationContext.CreateDirectoryAsync(name));
 
+    /// <summary>
+    ///     Creates a volume as a file in the current location and selects it, see
+    ///     <see cref="NavigationContext.CreateVolumeAsync" />. Unlike navigating, an error is thrown, so the input can be
+    ///     asked again.
+    /// </summary>
+    public async Task CreateVolumeAsync(IVolumeCreator creator, VolumeCreatorInput input)
+    {
+        // icons of files inside images are read from the pane's volume, so stop before writing to it
+        _iconsCancellation?.Cancel();
+        await NavigationContext.CreateVolumeAsync(creator, input.FileName, input.Values);
+        await RefreshEntriesAsync();
+    }
+
     /// <summary>Renames an entry in the current location and selects it, see <see cref="NavigationContext.RenameAsync" />.</summary>
     public Task RenameAsync(IEntry entry, string newName) =>
         RunNavigationAsync(() => NavigationContext.RenameAsync(entry, newName));

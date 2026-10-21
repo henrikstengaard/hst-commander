@@ -5,7 +5,8 @@ namespace Hst.Commander.Core;
 
 /// <summary>
 ///     Volume providers listed when choosing what a pane shows (Alt+F1/Alt+F2), the local volume provider first, and file
-///     volume providers opening files as volumes, the built-in ones first followed by those of the <see cref="Plugins" />.
+///     volume providers opening files as volumes, the built-in ones first followed by those of the <see cref="Plugins" />,
+///     and the volume creators of the plugins creating new volumes as files.
 /// </summary>
 public static class VolumeProviders
 {
@@ -23,6 +24,12 @@ public static class VolumeProviders
     /// </summary>
     public static IReadOnlyList<IFileVolumeProvider> Files => GetLists().Files;
 
+    /// <summary>
+    ///     Volume creators listed in the create dialog (F9): those of the plugins that can create volumes
+    ///     (<see cref="IPlugin.CanCreateVolumes" />), in plugin order.
+    /// </summary>
+    public static IReadOnlyList<IVolumeCreator> Creators => GetLists().Creators;
+
     private static Lists GetLists()
     {
         var plugins = Plugins.All;
@@ -33,7 +40,8 @@ public static class VolumeProviders
 
         lists = new Lists(plugins,
             [Local, ..plugins.SelectMany(plugin => plugin.VolumeProviders)],
-            [Iso9660, ..plugins.SelectMany(plugin => plugin.FileVolumeProviders)]);
+            [Iso9660, ..plugins.SelectMany(plugin => plugin.FileVolumeProviders)],
+            [..plugins.Where(plugin => plugin.CanCreateVolumes).SelectMany(plugin => plugin.VolumeCreators)]);
         _lists = lists;
         return lists;
     }
@@ -41,5 +49,6 @@ public static class VolumeProviders
     private sealed record Lists(
         IReadOnlyList<IPlugin> Plugins,
         IReadOnlyList<IVolumeProvider> All,
-        IReadOnlyList<IFileVolumeProvider> Files);
+        IReadOnlyList<IFileVolumeProvider> Files,
+        IReadOnlyList<IVolumeCreator> Creators);
 }
