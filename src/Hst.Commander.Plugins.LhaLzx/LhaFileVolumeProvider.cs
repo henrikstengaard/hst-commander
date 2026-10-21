@@ -14,8 +14,6 @@ public class LhaFileVolumeProvider : IFileVolumeProvider
 
     public string Description => "Lha archives";
 
-    public IReadOnlyCollection<string> Extensions { get; } = [".lha", ".lzh"];
-
     public async Task<bool> IsMatch(string name, Stream stream, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(stream);

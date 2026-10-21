@@ -566,21 +566,33 @@ public sealed class NavigationContext : IDisposable
             return;
         }
 
-        // files with an extension of a file volume provider detecting them, e.g. ISO images or zip archives, are
-        // browsed as images
-        var extension = Path.GetExtension(entry.Name);
-        if (await OpenImageAsync(entry, _fileVolumeProviders.Where(fileVolumeProvider =>
-                fileVolumeProvider.Extensions.Contains(extension, StringComparer.OrdinalIgnoreCase)), cancellationToken))
+        // local files are started without detecting images when set to start them with the host
+        var localFilePath = !IsInImage && LocalPath is { } localPath ? Path.Combine(localPath, entry.Name) : null;
+        if (EnterFileAction == EnterFileAction.StartWithHost && localFilePath != null)
+        {
+            _startFile(localFilePath);
+            return;
+        }
+
+        // files detected by any file volume provider, e.g. ISO images or zip archives (also with other extensions like
+        // .nupkg), are browsed as images
+        if (await OpenImageAsync(entry, _fileVolumeProviders, cancellationToken))
         {
             return;
         }
 
         // local files are started, e.g. executing a program; files inside images can't be started
-        if (!IsInImage && LocalPath is { } localPath)
+        if (localFilePath != null)
         {
-            _startFile(Path.Combine(localPath, entry.Name));
+            _startFile(localFilePath);
         }
     }
+
+    /// <summary>
+    ///     What <see cref="OpenEntryAsync" /> does with files: browse detected images as volumes (default) or start
+    ///     local files with the host operating system.
+    /// </summary>
+    public EnterFileAction EnterFileAction { get; set; } = EnterFileAction.OpenAsVolume;
 
     /// <summary>
     ///     Opens an entry as a volume (Ctrl+PageDown): a file detected by any file volume provider is browsed as an

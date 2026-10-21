@@ -34,12 +34,16 @@ public partial class SettingsDialog : Window
             .ToList();
         VolumeProviderKeysComboBox.SelectedIndex =
             Math.Max(0, VolumeProviderKeyBindings.All.ToList().IndexOf(settings.EffectiveVolumeProviderKeys));
+        EnterFileActionComboBox.ItemsSource = EnterFileActions.All.Select(EnterFileActions.GetName).ToList();
+        EnterFileActionComboBox.SelectedIndex =
+            Math.Max(0, EnterFileActions.All.ToList().IndexOf(settings.EnterFileAction));
 
         var accepted = false;
         OkButton.Click += (_, _) =>
         {
             accepted = true;
-            Close((settings with { Theme = SelectedTheme }).WithVolumeProviderKeys(SelectedVolumeProviderKeys));
+            Close((settings with { Theme = SelectedTheme, EnterFileAction = SelectedEnterFileAction })
+                .WithVolumeProviderKeys(SelectedVolumeProviderKeys));
         };
         CancelButton.Click += (_, _) => Close();
         Closed += (_, _) =>
@@ -56,4 +60,7 @@ public partial class SettingsDialog : Window
 
     private VolumeProviderKeys SelectedVolumeProviderKeys =>
         VolumeProviderKeyBindings.All[Math.Max(0, VolumeProviderKeysComboBox.SelectedIndex)];
+
+    private EnterFileAction SelectedEnterFileAction =>
+        EnterFileActions.All[Math.Max(0, EnterFileActionComboBox.SelectedIndex)];
 }

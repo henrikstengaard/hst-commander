@@ -20,9 +20,6 @@ public class ZipFileVolumeProvider : IFileVolumeProvider
 
     public string Description => "Zip archives";
 
-    // files in zip format with other extensions, e.g. .docx or .jar, are opened with Ctrl+PageDown
-    public IReadOnlyCollection<string> Extensions { get; } = [".zip"];
-
     public async Task<bool> IsMatch(string name, Stream stream, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(stream);

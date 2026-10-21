@@ -18,6 +18,7 @@ public sealed class SettingsDialog : Dialog
 
     private readonly RadioGroup _themeRadioGroup;
     private readonly RadioGroup _volumeProviderKeysRadioGroup;
+    private readonly RadioGroup _enterFileActionRadioGroup;
     private readonly TuiSettings _settings;
     private readonly Action<TuiTheme> _preview;
 
@@ -27,7 +28,7 @@ public sealed class SettingsDialog : Dialog
         _preview = preview;
         Title = "Settings";
         Width = 50;
-        Height = 13;
+        Height = 16;
         ColorScheme = palette.DialogColorScheme;
 
         var themeLabel = new Label { X = 1, Y = 1, Text = "Theme:" };
@@ -51,10 +52,20 @@ public sealed class SettingsDialog : Dialog
             SelectedItem = Math.Max(0, VolumeProviderKeyBindings.All.ToList().IndexOf(settings.EffectiveVolumeProviderKeys))
         };
 
+        var enterFileActionLabel = new Label { X = 1, Y = 8, Text = "Enter on file:" };
+        _enterFileActionRadioGroup = new RadioGroup
+        {
+            X = 15,
+            Y = 8,
+            RadioLabels = EnterFileActions.All.Select(EnterFileActions.GetName).ToArray(),
+            SelectedItem = Math.Max(0, EnterFileActions.All.ToList().IndexOf(settings.EnterFileAction))
+        };
+
         var okButton = new Button { Text = "OK", IsDefault = true };
         okButton.Accepting += (_, e) =>
         {
-            Result = (_settings with { Theme = SelectedTheme }).WithVolumeProviderKeys(SelectedVolumeProviderKeys);
+            Result = (_settings with { Theme = SelectedTheme, EnterFileAction = SelectedEnterFileAction })
+                .WithVolumeProviderKeys(SelectedVolumeProviderKeys);
             e.Cancel = true;
             Application.RequestStop(this);
         };
@@ -65,7 +76,8 @@ public sealed class SettingsDialog : Dialog
             Application.RequestStop(this);
         };
 
-        Add(themeLabel, _themeRadioGroup, volumeProviderKeysLabel, _volumeProviderKeysRadioGroup);
+        Add(themeLabel, _themeRadioGroup, volumeProviderKeysLabel, _volumeProviderKeysRadioGroup,
+            enterFileActionLabel, _enterFileActionRadioGroup);
         AddButton(okButton);
         AddButton(cancelButton);
         Initialized += (_, _) => _themeRadioGroup.SetFocus();
@@ -78,6 +90,9 @@ public sealed class SettingsDialog : Dialog
 
     private VolumeProviderKeys SelectedVolumeProviderKeys =>
         VolumeProviderKeyBindings.All[Math.Max(0, _volumeProviderKeysRadioGroup.SelectedItem)];
+
+    private EnterFileAction SelectedEnterFileAction =>
+        EnterFileActions.All[Math.Max(0, _enterFileActionRadioGroup.SelectedItem)];
 
     private void Preview(TuiTheme theme)
     {

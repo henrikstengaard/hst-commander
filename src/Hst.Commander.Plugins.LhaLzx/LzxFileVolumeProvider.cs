@@ -13,8 +13,6 @@ public class LzxFileVolumeProvider : IFileVolumeProvider
 
     public string Description => "Lzx archives";
 
-    public IReadOnlyCollection<string> Extensions { get; } = [".lzx"];
-
     public async Task<bool> IsMatch(string name, Stream stream, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(stream);

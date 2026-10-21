@@ -25,6 +25,9 @@ public sealed record TuiSettings
     /// </summary>
     public VolumeProviderKeys? VolumeProviderKeys { get; init; }
 
+    /// <summary>What Enter does with files: browse images as volumes or start them with the host operating system.</summary>
+    public EnterFileAction EnterFileAction { get; init; } = EnterFileAction.OpenAsVolume;
+
     /// <summary>Keys opening the volume provider lists, the chosen ones or the default of the host operating system.</summary>
     [JsonIgnore]
     public VolumeProviderKeys EffectiveVolumeProviderKeys => VolumeProviderKeys ?? VolumeProviderKeyBindings.Default;
