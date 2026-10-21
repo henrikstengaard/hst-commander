@@ -20,6 +20,15 @@ public interface IFileVolumeProvider
     string Description { get; }
 
     /// <summary>
+    /// True when volumes created can write to the file, e.g. adding files to an Amiga disk file. Hst Commander then
+    /// passes a writable stream to <see cref="CreateVolume" /> when the file can be written (a local file that isn't
+    /// read-only), otherwise a read-only stream (<see cref="Stream.CanWrite" /> is false) and the volume must be
+    /// read-only. Writable images are opened once and shared by both panes and file operations, so all see the same
+    /// contents. Defaults to false: the stream is read-only.
+    /// </summary>
+    bool CanWrite => false;
+
+    /// <summary>
     /// Checks if a file can be opened as a volume, typically by reading its magic signature. Return false for files
     /// that can't be opened, so they are started as usual.
     /// </summary>
@@ -35,7 +44,10 @@ public interface IFileVolumeProvider
     /// disposed by Hst Commander after the volume, which is disposed first when it implements
     /// <see cref="IDisposable" />.
     /// </summary>
-    /// <param name="stream">Contents of the file, seekable and positioned at the start.</param>
+    /// <param name="stream">
+    /// Contents of the file, seekable and positioned at the start. Writable only when <see cref="CanWrite" /> and the
+    /// file can be written.
+    /// </param>
     /// <param name="cancellationToken"></param>
     /// <returns>Volume at its root.</returns>
     Task<IVolume> CreateVolume(Stream stream, CancellationToken cancellationToken = default);

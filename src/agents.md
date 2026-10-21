@@ -17,7 +17,7 @@ There are two front-ends with the same functionality: a terminal UI (TUI) built 
   build-and-test.yml                             Builds and tests the solution on Windows, macOS and Linux on every push
   build-and-release.yml                          Manual: publishes and packages TUI and GUI per runtime (setup/portable zip, dmg, AppImage/deb) and creates a draft prerelease
 src/
-  Hst.Commander.sln                              Solution file (7 projects)
+  Hst.Commander.sln                              Solution file (8 projects)
   Directory.Build.props                          Shared product name, version, authors and copyright for all projects
   Directory.Build.targets                        Replaces the last version part with the git commit count
   packaging/                                     Release packaging used by build-and-release.yml: linux/package.sh (AppImage + .deb), macos/package.sh (.dmg, GUI as .app bundle in a create-dmg window with dmg-background.svg/.png, rendered by make-dmg-background.cmd, showing the drag to Applications), windows/setup.iss (Inno Setup)
@@ -25,6 +25,7 @@ src/
   Hst.Commander.Abstractions/                    IVolumeProvider / IFileVolumeProvider / IPlugin / IVolume / IEntry interfaces and Paths (no external deps)
   Hst.Commander.Plugins.Zip/                     Zip plugin included by default (ZipPlugin, ZipFileVolumeProvider, ZipVolume), references only Abstractions
   Hst.Commander.Plugins.LhaLzx/                  Lha and lzx plugin included by default (LhaLzxPlugin, LhaFileVolumeProvider, LzxFileVolumeProvider, ArchiveVolume, LhaVolume, LzxVolume) using the Hst.Compression package, references only Abstractions
+  Hst.Commander.Plugins.Amiga/                   Amiga plugin included by default (AmigaPlugin, AdfFileVolumeProvider, RdbFileVolumeProvider, AmigaFileSystems, AmigaFileSystemVolume, RdbVolume): writable adf and RDB hard disk images (raw or vhd) using the Hst.Amiga and LTRData.DiscUtils.Vhd packages, references only Abstractions
   Hst.Commander.Core/                            Volume implementations, volume providers, file volume providers, Plugins + PluginLoader, NavigationContext + shared utilities
   Hst.Commander.Tui/                             Terminal.Gui TUI application
     MainWindow.cs                                Dual-pane window, File menu, function key bar, columns, key bindings, theme colors, F5 copy, F6 move/rename, F7 make directory, F8/Delete delete, Ctrl+P/Alt+Enter properties
@@ -85,6 +86,8 @@ src/
         |                          [ZipPlugin, ZipFileVolumeProvider, ZipVolume]  <- Hst.Commander.Plugins.Zip
         |                          [LhaLzxPlugin, Lha/LzxFileVolumeProvider,
         |                           LhaVolume, LzxVolume]  <- Hst.Commander.Plugins.LhaLzx
+        |                          [AmigaPlugin, Adf/RdbFileVolumeProvider,
+        |                           AmigaFileSystemVolume, RdbVolume]  <- Hst.Commander.Plugins.Amiga
         |                                    /    (default plugins, Plugins.All)
 [Volume Implementations]  <- Hst.Commander.Core
   LocalVolumeProvider (VolumeProviders.All),
@@ -130,10 +133,11 @@ Volume providers are what a pane can show. `VolumeProviders.All` (`Hst.Commander
 ```csharp
 string Name { get; }          // e.g. "Zip"
 string Description { get; }   // e.g. "Zip archives"
+bool CanWrite => false;       // true when volumes can write to the file (gets a writable stream when the file can be written)
 Task<bool> IsMatch(string name, Stream stream, CancellationToken cancellationToken = default); // magic signature check; stream at the start, may not be seekable
 Task<IVolume> CreateVolume(Stream stream, CancellationToken cancellationToken = default);     // new volume at its root over a seekable stream
 ```
-File volume providers register files that open as volumes (images, e.g. ISO images and zip archives), see Images in the Navigation Model. `VolumeProviders.Files` is the list asked in order: the built-in `VolumeProviders.Iso9660` (`Iso9660FileVolumeProvider`, signature `CD001` at offset `0x8001`) followed by the file volume providers of the plugins (`IPlugin.FileVolumeProviders`). The stream passed to `CreateVolume` stays open while the volume is used and is disposed by Hst Commander after the volume (disposed first when `IDisposable`); like volume providers, each call must return a volume of its own.
+File volume providers register files that open as volumes (images, e.g. ISO images and zip archives), see Images in the Navigation Model. `VolumeProviders.Files` is the list asked in order: the built-in `VolumeProviders.Iso9660` (`Iso9660FileVolumeProvider`, signature `CD001` at offset `0x8001`) followed by the file volume providers of the plugins (`IPlugin.FileVolumeProviders`). The stream passed to `CreateVolume` stays open while the volume is used and is disposed by Hst Commander after the volume (disposed first when `IDisposable`); like volume providers, each call must return a volume of its own. The stream is read-only (`CanWrite` false) unless the provider's `CanWrite` is true and the file can be written, see Writable Images.
 
 **`IPlugin`** (`Hst.Commander.Abstractions/IPlugin.cs`)
 ```csharp
@@ -148,7 +152,7 @@ A plugin is a project referencing only `Hst.Commander.Abstractions` (`Paths` is 
 
 ### Plugins
 
-- `Plugins.BuiltIn` (`Hst.Commander.Core`) lists the plugins included by default, currently `ZipPlugin` (`Hst.Commander.Plugins.Zip`) and `LhaLzxPlugin` (`Hst.Commander.Plugins.LhaLzx`), both referenced by `Hst.Commander.Core`. `Plugins.All` is the built-in plugins followed by the plugins loaded from disk; `VolumeProviders.All`/`Files` are created again from it when it changes.
+- `Plugins.BuiltIn` (`Hst.Commander.Core`) lists the plugins included by default, currently `ZipPlugin` (`Hst.Commander.Plugins.Zip`), `LhaLzxPlugin` (`Hst.Commander.Plugins.LhaLzx`) and `AmigaPlugin` (`Hst.Commander.Plugins.Amiga`), all referenced by `Hst.Commander.Core`. `Plugins.All` is the built-in plugins followed by the plugins loaded from disk; `VolumeProviders.All`/`Files` are created again from it when it changes.
 - Both front-ends call `Plugins.Load()` at startup, before the panes (and their `NavigationContext`s, which take `VolumeProviders.Files` when created) are created: the TUI in `Program.cs`, the GUI in `App.OnFrameworkInitializationCompleted` (fully qualified as `Hst.Commander.Core.Plugins`, since `Plugins` in `Hst.Commander.Gui` resolves to the `Hst.Commander.Plugins` namespace). It loads once and returns the errors of plugins that failed to load; `Plugins.FormatErrors` joins them into one message (null when none), shown once the main window is loaded (TUI `MainWindow.ShowErrorWhenLoaded`, GUI `MainWindow.StartupError` shown with `ErrorDialog` when opened). Other plugins still load.
 - `PluginLoader.Directories` are scanned in order: `~/.hst-commander/plugins` (`SettingsPaths.Directory`) and `plugins` in the directory Hst Commander is executed from (`AppContext.BaseDirectory`); missing directories are skipped and a directory listed twice is scanned once.
 - In a plugin directory, `PluginLoader.Load(directories, loadedPlugins)` loads `Name/Name.dll` (a plugin in a directory of its own with its dependencies, the recommended layout) and then single assemblies `*.dll`, ordered by path. Public non-abstract classes implementing `IPlugin` with a parameterless constructor are created. Assemblies without plugins are skipped (e.g. dependencies; a `BadImageFormatException`, e.g. a native library, is ignored for single assemblies but reported for `Name/Name.dll`), as are plugins whose type full name is already loaded (e.g. a copy of the built-in Zip plugin). Errors are reported per assembly in `PluginLoadResult.Errors`.
@@ -169,6 +173,8 @@ A plugin is a project referencing only `Hst.Commander.Abstractions` (`Paths` is 
 | `EntryVolumeProvider` | Adapter that presents a child `IVolume` as if it starts at the path of the opening `IEntry`. Used when pushing volumes into `NestedVolume` |
 | `DiskImageVolume` | **Stub** — all methods throw `NotImplementedException`. Intended for raw disk images (MBR/GPT/RDB partition tables) |
 | `NullVolume` | Null object — returns an empty entry list, safe fallback |
+| `AmigaFileSystemVolume` | `Hst.Commander.Plugins.Amiga`: reads and writes an Amiga file system via `Hst.Amiga` (`IFileSystemVolume`): the Fast File System (`DOS\0`-`DOS\7`) of an adf, created by `AdfFileVolumeProvider` (`DOS` + 0-7 at offset 0 and the size of a double (901120) or high (1802240) density disk; `AmigaFileSystems.MountAdf`), or the Fast File System or PFS3 (`PFS\3`, `PDS\3`) of an RDB partition (`AmigaFileSystems.MountPartition`; other file systems, e.g. SFS, throw `IOException`). Writable when the stream is; changes are flushed after each operation and when a written stream is closed (PFS3 caches). Names are case-insensitive and can't contain `/` or `:`; names longer than the file system's maximum (30, 107 for `DOS\6`/`DOS\7`, PFS3's file name size - 1) throw `IOException`, as Hst.Amiga would truncate them. A case-only rename goes through a temporary name. Amiga dates are local time (converted from/to UTC, dates before 1978 are set to 1978-01-01). Delete and overwrite ignore protection bits. Hst.Amiga errors are thrown as `IOException`. Disposing (PFS3 flushes) and closing a written stream wait on the thread pool, as Hst.Amiga waits for async writes there, which would deadlock on a UI thread |
+| `RdbVolume` | `Hst.Commander.Plugins.Amiga`: hard disk images with a rigid disk block, created by `RdbFileVolumeProvider` (`RDSK` at the start of one of the first 16 blocks of 512 bytes; raw images such as `.hdf`/`.img` and fixed vhd images directly, dynamic/differencing vhd images, `conectix` at offset 0, through `DiscUtils.Vhd.Disk.Content`). The root lists the partitions as directories `1`..`n` in RDB order (size = partition size); a partition is mounted as an `AmigaFileSystemVolume` when opened and stays mounted until disposed. The partition list itself is read-only (`NotSupportedException`). `CreateVolume` throws `IOException` when there is no rigid disk block or it has no partitions, shown as an error |
 
 `Iso9660Volume`, `ZipVolume`, `LhaVolume` and `LzxVolume` are read-only: `OpenWrite`, `CreateContainer`, `Delete`, `Rename` and `SetModifiedDate` throw `NotSupportedException`. `LocalVolume.CreateContainer` throws `NotSupportedException` in the drive list.
 
@@ -183,7 +189,7 @@ A plugin is a project referencing only `Hst.Commander.Abstractions` (`Paths` is 
 - `VolumeMove.MoveToAsync` (`Hst.Commander.Core.Volumes`) is an extension method moving entries between any two writable volumes: it copies like `VolumeCopy.CopyToAsync` (same `CopyOptions`, `CopyProgress` and overwrite confirmation; both share `VolumeCopy.TransferAsync`) and deletes each item from the source right after it is copied. Containers are deleted from the source after everything is copied, deepest first, only when empty, so items answered `No` or not matching the filter are kept in the source with their containers.
 - `NavigationContext.MoveAsync` is what the front-ends call, resolving the destination like `CopyAsync` (and throwing `IOException` when moving onto itself or a directory into itself). When both locations are local directories on the same drive (`FindDrive`) and the filter matches all items (`*`, `*.*` or empty), entries whose name doesn't exist in the destination are moved with `File.Move`/`Directory.Move` (fast, no extra space); the rest (existing names to confirm or merge, other drives, volumes or filters) go through `VolumeMove.MoveToAsync` on volumes of its own from `OpenLocationAsync`.
 - A single entry moved to a plain name (no `/` or `\`, not rooted, not the other pane's path and not an existing directory in the current location, which the entry is moved into instead) is renamed: `NavigationContext.GetRenameNameAsync` returns that name (null for a move) and `RenameAsync(entry, newName)` renames it with `IVolume.Rename` on the pane's own volume. The name is validated like making a directory; another entry with the name throws `IOException`, a case-only change is allowed. The renamed entry is selected once by `GetSelectedIndex`, like a created directory. `MoveAsync` renames too when given such a name.
-- `NavigationContext.MoveNotSupportedMessage` is the reason entries can't be moved (the local drive list, inside an image), null when supported; `MoveAsync`/`RenameAsync` then throw `NotSupportedException`. Both front-ends show it as an error instead of the move dialog. `NavigationContext.GetMoveDescription` gives the dialog text, e.g. `Move 'a.txt'` or `Move 3 entries`.
+- `NavigationContext.MoveNotSupportedMessage` is the reason entries can't be moved (the local drive list, inside a read-only image), null when supported; `MoveAsync`/`RenameAsync` then throw `NotSupportedException`. Both front-ends show it as an error instead of the move dialog. `NavigationContext.GetMoveDescription` gives the dialog text, e.g. `Move 'a.txt'` or `Move 3 entries`.
 
 ### Deleting
 
@@ -193,7 +199,7 @@ A plugin is a project referencing only `Hst.Commander.Abstractions` (`Paths` is 
 ### Making Directories
 
 - `NavigationContext.CreateDirectoryAsync(name)` creates a directory in the current location with `IVolume.CreateContainer` on the pane's own volume. The name is trimmed; an empty name, `.`, `..`, names with `/`, `\` or invalid file name characters and names of existing entries (case-insensitive on Windows) throw `IOException`. The created directory is selected once by `GetSelectedIndex` when the entries are listed again.
-- `NavigationContext.CreateDirectoryNotSupportedMessage` is the reason a directory can't be created (the local drive list, inside an image), null when supported; `CreateDirectoryAsync` then throws `NotSupportedException`. Both front-ends show it as an error instead of the make directory dialog.
+- `NavigationContext.CreateDirectoryNotSupportedMessage` is the reason a directory can't be created (the local drive list, inside a read-only image), null when supported; `CreateDirectoryAsync` then throws `NotSupportedException`. Both front-ends show it as an error instead of the make directory dialog.
 
 ### Selecting Groups
 
@@ -219,10 +225,17 @@ Each UI pane has a `NavigationContext` that owns a `NestedVolume` over a root vo
 
 Opening a file (Enter or double-click in both front-ends, `NavigationContext.OpenEntryAsync`) first detects whether it is an image, a file browsed as a volume, by its magic signature, asking all file volume providers regardless of the extension, so e.g. a `.nupkg` package, `.jar` or `.docx` document opens as a zip archive; a file no provider detects is started (see Enter on Files). Opening it as a volume (Ctrl+PageDown or File > Open as volume in both front-ends, `NavigationContext.OpenAsVolumeAsync`, like Total Commander) asks the file volume providers the same way, also when Enter is set to start files with the host OS, and throws `IOException` (`'name' can't be opened as a volume`) when none detects it; directories and `..` are opened like Enter. Images are detected in any location (local directories, other volume providers and inside images, so e.g. a zip archive inside an ISO image or another zip archive opens too):
 1. The file volume providers (`NavigationContext` constructor's optional `fileVolumeProviders`, default `VolumeProviders.Files`) are asked in order with `IFileVolumeProvider.IsMatch`, reading the file with `IVolume.OpenRead` of the current volume. A seekable stream is reset to the start for the next provider, otherwise the file is opened again. Files that can't be read (`IOException`, `UnauthorizedAccessException`, `NotSupportedException`, e.g. locked) are not images.
-2. The first matching provider's `CreateVolume` gets the file opened again as a seekable stream; a stream that isn't seekable (e.g. a file inside a zip archive) is first copied to a temporary file deleted on close.
+2. The first matching provider's `CreateVolume` gets the file opened again as a seekable stream (writable local files of providers that can write are shared, see Writable Images); a stream that isn't seekable (e.g. a file inside a zip archive) is first copied to a temporary file deleted on close.
 3. The volume is wrapped in an `EntryVolumeProvider` and pushed with `nestedVolume.PushVolume`, and the image (provider, file name, directory of the file inside the image it's in, volume and stream) is pushed on the `NavigationContext`'s image stack, used by `OpenLocationAsync` to open the images again. `NavigationContext.IsInImage` is true while an image is open.
 
 Going up when at the root of an image calls `PopVolume()` and disposes the image's volume and stream. Changing the volume provider or location closes all images.
+
+#### Writable Images
+
+- A file volume provider with `IFileVolumeProvider.CanWrite` (the Amiga plugin's adf and RDB providers) gets a writable stream for a local file opened directly from a local directory (not inside another image). `SharedImages` (`Hst.Commander.Core`, internal) opens such a file once per full path (case-insensitive on Windows and macOS) with `FileAccess.ReadWrite`, `FileShare.ReadWrite` and no buffering (changes are in the file right away), falling back to read-only (e.g. a read-only file), and shares the volume between both panes and the volumes of file operations from `OpenLocationAsync`: two volumes writing the same file would each keep their own file system state (e.g. free blocks) and damage it. Each user gets a `SharedImageVolume` view with its own current directory; every operation (and each read/write of its streams, `LockedStream`) holds the image's `SemaphoreSlim` and changes the shared volume to the view's directory first, so a copy on a background thread and the pane are serialized. The operations run on the thread pool while holding the lock, so the lock is never held by work waiting for a blocked UI thread. The file is closed when the last view is disposed.
+- Other images of such providers (inside other images, e.g. an adf inside a zip archive or on an RDB partition, copied to a temporary file when not seekable) get a `ReadOnlyStream` (`Hst.Commander.Core.Volumes`) and are read-only, as changes would be lost.
+- `OpenedImage.IsWritable` (shared and the file opened for writing) decides `CreateDirectoryNotSupportedMessage`/`MoveNotSupportedMessage` (`... not supported in a read-only image`) inside images. Copying into, deleting, renaming and making directories work in writable images like in local directories.
+- `LocalVolume.OpenRead` shares the file with writers (`FileShare.ReadWrite`), so an open writable image can still be detected in the other pane or copied.
 
 #### Going to the Root
 
@@ -272,6 +285,7 @@ What opening a file with Enter or double-click does is chosen in File > Settings
 **Working:**
 - The Terminal.Gui v2 TUI and Avalonia 12 GUI dual-pane browsers, with per-pane navigation and current-directory startup.
 - Local drive/directory listing, parent navigation, and read-only browsing of ISO images, zip archives (the default Zip plugin) and lha/lzx archives (the default LhaLzx plugin) as nested volumes, detected by their magic signature, also inside other images.
+- Reading and writing Amiga disk files (adf, Fast File System) and the partitions (Fast File System, PFS3) of Amiga hard disk images with a rigid disk block (raw or vhd) with the default Amiga plugin, shared between panes and file operations (see Writable Images).
 - Starting/executing local files with Enter or double-click, with executables drawn in green.
 - GUI entry icons: icons contained in programs and .ico files (also inside images), otherwise the host OS icons for file types, folders and drives.
 - The volume abstraction layer and implementations: `LocalVolume`, `Iso9660Volume`, `ZipVolume`, `LhaVolume`, `LzxVolume`, `NestedVolume`, `EntryVolumeProvider`, and `NullVolume`.
@@ -291,7 +305,8 @@ What opening a file with Enter or double-click does is chosen in File > Settings
 
 **Not implemented:**
 - View (F3), edit (F4) and other file-management operations.
-- Writing to images; ISO images and zip, lha and lzx archives are read-only.
+- Writing to images other than Amiga adf and RDB images; ISO images and zip, lha and lzx archives are read-only, as are Amiga images inside other images.
+- Changing RDB partitions, other Amiga file systems (e.g. SFS), PiStorm RDB partitions in MBR disks and vhdx/vmdk images.
 - Unloading or reloading plugins while running, and a list of loaded plugins in the UI.
 - `DiskImageVolume` remains an intentional stub.
 
@@ -315,6 +330,7 @@ What opening a file with Enter or double-click does is chosen in File > Settings
 - Abstractions: `Hst.Commander.Abstractions` (interfaces, `Paths`)
 - Zip plugin: `Hst.Commander.Plugins.Zip`
 - Lha and lzx plugin: `Hst.Commander.Plugins.LhaLzx`
+- Amiga plugin: `Hst.Commander.Plugins.Amiga`
 - Core: `Hst.Commander.Core` (`AppInfo`, `EmbeddedIconReader`, `EnterFileAction`, `EntryProperties`, `FileSystemDetails`, `IconImage`, `NavigationContext`, `NameFilter`, `PluginLoader`, `Plugins`, `SelectGroupOptions`, `FileStarter`, `SettingsPaths`, `SizeFormatter`), `Hst.Commander.Core.Volumes` (volumes)
 - Tui: `Hst.Commander.Tui`
 - Gui: `Hst.Commander.Gui`, `Hst.Commander.Gui.Icons` (entry icons)
@@ -334,7 +350,7 @@ What opening a file with Enter or double-click does is chosen in File > Settings
 3. **Handle `Paths.Root` and `Paths.Parent`** in `ChangeDirectory` — both are case-insensitive string comparisons.
 4. **Add unit tests** in `Hst.Commander.Core.Tests/` using the `Given<YourVolume>` naming pattern.
 5. **To make it selectable with Alt+F1/Alt+F2**, implement `IVolumeProvider` (see `LocalVolumeProvider`) and add it to `VolumeProviders.All`.
-6. **Or open files as the volume** (images): implement `IFileVolumeProvider` with `IsMatch` checking the file's magic signature (see `Iso9660FileVolumeProvider` and `ZipFileVolumeProvider`) and add it to `VolumeProviders.Files`, or return it from `IPlugin.FileVolumeProviders` of a plugin. `NavigationContext` then opens matching files as images (see Images).
+6. **Or open files as the volume** (images): implement `IFileVolumeProvider` with `IsMatch` checking the file's magic signature (see `Iso9660FileVolumeProvider` and `ZipFileVolumeProvider`) and add it to `VolumeProviders.Files`, or return it from `IPlugin.FileVolumeProviders` of a plugin. `NavigationContext` then opens matching files as images (see Images). Return true from `CanWrite` when the volume can write to the file (see Writable Images and `AdfFileVolumeProvider`).
 
 Plugins are separate projects referencing only `Hst.Commander.Abstractions`, e.g. `Hst.Commander.Plugins.Zip`: implement `IPlugin` returning the plugin's volume providers and file volume providers, and either add it to `Plugins.BuiltIn` (`Hst.Commander.Core`, which references the plugins included by default) or build it and copy its output to `~/.hst-commander/plugins/<Name>/` or `plugins/<Name>/` next to the executable, with `<Name>.dll` as the plugin assembly (reference `Hst.Commander.Abstractions` with `<Private>false</Private>` and `<ExcludeAssets>runtime</ExcludeAssets>` so it isn't copied; a copy is ignored anyway).
 
@@ -363,6 +379,8 @@ public async Task When_VolumeIsPushed_Then_NestedVolumeListsEntriesFromNewVolume
 - `TestEntry` (`Hst.Commander.Core.Tests/TestEntry.cs`): in-memory `IEntry` with optional `byte[]? Data`.
 - Use `AddEntry(pathComponents, entry)` to build the in-memory tree.
 - `ZipTestData` (`Hst.Commander.Core.Tests/ZipTestData.cs`): creates zip archives in memory (`CreateZip((name, content)...)`, names ending with `/` are directories).
+- `AmigaTestData` (`Hst.Commander.Core.Tests/AmigaTestData.cs`): creates a formatted adf (`CreateAdf`), raw and dynamic vhd RDB images with Fast File System (`Dos3DosType`) and PFS3 (`Pfs3DosType`) partitions (`CreateRdbImage`, `CreateVhdRdbImage`) and lists an adf mounted again (`ListAdfNames`).
+- `SingleThreadSynchronizationContext` (`Hst.Commander.Core.Tests/SingleThreadSynchronizationContext.cs`): `Run(operation, timeout)` runs an operation with continuations on one thread like a UI thread, throwing `TimeoutException` on a deadlock.
 - `ArchiveTestData` (`Hst.Commander.Core.Tests/ArchiveTestData.cs`): lha and lzx archives in `TestData/Archives` (from the Hst.Compression tests), e.g. `dirs-files.lha`/`.lzx` (`ArchiveTestData.DirsFiles`).
 
 ---
@@ -470,6 +488,8 @@ dotnet test src/Hst.Commander.Core.Tests/Hst.Commander.Core.Tests.csproj --logge
 | `LTRData.DiscUtils.Iso9660` | 1.0.54 | `Hst.Commander.Core` — ISO 9660 reading |
 | `System.Linq.Async` | 6.0.1 | `Hst.Commander.Core` — async LINQ |
 | `Hst.Compression` | 0.4.96 | `Hst.Commander.Plugins.LhaLzx` — lha and lzx archive reading |
+| `Hst.Amiga` | 0.6.243 | `Hst.Commander.Plugins.Amiga` — Amiga rigid disk block, Fast File System and PFS3 reading and writing |
+| `LTRData.DiscUtils.Vhd` | 1.0.54 | `Hst.Commander.Plugins.Amiga` — vhd images with a rigid disk block |
 | `Terminal.Gui` | 2.0.0-prealpha.1895 | `Hst.Commander.Tui` — TUI framework |
 | `Microsoft.Build.Tasks.Git` | 10.0.402 | `Hst.Commander.Tui` — build only (`PrivateAssets="all"`), overrides the vulnerable 8.0.0 (GHSA-23fw-v26w-5fgq) pulled in by Terminal.Gui's `Microsoft.SourceLink.GitHub` 8.0.0 dependency |
 | `Avalonia`, `Avalonia.Desktop`, `Avalonia.Themes.Fluent` | 12.1.4 | `Hst.Commander.Gui` — desktop GUI framework |

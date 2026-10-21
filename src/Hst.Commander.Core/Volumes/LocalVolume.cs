@@ -132,9 +132,13 @@ public class LocalVolume(string path) : IVolume
         return Task.FromResult(fileEntry);
     }
 
+    /// <summary>
+    /// Opens an item for reading, shared with writers, e.g. a writable image opened in a pane (see
+    /// <c>SharedImages</c>), so it can still be detected as an image or copied.
+    /// </summary>
     public Task<Stream> OpenRead(string name, CancellationToken cancellationToken = default) =>
-        Task.FromResult<Stream>(new FileStream(GetItemPath(name), FileMode.Open, FileAccess.Read, FileShare.Read,
-            BufferSize, true));
+        Task.FromResult<Stream>(new FileStream(GetItemPath(name), FileMode.Open, FileAccess.Read,
+            FileShare.ReadWrite, BufferSize, true));
 
     public Task<Stream> OpenWrite(string name, CancellationToken cancellationToken = default) =>
         Task.FromResult<Stream>(new FileStream(GetItemPath(name), FileMode.Create, FileAccess.Write, FileShare.None,

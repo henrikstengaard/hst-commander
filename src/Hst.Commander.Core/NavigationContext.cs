@@ -631,9 +631,13 @@ public sealed class NavigationContext : IDisposable
             return false;
         }
 
-        // an image inside another image is opened again from the directory it's in, e.g. for copying
+        // a local file is shared when it can be written, otherwise an image inside another image is opened again
+        // from the directory it's in, e.g. for copying
         var parentPathComponents = IsInImage ? _images.Peek().Volume.CurrentPathComponents.ToList() : [];
-        var image = await OpenImageAsync(fileVolumeProvider, entry.Name, parentPathComponents,
+        var sharedPath = fileVolumeProvider.CanWrite && !IsInImage && LocalPath is { } localPath
+            ? Path.Combine(localPath, entry.Name)
+            : null;
+        var image = await OpenImageAsync(fileVolumeProvider, entry.Name, parentPathComponents, sharedPath,
             token => volume.OpenRead(entry.Name, token), cancellationToken);
         _nestedVolume.PushVolume(new EntryVolumeProvider(entry, image.Volume));
         _images.Push(image);
@@ -697,16 +701,29 @@ public sealed class NavigationContext : IDisposable
         return null;
     }
 
-    /// <summary>Opens a file as an image with a file volume provider.</summary>
+    /// <summary>
+    ///     Opens a file as an image with a file volume provider. A local file opened by a file volume provider that can
+    ///     write (<paramref name="sharedPath" />) is shared with the other pane and file operations (see
+    ///     <see cref="SharedImages" />), other files are opened for reading.
+    /// </summary>
     private static async Task<OpenedImage> OpenImageAsync(IFileVolumeProvider fileVolumeProvider, string name,
-        IReadOnlyList<string> parentPathComponents, Func<CancellationToken, Task<Stream>> openRead,
+        IReadOnlyList<string> parentPathComponents, string? sharedPath, Func<CancellationToken, Task<Stream>> openRead,
         CancellationToken cancellationToken)
     {
+        if (sharedPath != null)
+        {
+            var sharedVolume = await SharedImages.OpenAsync(sharedPath, fileVolumeProvider, cancellationToken);
+            return new OpenedImage(fileVolumeProvider, name, parentPathComponents, sharedVolume, null, sharedPath,
+                sharedVolume.IsWritable);
+        }
+
         var stream = await OpenSeekableAsync(openRead, cancellationToken);
         try
         {
-            var volume = await fileVolumeProvider.CreateVolume(stream, cancellationToken);
-            return new OpenedImage(fileVolumeProvider, name, parentPathComponents, volume, stream);
+            // a file volume provider that can write gets a read-only stream, e.g. of a temporary copy of the file
+            var volume = await fileVolumeProvider.CreateVolume(
+                fileVolumeProvider.CanWrite ? new ReadOnlyStream(stream) : stream, cancellationToken);
+            return new OpenedImage(fileVolumeProvider, name, parentPathComponents, volume, stream, null, false);
         }
         catch
         {
@@ -838,7 +855,8 @@ public sealed class NavigationContext : IDisposable
 
                 var parentVolume = volume;
                 var openedImage = await OpenImageAsync(image.FileVolumeProvider, image.Name,
-                    image.ParentPathComponents, token => parentVolume.OpenRead(image.Name, token), cancellationToken);
+                    image.ParentPathComponents, image.SharedPath, token => parentVolume.OpenRead(image.Name, token),
+                    cancellationToken);
                 resources.Push(openedImage);
                 volume = openedImage.Volume;
             }
@@ -908,7 +926,7 @@ public sealed class NavigationContext : IDisposable
 
     /// <summary>
     ///     Deletes entries in the current location, directories with everything in them. Like copying, it uses a volume
-    ///     of its own, so it can run on a background thread. Images are read-only and throw
+    ///     of its own, so it can run on a background thread. Read-only images throw
     ///     <see cref="NotSupportedException" />.
     /// </summary>
     public async Task DeleteAsync(IReadOnlyCollection<IEntry> entries, IProgress<DeleteProgress>? progress = null,
@@ -958,13 +976,14 @@ public sealed class NavigationContext : IDisposable
 
     /// <summary>
     ///     Why a directory can't be created in the current location, e.g. in the local drive list or inside a read-only
-    ///     image. Null when creating a directory is supported, front-ends then ask for its name.
+    ///     image (images are writable when their file volume provider can write and their local file can be written).
+    ///     Null when creating a directory is supported, front-ends then ask for its name.
     /// </summary>
     public string? CreateDirectoryNotSupportedMessage =>
         _rootVolume is LocalVolume && !_nestedVolume.CurrentPathComponents.Any()
             ? "Creating a directory is not supported in the drive list"
-            : IsInImage
-                ? "Creating a directory is not supported in an image, images are read-only"
+            : IsInImage && !_images.Peek().IsWritable
+                ? "Creating a directory is not supported in a read-only image"
                 : null;
 
     /// <summary>
@@ -999,8 +1018,8 @@ public sealed class NavigationContext : IDisposable
     public string? MoveNotSupportedMessage =>
         _rootVolume is LocalVolume && !_nestedVolume.CurrentPathComponents.Any()
             ? "Moving is not supported in the drive list"
-            : IsInImage
-                ? "Moving is not supported in an image, images are read-only"
+            : IsInImage && !_images.Peek().IsWritable
+                ? "Moving is not supported in a read-only image"
                 : null;
 
     /// <summary>
@@ -1286,10 +1305,13 @@ public sealed class NavigationContext : IDisposable
     /// <param name="parentPathComponents">
     ///     Directory of the file in the image it's in, used to open it again. Empty for a file in the root volume.
     /// </param>
-    /// <param name="volume">Volume of the image.</param>
-    /// <param name="stream">Stream of the file, closed after the volume.</param>
+    /// <param name="volume">Volume of the image, a view of a shared image when shared.</param>
+    /// <param name="stream">Stream of the file, closed after the volume. Null when shared.</param>
+    /// <param name="sharedPath">Path of the local file of a shared image (see <see cref="SharedImages" />).</param>
+    /// <param name="isWritable">True when the image can be changed.</param>
     private sealed class OpenedImage(IFileVolumeProvider fileVolumeProvider, string name,
-        IReadOnlyList<string> parentPathComponents, IVolume volume, Stream stream) : IDisposable
+        IReadOnlyList<string> parentPathComponents, IVolume volume, Stream? stream, string? sharedPath,
+        bool isWritable) : IDisposable
     {
         public IFileVolumeProvider FileVolumeProvider { get; } = fileVolumeProvider;
 
@@ -1299,10 +1321,14 @@ public sealed class NavigationContext : IDisposable
 
         public IVolume Volume { get; } = volume;
 
+        public string? SharedPath { get; } = sharedPath;
+
+        public bool IsWritable { get; } = isWritable;
+
         public void Dispose()
         {
             (Volume as IDisposable)?.Dispose();
-            stream.Dispose();
+            stream?.Dispose();
         }
     }
 
