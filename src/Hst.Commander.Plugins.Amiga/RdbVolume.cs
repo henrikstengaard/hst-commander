@@ -7,7 +7,8 @@ namespace Hst.Commander.Plugins.Amiga;
 
 /// <summary>
 /// Volume browsing the partitions of a hard disk image with a rigid disk block (RDB). The root lists the partitions as
-/// directories named 1 to the number of partitions, in the order of the rigid disk block. A partition is mounted when
+/// directories named 1 to the number of partitions, in the order of the rigid disk block, shown with their drive names
+/// (e.g. "DH0", see <see cref="IEntry.DisplayName" />). A partition is mounted when
 /// opened (Fast File System or PFS3) and stays mounted until the volume is disposed. The partitions can't be changed,
 /// their file systems are writable when the stream is.
 /// </summary>
@@ -65,9 +66,13 @@ public class RdbVolume : IVolume, IDisposable
         }
     }
 
-    private IEntry CreatePartitionEntry(int partitionIndex) =>
-        new PartitionEntry(GetPartitionName(partitionIndex), EntryType.Container,
-            _partitionBlocks[partitionIndex].PartitionSize, null);
+    private IEntry CreatePartitionEntry(int partitionIndex)
+    {
+        var name = GetPartitionName(partitionIndex);
+        var driveName = _partitionBlocks[partitionIndex].DriveName;
+        return new PartitionEntry(name, string.IsNullOrWhiteSpace(driveName) ? name : driveName,
+            _partitionBlocks[partitionIndex].PartitionSize);
+    }
 
     public async Task ChangeDirectory(IEnumerable<string> pathComponents,
         CancellationToken cancellationToken = default)
@@ -195,5 +200,16 @@ public class RdbVolume : IVolume, IDisposable
         GC.SuppressFinalize(this);
     }
 
-    private sealed record PartitionEntry(string Name, EntryType Type, long? Size, DateTime? ModifiedDate) : IEntry;
+    /// <summary>
+    /// Partition in the partition list, shown with its drive name, e.g. "DH0" (the number without one). It is a volume of its
+    /// own, so its icon is the Disk.info file in its root.
+    /// </summary>
+    private sealed record PartitionEntry(string Name, string DisplayName, long? Size) : IEntry
+    {
+        public EntryType Type => EntryType.Container;
+
+        public DateTime? ModifiedDate => null;
+
+        public bool IsVolume => true;
+    }
 }

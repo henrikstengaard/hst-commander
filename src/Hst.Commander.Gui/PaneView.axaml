@@ -98,7 +98,7 @@
                                 <DockPanel Grid.Column="0">
                                     <Image DockPanel.Dock="Left" Width="16" Height="16" Margin="4,0,0,0"
                                            Source="{Binding Icon}" RenderOptions.BitmapInterpolationMode="HighQuality" />
-                                    <TextBlock Text="{Binding Name}" />
+                                    <TextBlock Text="{Binding DisplayName}" />
                                 </DockPanel>
                                 <TextBlock Grid.Column="1" Text="{Binding Size}" TextAlignment="Right" />
                                 <TextBlock Grid.Column="2" Text="{Binding Modified}" />

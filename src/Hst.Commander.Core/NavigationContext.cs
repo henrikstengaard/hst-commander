@@ -13,6 +13,11 @@ public sealed class NavigationContext : IDisposable
     private readonly HashSet<string> _executableNames = new(StringComparer.Ordinal);
     private readonly Action<string> _startFile;
     private readonly IReadOnlyList<IFileVolumeProvider> _fileVolumeProviders;
+    private readonly IReadOnlyList<IIconProvider> _iconProviders;
+    private readonly Dictionary<string, IconFile> _iconFiles = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, IReadOnlyList<VolumeIconFile>> _volumeIconFiles = new(StringComparer.Ordinal);
+    private readonly SemaphoreSlim _iconLocationLock = new(1, 1);
+    private Task<VolumeLocation>? _iconLocation;
     private string? _newEntryName;
     private bool _selectFirstEntry;
 
@@ -25,11 +30,17 @@ public sealed class NavigationContext : IDisposable
     ///     File volume providers asked in order whether a file opened with <see cref="OpenEntryAsync" /> is browsed as a
     ///     volume (an image), e.g. an ISO image or a zip archive. Defaults to <see cref="VolumeProviders.Files" />.
     /// </param>
+    /// <param name="iconProviders">
+    ///     Icon providers reading icons from icon files next to the listed entries, e.g. Amiga .info files (see
+    ///     <see cref="GetIconFile" />). Defaults to <see cref="VolumeProviders.Icons" />.
+    /// </param>
     public NavigationContext(string initialPath, Action<string>? startFile = null,
-        IReadOnlyList<IFileVolumeProvider>? fileVolumeProviders = null)
+        IReadOnlyList<IFileVolumeProvider>? fileVolumeProviders = null,
+        IReadOnlyList<IIconProvider>? iconProviders = null)
     {
         _startFile = startFile ?? FileStarter.StartWithShell;
         _fileVolumeProviders = fileVolumeProviders ?? VolumeProviders.Files;
+        _iconProviders = iconProviders ?? VolumeProviders.Icons;
         _volumeProvider = VolumeProviders.Local;
         _rootVolume = new LocalVolume(initialPath);
         _nestedVolume = new NestedVolume(_rootVolume);
@@ -460,6 +471,7 @@ public sealed class NavigationContext : IDisposable
         }
 
         UpdateExecutableNames(entries);
+        UpdateIconFiles(entries);
 
         // keep marks of entries still present, refreshed with the listed entries so sizes are current
         var markedEntries = entries.Where(IsMarked).ToList();
@@ -491,6 +503,260 @@ public sealed class NavigationContext : IDisposable
             {
                 _executableNames.Add(entry.Name);
             }
+        }
+    }
+
+    /// <summary>Largest icon file read by <see cref="ReadIconAsync" />, larger files have no icon.</summary>
+    private const long MaxIconFileSize = 4 * 1024 * 1024;
+
+    private sealed record IconFile(IIconProvider Provider, IEntry Entry);
+
+    /// <summary>
+    ///     Finds the icon files of the listed entries with the icon providers: the first provider whose icon file for
+    ///     an entry (e.g. "file.info" for "file" and for "file.info" itself) is a listed file, matched exactly,
+    ///     otherwise case-insensitive. Not in the drive list.
+    /// </summary>
+    private void UpdateIconFiles(IReadOnlyList<IEntry> entries)
+    {
+        _iconFiles.Clear();
+        _volumeIconFiles.Clear();
+        CloseIconLocation();
+        if (_iconProviders.Count == 0 || IsDriveList)
+        {
+            return;
+        }
+
+        var exactItems = new Dictionary<string, IEntry>(StringComparer.Ordinal);
+        var items = new Dictionary<string, IEntry>(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in entries.Where(entry => entry.Type == EntryType.Item))
+        {
+            exactItems.TryAdd(item.Name, item);
+            items.TryAdd(item.Name, item);
+        }
+
+        foreach (var entry in entries.Where(entry => !entry.Name.Equals(Paths.Parent, StringComparison.Ordinal)))
+        {
+            foreach (var provider in _iconProviders)
+            {
+                if (provider.GetIconFileName(entry.Name) is { } iconFileName &&
+                    (exactItems.GetValueOrDefault(iconFileName) ?? items.GetValueOrDefault(iconFileName)) is
+                    { } iconFile)
+                {
+                    _iconFiles[entry.Name] = new IconFile(provider, iconFile);
+                    break;
+                }
+            }
+
+            // volumes, e.g. partitions, can hold their icon inside, looked up when the icon is read
+            if (!_iconFiles.ContainsKey(entry.Name) && entry is { IsVolume: true, Type: EntryType.Container })
+            {
+                var volumeIconFiles = _iconProviders
+                    .Select(provider => (Provider: provider, FileName: provider.GetVolumeIconFileName(entry.Name)))
+                    .Where(volumeIconFile => volumeIconFile.FileName != null)
+                    .Select(volumeIconFile => new VolumeIconFile(volumeIconFile.Provider, volumeIconFile.FileName!))
+                    .ToList();
+                if (volumeIconFiles.Count > 0)
+                {
+                    _volumeIconFiles[entry.Name] = volumeIconFiles;
+                }
+            }
+        }
+    }
+
+    /// <summary>Icon file inside a volume entry, e.g. Disk.info in an Amiga partition.</summary>
+    private sealed record VolumeIconFile(IIconProvider Provider, string FileName);
+
+    /// <summary>
+    ///     Icon file holding the icon of a listed entry, e.g. "file.info" for "file" and for "file.info" itself, null
+    ///     when no icon provider has an icon file listed for it. Updated by <see cref="ListEntriesAsync" />.
+    /// </summary>
+    public IEntry? GetIconFile(IEntry entry) => _iconFiles.GetValueOrDefault(entry.Name)?.Entry;
+
+    /// <summary>
+    ///     True when a listed entry can have an icon read by <see cref="ReadIconAsync" />: it has an icon file (see
+    ///     <see cref="GetIconFile" />), or it is a volume (<see cref="IEntry.IsVolume" />, e.g. a partition) and an icon
+    ///     provider has an icon file inside volumes (e.g. Disk.info), which may not exist.
+    /// </summary>
+    public bool HasIcon(IEntry entry) =>
+        _iconFiles.ContainsKey(entry.Name) || _volumeIconFiles.ContainsKey(entry.Name);
+
+    /// <summary>
+    ///     Reads the icon of a listed entry from its icon file (see <see cref="GetIconFile" />) with the icon provider,
+    ///     null when it has no icon file or the icon can't be read. Local files are read on a background thread, files
+    ///     inside images and other volumes with the pane's own volume, so it must not run concurrently with navigation.
+    /// </summary>
+    /// <param name="entry">Listed entry.</param>
+    /// <param name="size">Wanted width/height in pixels.</param>
+    /// <param name="cancellationToken"></param>
+    public Task<IconImage?> ReadIconAsync(IEntry entry, int size, CancellationToken cancellationToken = default) =>
+        ReadIconFileAsync(entry, (provider, name, stream) => provider.ReadIcon(name, stream, size, cancellationToken),
+            null, cancellationToken);
+
+    /// <summary>
+    ///     Reads all icons of the icon file of a listed entry (see <see cref="GetIconFile" />) with the icon provider,
+    ///     e.g. the normal and the selected image of an Amiga icon, empty when it has no icon file or the icons can't be
+    ///     read. Like <see cref="ReadIconAsync" />, it must not run concurrently with navigation.
+    /// </summary>
+    public async Task<IReadOnlyList<EntryIcon>> ReadIconsAsync(IEntry entry,
+        CancellationToken cancellationToken = default) =>
+        await ReadIconFileAsync(entry, (provider, name, stream) => provider.ReadIcons(name, stream, cancellationToken),
+            [], cancellationToken) ?? [];
+
+    /// <summary>
+    ///     Reads the icon file of a listed entry into memory and reads it with the icon provider on the thread pool,
+    ///     returning <paramref name="none" /> when there is no icon file, it can't be read or the provider fails.
+    /// </summary>
+    private async Task<T?> ReadIconFileAsync<T>(IEntry entry, Func<IIconProvider, string, Stream, Task<T>> read,
+        T? none, CancellationToken cancellationToken)
+    {
+        if (_volumeIconFiles.TryGetValue(entry.Name, out var volumeIconFiles))
+        {
+            return await ReadVolumeIconFileAsync(entry, volumeIconFiles, read, none, cancellationToken);
+        }
+
+        if (!_iconFiles.TryGetValue(entry.Name, out var iconFile) || iconFile.Entry.Size > MaxIconFileSize)
+        {
+            return none;
+        }
+
+        try
+        {
+            var localPath = GetLocalPath(iconFile.Entry);
+            var data = new MemoryStream();
+            if (localPath != null)
+            {
+                await Task.Run(async () =>
+                {
+                    await using var stream = new FileStream(localPath, FileMode.Open, FileAccess.Read,
+                        FileShare.ReadWrite);
+                    await CopyIconFileAsync(stream, data, cancellationToken);
+                }, cancellationToken);
+            }
+            else
+            {
+                await using var stream = await OpenReadAsync(iconFile.Entry, cancellationToken);
+                await CopyIconFileAsync(stream, data, cancellationToken);
+            }
+
+            data.Position = 0;
+            return await Task.Run(() => read(iconFile.Provider, iconFile.Entry.Name, data), cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // an unreadable or invalid icon file just has no icon, also when a plugin fails reading it
+            return none;
+        }
+    }
+
+    /// <summary>
+    ///     Reads the icon file inside a volume entry (e.g. Disk.info in an Amiga partition) with the first provider whose
+    ///     icon file exists. The volume entry is opened on a volume of its own (<see cref="OpenLocationAsync" />, opened
+    ///     once per listing and shared by the volume entries), on the thread pool, so the pane's volume isn't changed.
+    /// </summary>
+    private async Task<T?> ReadVolumeIconFileAsync<T>(IEntry entry, IReadOnlyList<VolumeIconFile> volumeIconFiles,
+        Func<IIconProvider, string, Stream, Task<T>> read, T? none, CancellationToken cancellationToken)
+    {
+        // opened on the calling (UI) thread, as it reads the pane's state
+        var locationTask = _iconLocation ??= OpenLocationAsync(CancellationToken.None);
+        try
+        {
+            return await Task.Run(async () =>
+            {
+                await _iconLocationLock.WaitAsync(cancellationToken);
+                try
+                {
+                    var volume = (await locationTask).Volume;
+                    // a failing change keeps the directory, so only a successful one is changed back
+                    await volume.ChangeDirectory([entry.Name], cancellationToken);
+                    try
+                    {
+                        foreach (var volumeIconFile in volumeIconFiles)
+                        {
+                            var data = new MemoryStream();
+                            try
+                            {
+                                await using var stream = await volume.OpenRead(volumeIconFile.FileName,
+                                    cancellationToken);
+                                await CopyIconFileAsync(stream, data, cancellationToken);
+                            }
+                            catch (Exception exception) when (exception is IOException
+                                                                  or UnauthorizedAccessException
+                                                                  or NotSupportedException)
+                            {
+                                // e.g. the volume has no icon file of this provider
+                                continue;
+                            }
+
+                            data.Position = 0;
+                            return await read(volumeIconFile.Provider, volumeIconFile.FileName, data);
+                        }
+
+                        return none;
+                    }
+                    finally
+                    {
+                        await volume.ChangeDirectory([Paths.Parent], CancellationToken.None);
+                    }
+                }
+                finally
+                {
+                    _iconLocationLock.Release();
+                }
+            }, cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // e.g. a partition that can't be mounted just has no icon
+            return none;
+        }
+    }
+
+    /// <summary>
+    ///     Closes the location volume icons are read from, once no icon is read from it, e.g. when the entries are
+    ///     listed again.
+    /// </summary>
+    private void CloseIconLocation()
+    {
+        if (_iconLocation is not { } locationTask)
+        {
+            return;
+        }
+
+        _iconLocation = null;
+        _ = CloseAsync();
+        return;
+
+        async Task CloseAsync()
+        {
+            await _iconLocationLock.WaitAsync();
+            try
+            {
+                (await locationTask).Dispose();
+            }
+            catch (Exception)
+            {
+                // the location failed to open, nothing to close
+            }
+            finally
+            {
+                _iconLocationLock.Release();
+            }
+        }
+    }
+
+    private static async Task CopyIconFileAsync(Stream source, MemoryStream destination,
+        CancellationToken cancellationToken)
+    {
+        var buffer = new byte[81920];
+        int read;
+        while ((read = await source.ReadAsync(buffer, cancellationToken)) > 0)
+        {
+            if (destination.Length + read > MaxIconFileSize)
+            {
+                throw new IOException("Icon file is too large");
+            }
+
+            destination.Write(buffer, 0, read);
         }
     }
 
@@ -1420,7 +1686,11 @@ public sealed class NavigationContext : IDisposable
         (_rootVolume as IDisposable)?.Dispose();
     }
 
-    public void Dispose() => CloseVolumes();
+    public void Dispose()
+    {
+        CloseIconLocation();
+        CloseVolumes();
+    }
 
     /// <summary>
     ///     A file opened as a volume (an image) by a file volume provider.

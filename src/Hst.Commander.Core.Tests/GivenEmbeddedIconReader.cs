@@ -85,6 +85,77 @@ public class GivenEmbeddedIconReader
         Assert.Null(icoIcon);
     }
 
+    [Fact]
+    public void When_ReadIconsFromIcoFile_Then_OneIconWithAllImagesLargestFirstIsReturned()
+    {
+        // arrange
+        var ico = CreateIco(Create32BitDib(16, 0x80), CreatePng(48), Create24BitDib());
+
+        // act
+        var icons = EmbeddedIconReader.ReadIcons("app.ico", new MemoryStream(ico));
+
+        // assert
+        var icon = Assert.Single(icons);
+        Assert.Equal("Icon", icon.Name);
+        Assert.Equal([48, 16, 2], icon.Images.Select(image => image.Width));
+        Assert.Equal(32, icon.Images[1].BitsPerPixel);
+        Assert.Equal(24, icon.Images[2].BitsPerPixel);
+    }
+
+    [Fact]
+    public void When_ReadIconsFromExecutable_Then_IconGroupsAreReturnedByResourceId()
+    {
+        // arrange
+        var exe = CreateExecutable(Create24BitDib());
+
+        // act
+        var icons = EmbeddedIconReader.ReadIcons("app.exe", new MemoryStream(exe));
+
+        // assert
+        var icon = Assert.Single(icons);
+        Assert.Equal("#1", icon.Name);
+        var image = Assert.Single(icon.Images);
+        Assert.Equal(2, image.Width);
+        Assert.Equal(new byte[] { 0, 0, 255, 255 }, image.BgraPixels![..4]);
+    }
+
+    [Fact]
+    public void When_ReadIconsFromWindowsLibraryWithManyIcons_Then_AllIconGroupsAreReturned()
+    {
+        // Windows 10 and later keep the icons of system libraries in SystemResources
+        var path = new[]
+        {
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "SystemResources",
+                "imageres.dll.mun"),
+            Path.Combine(Environment.SystemDirectory, "imageres.dll")
+        }.FirstOrDefault(File.Exists);
+        if (!OperatingSystem.IsWindows() || path == null)
+        {
+            return;
+        }
+
+        // act
+        using var stream = File.OpenRead(path);
+        var icons = EmbeddedIconReader.ReadIcons("imageres.dll", stream);
+
+        // assert
+        Assert.True(icons.Count > 100);
+        Assert.All(icons, icon => Assert.NotEmpty(icon.Images));
+        Assert.Contains(icons, icon => icon.Images.Count > 1);
+    }
+
+    [Fact]
+    public void When_ReadIconsFromInvalidFile_Then_NoIconsAreReturned()
+    {
+        // act
+        var exeIcons = EmbeddedIconReader.ReadIcons("app.exe", new MemoryStream("MZ"u8.ToArray()));
+        var icoIcons = EmbeddedIconReader.ReadIcons("app.ico", new MemoryStream(new byte[100]));
+
+        // assert
+        Assert.Empty(exeIcons);
+        Assert.Empty(icoIcons);
+    }
+
     [Theory]
     [InlineData("app.exe", true)]
     [InlineData("APP.ICO", true)]

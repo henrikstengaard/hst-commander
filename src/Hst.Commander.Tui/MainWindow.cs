@@ -930,7 +930,7 @@ public sealed class MainWindow : Window
         {
             var size = SizeFormatter.FormatEntrySize(entry);
             var modifiedDate = entry.ModifiedDate?.ToString("yyyy-MM-dd HH:mm") ?? string.Empty;
-            table.Rows.Add(entry.Name, size, modifiedDate);
+            table.Rows.Add(entry.DisplayName, size, modifiedDate);
         }
 
         pane.TableView.Table = new DataTableSource(table);
@@ -969,7 +969,7 @@ public sealed class MainWindow : Window
         for (var rowIndex = 0; rowIndex < pane.Entries.Count; rowIndex++)
         {
             pane.DataTable.Rows[rowIndex][0] = FormatEntryName(
-                pane.Entries[rowIndex].Name,
+                pane.Entries[rowIndex].DisplayName,
                 pane.Entries[rowIndex].Type,
                 widths.Name);
         }

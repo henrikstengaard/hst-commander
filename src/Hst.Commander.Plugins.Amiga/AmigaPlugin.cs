@@ -4,7 +4,7 @@ namespace Hst.Commander.Plugins.Amiga;
 
 /// <summary>
 /// Plugin opening Amiga disk files (adf) and hard disk images with a rigid disk block (RDB) as writable volumes and
-/// creating new adfs (F9), included with Hst Commander by default.
+/// creating new adfs (F9), and showing the icons of .info files, included with Hst Commander by default.
 /// </summary>
 public class AmigaPlugin : IPlugin
 {
@@ -16,4 +16,6 @@ public class AmigaPlugin : IPlugin
     public bool CanCreateVolumes => true;
 
     public IEnumerable<IVolumeCreator> VolumeCreators { get; } = [new AdfVolumeCreator()];
+
+    public IEnumerable<IIconProvider> IconProviders { get; } = [new AmigaIconProvider()];
 }

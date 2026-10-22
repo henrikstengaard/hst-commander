@@ -296,6 +296,10 @@ public partial class MainWindow : Window
             !typeOnly || sameType
                 ? (size, cancellationToken) =>
                     FileIcons.LoadIconAsync(iconEntry, pane.NavigationContext, size, typeOnly, cancellationToken)
+                : null,
+            !typeOnly || sameType
+                ? cancellationToken =>
+                    FileIcons.LoadIconsAsync(iconEntry, pane.NavigationContext, typeOnly, cancellationToken)
                 : null).ShowDialog(this);
         pane.FocusEntries();
     }

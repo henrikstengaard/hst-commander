@@ -1,7 +1,8 @@
 namespace Hst.Commander.Abstractions;
 
 /// <summary>
-/// Interface for a plugin extending Hst Commander with volume providers and file volume providers.
+/// Interface for a plugin extending Hst Commander with volume providers, file volume providers, volume creators and
+/// icon providers.
 /// </summary>
 public interface IPlugin
 {
@@ -31,4 +32,10 @@ public interface IPlugin
     /// when <see cref="CanCreateVolumes" /> is true. A plugin can create several kinds of volumes.
     /// </summary>
     IEnumerable<IVolumeCreator> VolumeCreators => [];
+
+    /// <summary>
+    /// Icon providers reading icons from icon files next to entries, e.g. Amiga .info files, shown left of the entry
+    /// names in the GUI. Asked in plugin order; the first provider with an icon file listed for an entry is used.
+    /// </summary>
+    IEnumerable<IIconProvider> IconProviders => [];
 }

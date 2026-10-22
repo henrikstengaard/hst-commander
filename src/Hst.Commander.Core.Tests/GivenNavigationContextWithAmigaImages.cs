@@ -190,6 +190,8 @@ public class GivenNavigationContextWithAmigaImages : IDisposable
             Assert.Empty(startedFiles);
             Assert.Equal([Paths.Parent, "1", "2"], partitionNames);
             Assert.All(partitionEntries.Skip(1), entry => Assert.Equal(EntryType.Container, entry.Type));
+            Assert.Equal(["DH0", "DH1"], partitionEntries.Skip(1).Select(entry => entry.DisplayName));
+            Assert.All(partitionEntries.Skip(1), entry => Assert.True(entry.IsVolume));
             Assert.Equal([Paths.Parent, "pfs3"], await ListNamesAsync(navigationContext));
             Assert.Equal(Path.Combine(imagePath, "2"), navigationContext.CurrentPath);
         }
@@ -201,6 +203,63 @@ public class GivenNavigationContextWithAmigaImages : IDisposable
         Assert.Equal([Paths.Parent, "ffs"], await ListNamesAsync(reopenedContext));
         await reopenedContext.ChangeLocationAsync(Path.Combine(imagePath, "2", "pfs3"));
         Assert.Equal(Path.Combine(imagePath, "2", "pfs3"), reopenedContext.CurrentPath);
+    }
+
+    [Fact]
+    public async Task When_RdbPartitionHasDiskIcon_Then_IconIsReadFromInsideThePartition()
+    {
+        // arrange
+        var imagePath = Path.Combine(_rootPath, "disk.hdf");
+        await AmigaTestData.CreateRdbImage(imagePath, AmigaTestData.Dos3DosType, AmigaTestData.Pfs3DosType);
+        await File.WriteAllBytesAsync(Path.Combine(_rootPath, "Disk.info"), await AmigaIconTestData.CreatePlanarIcon());
+        using var localContext = new NavigationContext(_rootPath);
+        using var rdbContext = new NavigationContext(_rootPath);
+        await OpenAsync(rdbContext, "disk.hdf");
+        await OpenAsync(rdbContext, "1");
+        var localEntries = await localContext.ListEntriesAsync();
+        await localContext.CopyAsync([localEntries.First(entry => entry.Name == "Disk.info")], rdbContext,
+            rdbContext.CurrentPath, "*");
+        await rdbContext.GoParentAsync();
+        var partitions = await rdbContext.ListEntriesAsync();
+
+        // act
+        var icon = await rdbContext.ReadIconAsync(partitions.First(entry => entry.Name == "1"), 16);
+        var icons = await rdbContext.ReadIconsAsync(partitions.First(entry => entry.Name == "1"));
+        var noIcon = await rdbContext.ReadIconAsync(partitions.First(entry => entry.Name == "2"), 16);
+
+        // assert
+        Assert.True(rdbContext.HasIcon(partitions.First(entry => entry.Name == "1")));
+        Assert.Null(rdbContext.GetIconFile(partitions.First(entry => entry.Name == "1")));
+        Assert.NotNull(icon);
+        Assert.Equal(4, icon.Width);
+        Assert.Equal(["Normal (planar)"], icons.Select(entryIcon => entryIcon.Name));
+        Assert.Null(noIcon);
+        // the pane stays in the partition list
+        Assert.Equal(imagePath, rdbContext.CurrentPath);
+        Assert.Equal([Paths.Parent, "1", "2"], await ListNamesAsync(rdbContext));
+    }
+
+    [Fact]
+    public async Task When_RdbPartitionIconsAreReadOnUiThread_Then_ItDoesNotDeadlock()
+    {
+        // arrange
+        var imagePath = Path.Combine(_rootPath, "disk.hdf");
+        await AmigaTestData.CreateRdbImage(imagePath, AmigaTestData.Dos3DosType, AmigaTestData.Pfs3DosType);
+
+        // act and assert
+        SingleThreadSynchronizationContext.Run(async () =>
+        {
+            using var navigationContext = new NavigationContext(_rootPath);
+            await OpenAsync(navigationContext, "disk.hdf");
+            var partitions = await navigationContext.ListEntriesAsync();
+            foreach (var partition in partitions.Skip(1))
+            {
+                Assert.Null(await navigationContext.ReadIconAsync(partition, 16));
+            }
+
+            // listing again closes the location icons were read from
+            await navigationContext.ListEntriesAsync();
+        }, TimeSpan.FromSeconds(30));
     }
 
     [Theory]

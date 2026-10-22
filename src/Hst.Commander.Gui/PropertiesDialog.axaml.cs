@@ -9,7 +9,8 @@ namespace Hst.Commander.Gui;
 
 /// <summary>
 ///     Modal properties dialog (Alt+Enter) showing the name and the sections of lines of <see cref="EntryProperties" />
-///     separated by lines, and the used space of drives as a progress bar. When opened it counts the size and contents
+///     separated by lines, and the used space of drives as a progress bar. Clicking the icon shows it in a higher
+///     resolution in the <see cref="IconViewerDialog" />. When opened it counts the size and contents
 ///     in the background and updates the lines; closing the dialog cancels counting.
 /// </summary>
 public partial class PropertiesDialog : Window
@@ -42,15 +43,23 @@ public partial class PropertiesDialog : Window
     ///     Loads the icon shown left of the name when opened, given its size in pixels, e.g. with
     ///     <see cref="Icons.FileIcons.LoadIconAsync" />. Null to keep the initial icon.
     /// </param>
-    public PropertiesDialog(EntryProperties properties,
+    /// <param name="loadIcons">
+    ///     Loads all icons of the entry for the <see cref="IconViewerDialog" />, e.g. with
+    ///     <see cref="Icons.FileIcons.LoadIconsAsync" />. Null to view the icon shown.
+    /// </param>
+    internal PropertiesDialog(EntryProperties properties,
         Func<IProgress<EntryContents>, CancellationToken, Task> countContents, IImage? initialIcon = null,
-        Func<int, CancellationToken, Task<IImage>>? loadIcon = null) : this()
+        Func<int, CancellationToken, Task<IImage>>? loadIcon = null,
+        Func<CancellationToken, Task<IReadOnlyList<Icons.ViewerIcon>>>? loadIcons = null) : this()
     {
         NameText.Text = properties.Name;
         if (initialIcon != null)
         {
             EntryIcon.Source = initialIcon;
-            EntryIcon.IsVisible = true;
+            IconButton.IsVisible = true;
+            IconButton.Click += async (_, _) =>
+                await new IconViewerDialog(properties.Name, EntryIcon.Source ?? initialIcon, loadIcons)
+                    .ShowDialog(this);
             if (loadIcon != null)
             {
                 Opened += (_, _) => LoadIcon(loadIcon);

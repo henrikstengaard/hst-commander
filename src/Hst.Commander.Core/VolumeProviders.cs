@@ -6,7 +6,7 @@ namespace Hst.Commander.Core;
 /// <summary>
 ///     Volume providers listed when choosing what a pane shows (Alt+F1/Alt+F2), the local volume provider first, and file
 ///     volume providers opening files as volumes, the built-in ones first followed by those of the <see cref="Plugins" />,
-///     and the volume creators of the plugins creating new volumes as files.
+///     the volume creators of the plugins creating new volumes as files and the icon providers of the plugins.
 /// </summary>
 public static class VolumeProviders
 {
@@ -30,6 +30,11 @@ public static class VolumeProviders
     /// </summary>
     public static IReadOnlyList<IVolumeCreator> Creators => GetLists().Creators;
 
+    /// <summary>
+    ///     Icon providers reading icons from icon files next to entries, e.g. Amiga .info files, in plugin order.
+    /// </summary>
+    public static IReadOnlyList<IIconProvider> Icons => GetLists().Icons;
+
     private static Lists GetLists()
     {
         var plugins = Plugins.All;
@@ -41,7 +46,8 @@ public static class VolumeProviders
         lists = new Lists(plugins,
             [Local, ..plugins.SelectMany(plugin => plugin.VolumeProviders)],
             [Iso9660, ..plugins.SelectMany(plugin => plugin.FileVolumeProviders)],
-            [..plugins.Where(plugin => plugin.CanCreateVolumes).SelectMany(plugin => plugin.VolumeCreators)]);
+            [..plugins.Where(plugin => plugin.CanCreateVolumes).SelectMany(plugin => plugin.VolumeCreators)],
+            [..plugins.SelectMany(plugin => plugin.IconProviders)]);
         _lists = lists;
         return lists;
     }
@@ -50,5 +56,6 @@ public static class VolumeProviders
         IReadOnlyList<IPlugin> Plugins,
         IReadOnlyList<IVolumeProvider> All,
         IReadOnlyList<IFileVolumeProvider> Files,
-        IReadOnlyList<IVolumeCreator> Creators);
+        IReadOnlyList<IVolumeCreator> Creators,
+        IReadOnlyList<IIconProvider> Icons);
 }

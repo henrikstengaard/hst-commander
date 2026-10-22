@@ -9,8 +9,11 @@
         WindowStartupLocation="CenterOwner">
     <StackPanel Margin="16" Spacing="8">
         <DockPanel>
-            <Image x:Name="EntryIcon" DockPanel.Dock="Left" Width="32" Height="32" Margin="0,0,12,0"
-                   IsVisible="False" />
+            <!-- clicking the icon views it in a higher resolution -->
+            <Button x:Name="IconButton" DockPanel.Dock="Left" Margin="0,0,12,0" Padding="2" Background="Transparent"
+                    BorderThickness="0" Cursor="Hand" ToolTip.Tip="View icon" IsVisible="False">
+                <Image x:Name="EntryIcon" Width="32" Height="32" />
+            </Button>
             <TextBlock x:Name="NameText" FontWeight="Bold" FontSize="16" TextTrimming="CharacterEllipsis"
                        VerticalAlignment="Center" />
         </DockPanel>

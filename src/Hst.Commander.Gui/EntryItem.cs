@@ -20,6 +20,9 @@ public sealed class EntryItem(IEntry entry, bool isMarked = false, bool isExecut
 
     public string Name => Entry.Name;
 
+    /// <summary>Name shown in the pane, e.g. "DH0" for an RDB partition (<see cref="IEntry.DisplayName" />).</summary>
+    public string DisplayName => Entry.DisplayName;
+
     public bool IsContainer => Entry.Type == EntryType.Container;
 
     /// <summary>True when the entry is an executable file, shown in the executable color.</summary>

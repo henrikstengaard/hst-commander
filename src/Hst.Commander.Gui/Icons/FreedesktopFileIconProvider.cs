@@ -1,6 +1,6 @@
 using System.Diagnostics;
 using System.Text.RegularExpressions;
-using Hst.Commander.Core;
+using Hst.Commander.Abstractions;
 
 namespace Hst.Commander.Gui.Icons;
 
