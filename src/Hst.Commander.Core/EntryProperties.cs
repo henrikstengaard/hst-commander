@@ -104,7 +104,8 @@ public sealed class EntryProperties
         var isContainer = entry.Type == EntryType.Container;
         var info = GetLocalInfo(entry, localDirectory);
 
-        var typeSection = new List<Field> { new("Type", FileSystemDetails.GetTypeName(entry.Name, isContainer)) };
+        var details = entry.Details;
+        var typeSection = new List<Field> { new("Type", GetTypeName(entry)) };
         if (info?.LinkTarget is { } linkTarget)
         {
             typeSection.Add(new Field("Link target", linkTarget));
@@ -135,8 +136,20 @@ public sealed class EntryProperties
             }
         }
 
-        return new EntryProperties(entry.Name, WithoutEmpty(typeSection, sizeSection, dateSection, attributeSection));
+        var detailSections = details?.Sections
+            .Select(section => section.Select(CreateField).ToList())
+            .ToArray() ?? [];
+        return new EntryProperties(entry.DisplayName,
+            WithoutEmpty([typeSection, ..detailSections, sizeSection, dateSection, attributeSection]),
+            details?.UsedFraction is { } usedFraction ? Math.Clamp(usedFraction, 0, 1) : null);
     }
+
+    /// <summary>Type of an entry: the type of its details (e.g. "Amiga partition") or the file type.</summary>
+    private static string GetTypeName(IEntry entry) =>
+        entry.Details?.TypeName ?? FileSystemDetails.GetTypeName(entry.Name, entry.Type == EntryType.Container);
+
+    private static Field CreateField(EntryProperty property) => new(property.Label,
+        property.Bytes is { } bytes ? SizeFormatter.FormatWithBytes(bytes) : property.Value);
 
     private static EntryProperties CreateForEntries(IReadOnlyList<IEntry> entries, string location,
         string? localDirectory)
@@ -144,7 +157,7 @@ public sealed class EntryProperties
         var files = entries.Count(entry => entry.Type != EntryType.Container);
         var folders = entries.Count - files;
         var typeNames = entries
-            .Select(entry => FileSystemDetails.GetTypeName(entry.Name, entry.Type == EntryType.Container))
+            .Select(GetTypeName)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 

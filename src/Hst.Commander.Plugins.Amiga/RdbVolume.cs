@@ -8,8 +8,9 @@ namespace Hst.Commander.Plugins.Amiga;
 /// <summary>
 /// Volume browsing the partitions of a hard disk image with a rigid disk block (RDB). The root lists the partitions as
 /// directories named 1 to the number of partitions, in the order of the rigid disk block, shown with their drive names
-/// (e.g. "DH0", see <see cref="IEntry.DisplayName" />). A partition is mounted when
-/// opened (Fast File System or PFS3) and stays mounted until the volume is disposed. The partitions can't be changed,
+/// and volume names (e.g. "DH0: Workbench", see <see cref="IEntry.DisplayName" />) and their partition details in the
+/// properties dialog (<see cref="IEntry.Details" />). A partition is mounted (Fast File System or PFS3) when listed or
+/// opened and stays mounted until the volume is disposed. The partitions can't be changed,
 /// their file systems are writable when the stream is.
 /// </summary>
 public class RdbVolume : IVolume, IDisposable
@@ -17,7 +18,10 @@ public class RdbVolume : IVolume, IDisposable
     private readonly Stream _stream;
     private readonly IReadOnlyList<PartitionBlock> _partitionBlocks;
     private readonly IDisposable? _resource;
+    private const string PartitionTypeName = "Amiga partition";
+
     private readonly Dictionary<int, AmigaFileSystemVolume> _mountedVolumes = new();
+    private readonly HashSet<int> _unmountablePartitions = [];
     private int? _partitionIndex;
 
     /// <param name="stream">Stream of the disk, written to when writable.</param>
@@ -62,16 +66,92 @@ public class RdbVolume : IVolume, IDisposable
         for (var partitionIndex = 0; partitionIndex < _partitionBlocks.Count; partitionIndex++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            yield return CreatePartitionEntry(partitionIndex);
+            yield return await CreatePartitionEntry(partitionIndex);
         }
     }
 
-    private IEntry CreatePartitionEntry(int partitionIndex)
+    /// <summary>
+    /// Creates the entry of a partition, mounting its file system the first time for the volume name and space;
+    /// a partition that can't be mounted (e.g. SFS) is shown without them.
+    /// </summary>
+    private async Task<IEntry> CreatePartitionEntry(int partitionIndex)
     {
         var name = GetPartitionName(partitionIndex);
-        var driveName = _partitionBlocks[partitionIndex].DriveName;
-        return new PartitionEntry(name, string.IsNullOrWhiteSpace(driveName) ? name : driveName,
-            _partitionBlocks[partitionIndex].PartitionSize);
+        var partitionBlock = _partitionBlocks[partitionIndex];
+        var volume = await TryMountPartition(partitionIndex);
+        var driveName = partitionBlock.DriveName?.Trim();
+        var volumeName = volume?.VolumeName.Trim();
+
+        var label = string.IsNullOrEmpty(driveName) ? name : driveName;
+        var displayName = string.IsNullOrEmpty(volumeName) ? label : $"{label}: {volumeName}";
+        return new PartitionEntry(name, displayName, partitionBlock.PartitionSize,
+            CreateDetails(partitionIndex, driveName, volumeName, volume));
+    }
+
+    private EntryDetails CreateDetails(int partitionIndex, string? driveName, string? volumeName,
+        AmigaFileSystemVolume? volume)
+    {
+        var partitionBlock = _partitionBlocks[partitionIndex];
+        var partitionSection = new List<EntryProperty> { new("Partition", GetPartitionName(partitionIndex)) };
+        if (!string.IsNullOrEmpty(driveName))
+        {
+            partitionSection.Add(new EntryProperty("Drive name", driveName));
+        }
+
+        if (!string.IsNullOrEmpty(volumeName))
+        {
+            partitionSection.Add(new EntryProperty("Volume name", volumeName));
+        }
+
+        partitionSection.Add(new EntryProperty("File system", AmigaFileSystems.FormatFileSystem(partitionBlock.DosType)));
+
+        var bootSection = new List<EntryProperty>
+        {
+            new("Bootable", partitionBlock.Bootable ? "Yes" : "No"),
+            new("Boot priority", partitionBlock.BootPriority.ToString(CultureInfo.InvariantCulture)),
+            new("Cylinders", string.Create(CultureInfo.InvariantCulture,
+                $"{partitionBlock.LowCyl} - {partitionBlock.HighCyl}"))
+        };
+
+        if (volume == null)
+        {
+            return new EntryDetails(PartitionTypeName, [partitionSection, bootSection]);
+        }
+
+        var capacity = volume.Size;
+        var free = Math.Clamp(volume.Free, 0, capacity);
+        List<EntryProperty> spaceSection =
+        [
+            EntryProperty.FromBytes("Used space", capacity - free),
+            EntryProperty.FromBytes("Free space", free),
+            EntryProperty.FromBytes("Capacity", capacity)
+        ];
+        return new EntryDetails(PartitionTypeName, [partitionSection, bootSection, spaceSection],
+            capacity > 0 ? (double)(capacity - free) / capacity : null);
+    }
+
+    /// <summary>Mounted file system of a partition, mounting it the first time; null when it can't be mounted.</summary>
+    private async Task<AmigaFileSystemVolume?> TryMountPartition(int partitionIndex)
+    {
+        if (_mountedVolumes.TryGetValue(partitionIndex, out var volume))
+        {
+            return volume;
+        }
+
+        if (_unmountablePartitions.Contains(partitionIndex))
+        {
+            return null;
+        }
+
+        try
+        {
+            return _mountedVolumes[partitionIndex] = await MountPartition(partitionIndex);
+        }
+        catch (IOException)
+        {
+            _unmountablePartitions.Add(partitionIndex);
+            return null;
+        }
     }
 
     public async Task ChangeDirectory(IEnumerable<string> pathComponents,
@@ -162,7 +242,7 @@ public class RdbVolume : IVolume, IDisposable
         }
 
         await OpenPartition(name, cancellationToken);
-        return CreatePartitionEntry(_partitionIndex!.Value);
+        return await CreatePartitionEntry(_partitionIndex!.Value);
     }
 
     public Task<Stream> OpenRead(string name, CancellationToken cancellationToken = default) =>
@@ -201,10 +281,11 @@ public class RdbVolume : IVolume, IDisposable
     }
 
     /// <summary>
-    /// Partition in the partition list, shown with its drive name, e.g. "DH0" (the number without one). It is a volume of its
-    /// own, so its icon is the Disk.info file in its root.
+    /// Partition in the partition list, shown with its drive name and volume name, e.g. "DH0: Workbench" (the number
+    /// without a drive name, no volume name when it can't be mounted). It is a volume of its own, so its icon is the
+    /// Disk.info file in its root.
     /// </summary>
-    private sealed record PartitionEntry(string Name, string DisplayName, long? Size) : IEntry
+    private sealed record PartitionEntry(string Name, string DisplayName, long? Size, EntryDetails Details) : IEntry
     {
         public EntryType Type => EntryType.Container;
 

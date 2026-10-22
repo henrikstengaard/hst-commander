@@ -17,6 +17,7 @@ public static class AmigaTestData
 
     public static readonly byte[] Dos3DosType = [0x44, 0x4f, 0x53, 0x3];
     public static readonly byte[] Pfs3DosType = [0x50, 0x46, 0x53, 0x3];
+    public static readonly byte[] SfsDosType = [0x53, 0x46, 0x53, 0x0];
 
     /// <summary>Creates a double density adf formatted with the Fast File System.</summary>
     public static async Task CreateAdf(string path)
@@ -47,6 +48,14 @@ public static class AmigaTestData
         await WriteRdb(disk.Content, dosTypes, false);
     }
 
+    /// <summary>Volume name of a formatted partition in the images: Workbench, Work, Work2, ...</summary>
+    public static string GetVolumeName(int partitionIndex) => partitionIndex switch
+    {
+        0 => "Workbench",
+        1 => "Work",
+        _ => $"Work{partitionIndex}"
+    };
+
     private static async Task WriteRdb(Stream stream, byte[][] dosTypes, bool setLength = true)
     {
         var rigidDiskBlock = DiskSize.CreateRigidDiskBlock();
@@ -64,15 +73,15 @@ public static class AmigaTestData
             await RigidDiskBlockWriter.WriteBlock(rigidDiskBlock, stream);
         }
 
-        foreach (var partitionBlock in rigidDiskBlock.PartitionBlocks)
+        foreach (var (partitionBlock, index) in rigidDiskBlock.PartitionBlocks.Select((block, index) => (block, index)))
         {
             if (partitionBlock.DosType.SequenceEqual(Pfs3DosType))
             {
-                await Pfs3Formatter.FormatPartition(stream, partitionBlock, partitionBlock.DriveName);
+                await Pfs3Formatter.FormatPartition(stream, partitionBlock, GetVolumeName(index));
             }
             else if (partitionBlock.DosType.SequenceEqual(Dos3DosType))
             {
-                await FastFileSystemFormatter.FormatPartition(stream, partitionBlock, partitionBlock.DriveName);
+                await FastFileSystemFormatter.FormatPartition(stream, partitionBlock, GetVolumeName(index));
             }
         }
     }

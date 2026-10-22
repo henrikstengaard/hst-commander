@@ -45,6 +45,12 @@ public class AmigaFileSystemVolume : IVolume, IDisposable
     /// <summary>Size of the file system in bytes.</summary>
     public long Size => _fileSystemVolume.Size;
 
+    /// <summary>Free space of the file system in bytes.</summary>
+    public long Free => _fileSystemVolume.Free;
+
+    /// <summary>Volume name of the file system, e.g. "Workbench".</summary>
+    public string VolumeName => _fileSystemVolume.Name;
+
     public async IAsyncEnumerable<IEntry> ListEntries(
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {

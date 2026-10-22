@@ -190,7 +190,7 @@ public class GivenNavigationContextWithAmigaImages : IDisposable
             Assert.Empty(startedFiles);
             Assert.Equal([Paths.Parent, "1", "2"], partitionNames);
             Assert.All(partitionEntries.Skip(1), entry => Assert.Equal(EntryType.Container, entry.Type));
-            Assert.Equal(["DH0", "DH1"], partitionEntries.Skip(1).Select(entry => entry.DisplayName));
+            Assert.Equal(["DH0: Workbench", "DH1: Work"], partitionEntries.Skip(1).Select(entry => entry.DisplayName));
             Assert.All(partitionEntries.Skip(1), entry => Assert.True(entry.IsVolume));
             Assert.Equal([Paths.Parent, "pfs3"], await ListNamesAsync(navigationContext));
             Assert.Equal(Path.Combine(imagePath, "2"), navigationContext.CurrentPath);
@@ -203,6 +203,59 @@ public class GivenNavigationContextWithAmigaImages : IDisposable
         Assert.Equal([Paths.Parent, "ffs"], await ListNamesAsync(reopenedContext));
         await reopenedContext.ChangeLocationAsync(Path.Combine(imagePath, "2", "pfs3"));
         Assert.Equal(Path.Combine(imagePath, "2", "pfs3"), reopenedContext.CurrentPath);
+    }
+
+    [Fact]
+    public async Task When_PropertiesOfRdbPartitionAreShown_Then_PartitionDetailsAreShown()
+    {
+        // arrange
+        var imagePath = Path.Combine(_rootPath, "disk.hdf");
+        await AmigaTestData.CreateRdbImage(imagePath, AmigaTestData.Dos3DosType, AmigaTestData.Pfs3DosType);
+        using var navigationContext = new NavigationContext(_rootPath);
+        await OpenAsync(navigationContext, "disk.hdf");
+        var partitions = await navigationContext.ListEntriesAsync();
+
+        // act
+        var properties = navigationContext.GetProperties([partitions.First(entry => entry.Name == "2")]);
+
+        // assert
+        var lines = properties.GetSections().SelectMany(section => section)
+            .ToDictionary(line => line.Label, line => line.Value);
+        Assert.Equal("DH1: Work", properties.Name);
+        Assert.Equal("Amiga partition", lines["Type"]);
+        Assert.Equal("2", lines["Partition"]);
+        Assert.Equal("DH1", lines["Drive name"]);
+        Assert.Equal("Work", lines["Volume name"]);
+        Assert.Equal("Professional File System 3 (PFS\\3)", lines["File system"]);
+        Assert.Equal("No", lines["Bootable"]);
+        Assert.Contains("bytes", lines["Free space"]);
+        Assert.Contains("bytes", lines["Capacity"]);
+        Assert.NotNull(properties.UsedFraction);
+        Assert.InRange(properties.UsedFraction.Value, 0, 1);
+    }
+
+    [Fact]
+    public async Task When_RdbPartitionCantBeMounted_Then_ItIsShownWithoutVolumeName()
+    {
+        // arrange
+        var imagePath = Path.Combine(_rootPath, "disk.hdf");
+        await AmigaTestData.CreateRdbImage(imagePath, AmigaTestData.Dos3DosType, AmigaTestData.SfsDosType);
+        using var navigationContext = new NavigationContext(_rootPath);
+        await OpenAsync(navigationContext, "disk.hdf");
+
+        // act
+        var partitions = await navigationContext.ListEntriesAsync();
+        var properties = navigationContext.GetProperties([partitions.First(entry => entry.Name == "2")]);
+
+        // assert
+        Assert.Equal(["DH0: Workbench", "DH1"], partitions.Skip(1).Select(entry => entry.DisplayName));
+        var lines = properties.GetSections().SelectMany(section => section)
+            .ToDictionary(line => line.Label, line => line.Value);
+        Assert.Equal("DH1", lines["Drive name"]);
+        Assert.Equal("Smart File System (SFS\\0)", lines["File system"]);
+        Assert.False(lines.ContainsKey("Volume name"));
+        Assert.False(lines.ContainsKey("Free space"));
+        Assert.Null(properties.UsedFraction);
     }
 
     [Fact]

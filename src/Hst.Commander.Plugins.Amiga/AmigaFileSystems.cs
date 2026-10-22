@@ -60,6 +60,39 @@ public static class AmigaFileSystems
             $"Partition '{name}' has the file system '{partitionBlock.DosTypeFormatted}', which is not supported");
     }
 
+    /// <summary>
+    /// Name of the file system of a DOS type with the DOS type, e.g. "Fast File System, international (DOS\3)", or
+    /// just the DOS type when unknown.
+    /// </summary>
+    public static string FormatFileSystem(byte[] dosType)
+    {
+        ArgumentNullException.ThrowIfNull(dosType);
+
+        if (dosType.Length != 4)
+        {
+            return Convert.ToHexString(dosType);
+        }
+
+        var formatted = $"{(char)dosType[0]}{(char)dosType[1]}{(char)dosType[2]}\\{dosType[3]}";
+        string? name = formatted switch
+        {
+            "DOS\\0" => "Old File System",
+            "DOS\\1" => "Fast File System",
+            "DOS\\2" => "Old File System, international",
+            "DOS\\3" => "Fast File System, international",
+            "DOS\\4" => "Old File System, directory cache",
+            "DOS\\5" => "Fast File System, directory cache",
+            "DOS\\6" => "Old File System, long file names",
+            "DOS\\7" => "Fast File System, long file names",
+            "PFS\\3" => "Professional File System 3",
+            "PDS\\3" => "Professional File System 3, direct SCSI",
+            "SFS\\0" => "Smart File System",
+            "SFS\\2" => "Smart File System 2",
+            _ => null
+        };
+        return name != null ? $"{name} ({formatted})" : formatted;
+    }
+
     private static bool IsFastFileSystem(byte[] dosType) =>
         dosType.Length == 4 && dosType[0] == 'D' && dosType[1] == 'O' && dosType[2] == 'S' && dosType[3] <= 7;
 
