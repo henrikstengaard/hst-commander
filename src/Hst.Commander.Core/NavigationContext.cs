@@ -1,4 +1,4 @@
-using Hst.Commander.Core.Volumes;
+﻿using Hst.Commander.Core.Volumes;
 using Hst.Commander.Abstractions;
 
 namespace Hst.Commander.Core;
@@ -861,6 +861,13 @@ public sealed class NavigationContext : IDisposable
     public EnterFileAction EnterFileAction { get; set; } = EnterFileAction.OpenAsVolume;
 
     /// <summary>
+    ///     How <see cref="CopyAsync" /> and <see cref="MoveAsync" /> store Amiga names, protection bits and comments
+    ///     when copying from an Amiga volume to other volumes, e.g. a local directory (see
+    ///     <see cref="CopyOptions.UaeMetadata" />).
+    /// </summary>
+    public UaeMetadataFormat UaeMetadata { get; set; } = UaeMetadataFormat.UaeFsDb;
+
+    /// <summary>
     ///     Opens an entry as a volume (Ctrl+PageDown): a file detected by any file volume provider is browsed as an
     ///     image regardless of its extension, e.g. a .docx document as a zip archive. Directories and ".." are opened
     ///     like <see cref="OpenEntryAsync" />. Throws <see cref="IOException" /> when no file volume provider detects
@@ -1186,7 +1193,7 @@ public sealed class NavigationContext : IDisposable
         {
             ThrowIfCopyingOntoItself(source.Path, entries, destination.Path, targetName, "copy");
             await source.Volume.CopyToAsync(entries, destination.Volume,
-                new CopyOptions(filter, targetName, confirmOverwrite), progress, cancellationToken);
+                new CopyOptions(filter, targetName, confirmOverwrite, UaeMetadata), progress, cancellationToken);
         }
     }
 
@@ -1511,7 +1518,7 @@ public sealed class NavigationContext : IDisposable
             if (remainingEntries.Count > 0)
             {
                 await source.Volume.MoveToAsync(remainingEntries, destination.Volume,
-                    new CopyOptions(filter, targetName, confirmOverwrite), progress, cancellationToken);
+                    new CopyOptions(filter, targetName, confirmOverwrite, UaeMetadata), progress, cancellationToken);
             }
         }
     }

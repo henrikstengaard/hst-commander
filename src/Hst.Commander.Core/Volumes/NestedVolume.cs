@@ -122,6 +122,12 @@ public class NestedVolume(IVolume volume) : IVolume
     public Task SetModifiedDate(string name, DateTime modifiedDate, CancellationToken cancellationToken = default) =>
         _currentVolume.SetModifiedDate(name, modifiedDate, cancellationToken);
 
+    public Task<bool> SupportsAmigaMetadata(CancellationToken cancellationToken = default) =>
+        _currentVolume.SupportsAmigaMetadata(cancellationToken);
+
+    public Task SetAmigaMetadata(string name, AmigaMetadata metadata, CancellationToken cancellationToken = default) =>
+        _currentVolume.SetAmigaMetadata(name, metadata, cancellationToken);
+
     /// <summary>
     /// Name of the nested volume.
     /// </summary>

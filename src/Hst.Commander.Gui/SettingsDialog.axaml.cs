@@ -1,4 +1,4 @@
-using Avalonia.Controls;
+﻿using Avalonia.Controls;
 using Hst.Commander.Core;
 
 namespace Hst.Commander.Gui;
@@ -37,12 +37,19 @@ public partial class SettingsDialog : Window
         EnterFileActionComboBox.ItemsSource = EnterFileActions.All.Select(EnterFileActions.GetName).ToList();
         EnterFileActionComboBox.SelectedIndex =
             Math.Max(0, EnterFileActions.All.ToList().IndexOf(settings.EnterFileAction));
+        UaeMetadataComboBox.ItemsSource = UaeMetadataFormats.All.Select(UaeMetadataFormats.GetName).ToList();
+        UaeMetadataComboBox.SelectedIndex = Math.Max(0, UaeMetadataFormats.All.ToList().IndexOf(settings.UaeMetadata));
 
         var accepted = false;
         OkButton.Click += (_, _) =>
         {
             accepted = true;
-            Close((settings with { Theme = SelectedTheme, EnterFileAction = SelectedEnterFileAction })
+            Close((settings with
+                {
+                    Theme = SelectedTheme,
+                    EnterFileAction = SelectedEnterFileAction,
+                    UaeMetadata = SelectedUaeMetadata
+                })
                 .WithVolumeProviderKeys(SelectedVolumeProviderKeys));
         };
         CancelButton.Click += (_, _) => Close();
@@ -63,4 +70,7 @@ public partial class SettingsDialog : Window
 
     private EnterFileAction SelectedEnterFileAction =>
         EnterFileActions.All[Math.Max(0, EnterFileActionComboBox.SelectedIndex)];
+
+    private UaeMetadataFormat SelectedUaeMetadata =>
+        UaeMetadataFormats.All[Math.Max(0, UaeMetadataComboBox.SelectedIndex)];
 }

@@ -14,6 +14,9 @@ public class LocalVolume(string path) : IVolume
 
     public IEnumerable<string> CurrentPathComponents => _currentPathComponents;
 
+    /// <summary>Full path of the current directory, null in the drive list.</summary>
+    public string? LocalPath => _currentPath;
+
     public async IAsyncEnumerable<IEntry> ListEntries([EnumeratorCancellation] CancellationToken cancellationToken =
         default)
     {

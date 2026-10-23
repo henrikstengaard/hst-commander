@@ -1,4 +1,4 @@
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using Hst.Commander.Abstractions;
 
 namespace Hst.Commander.Plugins.Disk;
@@ -150,6 +150,12 @@ public sealed class HybridDiskVolume : IVolume, IDisposable
 
     public Task SetModifiedDate(string name, DateTime modifiedDate, CancellationToken cancellationToken = default) =>
         _currentVolume?.SetModifiedDate(name, modifiedDate, cancellationToken) ?? throw ReadOnly();
+
+    public Task<bool> SupportsAmigaMetadata(CancellationToken cancellationToken = default) =>
+        _currentVolume?.SupportsAmigaMetadata(cancellationToken) ?? Task.FromResult(false);
+
+    public Task SetAmigaMetadata(string name, AmigaMetadata metadata, CancellationToken cancellationToken = default) =>
+        _currentVolume?.SetAmigaMetadata(name, metadata, cancellationToken) ?? throw ReadOnly();
 
     private static NotSupportedException ReadOnly() =>
         new("The partition table list is read-only, open a partition to change its files");

@@ -50,4 +50,10 @@ public class EntryVolumeProvider(IEntry entry, IVolume volumeProvider) : IVolume
 
     public Task SetModifiedDate(string name, DateTime modifiedDate, CancellationToken cancellationToken = default) =>
         volumeProvider.SetModifiedDate(name, modifiedDate, cancellationToken);
+
+    public Task<bool> SupportsAmigaMetadata(CancellationToken cancellationToken = default) =>
+        volumeProvider.SupportsAmigaMetadata(cancellationToken);
+
+    public Task SetAmigaMetadata(string name, AmigaMetadata metadata, CancellationToken cancellationToken = default) =>
+        volumeProvider.SetAmigaMetadata(name, metadata, cancellationToken);
 }

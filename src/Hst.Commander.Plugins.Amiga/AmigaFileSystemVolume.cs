@@ -1,4 +1,4 @@
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using Hst.Amiga.FileSystems;
 using Hst.Amiga.FileSystems.Exceptions;
 using Hst.Commander.Abstractions;
@@ -239,6 +239,27 @@ public class AmigaFileSystemVolume : IVolume, IDisposable
         await Flush();
     }
 
+    public Task<bool> SupportsAmigaMetadata(CancellationToken cancellationToken = default) => Task.FromResult(true);
+
+    public async Task SetAmigaMetadata(string name, AmigaMetadata metadata,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(metadata);
+        ThrowIfReadOnly();
+
+        var entry = await FindEntry(name) ?? throw new FileNotFoundException($"Entry '{name}' not found");
+        var comment = metadata.Comment.Length > MaxCommentLength
+            ? metadata.Comment[..MaxCommentLength]
+            : metadata.Comment;
+        await Run(() => _fileSystemVolume.SetProtectionBits(entry.Name,
+            ProtectionBitsConverter.ToProtectionBits(metadata.ProtectionBits)));
+        await Run(() => _fileSystemVolume.SetComment(entry.Name, comment));
+        await Flush();
+    }
+
+    /// <summary>Maximum length of comments in Amiga file systems.</summary>
+    private const int MaxCommentLength = 79;
+
     /// <summary>
     /// Amiga date of a date, in local time without a time zone. Dates before the Amiga epoch, 1 January 1978, can't
     /// be stored and are set to the epoch.
@@ -267,11 +288,13 @@ public class AmigaFileSystemVolume : IVolume, IDisposable
             _ => false
         };
 
+        var metadata = new AmigaMetadata(ProtectionBitsConverter.ToProtectionValue(entry.ProtectionBits),
+            entry.Comment ?? string.Empty);
         return isDirectory
-            ? new AmigaVolumeEntry(entry.Name, EntryType.Container, null, FromAmigaDate(entry.Date))
+            ? new AmigaVolumeEntry(entry.Name, EntryType.Container, null, FromAmigaDate(entry.Date), metadata)
             : new AmigaVolumeEntry(entry.Name, EntryType.Item,
                 entry.Type == AmigaEntryType.SoftLink && entry.LinkEntry != null ? entry.LinkEntry.Size : entry.Size,
-                FromAmigaDate(entry.Date));
+                FromAmigaDate(entry.Date), metadata);
     }
 
     /// <summary>Finds an entry in the current directory, case-insensitive like Amiga file systems.</summary>
@@ -360,7 +383,15 @@ public class AmigaFileSystemVolume : IVolume, IDisposable
     /// </summary>
     private static void RunBlocking(Func<Task> operation) => Task.Run(operation).GetAwaiter().GetResult();
 
-    private sealed record AmigaVolumeEntry(string Name, EntryType Type, long? Size, DateTime? ModifiedDate) : IEntry;
+    private sealed record AmigaVolumeEntry(
+        string Name,
+        EntryType Type,
+        long? Size,
+        DateTime? ModifiedDate,
+        AmigaMetadata AmigaMetadata) : IEntry
+    {
+        AmigaMetadata? IEntry.AmigaMetadata => AmigaMetadata;
+    }
 
     /// <summary>Stream writing a file, flushing the file system when closed, e.g. caches of PFS3.</summary>
     private sealed class FlushingStream(Stream stream, IFileSystemVolume fileSystemVolume) : Stream

@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using Hst.Commander.Core;
 using Hst.Commander.Core.Volumes;
 using Hst.Commander.Abstractions;
@@ -97,6 +97,7 @@ public sealed class MainWindow : Window
         ApplyTheme(theme);
         ApplyVolumeProviderKeys(settings.EffectiveVolumeProviderKeys);
         ApplyEnterFileAction(settings.EnterFileAction);
+        ApplyUaeMetadata(settings.UaeMetadata);
         ConfigurePaneKeys(_leftPane, _rightPane);
         ConfigurePaneKeys(_rightPane, _leftPane);
         // also when run again after a program has run in the terminal
@@ -198,6 +199,13 @@ public sealed class MainWindow : Window
         _rightPane.NavigationContext.EnterFileAction = action;
     }
 
+    /// <summary>Sets how both panes store Amiga names, protection bits and comments when copying from Amiga volumes.</summary>
+    private void ApplyUaeMetadata(UaeMetadataFormat format)
+    {
+        _leftPane.NavigationContext.UaeMetadata = format;
+        _rightPane.NavigationContext.UaeMetadata = format;
+    }
+
     private Key LeftVolumeProviderKey => WithVolumeProviderModifier(Key.F1);
 
     private Key RightVolumeProviderKey => WithVolumeProviderModifier(Key.F2);
@@ -242,6 +250,7 @@ public sealed class MainWindow : Window
         ApplyTheme(result.Theme);
         ApplyVolumeProviderKeys(result.EffectiveVolumeProviderKeys);
         ApplyEnterFileAction(result.EnterFileAction);
+        ApplyUaeMetadata(result.UaeMetadata);
         try
         {
             result.Save();

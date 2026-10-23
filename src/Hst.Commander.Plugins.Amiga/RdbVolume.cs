@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Runtime.CompilerServices;
 using Hst.Amiga.RigidDiskBlocks;
 using Hst.Commander.Abstractions;
@@ -316,6 +316,12 @@ public class RdbVolume : IVolume, IDisposable
 
     public Task SetModifiedDate(string name, DateTime modifiedDate, CancellationToken cancellationToken = default) =>
         CurrentVolume?.SetModifiedDate(name, modifiedDate, cancellationToken) ?? throw PartitionsReadOnly();
+
+    public Task<bool> SupportsAmigaMetadata(CancellationToken cancellationToken = default) =>
+        Task.FromResult(CurrentVolume != null);
+
+    public Task SetAmigaMetadata(string name, AmigaMetadata metadata, CancellationToken cancellationToken = default) =>
+        CurrentVolume?.SetAmigaMetadata(name, metadata, cancellationToken) ?? throw PartitionsReadOnly();
 
     private static NotSupportedException PartitionsReadOnly() =>
         new("The partition list is read-only, open a partition to change its files");

@@ -395,4 +395,48 @@ public class GivenNavigationContextWithAmigaImages : IDisposable
         Assert.False(navigationContext.IsInImage);
         Assert.Equal([Path.Combine(_rootPath, "notes.txt")], startedFiles);
     }
+
+    [Fact]
+    public async Task When_CopyingBetweenAdfAndLocalDirectory_Then_UaeMetadataIsWrittenAndRead()
+    {
+        // arrange - an adf with an item with a name and protection bits that can't be stored in local directories
+        var adfPath = Path.Combine(_rootPath, "disk.adf");
+        await AmigaTestData.CreateAdf(adfPath);
+        await using (var stream = File.Open(adfPath, FileMode.Open, FileAccess.ReadWrite))
+        using (var volume = await Hst.Commander.Plugins.Amiga.AmigaFileSystems.MountAdf(stream))
+        {
+            await using (var itemStream = await volume.OpenWrite("file*1"))
+            {
+                await itemStream.WriteAsync("Amiga"u8.ToArray());
+            }
+
+            await volume.SetAmigaMetadata("file*1", new AmigaMetadata(0x40, "Comment"));
+        }
+
+        var localPath = Directory.CreateDirectory(Path.Combine(_rootPath, "local")).FullName;
+        await AmigaTestData.CreateAdf(Path.Combine(_rootPath, "disk2.adf"));
+
+        using var adfContext = new NavigationContext(_rootPath);
+        using var localContext = new NavigationContext(localPath);
+        await OpenAsync(adfContext, "disk.adf");
+
+        // act - copy from the adf to the local directory and from there to another adf
+        await adfContext.CopyAsync([(await adfContext.ListEntriesAsync()).First(entry => entry.Name == "file*1")],
+            localContext, localContext.CurrentPath, "*");
+        var localNames = await ListNamesAsync(localContext);
+        var adf2Context = new NavigationContext(_rootPath);
+        using (adf2Context)
+        {
+            await OpenAsync(adf2Context, "disk2.adf");
+            await localContext.CopyAsync((await localContext.ListEntriesAsync()).Where(entry => entry.Name != Paths.Parent)
+                .ToList(), adf2Context, adf2Context.CurrentPath, "*");
+            var copiedEntries = await adf2Context.ListEntriesAsync();
+
+            // assert
+            Assert.Equal([Paths.Parent, "_UAEFSDB.___", "__uae___file_1"], localNames.Order(StringComparer.Ordinal));
+            var copiedEntry = Assert.Single(copiedEntries, entry => entry.Name != Paths.Parent);
+            Assert.Equal("file*1", copiedEntry.Name);
+            Assert.Equal(new AmigaMetadata(0x40, "Comment"), copiedEntry.AmigaMetadata);
+        }
+    }
 }

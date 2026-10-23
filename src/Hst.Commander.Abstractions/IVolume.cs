@@ -82,4 +82,21 @@ public interface IVolume
     /// <param name="modifiedDate">Modified date. Dates of kind unspecified are treated as UTC.</param>
     /// <param name="cancellationToken"></param>
     Task SetModifiedDate(string name, DateTime modifiedDate, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// True when the current directory stores Amiga names, protection bits and comments as they are, e.g. an Amiga
+    /// file system. Copying between such volumes keeps them; copying to or from other volumes uses UAE metadata files.
+    /// Defaults to false.
+    /// </summary>
+    Task<bool> SupportsAmigaMetadata(CancellationToken cancellationToken = default) => Task.FromResult(false);
+
+    /// <summary>
+    /// Set the Amiga protection bits and comment of an item or container in current directory.
+    /// Throws <see cref="NotSupportedException"/> when the volume doesn't store them (the default) or is read-only.
+    /// </summary>
+    /// <param name="name">Name of entry to set the protection bits and comment of.</param>
+    /// <param name="metadata">Protection bits and comment.</param>
+    /// <param name="cancellationToken"></param>
+    Task SetAmigaMetadata(string name, AmigaMetadata metadata, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("Amiga protection bits and comments are not supported");
 }

@@ -25,4 +25,10 @@ public interface IEntry
     /// hold its own icon inside it (see <see cref="IIconProvider.GetVolumeIconFileName" />). Defaults to false.
     /// </summary>
     bool IsVolume => false;
+
+    /// <summary>
+    /// Amiga protection bits and comment of an entry in an Amiga file system, null for volumes without them (see
+    /// <see cref="IVolume.SupportsAmigaMetadata" />). Defaults to null.
+    /// </summary>
+    AmigaMetadata? AmigaMetadata => null;
 }

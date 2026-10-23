@@ -1,4 +1,4 @@
-using Avalonia.Controls;
+﻿using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Hst.Commander.Core;
@@ -32,6 +32,7 @@ public partial class MainWindow : Window
         LeftPane.NavigationContext = new NavigationContext(initialPath);
         RightPane.NavigationContext = new NavigationContext(initialPath);
         ApplyEnterFileAction(settings.EnterFileAction);
+        ApplyUaeMetadata(settings.UaeMetadata);
         LeftPane.NavigationFailed += async (_, exception) => await ShowErrorAsync(exception);
         RightPane.NavigationFailed += async (_, exception) => await ShowErrorAsync(exception);
         CopyMenuItem.Click += async (_, _) => await CopyAsync(_activePane);
@@ -182,6 +183,13 @@ public partial class MainWindow : Window
     {
         LeftPane.NavigationContext.EnterFileAction = action;
         RightPane.NavigationContext.EnterFileAction = action;
+    }
+
+    /// <summary>Sets how both panes store Amiga names, protection bits and comments when copying from Amiga volumes.</summary>
+    private void ApplyUaeMetadata(UaeMetadataFormat format)
+    {
+        LeftPane.NavigationContext.UaeMetadata = format;
+        RightPane.NavigationContext.UaeMetadata = format;
     }
 
     /// <summary>
@@ -540,6 +548,7 @@ public partial class MainWindow : Window
         ThemeManager.Apply(settings.Theme);
         ApplyVolumeProviderKeys(settings.EffectiveVolumeProviderKeys);
         ApplyEnterFileAction(settings.EnterFileAction);
+        ApplyUaeMetadata(settings.UaeMetadata);
         try
         {
             settings.Save();

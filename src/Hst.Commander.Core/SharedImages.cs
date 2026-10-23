@@ -1,4 +1,4 @@
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using Hst.Commander.Abstractions;
 
 namespace Hst.Commander.Core;
@@ -238,6 +238,16 @@ internal sealed class SharedImageVolume : IVolume, IDisposable
         RunAsync(async volume =>
         {
             await volume.SetModifiedDate(name, modifiedDate, cancellationToken);
+            return true;
+        }, cancellationToken);
+
+    public Task<bool> SupportsAmigaMetadata(CancellationToken cancellationToken = default) =>
+        RunAsync(volume => volume.SupportsAmigaMetadata(cancellationToken), cancellationToken);
+
+    public Task SetAmigaMetadata(string name, AmigaMetadata metadata, CancellationToken cancellationToken = default) =>
+        RunAsync(async volume =>
+        {
+            await volume.SetAmigaMetadata(name, metadata, cancellationToken);
             return true;
         }, cancellationToken);
 

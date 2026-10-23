@@ -9,3 +9,5 @@ As an example this library is used by the Hst Commander Core to implement a buil
 Plugins reference only this library: implement `IPlugin` returning `IVolumeProvider`s (volumes a pane can show) and `IFileVolumeProvider`s (files opened as volumes, detected by their magic signature), `IVolumeCreator`s (new volumes created as files) and `IIconProvider`s (icons read from icon files next to entries, e.g. Amiga .info files), see the Zip plugin `Hst.Commander.Plugins.Zip`.
 
 Entries can give a name shown in the panes (`IEntry.DisplayName`) and details shown in the properties dialog (`IEntry.Details`, `EntryDetails` with `EntryProperty` lines), e.g. the drive and volume name of an Amiga partition.
+
+Volumes storing Amiga names, protection bits and comments (Amiga file systems) return true from `IVolume.SupportsAmigaMetadata`, give entries their `IEntry.AmigaMetadata` and set them with `IVolume.SetAmigaMetadata`; Hst Commander keeps them when copying between such volumes and stores them as UAE metadata on other volumes.

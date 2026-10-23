@@ -1,4 +1,4 @@
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using Hst.Commander.Abstractions;
 
 namespace Hst.Commander.Plugins.Disk;
@@ -223,6 +223,13 @@ public abstract class VolumeListVolume : IVolume, IDisposable
 
     public Task SetModifiedDate(string name, DateTime modifiedDate, CancellationToken cancellationToken = default) =>
         CurrentVolume?.SetModifiedDate(name, modifiedDate, cancellationToken) ??
+        throw new NotSupportedException(ReadOnlyMessage);
+
+    public Task<bool> SupportsAmigaMetadata(CancellationToken cancellationToken = default) =>
+        CurrentVolume?.SupportsAmigaMetadata(cancellationToken) ?? Task.FromResult(false);
+
+    public Task SetAmigaMetadata(string name, AmigaMetadata metadata, CancellationToken cancellationToken = default) =>
+        CurrentVolume?.SetAmigaMetadata(name, metadata, cancellationToken) ??
         throw new NotSupportedException(ReadOnlyMessage);
 
     /// <summary>Disposes resources after the mounted volumes, e.g. the streams of the partitions.</summary>
