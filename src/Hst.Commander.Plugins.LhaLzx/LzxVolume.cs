@@ -1,3 +1,4 @@
+﻿using Hst.Commander.Abstractions;
 using Hst.Compression.Lzx;
 
 namespace Hst.Commander.Plugins.LhaLzx;
@@ -26,10 +27,37 @@ public class LzxVolume : ArchiveVolume<LzxEntry>
         foreach (var lzxEntry in await lzxArchive.Entries())
         {
             // dates are stored in local time without a time zone
-            lzxVolume.AddEntry(lzxEntry.Name, lzxEntry.UnpackedSize, lzxEntry.Date.ToUniversalTime(), lzxEntry);
+            lzxVolume.AddEntry(lzxEntry.Name, lzxEntry.UnpackedSize, lzxEntry.Date.ToUniversalTime(), lzxEntry,
+                new AmigaMetadata(GetProtectionBits(lzxEntry.Attributes), lzxEntry.Comment ?? string.Empty));
         }
 
         return lzxVolume;
+    }
+
+    /// <summary>
+    /// Amiga protection bits as stored on disk (bits 7-0 "hsparwed", "rwed" set when not allowed) of the attributes of
+    /// a lzx entry, which are set when allowed.
+    /// </summary>
+    private static int GetProtectionBits(AttributesEnum attributes)
+    {
+        var protectionBits = 0;
+        AddBit(AttributesEnum.HeldResident, 7, true);
+        AddBit(AttributesEnum.Script, 6, true);
+        AddBit(AttributesEnum.Pure, 5, true);
+        AddBit(AttributesEnum.Archive, 4, true);
+        AddBit(AttributesEnum.Read, 3, false);
+        AddBit(AttributesEnum.Write, 2, false);
+        AddBit(AttributesEnum.Executable, 1, false);
+        AddBit(AttributesEnum.Delete, 0, false);
+        return protectionBits;
+
+        void AddBit(AttributesEnum attribute, int bit, bool setWhenAttribute)
+        {
+            if (attributes.HasFlag(attribute) == setWhenAttribute)
+            {
+                protectionBits |= 1 << bit;
+            }
+        }
     }
 
     protected override async Task<Stream> OpenArchiveEntry(LzxEntry archiveEntry) =>

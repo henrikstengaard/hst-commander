@@ -80,8 +80,9 @@ public sealed class EntryProperties
     /// <param name="location">Path of the location, e.g. <see cref="NavigationContext.CurrentPath" />.</param>
     /// <param name="localDirectory">Local directory of the location, null inside images and other volumes.</param>
     /// <param name="isDriveList">True when the entries are local drives.</param>
+    /// <param name="uaeMetadata">UAE metadata of a single entry, shown with its Amiga name.</param>
     internal static EntryProperties Create(IReadOnlyList<IEntry> entries, string location, string? localDirectory,
-        bool isDriveList)
+        bool isDriveList, UaeMetadataNode? uaeMetadata = null)
     {
         ArgumentNullException.ThrowIfNull(entries);
         if (entries.Count == 0)
@@ -95,11 +96,30 @@ public sealed class EntryProperties
         }
 
         return entries.Count == 1
-            ? CreateForEntry(entries[0], location, localDirectory)
+            ? CreateForEntry(entries[0], location, localDirectory, uaeMetadata)
             : CreateForEntries(entries, location, localDirectory);
     }
 
-    private static EntryProperties CreateForEntry(IEntry entry, string location, string? localDirectory)
+    /// <summary>
+    ///     Amiga protection bits as shown by the Amiga List command, e.g. "----rwed": "hspa" when set, "rwed" when
+    ///     allowed (not set in the protection bits stored on disk).
+    /// </summary>
+    public static string FormatProtectionBits(int protectionBits)
+    {
+        const string letters = "hsparwed";
+        var characters = new char[letters.Length];
+        for (var index = 0; index < letters.Length; index++)
+        {
+            var bit = letters.Length - 1 - index;
+            var isSet = (protectionBits & (1 << bit)) != 0;
+            characters[index] = isSet == bit >= 4 ? letters[index] : '-';
+        }
+
+        return new string(characters);
+    }
+
+    private static EntryProperties CreateForEntry(IEntry entry, string location, string? localDirectory,
+        UaeMetadataNode? uaeMetadata)
     {
         var isContainer = entry.Type == EntryType.Container;
         var info = GetLocalInfo(entry, localDirectory);
@@ -136,11 +156,24 @@ public sealed class EntryProperties
             }
         }
 
+        // Amiga entries and entries with UAE metadata, e.g. copied from an Amiga volume to a local directory
+        var amigaSection = new List<Field>();
+        if (uaeMetadata != null)
+        {
+            amigaSection.Add(new Field("Amiga name", uaeMetadata.AmigaName));
+        }
+
+        if ((entry.AmigaMetadata ?? uaeMetadata?.Metadata) is { } amigaMetadata)
+        {
+            amigaSection.Add(new Field("Protection bits", FormatProtectionBits(amigaMetadata.ProtectionBits)));
+            amigaSection.Add(new Field("Comment", amigaMetadata.Comment));
+        }
+
         var detailSections = details?.Sections
             .Select(section => section.Select(CreateField).ToList())
             .ToArray() ?? [];
         return new EntryProperties(entry.DisplayName,
-            WithoutEmpty([typeSection, ..detailSections, sizeSection, dateSection, attributeSection]),
+            WithoutEmpty([typeSection, ..detailSections, sizeSection, dateSection, attributeSection, amigaSection]),
             details?.UsedFraction is { } usedFraction ? Math.Clamp(usedFraction, 0, 1) : null);
     }
 

@@ -1,11 +1,13 @@
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using Hst.Commander.Abstractions;
 
 namespace Hst.Commander.Plugins.LhaLzx;
 
 /// <summary>
 /// Read-only volume browsing the entries of an archive. Directories are the directory entries of the archive and the
-/// directories in the paths of its files, as archives don't need to contain entries for directories.
+/// directories in the paths of its files, as archives don't need to contain entries for directories. Archives store
+/// Amiga names, protection bits and comments (<see cref="IEntry.AmigaMetadata" />) as they are, so copying from them
+/// keeps them like copying from an Amiga volume.
 /// </summary>
 /// <typeparam name="TArchiveEntry">Entry of the archive, read with <see cref="OpenArchiveEntry" />.</typeparam>
 public abstract class ArchiveVolume<TArchiveEntry> : IVolume
@@ -28,7 +30,8 @@ public abstract class ArchiveVolume<TArchiveEntry> : IVolume
     /// Adds an archive entry to the directory tree. "/" and "\" separate path components and a path ending with one is
     /// a directory. Empty, "." and ".." path components are skipped, so entries can't point outside the archive.
     /// </summary>
-    protected void AddEntry(string path, long size, DateTime? modifiedDate, TArchiveEntry archiveEntry)
+    protected void AddEntry(string path, long size, DateTime? modifiedDate, TArchiveEntry archiveEntry,
+        AmigaMetadata? amigaMetadata = null)
     {
         var pathComponents = path
             .Split(['/', '\\'], StringSplitOptions.RemoveEmptyEntries)
@@ -50,10 +53,11 @@ public abstract class ArchiveVolume<TArchiveEntry> : IVolume
         if (isDirectory)
         {
             directory.ModifiedDate = modifiedDate;
+            directory.AmigaMetadata = amigaMetadata;
         }
         else
         {
-            directory.Files[pathComponents[^1]] = new ArchiveFile(size, modifiedDate, archiveEntry);
+            directory.Files[pathComponents[^1]] = new ArchiveFile(size, modifiedDate, archiveEntry, amigaMetadata);
         }
     }
 
@@ -80,10 +84,10 @@ public abstract class ArchiveVolume<TArchiveEntry> : IVolume
     }
 
     private static IEntry CreateEntry(ArchiveDirectory directory) =>
-        new ArchiveEntry(directory.Name, EntryType.Container, null, directory.ModifiedDate);
+        new ArchiveEntry(directory.Name, EntryType.Container, null, directory.ModifiedDate, directory.AmigaMetadata);
 
     private static IEntry CreateEntry(string name, ArchiveFile file) =>
-        new ArchiveEntry(name, EntryType.Item, file.Size, file.ModifiedDate);
+        new ArchiveEntry(name, EntryType.Item, file.Size, file.ModifiedDate, file.AmigaMetadata);
 
     public Task ChangeDirectory(IEnumerable<string> pathComponents, CancellationToken cancellationToken = default)
     {
@@ -149,9 +153,16 @@ public abstract class ArchiveVolume<TArchiveEntry> : IVolume
     public Task SetModifiedDate(string name, DateTime modifiedDate, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException($"{Name} archives are read-only");
 
-    private sealed record ArchiveEntry(string Name, EntryType Type, long? Size, DateTime? ModifiedDate) : IEntry;
+    public Task<bool> SupportsAmigaMetadata(CancellationToken cancellationToken = default) => Task.FromResult(true);
 
-    private sealed record ArchiveFile(long Size, DateTime? ModifiedDate, TArchiveEntry ArchiveEntry);
+    public Task SetAmigaMetadata(string name, AmigaMetadata metadata, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException($"{Name} archives are read-only");
+
+    private sealed record ArchiveEntry(string Name, EntryType Type, long? Size, DateTime? ModifiedDate,
+        AmigaMetadata? AmigaMetadata) : IEntry;
+
+    private sealed record ArchiveFile(long Size, DateTime? ModifiedDate, TArchiveEntry ArchiveEntry,
+        AmigaMetadata? AmigaMetadata);
 
     /// <summary>
     /// Directory in the archive. Names are case-sensitive like in the archive, but found case-insensitive when no name
@@ -162,6 +173,8 @@ public abstract class ArchiveVolume<TArchiveEntry> : IVolume
         public string Name { get; } = name;
 
         public DateTime? ModifiedDate { get; set; }
+
+        public AmigaMetadata? AmigaMetadata { get; set; }
 
         public Dictionary<string, ArchiveDirectory> Directories { get; } = new(StringComparer.Ordinal);
 

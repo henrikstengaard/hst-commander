@@ -439,4 +439,115 @@ public class GivenNavigationContextWithAmigaImages : IDisposable
             Assert.Equal(new AmigaMetadata(0x40, "Comment"), copiedEntry.AmigaMetadata);
         }
     }
+
+    /// <summary>Creates an adf with the item "file*1" with the script protection bit and a comment.</summary>
+    private static async Task CreateAdfWithItemAsync(string adfPath)
+    {
+        await AmigaTestData.CreateAdf(adfPath);
+        await using var stream = File.Open(adfPath, FileMode.Open, FileAccess.ReadWrite);
+        using var volume = await Hst.Commander.Plugins.Amiga.AmigaFileSystems.MountAdf(stream);
+        await using (var itemStream = await volume.OpenWrite("file*1"))
+        {
+            await itemStream.WriteAsync("Amiga"u8.ToArray());
+        }
+
+        await volume.SetAmigaMetadata("file*1", new AmigaMetadata(0x40, "Comment"));
+    }
+
+    private static Dictionary<string, string> GetLines(EntryProperties properties) =>
+        properties.GetSections().SelectMany(section => section).ToDictionary(line => line.Label, line => line.Value);
+
+    [Fact]
+    public async Task When_PropertiesOfAdfEntryAreShown_Then_ProtectionBitsAndCommentAreShown()
+    {
+        // arrange
+        await CreateAdfWithItemAsync(Path.Combine(_rootPath, "disk.adf"));
+        using var navigationContext = new NavigationContext(_rootPath);
+        await OpenAsync(navigationContext, "disk.adf");
+        var entry = (await navigationContext.ListEntriesAsync()).First(entry => entry.Name == "file*1");
+
+        // act
+        var properties = await navigationContext.GetPropertiesAsync([entry]);
+
+        // assert
+        var lines = GetLines(properties);
+        Assert.Equal("-s--rwed", lines["Protection bits"]);
+        Assert.Equal("Comment", lines["Comment"]);
+        Assert.DoesNotContain("Amiga name", lines.Keys);
+    }
+
+    [Theory]
+    [InlineData(UaeMetadataFormat.UaeFsDb)]
+    [InlineData(UaeMetadataFormat.UaeMetafile)]
+    public async Task When_PropertiesOfLocalEntryWithUaeMetadataAreShown_Then_AmigaNameAndMetadataAreShown(
+        UaeMetadataFormat format)
+    {
+        // arrange - an Amiga item copied to a local directory with UAE metadata
+        await CreateAdfWithItemAsync(Path.Combine(_rootPath, "disk.adf"));
+        var localPath = Directory.CreateDirectory(Path.Combine(_rootPath, "local")).FullName;
+        using var adfContext = new NavigationContext(_rootPath) { UaeMetadata = format };
+        using var localContext = new NavigationContext(localPath);
+        await OpenAsync(adfContext, "disk.adf");
+        await adfContext.CopyAsync([(await adfContext.ListEntriesAsync()).First(entry => entry.Name == "file*1")],
+            localContext, localContext.CurrentPath, "*");
+        var localEntries = await localContext.ListEntriesAsync();
+        var localEntry = Assert.Single(localEntries, entry => entry.Name != Paths.Parent &&
+                                                              entry.Name != "_UAEFSDB.___" &&
+                                                              !entry.Name.EndsWith(".uaem"));
+        var plainProperties = await localContext.GetPropertiesAsync(
+            [localEntries.First(entry => entry.Name == Paths.Parent)]);
+
+        // act
+        var properties = await localContext.GetPropertiesAsync([localEntry]);
+
+        // assert - the pane shows the normal name, the properties the Amiga name and metadata
+        Assert.NotEqual("file*1", localEntry.Name);
+        Assert.Equal(localEntry.Name, properties.Name);
+        var lines = GetLines(properties);
+        Assert.Equal("file*1", lines["Amiga name"]);
+        Assert.Equal("-s--rwed", lines["Protection bits"]);
+        Assert.Equal("Comment", lines["Comment"]);
+        Assert.DoesNotContain("Protection bits", GetLines(plainProperties).Keys);
+    }
+
+    [Theory]
+    [InlineData("special_chars.lha")]
+    [InlineData("special_chars.lzx")]
+    public async Task When_CopyingFromLhaOrLzxArchive_Then_AmigaNamesAndMetadataAreKept(string name)
+    {
+        // arrange - archives from Hst Imager with names, protection bits and comments local directories can't store
+        File.Copy(ArchiveTestData.GetPath(name), Path.Combine(_rootPath, name));
+        await AmigaTestData.CreateAdf(Path.Combine(_rootPath, "disk.adf"));
+        var localPath = Directory.CreateDirectory(Path.Combine(_rootPath, "local")).FullName;
+        using var archiveContext = new NavigationContext(_rootPath);
+        using var adfContext = new NavigationContext(_rootPath);
+        using var localContext = new NavigationContext(localPath);
+        await OpenAsync(archiveContext, name);
+        await OpenAsync(adfContext, "disk.adf");
+        var archiveEntries = (await archiveContext.ListEntriesAsync())
+            .Where(entry => entry.Name != Paths.Parent)
+            .ToList();
+
+        // act
+        await archiveContext.CopyAsync(archiveEntries, adfContext, adfContext.CurrentPath, "*");
+        await archiveContext.CopyAsync(archiveEntries, localContext, localContext.CurrentPath, "*");
+
+        // assert - copied to the adf as they are and to the local directory with UAE metadata
+        var adfEntries = await adfContext.ListEntriesAsync();
+        Assert.Equal(archiveEntries.Select(entry => entry.Name).Order(StringComparer.Ordinal),
+            adfEntries.Where(entry => entry.Name != Paths.Parent).Select(entry => entry.Name)
+                .Order(StringComparer.Ordinal));
+        Assert.Equal(new AmigaMetadata(0x40, ""), adfEntries.First(entry => entry.Name == "file1*").AmigaMetadata);
+        Assert.Equal(new AmigaMetadata(0, "comment on file2"),
+            adfEntries.First(entry => entry.Name == "file2<").AmigaMetadata);
+        Assert.Equal(new AmigaMetadata(0x40, ""), adfEntries.First(entry => entry.Name == "dir2").AmigaMetadata);
+
+        var localEntries = await localContext.ListEntriesAsync();
+        Assert.Contains(localEntries, entry => entry.Name == "_UAEFSDB.___");
+        Assert.DoesNotContain(localEntries, entry => entry.Name.IndexOfAny(['*', '<']) >= 0);
+        var lines = GetLines(await localContext.GetPropertiesAsync(
+            [localEntries.First(entry => entry.Name.StartsWith("__uae___file2"))]));
+        Assert.Equal("file2<", lines["Amiga name"]);
+        Assert.Equal("comment on file2", lines["Comment"]);
+    }
 }

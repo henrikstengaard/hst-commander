@@ -1,3 +1,4 @@
+﻿using Hst.Commander.Abstractions;
 using Hst.Compression.Lha;
 
 namespace Hst.Commander.Plugins.LhaLzx;
@@ -9,6 +10,9 @@ public class LhaVolume : ArchiveVolume<LzHeader>
 {
     // entries for directories, also used for symbolic links (without a trailing path separator)
     private const string DirectoryMethod = "-lhd-";
+
+    // operating systems of level 1 and 2 headers storing their own attributes instead of Amiga protection bits
+    private static readonly int[] NonAmigaExtendTypes = ['M', 'U', 'w', 'W', 'm', '2', 'J'];
 
     private readonly LhaArchive _lhaArchive;
 
@@ -37,7 +41,8 @@ public class LhaVolume : ArchiveVolume<LzHeader>
                 continue;
             }
 
-            lhaVolume.AddEntry(path, header.OriginalSize, header.UnixLastModifiedStamp, header);
+            lhaVolume.AddEntry(path, header.OriginalSize, header.UnixLastModifiedStamp, header,
+                GetAmigaMetadata(header));
         }
 
         return lhaVolume;
@@ -48,6 +53,18 @@ public class LhaVolume : ArchiveVolume<LzHeader>
     {
         var index = name.IndexOf('\0');
         return index >= 0 ? name[..index] : name;
+    }
+
+    /// <summary>
+    /// Amiga protection bits and comment of a lha entry: Amiga lha archives store the protection bits as they are on
+    /// disk in the attribute and the comment after a zero character in the name.
+    /// </summary>
+    private static AmigaMetadata GetAmigaMetadata(LzHeader header)
+    {
+        var index = header.Name.IndexOf('\0');
+        var comment = index >= 0 ? header.Name[(index + 1)..] : string.Empty;
+        var protectionBits = NonAmigaExtendTypes.Contains(header.ExtendType) ? 0 : header.Attribute & 0xff;
+        return new AmigaMetadata(protectionBits, comment);
     }
 
     protected override Task<Stream> OpenArchiveEntry(LzHeader archiveEntry) =>

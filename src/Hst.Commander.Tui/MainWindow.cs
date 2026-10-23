@@ -391,7 +391,7 @@ public sealed class MainWindow : Window
             else if (key == Key.P.WithCtrl || key == Key.Enter.WithAlt)
             {
                 key.Handled = true;
-                ShowProperties(pane);
+                _ = ShowPropertiesAsync(pane);
             }
             else if (key == Key.O.WithCtrl)
             {
@@ -466,13 +466,13 @@ public sealed class MainWindow : Window
 
     private void ShowLocationOfActivePane() => _ = ShowLocationAsync(_activePane);
 
-    private void ShowPropertiesOfActivePane() => ShowProperties(_activePane);
+    private void ShowPropertiesOfActivePane() => _ = ShowPropertiesAsync(_activePane);
 
     /// <summary>
     ///     Shows the properties of the marked entries, or the entry under the cursor, of a pane. The size and contents
     ///     are counted in the background while the dialog is open; closing it stops counting.
     /// </summary>
-    private void ShowProperties(Pane pane)
+    private async Task ShowPropertiesAsync(Pane pane)
     {
         var entries = pane.NavigationContext.GetOperationEntries(GetCurrentEntry(pane));
         if (entries.Count == 0)
@@ -483,7 +483,7 @@ public sealed class MainWindow : Window
         EntryProperties properties;
         try
         {
-            properties = pane.NavigationContext.GetProperties(entries);
+            properties = await pane.NavigationContext.GetPropertiesAsync(entries);
         }
         catch (Exception exception)
         {

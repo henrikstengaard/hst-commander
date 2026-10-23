@@ -278,7 +278,7 @@ public partial class MainWindow : Window
         EntryProperties properties;
         try
         {
-            properties = pane.NavigationContext.GetProperties(entries);
+            properties = await pane.NavigationContext.GetPropertiesAsync(entries);
         }
         catch (Exception exception)
         {

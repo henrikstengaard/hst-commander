@@ -1226,6 +1226,45 @@ public sealed class NavigationContext : IDisposable
     }
 
     /// <summary>
+    ///     Properties like <see cref="GetProperties" />, with the Amiga name, protection bits and comment of a single
+    ///     entry from the UAE metadata of the current directory (see <see cref="UaeMetadataReader" />) in volumes not
+    ///     storing them, e.g. a file copied from an Amiga volume to a local directory. Reads with the pane's volume,
+    ///     so call it on the thread using the pane.
+    /// </summary>
+    public async Task<EntryProperties> GetPropertiesAsync(IReadOnlyList<IEntry> entries,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+
+        var uaeMetadata = entries is [{ AmigaMetadata: null } entry] && !IsDriveList && entry.Name != Paths.Parent
+            ? await FindUaeMetadataAsync(entry, cancellationToken)
+            : null;
+        var localDirectory = !IsInImage ? LocalPath : null;
+        return EntryProperties.Create(entries, CurrentPath, localDirectory, IsDriveList, uaeMetadata);
+    }
+
+    private async Task<UaeMetadataNode?> FindUaeMetadataAsync(IEntry entry, CancellationToken cancellationToken)
+    {
+        if (await _nestedVolume.SupportsAmigaMetadata(cancellationToken))
+        {
+            return null;
+        }
+
+        // only the entry and the metadata files it can have are read
+        var metafileName = entry.Name + Hst.Amiga.DataTypes.UaeMetafiles.Constants.UaeMetafileExtension;
+        var entries = await _nestedVolume.ListEntries(cancellationToken)
+            .Where(listedEntry => listedEntry.Name.Equals(entry.Name, StringComparison.Ordinal) ||
+                                  listedEntry.Name.Equals(Hst.Amiga.DataTypes.UaeFsDbs.Constants.UaeFsDbFileName,
+                                      StringComparison.OrdinalIgnoreCase) ||
+                                  listedEntry.Name.Equals(metafileName, StringComparison.OrdinalIgnoreCase))
+            .ToListAsync(cancellationToken);
+        var localDirectory = !IsInImage ? LocalPath : null;
+        var metadata = await UaeMetadataReader.ReadAsync(_nestedVolume, entries, localDirectory != null,
+            cancellationToken, localDirectory);
+        return metadata.Find(entry.Name);
+    }
+
+    /// <summary>
     ///     Counts the size and number of entries of entries in the current location for the properties dialog,
     ///     directories recursively. Like copying, it doesn't use the pane's volume, so it can run on a background
     ///     thread: local directories are read from the file system (with the size on disk on Windows), other

@@ -16,6 +16,16 @@ public class GivenNavigationContextShowingProperties
         volume.AddEntry([], new TestEntry("file1.txt", EntryType.Item, 5, ModifiedDate));
     });
 
+    [Theory]
+    [InlineData(0x00, "----rwed")]
+    [InlineData(0x40, "-s--rwed")]
+    [InlineData(0x02, "----rw-d")]
+    [InlineData(0x0f, "--------")]
+    [InlineData(0xf0, "hsparwed")]
+    public void When_ProtectionBitsAreFormatted_Then_TheyAreShownLikeTheAmigaListCommand(int protectionBits,
+        string expected) =>
+        Assert.Equal(expected, EntryProperties.FormatProtectionBits(protectionBits));
+
     [Fact]
     public async Task When_GetPropertiesOfFileInVolume_Then_TypeLocationSizeAndModifiedAreShown()
     {

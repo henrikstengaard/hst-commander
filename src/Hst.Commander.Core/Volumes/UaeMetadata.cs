@@ -59,10 +59,11 @@ internal static class UaeMetadataReader
     ///     Reads the UAE metadata of the current directory of a volume with its entries. Files that can't be read or
     ///     aren't valid metadata are normal files. With <paramref name="readAlternateDataStreams" />, the
     ///     "_UAEFSDB.___" alternate data streams WinUAE writes on NTFS are read when the directory has no
-    ///     "_UAEFSDB.___" file (local directories on Windows only).
+    ///     "_UAEFSDB.___" file (local directories on Windows only), from <paramref name="localDirectory" /> or the
+    ///     directory of a <see cref="LocalVolume" />.
     /// </summary>
     public static async Task<UaeDirectoryMetadata> ReadAsync(IVolume volume, IReadOnlyCollection<IEntry> entries,
-        bool readAlternateDataStreams, CancellationToken cancellationToken)
+        bool readAlternateDataStreams, CancellationToken cancellationToken, string? localDirectory = null)
     {
         var items = entries.Where(entry => entry.Type == EntryType.Item).ToList();
         var nodes = new List<UaeMetadataNode>();
@@ -79,7 +80,7 @@ internal static class UaeMetadataReader
             nodes.AddRange(readNodes.Select(node => node.Node));
         }
         else if (readAlternateDataStreams && OperatingSystem.IsWindows() &&
-                 volume is LocalVolume { LocalPath: { } localPath })
+                 (localDirectory ?? (volume as LocalVolume)?.LocalPath) is { } localPath)
         {
             nodes.AddRange(ReadAlternateDataStreams(localPath, entries));
         }
