@@ -21,6 +21,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hst.Commander.Plugins.LhaLz
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hst.Commander.Plugins.Amiga", "Hst.Commander.Plugins.Amiga\Hst.Commander.Plugins.Amiga.csproj", "{E968581E-20F5-40B7-85B0-18B3C22F53F5}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hst.Commander.Plugins.Disk", "Hst.Commander.Plugins.Disk\Hst.Commander.Plugins.Disk.csproj", "{A0903BC9-01B8-47E5-9719-534553EFA474}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -127,6 +129,18 @@ Global
 		{E968581E-20F5-40B7-85B0-18B3C22F53F5}.Release|x64.Build.0 = Release|Any CPU
 		{E968581E-20F5-40B7-85B0-18B3C22F53F5}.Release|x86.ActiveCfg = Release|Any CPU
 		{E968581E-20F5-40B7-85B0-18B3C22F53F5}.Release|x86.Build.0 = Release|Any CPU
+		{A0903BC9-01B8-47E5-9719-534553EFA474}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A0903BC9-01B8-47E5-9719-534553EFA474}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A0903BC9-01B8-47E5-9719-534553EFA474}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{A0903BC9-01B8-47E5-9719-534553EFA474}.Debug|x64.Build.0 = Debug|Any CPU
+		{A0903BC9-01B8-47E5-9719-534553EFA474}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{A0903BC9-01B8-47E5-9719-534553EFA474}.Debug|x86.Build.0 = Debug|Any CPU
+		{A0903BC9-01B8-47E5-9719-534553EFA474}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A0903BC9-01B8-47E5-9719-534553EFA474}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A0903BC9-01B8-47E5-9719-534553EFA474}.Release|x64.ActiveCfg = Release|Any CPU
+		{A0903BC9-01B8-47E5-9719-534553EFA474}.Release|x64.Build.0 = Release|Any CPU
+		{A0903BC9-01B8-47E5-9719-534553EFA474}.Release|x86.ActiveCfg = Release|Any CPU
+		{A0903BC9-01B8-47E5-9719-534553EFA474}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

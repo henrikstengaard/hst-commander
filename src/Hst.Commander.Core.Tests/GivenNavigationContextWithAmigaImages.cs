@@ -178,6 +178,8 @@ public class GivenNavigationContextWithAmigaImages : IDisposable
         {
             // act
             await OpenAsync(navigationContext, name);
+            var tableNames = await ListNamesAsync(navigationContext);
+            await OpenAsync(navigationContext, "rdb");
             var partitionNames = await ListNamesAsync(navigationContext);
             var partitionEntries = await navigationContext.ListEntriesAsync();
             await OpenAsync(navigationContext, "1");
@@ -188,21 +190,23 @@ public class GivenNavigationContextWithAmigaImages : IDisposable
 
             // assert
             Assert.Empty(startedFiles);
+            Assert.Equal([Paths.Parent, "rdb"], tableNames);
             Assert.Equal([Paths.Parent, "1", "2"], partitionNames);
             Assert.All(partitionEntries.Skip(1), entry => Assert.Equal(EntryType.Container, entry.Type));
-            Assert.Equal(["DH0: Workbench", "DH1: Work"], partitionEntries.Skip(1).Select(entry => entry.DisplayName));
+            Assert.Equal(["1 - DH0 - Workbench", "2 - DH1 - Work"], partitionEntries.Skip(1).Select(entry => entry.DisplayName));
             Assert.All(partitionEntries.Skip(1), entry => Assert.True(entry.IsVolume));
             Assert.Equal([Paths.Parent, "pfs3"], await ListNamesAsync(navigationContext));
-            Assert.Equal(Path.Combine(imagePath, "2"), navigationContext.CurrentPath);
+            Assert.Equal(Path.Combine(imagePath, "rdb", "2"), navigationContext.CurrentPath);
         }
 
         // the changes are read again from the file
         using var reopenedContext = new NavigationContext(_rootPath);
         await OpenAsync(reopenedContext, name);
+        await OpenAsync(reopenedContext, "rdb");
         await OpenAsync(reopenedContext, "1");
         Assert.Equal([Paths.Parent, "ffs"], await ListNamesAsync(reopenedContext));
-        await reopenedContext.ChangeLocationAsync(Path.Combine(imagePath, "2", "pfs3"));
-        Assert.Equal(Path.Combine(imagePath, "2", "pfs3"), reopenedContext.CurrentPath);
+        await reopenedContext.ChangeLocationAsync(Path.Combine(imagePath, "rdb", "2", "pfs3"));
+        Assert.Equal(Path.Combine(imagePath, "rdb", "2", "pfs3"), reopenedContext.CurrentPath);
     }
 
     [Fact]
@@ -213,6 +217,7 @@ public class GivenNavigationContextWithAmigaImages : IDisposable
         await AmigaTestData.CreateRdbImage(imagePath, AmigaTestData.Dos3DosType, AmigaTestData.Pfs3DosType);
         using var navigationContext = new NavigationContext(_rootPath);
         await OpenAsync(navigationContext, "disk.hdf");
+        await OpenAsync(navigationContext, "rdb");
         var partitions = await navigationContext.ListEntriesAsync();
 
         // act
@@ -221,7 +226,7 @@ public class GivenNavigationContextWithAmigaImages : IDisposable
         // assert
         var lines = properties.GetSections().SelectMany(section => section)
             .ToDictionary(line => line.Label, line => line.Value);
-        Assert.Equal("DH1: Work", properties.Name);
+        Assert.Equal("2 - DH1 - Work", properties.Name);
         Assert.Equal("Amiga partition", lines["Type"]);
         Assert.Equal("2", lines["Partition"]);
         Assert.Equal("DH1", lines["Drive name"]);
@@ -242,13 +247,14 @@ public class GivenNavigationContextWithAmigaImages : IDisposable
         await AmigaTestData.CreateRdbImage(imagePath, AmigaTestData.Dos3DosType, AmigaTestData.SfsDosType);
         using var navigationContext = new NavigationContext(_rootPath);
         await OpenAsync(navigationContext, "disk.hdf");
+        await OpenAsync(navigationContext, "rdb");
 
         // act
         var partitions = await navigationContext.ListEntriesAsync();
         var properties = navigationContext.GetProperties([partitions.First(entry => entry.Name == "2")]);
 
         // assert
-        Assert.Equal(["DH0: Workbench", "DH1"], partitions.Skip(1).Select(entry => entry.DisplayName));
+        Assert.Equal(["1 - DH0 - Workbench", "2 - DH1"], partitions.Skip(1).Select(entry => entry.DisplayName));
         var lines = properties.GetSections().SelectMany(section => section)
             .ToDictionary(line => line.Label, line => line.Value);
         Assert.Equal("DH1", lines["Drive name"]);
@@ -268,6 +274,7 @@ public class GivenNavigationContextWithAmigaImages : IDisposable
         using var localContext = new NavigationContext(_rootPath);
         using var rdbContext = new NavigationContext(_rootPath);
         await OpenAsync(rdbContext, "disk.hdf");
+        await OpenAsync(rdbContext, "rdb");
         await OpenAsync(rdbContext, "1");
         var localEntries = await localContext.ListEntriesAsync();
         await localContext.CopyAsync([localEntries.First(entry => entry.Name == "Disk.info")], rdbContext,
@@ -288,7 +295,7 @@ public class GivenNavigationContextWithAmigaImages : IDisposable
         Assert.Equal(["Normal (planar)"], icons.Select(entryIcon => entryIcon.Name));
         Assert.Null(noIcon);
         // the pane stays in the partition list
-        Assert.Equal(imagePath, rdbContext.CurrentPath);
+        Assert.Equal(Path.Combine(imagePath, "rdb"), rdbContext.CurrentPath);
         Assert.Equal([Paths.Parent, "1", "2"], await ListNamesAsync(rdbContext));
     }
 
@@ -304,6 +311,7 @@ public class GivenNavigationContextWithAmigaImages : IDisposable
         {
             using var navigationContext = new NavigationContext(_rootPath);
             await OpenAsync(navigationContext, "disk.hdf");
+            await OpenAsync(navigationContext, "rdb");
             var partitions = await navigationContext.ListEntriesAsync();
             foreach (var partition in partitions.Skip(1))
             {
@@ -331,6 +339,7 @@ public class GivenNavigationContextWithAmigaImages : IDisposable
             using var navigationContext = new NavigationContext(_rootPath);
             using var localContext = new NavigationContext(_rootPath);
             await OpenAsync(navigationContext, "disk.hdf");
+            await OpenAsync(navigationContext, "rdb");
             await OpenAsync(navigationContext, "2");
             if (writeFile)
             {
@@ -339,6 +348,7 @@ public class GivenNavigationContextWithAmigaImages : IDisposable
                     navigationContext, navigationContext.CurrentPath, "*");
             }
 
+            await navigationContext.GoParentAsync();
             await navigationContext.GoParentAsync();
             await navigationContext.GoParentAsync();
 

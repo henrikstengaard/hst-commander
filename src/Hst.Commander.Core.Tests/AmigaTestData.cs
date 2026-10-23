@@ -48,6 +48,12 @@ public static class AmigaTestData
         await WriteRdb(disk.Content, dosTypes, false);
     }
 
+    /// <summary>
+    /// Writes a rigid disk block like <see cref="CreateRdbImage" /> to a stream of a fixed size, e.g. a partition of
+    /// a PiStorm disk.
+    /// </summary>
+    public static Task WriteRdbToStream(Stream stream, params byte[][] dosTypes) => WriteRdb(stream, dosTypes, false);
+
     /// <summary>Volume name of a formatted partition in the images: Workbench, Work, Work2, ...</summary>
     public static string GetVolumeName(int partitionIndex) => partitionIndex switch
     {

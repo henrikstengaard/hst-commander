@@ -8,8 +8,8 @@ public interface IEntry
     DateTime? ModifiedDate { get; }
 
     /// <summary>
-    /// Name shown in the panes and at the top of the properties dialog, e.g. "DH0: Workbench" for the RDB partition
-    /// named "1" with drive name DH0 and volume name Workbench. Paths and file operations always use
+    /// Name shown in the panes and at the top of the properties dialog, e.g. "1 - DH0 - Workbench" for the RDB
+    /// partition named "1" with drive name DH0 and volume name Workbench. Paths and file operations always use
     /// <see cref="Name" />. Defaults to the name.
     /// </summary>
     string DisplayName => Name;

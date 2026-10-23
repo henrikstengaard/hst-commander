@@ -6,10 +6,11 @@ using Hst.Commander.Abstractions;
 namespace Hst.Commander.Plugins.Amiga;
 
 /// <summary>
-/// Volume browsing the partitions of a hard disk image with a rigid disk block (RDB). The root lists the partitions as
-/// directories named 1 to the number of partitions, in the order of the rigid disk block, shown with their drive names
-/// and volume names (e.g. "DH0: Workbench", see <see cref="IEntry.DisplayName" />) and their partition details in the
-/// properties dialog (<see cref="IEntry.Details" />). A partition is mounted (Fast File System or PFS3) when listed or
+/// Volume browsing the partitions of a hard disk image with a rigid disk block (RDB). The root lists the partition
+/// table as the directory "rdb" (shown as "RDB"), listing the partitions as directories named by their partition
+/// number (1, 2, ...), in the order of the rigid disk block, so paths show the partition table, e.g. "rdb\1". The partitions are shown with
+/// their number, drive name and volume name (e.g. "1 - DH0 - Workbench", see <see cref="IEntry.DisplayName" />) and
+/// their partition details in the properties dialog (<see cref="IEntry.Details" />). A partition is mounted (Fast File System or PFS3) when listed or
 /// opened and stays mounted until the volume is disposed. The partitions can't be changed,
 /// their file systems are writable when the stream is.
 /// </summary>
@@ -19,9 +20,12 @@ public class RdbVolume : IVolume, IDisposable
     private readonly IReadOnlyList<PartitionBlock> _partitionBlocks;
     private readonly IDisposable? _resource;
     private const string PartitionTypeName = "Amiga partition";
+    private const string PartitionTableName = "rdb";
+    private const string PartitionTableDisplayName = "RDB";
 
     private readonly Dictionary<int, AmigaFileSystemVolume> _mountedVolumes = new();
     private readonly HashSet<int> _unmountablePartitions = [];
+    private bool _inPartitionTable;
     private int? _partitionIndex;
 
     /// <param name="stream">Stream of the disk, written to when writable.</param>
@@ -43,12 +47,24 @@ public class RdbVolume : IVolume, IDisposable
     private AmigaFileSystemVolume? CurrentVolume =>
         _partitionIndex is { } partitionIndex ? _mountedVolumes[partitionIndex] : null;
 
-    public IEnumerable<string> CurrentPathComponents => _partitionIndex is { } partitionIndex
-        ? [GetPartitionName(partitionIndex), .._mountedVolumes[partitionIndex].CurrentPathComponents]
-        : [];
+    public IEnumerable<string> CurrentPathComponents => !_inPartitionTable ? []
+        : _partitionIndex is { } partitionIndex
+            ? [PartitionTableName, GetPartitionName(partitionIndex), .._mountedVolumes[partitionIndex].CurrentPathComponents]
+            : [PartitionTableName];
 
+    /// <summary>Name of a partition: the partition number, e.g. "1".</summary>
     private static string GetPartitionName(int partitionIndex) =>
         (partitionIndex + 1).ToString(CultureInfo.InvariantCulture);
+
+    private PartitionTableEntry CreatePartitionTableEntry() => new(PartitionTableName, PartitionTableDisplayName,
+        new EntryDetails(
+        "Partition table",
+        [
+            [
+                new EntryProperty("Partition table", "Rigid disk block (RDB)"),
+                new EntryProperty("Partitions", _partitionBlocks.Count.ToString(CultureInfo.InvariantCulture))
+            ]
+        ]));
 
     public async IAsyncEnumerable<IEntry> ListEntries(
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -60,6 +76,12 @@ public class RdbVolume : IVolume, IDisposable
                 yield return entry;
             }
 
+            yield break;
+        }
+
+        if (!_inPartitionTable)
+        {
+            yield return CreatePartitionTableEntry();
             yield break;
         }
 
@@ -82,8 +104,8 @@ public class RdbVolume : IVolume, IDisposable
         var driveName = partitionBlock.DriveName?.Trim();
         var volumeName = volume?.VolumeName.Trim();
 
-        var label = string.IsNullOrEmpty(driveName) ? name : driveName;
-        var displayName = string.IsNullOrEmpty(volumeName) ? label : $"{label}: {volumeName}";
+        var displayName = string.Join(" - ",
+            new[] { name, driveName, volumeName }.Where(part => !string.IsNullOrEmpty(part)));
         return new PartitionEntry(name, displayName, partitionBlock.PartitionSize,
             CreateDetails(partitionIndex, driveName, volumeName, volume));
     }
@@ -159,6 +181,7 @@ public class RdbVolume : IVolume, IDisposable
     {
         ArgumentNullException.ThrowIfNull(pathComponents);
 
+        var previousInPartitionTable = _inPartitionTable;
         var previousPartitionIndex = _partitionIndex;
         var previousPathComponents = CurrentVolume?.CurrentPathComponents.ToList();
         try
@@ -167,11 +190,23 @@ public class RdbVolume : IVolume, IDisposable
             {
                 if (pathComponent.Equals(Paths.Root, StringComparison.OrdinalIgnoreCase))
                 {
+                    _inPartitionTable = false;
                     _partitionIndex = null;
+                }
+                else if (!_inPartitionTable)
+                {
+                    if (!pathComponent.Equals(Paths.Parent, StringComparison.OrdinalIgnoreCase))
+                    {
+                        OpenPartitionTable(pathComponent);
+                    }
                 }
                 else if (CurrentVolume is not { } volume)
                 {
-                    if (!pathComponent.Equals(Paths.Parent, StringComparison.OrdinalIgnoreCase))
+                    if (pathComponent.Equals(Paths.Parent, StringComparison.OrdinalIgnoreCase))
+                    {
+                        _inPartitionTable = false;
+                    }
+                    else
                     {
                         await OpenPartition(pathComponent, cancellationToken);
                     }
@@ -188,6 +223,7 @@ public class RdbVolume : IVolume, IDisposable
         }
         catch
         {
+            _inPartitionTable = previousInPartitionTable;
             _partitionIndex = previousPartitionIndex;
             if (CurrentVolume is { } volume && previousPathComponents != null)
             {
@@ -196,6 +232,17 @@ public class RdbVolume : IVolume, IDisposable
 
             throw;
         }
+    }
+
+    /// <summary>Changes from the root to the partition list.</summary>
+    private void OpenPartitionTable(string name)
+    {
+        if (!name.Equals(PartitionTableName, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new DirectoryNotFoundException($"'{name}' not found");
+        }
+
+        _inPartitionTable = true;
     }
 
     /// <summary>Changes to the root of a partition, mounting its file system the first time.</summary>
@@ -241,6 +288,12 @@ public class RdbVolume : IVolume, IDisposable
             return await volume.OpenEntry(name, cancellationToken);
         }
 
+        if (!_inPartitionTable)
+        {
+            OpenPartitionTable(name);
+            return CreatePartitionTableEntry();
+        }
+
         await OpenPartition(name, cancellationToken);
         return await CreatePartitionEntry(_partitionIndex!.Value);
     }
@@ -281,8 +334,8 @@ public class RdbVolume : IVolume, IDisposable
     }
 
     /// <summary>
-    /// Partition in the partition list, shown with its drive name and volume name, e.g. "DH0: Workbench" (the number
-    /// without a drive name, no volume name when it can't be mounted). It is a volume of its own, so its icon is the
+    /// Partition in the partition list, shown with its number, drive name and volume name, e.g. "1 - DH0 - Workbench"
+    /// (no drive name when it has none, no volume name when it can't be mounted). It is a volume of its own, so its icon is the
     /// Disk.info file in its root.
     /// </summary>
     private sealed record PartitionEntry(string Name, string DisplayName, long? Size, EntryDetails Details) : IEntry
@@ -292,5 +345,15 @@ public class RdbVolume : IVolume, IDisposable
         public DateTime? ModifiedDate => null;
 
         public bool IsVolume => true;
+    }
+
+    /// <summary>Partition table in the root, the directory "rdb" shown as "RDB" listing the partitions.</summary>
+    private sealed record PartitionTableEntry(string Name, string DisplayName, EntryDetails Details) : IEntry
+    {
+        public EntryType Type => EntryType.Container;
+
+        public long? Size => null;
+
+        public DateTime? ModifiedDate => null;
     }
 }

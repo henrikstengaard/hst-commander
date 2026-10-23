@@ -38,4 +38,12 @@ public interface IPlugin
     /// names in the GUI. Asked in plugin order; the first provider with an icon file listed for an entry is used.
     /// </summary>
     IEnumerable<IIconProvider> IconProviders => [];
+
+    /// <summary>
+    /// Called once by Hst Commander when the plugin is loaded, before it is used, with the services of Hst Commander,
+    /// e.g. to open partitions with the file volume providers of other plugins. Defaults to doing nothing.
+    /// </summary>
+    void Initialize(IPluginHost host)
+    {
+    }
 }
