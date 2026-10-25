@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using Hst.Commander.Abstractions;
 
 namespace Hst.Commander.Core.Volumes;
@@ -14,6 +14,7 @@ namespace Hst.Commander.Core.Volumes;
 /// <param name="UaeMetadata">
 /// How Amiga names, protection bits and comments are stored when copying from a volume storing them (see
 /// <see cref="IVolume.SupportsAmigaMetadata" />) to one that doesn't, e.g. from an Amiga disk to a local directory.
+/// <see cref="UaeMetadataFormat.None" /> doesn't handle UAE metadata: it isn't read or copied with entries.
 /// </param>
 public record CopyOptions(
     string Filter = EntryFilter.All,
@@ -40,7 +41,8 @@ public static class VolumeCopy
     /// their current directories when the copy is done.
     /// Amiga names, protection bits and comments are kept between volumes storing them (Amiga file systems), stored
     /// as UAE metadata (<see cref="CopyOptions.UaeMetadata" />) when copying from them to other volumes and read from
-    /// UAE metadata when copying from other volumes to them, without copying the metadata files.
+    /// UAE metadata when copying from other volumes to them, without copying the metadata files. Between other
+    /// volumes, the UAE metadata of the copied entries is copied with them.
     /// </summary>
     /// <param name="source">Volume to copy entries from.</param>
     /// <param name="entries">Entries in the current directory of the source volume to copy.</param>
@@ -68,10 +70,11 @@ public static class VolumeCopy
         ArgumentNullException.ThrowIfNull(destination);
         options ??= new CopyOptions();
 
-        var metadataMode = await GetMetadataModeAsync(source, destination, cancellationToken);
+        var metadataMode = await GetMetadataModeAsync(source, destination, options.UaeMetadata, cancellationToken);
+        var readsUae = metadataMode is MetadataMode.ReadUae or MetadataMode.CopyUae;
         var sourceMetadata = new Dictionary<string, UaeDirectoryMetadata>();
         var metadata = UaeDirectoryMetadata.Empty;
-        if (metadataMode == MetadataMode.ReadUae)
+        if (readsUae)
         {
             var sourceEntries = await source.ListEntries(cancellationToken).ToListAsync(cancellationToken);
             metadata = await UaeMetadataReader.ReadAsync(source, sourceEntries, true, cancellationToken);
@@ -82,8 +85,8 @@ public static class VolumeCopy
         var items = new List<CopyItem>();
         foreach (var entry in entries)
         {
-            await AddCopyItemsAsync(source, [], entry, filter, metadata, metadataMode == MetadataMode.ReadUae,
-                sourceMetadata, items, cancellationToken);
+            await AddCopyItemsAsync(source, [], entry, filter, metadata, readsUae, sourceMetadata, items,
+                cancellationToken);
         }
 
         var state = new CopyState(items, progress);
@@ -109,7 +112,9 @@ public static class VolumeCopy
                 var amigaName = item.Directory.Count == 0 && options.TargetName != null
                     ? options.TargetName
                     : item.AmigaName ?? item.Entry.Name;
-                var writer = metadataMode == MetadataMode.WriteUae
+                // entries without metadata copied between volumes not storing Amiga metadata keep their names
+                var writer = metadataMode == MetadataMode.WriteUae ||
+                             (metadataMode == MetadataMode.CopyUae && item.AmigaName != null)
                     ? await GetWriterAsync(destination, itemDestinationDirectory, options.UaeMetadata, writers,
                         cancellationToken)
                     : null;
@@ -221,17 +226,24 @@ public static class VolumeCopy
         WriteUae,
 
         /// <summary>Only the destination stores them, they are read from UAE metadata in the source.</summary>
-        ReadUae
+        ReadUae,
+
+        /// <summary>
+        /// Neither volume stores them: UAE metadata of the copied entries is read in the source and written in the
+        /// destination, without copying the metadata files.
+        /// </summary>
+        CopyUae
     }
 
     private static async Task<MetadataMode> GetMetadataModeAsync(IVolume source, IVolume destination,
-        CancellationToken cancellationToken) =>
+        UaeMetadataFormat format, CancellationToken cancellationToken) =>
         (await source.SupportsAmigaMetadata(cancellationToken),
                 await destination.SupportsAmigaMetadata(cancellationToken)) switch
             {
                 (true, true) => MetadataMode.Amiga,
                 (true, false) => MetadataMode.WriteUae,
-                (false, true) => MetadataMode.ReadUae,
+                (false, true) when format != UaeMetadataFormat.None => MetadataMode.ReadUae,
+                (false, false) when format != UaeMetadataFormat.None => MetadataMode.CopyUae,
                 _ => MetadataMode.None
             };
 

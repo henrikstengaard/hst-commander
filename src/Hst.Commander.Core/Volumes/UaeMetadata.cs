@@ -28,6 +28,9 @@ internal sealed class UaeDirectoryMetadata(
 {
     public static UaeDirectoryMetadata Empty { get; } = new([], null, [], new Dictionary<string, string>());
 
+    /// <summary>Metadata of the entries, from the "_UAEFSDB.___" file, alternate data streams and metafiles.</summary>
+    public IReadOnlyList<UaeMetadataNode> Nodes { get; } = nodes;
+
     /// <summary>Name of the "_UAEFSDB.___" file as listed, null when the directory has none.</summary>
     public string? FsDbFileName { get; } = fsDbFileName;
 
@@ -37,7 +40,7 @@ internal sealed class UaeDirectoryMetadata(
     /// <summary>Names of the ".uaem" metafiles by the normal name of their entry.</summary>
     public IReadOnlyDictionary<string, string> MetafileNames { get; } = metafileNames;
 
-    public bool IsEmpty => nodes.Count == 0 && FsDbFileName == null && MetafileNames.Count == 0;
+    public bool IsEmpty => Nodes.Count == 0 && FsDbFileName == null && MetafileNames.Count == 0;
 
     /// <summary>True for the files holding the metadata, which aren't copied to Amiga volumes.</summary>
     public bool IsMetadataFile(string name) =>
@@ -45,8 +48,23 @@ internal sealed class UaeDirectoryMetadata(
 
     /// <summary>Finds the metadata of an entry by its normal name, matched exactly, otherwise case-insensitive.</summary>
     public UaeMetadataNode? Find(string normalName) =>
-        nodes.FirstOrDefault(node => node.NormalName.Equals(normalName, StringComparison.Ordinal)) ??
-        nodes.FirstOrDefault(node => node.NormalName.Equals(normalName, StringComparison.OrdinalIgnoreCase));
+        Nodes.FirstOrDefault(node => node.NormalName.Equals(normalName, StringComparison.Ordinal)) ??
+        Nodes.FirstOrDefault(node => node.NormalName.Equals(normalName, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>True when the node is in the "_UAEFSDB.___" file.</summary>
+    public bool IsFsDbNode(UaeMetadataNode node) => FsDbNodes.Any(data => data.Node == node);
+
+    /// <summary>
+    ///     True when the node is in an alternate data stream of the entry, which moves with the entry, rather than
+    ///     in the "_UAEFSDB.___" file or a metafile.
+    /// </summary>
+    public bool IsAlternateDataStreamNode(UaeMetadataNode node) =>
+        !IsFsDbNode(node) && !MetafileNames.ContainsKey(node.NormalName);
+
+    /// <summary>Finds the metadata of another entry than <paramref name="normalName" /> with the Amiga name.</summary>
+    public UaeMetadataNode? FindOtherByAmigaName(string amigaName, string? normalName) =>
+        Nodes.FirstOrDefault(node => node.AmigaName.Equals(amigaName, StringComparison.OrdinalIgnoreCase) &&
+                                     !node.NormalName.Equals(normalName, StringComparison.Ordinal));
 }
 
 /// <summary>Reads UAE metadata of a directory through <see cref="IVolume" />, so it works for any volume.</summary>
@@ -301,6 +319,7 @@ internal sealed class UaeMetadataWriter
     private readonly string _fsDbFileName;
     private readonly IReadOnlyDictionary<string, string> _metafileNames;
     private readonly Dictionary<string, UaeMetadataNode> _nodesByAmigaName;
+    private readonly bool _hasFsDbFile;
     private bool _isFsDbChanged;
 
     private UaeMetadataWriter(UaeMetadataFormat format, IEnumerable<IEntry> entries, UaeDirectoryMetadata metadata,
@@ -310,6 +329,7 @@ internal sealed class UaeMetadataWriter
         _names = entries.Select(entry => entry.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
         _fsDbNodes = metadata.FsDbNodes.ToList();
         _fsDbFileName = metadata.FsDbFileName ?? FsDbConstants.UaeFsDbFileName;
+        _hasFsDbFile = metadata.FsDbFileName != null;
         _metafileNames = metadata.MetafileNames;
         _nodesByAmigaName = new Dictionary<string, UaeMetadataNode>(StringComparer.OrdinalIgnoreCase);
         foreach (var node in nodes)
@@ -361,6 +381,25 @@ internal sealed class UaeMetadataWriter
         };
         _names.Add(name);
         return name;
+    }
+
+    /// <summary>
+    ///     Removes the metadata of an entry by its normal name, e.g. before it is renamed, so the name can be used
+    ///     again. A removed "_UAEFSDB.___" node is written by <see cref="FlushAsync" />, metafiles aren't deleted.
+    /// </summary>
+    public void Remove(string normalName)
+    {
+        _names.Remove(normalName);
+        foreach (var (amigaName, _) in _nodesByAmigaName
+                     .Where(pair => pair.Value.NormalName.Equals(normalName, StringComparison.Ordinal)).ToList())
+        {
+            _nodesByAmigaName.Remove(amigaName);
+        }
+
+        if (_fsDbNodes.RemoveAll(data => data.Node.NormalName.Equals(normalName, StringComparison.Ordinal)) > 0)
+        {
+            _isFsDbChanged = true;
+        }
     }
 
     /// <summary>
@@ -441,7 +480,10 @@ internal sealed class UaeMetadataWriter
         }
     }
 
-    /// <summary>Writes the "_UAEFSDB.___" file in the current directory of the volume when nodes were set.</summary>
+    /// <summary>
+    ///     Writes the "_UAEFSDB.___" file in the current directory of the volume when nodes were set or removed, or
+    ///     deletes it when no nodes are left.
+    /// </summary>
     public async Task FlushAsync(IVolume volume, CancellationToken cancellationToken)
     {
         if (!_isFsDbChanged)
@@ -449,7 +491,15 @@ internal sealed class UaeMetadataWriter
             return;
         }
 
-        await WriteFsDbAsync(volume, _fsDbFileName, _fsDbNodes, cancellationToken);
+        if (_fsDbNodes.Count > 0)
+        {
+            await WriteFsDbAsync(volume, _fsDbFileName, _fsDbNodes, cancellationToken);
+        }
+        else if (_hasFsDbFile)
+        {
+            await volume.Delete(_fsDbFileName, cancellationToken);
+        }
+
         _isFsDbChanged = false;
     }
 
@@ -472,7 +522,8 @@ internal sealed class UaeMetadataWriter
             _ => !ReplaceInvalidCharacters(name).Equals(name, StringComparison.Ordinal)
         };
 
-    private static bool IsWindowsReservedName(string name) =>
+    /// <summary>True when an Amiga name is a Windows reserved name, e.g. "CON" or "nul.txt".</summary>
+    internal static bool IsWindowsReservedName(string name) =>
         WindowsReservedNameRegex.IsMatch(name) || WindowsReservedNameRegex.IsMatch(Path.GetFileNameWithoutExtension(name));
 
     /// <summary>Name with invalid characters replaced with "_" and Windows reserved names prefixed with "_".</summary>
@@ -501,5 +552,193 @@ internal sealed class UaeMetadataWriter
         }
 
         return uniqueName;
+    }
+}
+
+/// <summary>
+///     Keeps the UAE metadata of directories up to date when entries are renamed, moved or deleted in volumes not
+///     storing Amiga metadata, e.g. local directories, so the entries keep their Amiga names, protection bits and
+///     comments and no metadata is left of entries that are gone.
+/// </summary>
+internal static class UaeMetadataUpdater
+{
+    /// <summary>
+    ///     Reads the UAE metadata of the current directory of a volume when it's handled: the format isn't
+    ///     <see cref="UaeMetadataFormat.None" /> and the volume doesn't store Amiga metadata itself. Empty otherwise.
+    /// </summary>
+    public static async Task<UaeDirectoryMetadata> ReadAsync(IVolume volume, UaeMetadataFormat format,
+        bool readAlternateDataStreams, string? localDirectory, CancellationToken cancellationToken)
+    {
+        if (format == UaeMetadataFormat.None || await volume.SupportsAmigaMetadata(cancellationToken))
+        {
+            return UaeDirectoryMetadata.Empty;
+        }
+
+        var entries = await volume.ListEntries(cancellationToken).ToListAsync(cancellationToken);
+        return await UaeMetadataReader.ReadAsync(volume, entries, readAlternateDataStreams, cancellationToken,
+            localDirectory);
+    }
+
+    /// <summary>
+    ///     True when a name can be used as it is in the directory: without characters other file systems can't store
+    ///     (local directories on other systems than Windows only can't store "/"), not a Windows reserved name.
+    /// </summary>
+    public static bool IsUsableName(string name, string? localDirectory) =>
+        localDirectory != null && !OperatingSystem.IsWindows()
+            ? name.IndexOfAny(Path.GetInvalidFileNameChars()) < 0
+            : !UaeMetadataWriter.RequiresNormalName(UaeMetadataFormat.None, name);
+
+    /// <summary>
+    ///     Renames an entry in the current directory to a new Amiga name, like renaming it on an Amiga with UAE: the
+    ///     entry gets a normal name for the Amiga name (the name itself when it can be used) and its protection bits
+    ///     and comment are kept. Entries with metadata in the "_UAEFSDB.___" file or a metafile keep using it, other
+    ///     entries get metadata in <paramref name="format" /> (WinUAE's alternate data streams are replaced). Returns
+    ///     the normal name, or null when the entry has no metadata and the name can be used, so it's renamed as usual.
+    /// </summary>
+    public static async Task<string?> RenameAsync(IVolume volume, IEntry entry, string newName,
+        UaeMetadataFormat format, string? localDirectory, CancellationToken cancellationToken)
+    {
+        var metadata = await ReadAsync(volume, format, true, localDirectory, cancellationToken);
+        var node = metadata.Find(entry.Name) is { } foundNode &&
+                   foundNode.NormalName.Equals(entry.Name, StringComparison.Ordinal)
+            ? foundNode
+            : null;
+        if (node == null && IsUsableName(newName, localDirectory))
+        {
+            return null;
+        }
+
+        if (newName.Contains(':'))
+        {
+            throw new IOException($"Invalid name '{newName}'");
+        }
+
+        if (metadata.FindOtherByAmigaName(newName, entry.Name) is { } otherNode)
+        {
+            throw new IOException($"'{otherNode.AmigaName}' already exists");
+        }
+
+        var metafileName = metadata.MetafileNames.GetValueOrDefault(entry.Name);
+        var writerFormat = node != null && metadata.IsFsDbNode(node)
+            ? UaeMetadataFormat.UaeFsDb
+            : metafileName != null
+                ? UaeMetadataFormat.UaeMetafile
+                : format;
+        var writer = await UaeMetadataWriter.CreateAsync(volume, writerFormat, cancellationToken);
+        writer.Remove(entry.Name);
+        var normalName = writer.GetName(newName);
+        if (!normalName.Equals(entry.Name, StringComparison.Ordinal))
+        {
+            await volume.Rename(entry.Name, normalName, cancellationToken);
+            if (metafileName != null)
+            {
+                await volume.Delete(metafileName, cancellationToken);
+            }
+        }
+
+        if (node != null && metadata.IsAlternateDataStreamNode(node) && localDirectory != null)
+        {
+            DeleteAlternateDataStream(Path.Combine(localDirectory, normalName));
+        }
+
+        await writer.SetAsync(volume, newName, normalName, node?.Metadata, entry.ModifiedDate, cancellationToken);
+        await writer.FlushAsync(volume, cancellationToken);
+        return normalName;
+    }
+
+    /// <summary>
+    ///     Moves the metadata of entries moved from the current directory of the source volume to the current
+    ///     directory of the destination volume with their names (e.g. with <see cref="File.Move(string, string)" />):
+    ///     "_UAEFSDB.___" nodes are written to the destination's "_UAEFSDB.___" file and metafiles are moved (WinUAE's
+    ///     alternate data streams move with the entries). The metadata is then removed from the source.
+    /// </summary>
+    public static async Task MoveAsync(IVolume source, UaeDirectoryMetadata sourceMetadata, IVolume destination,
+        IEnumerable<IEntry> movedEntries, CancellationToken cancellationToken)
+    {
+        UaeMetadataWriter? writer = null;
+        try
+        {
+            foreach (var entry in movedEntries)
+            {
+                if (sourceMetadata.MetafileNames.GetValueOrDefault(entry.Name) is { } metafileName)
+                {
+                    await MoveItemAsync(source, destination, metafileName, cancellationToken);
+                }
+
+                if (sourceMetadata.Find(entry.Name) is { } node && sourceMetadata.IsFsDbNode(node))
+                {
+                    writer ??= await UaeMetadataWriter.CreateAsync(destination, UaeMetadataFormat.UaeFsDb,
+                        cancellationToken);
+                    await writer.SetAsync(destination, node.AmigaName, node.NormalName, node.Metadata,
+                        entry.ModifiedDate, cancellationToken);
+                }
+            }
+        }
+        catch
+        {
+            // the metadata of the entries moved so far is kept, also when moving fails
+            try
+            {
+                if (writer != null)
+                {
+                    await writer.FlushAsync(destination, CancellationToken.None);
+                }
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException
+                                                  or NotSupportedException)
+            {
+                // keep the error that stopped the move rather than the failed metadata
+            }
+
+            await TryRemoveMissingAsync(source, sourceMetadata);
+            throw;
+        }
+
+        if (writer != null)
+        {
+            await writer.FlushAsync(destination, cancellationToken);
+        }
+
+        await UaeMetadataReader.RemoveMissingAsync(source, sourceMetadata, cancellationToken);
+    }
+
+    /// <summary>Removes the metadata of entries no longer in the directory, ignoring errors.</summary>
+    public static async Task TryRemoveMissingAsync(IVolume volume, UaeDirectoryMetadata metadata)
+    {
+        try
+        {
+            await UaeMetadataReader.RemoveMissingAsync(volume, metadata, CancellationToken.None);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException
+                                              or NotSupportedException)
+        {
+            // keep the error that stopped the operation rather than the failed metadata
+        }
+    }
+
+    private static async Task MoveItemAsync(IVolume source, IVolume destination, string name,
+        CancellationToken cancellationToken)
+    {
+        await using (var sourceStream = await source.OpenRead(name, cancellationToken))
+        await using (var destinationStream = await destination.OpenWrite(name, cancellationToken))
+        {
+            await sourceStream.CopyToAsync(destinationStream, cancellationToken);
+        }
+
+        await source.Delete(name, cancellationToken);
+    }
+
+    private static void DeleteAlternateDataStream(string path)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var streamPath = string.Concat(path, ":", FsDbConstants.UaeFsDbFileName);
+        if (File.Exists(streamPath))
+        {
+            File.Delete(streamPath);
+        }
     }
 }

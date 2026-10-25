@@ -28,7 +28,7 @@ public sealed class SettingsDialog : Dialog
         _settings = settings;
         _preview = preview;
         Title = "Settings";
-        Width = 50;
+        Width = 56;
         Height = 20;
         ColorScheme = palette.DialogColorScheme;
 

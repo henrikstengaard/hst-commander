@@ -19,7 +19,11 @@ public enum UaeMetadataFormat
     /// </summary>
     UaeMetafile,
 
-    /// <summary>No metadata: protection bits and comments are lost and invalid characters in names are replaced with "_".</summary>
+    /// <summary>
+    ///     No UAE metadata handling: copying from Amiga volumes loses protection bits and comments and replaces invalid
+    ///     characters in names with "_", UAE metadata isn't read, shown or kept up to date when renaming, moving and
+    ///     deleting, and metadata files are normal files.
+    /// </summary>
     None
 }
 
@@ -32,7 +36,7 @@ public static class UaeMetadataFormats
     public static string GetName(UaeMetadataFormat format) => format switch
     {
         UaeMetadataFormat.UaeMetafile => "UAE metafiles (FS-UAE)",
-        UaeMetadataFormat.None => "None",
+        UaeMetadataFormat.None => "None (no UAE metadata handling)",
         _ => "UAEFSDB (WinUAE, FS-UAE)"
     };
 }

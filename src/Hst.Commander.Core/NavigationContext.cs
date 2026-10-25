@@ -1200,7 +1200,8 @@ public sealed class NavigationContext : IDisposable
     /// <summary>
     ///     Deletes entries in the current location, directories with everything in them. Like copying, it uses a volume
     ///     of its own, so it can run on a background thread. Read-only images throw
-    ///     <see cref="NotSupportedException" />.
+    ///     <see cref="NotSupportedException" />. The UAE metadata of deleted entries is removed (see
+    ///     <see cref="UaeMetadata" />).
     /// </summary>
     public async Task DeleteAsync(IReadOnlyCollection<IEntry> entries, IProgress<DeleteProgress>? progress = null,
         CancellationToken cancellationToken = default)
@@ -1208,7 +1209,20 @@ public sealed class NavigationContext : IDisposable
         ArgumentNullException.ThrowIfNull(entries);
 
         using var location = await OpenLocationAsync(cancellationToken);
-        await location.Volume.DeleteAsync(entries, progress, cancellationToken);
+        var metadata = await UaeMetadataUpdater.ReadAsync(location.Volume, UaeMetadata, false, null,
+            cancellationToken);
+        try
+        {
+            await location.Volume.DeleteAsync(entries, progress, cancellationToken);
+        }
+        catch
+        {
+            // the metadata of the entries deleted so far is removed, also when deleting fails
+            await UaeMetadataUpdater.TryRemoveMissingAsync(location.Volume, metadata);
+            throw;
+        }
+
+        await UaeMetadataReader.RemoveMissingAsync(location.Volume, metadata, cancellationToken);
     }
 
     /// <summary>
@@ -1229,7 +1243,7 @@ public sealed class NavigationContext : IDisposable
     ///     Properties like <see cref="GetProperties" />, with the Amiga name, protection bits and comment of a single
     ///     entry from the UAE metadata of the current directory (see <see cref="UaeMetadataReader" />) in volumes not
     ///     storing them, e.g. a file copied from an Amiga volume to a local directory. Reads with the pane's volume,
-    ///     so call it on the thread using the pane.
+    ///     so call it on the thread using the pane. Not with <see cref="UaeMetadataFormat.None" />.
     /// </summary>
     public async Task<EntryProperties> GetPropertiesAsync(IReadOnlyList<IEntry> entries,
         CancellationToken cancellationToken = default)
@@ -1245,7 +1259,7 @@ public sealed class NavigationContext : IDisposable
 
     private async Task<UaeMetadataNode?> FindUaeMetadataAsync(IEntry entry, CancellationToken cancellationToken)
     {
-        if (await _nestedVolume.SupportsAmigaMetadata(cancellationToken))
+        if (UaeMetadata == UaeMetadataFormat.None || await _nestedVolume.SupportsAmigaMetadata(cancellationToken))
         {
             return null;
         }
@@ -1489,7 +1503,10 @@ public sealed class NavigationContext : IDisposable
     ///     Renames an entry in the current location. The renamed entry is selected by <see cref="GetSelectedIndex" />
     ///     when the entries are listed again. Throws <see cref="NotSupportedException" /> when the location doesn't
     ///     support it (see <see cref="MoveNotSupportedMessage" />) and <see cref="IOException" /> when the name is
-    ///     invalid or another entry with the name already exists.
+    ///     invalid or another entry with the name already exists. When UAE metadata is handled (see
+    ///     <see cref="UaeMetadata" />) in a volume not storing Amiga metadata, the name is the new Amiga name of
+    ///     entries with UAE metadata and can contain characters the volume can't store, see
+    ///     <see cref="UaeMetadataUpdater.RenameAsync" />.
     /// </summary>
     public async Task RenameAsync(IEntry entry, string newName, CancellationToken cancellationToken = default)
     {
@@ -1501,7 +1518,9 @@ public sealed class NavigationContext : IDisposable
             throw new NotSupportedException(message);
         }
 
-        newName = ValidateName(newName, "Name");
+        var handlesUaeMetadata = UaeMetadata != UaeMetadataFormat.None &&
+                                 !await _nestedVolume.SupportsAmigaMetadata(cancellationToken);
+        newName = ValidateName(newName, "Name", !handlesUaeMetadata);
         if (newName.Equals(entry.Name, StringComparison.Ordinal))
         {
             return;
@@ -1514,9 +1533,18 @@ public sealed class NavigationContext : IDisposable
             throw new IOException($"'{existingEntry.Name}' already exists");
         }
 
-        await _nestedVolume.Rename(entry.Name, newName, cancellationToken);
+        var localDirectory = !IsInImage ? LocalPath : null;
+        var normalName = handlesUaeMetadata
+            ? await UaeMetadataUpdater.RenameAsync(_nestedVolume, entry, newName, UaeMetadata, localDirectory,
+                cancellationToken)
+            : null;
+        if (normalName == null)
+        {
+            await _nestedVolume.Rename(entry.Name, newName, cancellationToken);
+        }
+
         _markedEntries.Remove(entry.Name);
-        _newEntryName = newName;
+        _newEntryName = normalName ?? newName;
     }
 
     /// <summary>
@@ -1552,8 +1580,8 @@ public sealed class NavigationContext : IDisposable
         using (destination)
         {
             ThrowIfCopyingOntoItself(source.Path, entries, destination.Path, targetName, "move");
-            var remainingEntries = MoveOnSameDrive(source, entries, destination, filter, targetName, progress,
-                cancellationToken);
+            var remainingEntries = await MoveOnSameDriveAsync(source, entries, destination, filter, targetName,
+                progress, cancellationToken);
             if (remainingEntries.Count > 0)
             {
                 await source.Volume.MoveToAsync(remainingEntries, destination.Volume,
@@ -1566,11 +1594,13 @@ public sealed class NavigationContext : IDisposable
     ///     Moves entries by renaming them when both locations are local directories on the same drive and all items
     ///     are moved, which is fast and needs no extra space. Returns the entries left to move by copying: all entries
     ///     when renaming isn't possible, otherwise entries that exist in the destination (to confirm overwriting and
-    ///     merge directories).
+    ///     merge directories). When UAE metadata is handled, the metadata of moved entries is moved too, while
+    ///     entries with metadata moved to another name or whose Amiga name is in the destination's metadata are left
+    ///     to copy, which gives them their names in the destination. The metadata files themselves aren't moved.
     /// </summary>
-    private static IReadOnlyList<IEntry> MoveOnSameDrive(VolumeLocation source, IReadOnlyCollection<IEntry> entries,
-        VolumeLocation destination, string filter, string? targetName, IProgress<CopyProgress>? progress,
-        CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<IEntry>> MoveOnSameDriveAsync(VolumeLocation source,
+        IReadOnlyCollection<IEntry> entries, VolumeLocation destination, string filter, string? targetName,
+        IProgress<CopyProgress>? progress, CancellationToken cancellationToken)
     {
         if (source.Volume is not LocalVolume || destination.Volume is not LocalVolume ||
             !(string.IsNullOrWhiteSpace(filter) || filter.Trim() is EntryFilter.All or "*.*") ||
@@ -1580,35 +1610,76 @@ public sealed class NavigationContext : IDisposable
             return entries.ToList();
         }
 
+        // alternate data streams move with the entries
+        var sourceMetadata = await UaeMetadataUpdater.ReadAsync(source.Volume, UaeMetadata, false, null,
+            cancellationToken);
+        var destinationMetadata = sourceMetadata.IsEmpty
+            ? UaeDirectoryMetadata.Empty
+            : await UaeMetadataUpdater.ReadAsync(destination.Volume, UaeMetadata, false, null, cancellationToken);
+
         var remainingEntries = new List<IEntry>();
-        var movedEntries = 0;
-        foreach (var entry in entries)
+        var movedEntries = new List<IEntry>();
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            var sourcePath = Path.Combine(source.Path, entry.Name);
-            var destinationPath = Path.Combine(destination.Path, targetName ?? entry.Name);
-            if (File.Exists(destinationPath) || Directory.Exists(destinationPath))
+            foreach (var entry in entries)
             {
-                remainingEntries.Add(entry);
-                continue;
+                cancellationToken.ThrowIfCancellationRequested();
+                if (entry.Type == EntryType.Item && sourceMetadata.IsMetadataFile(entry.Name))
+                {
+                    continue;
+                }
+
+                var sourcePath = Path.Combine(source.Path, entry.Name);
+                var destinationPath = Path.Combine(destination.Path, targetName ?? entry.Name);
+                var node = sourceMetadata.Find(entry.Name);
+                if (File.Exists(destinationPath) || Directory.Exists(destinationPath) ||
+                    (node != null && (targetName != null ||
+                                      destinationMetadata.FindOtherByAmigaName(node.AmigaName, null) != null)))
+                {
+                    remainingEntries.Add(entry);
+                    continue;
+                }
+
+                progress?.Report(new CopyProgress(entry.Name, 0, 0, 0, 0, movedEntries.Count, entries.Count, 0,
+                    null));
+                if (entry.Type == EntryType.Container)
+                {
+                    Directory.Move(sourcePath, destinationPath);
+                }
+                else
+                {
+                    File.Move(sourcePath, destinationPath);
+                }
+
+                movedEntries.Add(entry);
+            }
+        }
+        catch when (!sourceMetadata.IsEmpty)
+        {
+            // the metadata of the entries moved so far is moved too, keeping the error that stopped the move
+            try
+            {
+                await UaeMetadataUpdater.MoveAsync(source.Volume, sourceMetadata, destination.Volume, movedEntries,
+                    CancellationToken.None);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException
+                                                  or NotSupportedException)
+            {
             }
 
-            progress?.Report(new CopyProgress(entry.Name, 0, 0, 0, 0, movedEntries, entries.Count, 0, null));
-            if (entry.Type == EntryType.Container)
-            {
-                Directory.Move(sourcePath, destinationPath);
-            }
-            else
-            {
-                File.Move(sourcePath, destinationPath);
-            }
-
-            movedEntries++;
+            throw;
         }
 
-        if (movedEntries > 0)
+        if (!sourceMetadata.IsEmpty)
         {
-            progress?.Report(new CopyProgress(string.Empty, 0, 0, 0, 0, movedEntries, entries.Count, 0, null));
+            await UaeMetadataUpdater.MoveAsync(source.Volume, sourceMetadata, destination.Volume, movedEntries,
+                cancellationToken);
+        }
+
+        if (movedEntries.Count > 0)
+        {
+            progress?.Report(new CopyProgress(string.Empty, 0, 0, 0, 0, movedEntries.Count, entries.Count, 0,
+                null));
         }
 
         return remainingEntries;
@@ -1619,9 +1690,10 @@ public sealed class NavigationContext : IDisposable
 
     /// <summary>
     ///     Trims an entry name entered by the user and checks it's valid: an empty name, "." and "..", and names with
-    ///     path separators or invalid file name characters throw <see cref="IOException" />.
+    ///     path separators, control characters or (with <paramref name="checkFileNameCharacters" />) invalid file name
+    ///     characters throw <see cref="IOException" />.
     /// </summary>
-    private static string ValidateName(string name, string description)
+    private static string ValidateName(string name, string description, bool checkFileNameCharacters = true)
     {
         name = name.Trim();
         if (name.Length == 0)
@@ -1629,8 +1701,8 @@ public sealed class NavigationContext : IDisposable
             throw new IOException($"{description} is empty");
         }
 
-        if (name is "." or ".." || name.IndexOfAny(['/', '\\']) >= 0 ||
-            name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+        if (name is "." or ".." || name.IndexOfAny(['/', '\\']) >= 0 || name.Any(char.IsControl) ||
+            (checkFileNameCharacters && name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0))
         {
             throw new IOException($"Invalid {description.ToLowerInvariant()} '{name}'");
         }

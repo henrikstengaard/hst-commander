@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using Hst.Amiga.DataTypes.UaeFsDbs;
 using Hst.Commander.Abstractions;
 using Hst.Commander.Core.Volumes;
@@ -225,7 +225,7 @@ public class GivenVolumeCopyWithUaeMetadata : IDisposable
     }
 
     [Fact]
-    public async Task When_CopyingBetweenLocalDirectories_Then_UaeMetadataFilesAreCopiedAsTheyAre()
+    public async Task When_CopyingBetweenLocalDirectories_Then_UaeMetadataIsCopiedWithTheEntries()
     {
         // arrange
         var source = await CreateAdfWithEntriesAsync("source.adf");
@@ -237,7 +237,48 @@ public class GivenVolumeCopyWithUaeMetadata : IDisposable
         await local.CopyToAsync(await ListAsync(local), destination);
 
         // assert
-        Assert.Equal(ListLocalNames(Path.Combine(_rootPath, "local")), ListLocalNames(Path.Combine(_rootPath, "local2")));
+        var destinationPath = Path.Combine(_rootPath, "local2");
+        Assert.Equal(ListLocalNames(Path.Combine(_rootPath, "local")), ListLocalNames(destinationPath));
+        Assert.Equal(["dir#1", "file*1"],
+            (await ReadFsDbNodesAsync(destinationPath)).Select(node => node.AmigaName).Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public async Task When_CopyingEntryWithoutItsMetadataFileBetweenLocalDirectories_Then_ItsMetadataIsCopied()
+    {
+        // arrange
+        var source = await CreateAdfWithEntriesAsync("source.adf");
+        var local = CreateLocalVolume("local");
+        await source.CopyToAsync(await ListAsync(source), local, new CopyOptions(UaeMetadata: UaeMetadataFormat.UaeMetafile));
+        var destination = CreateLocalVolume("local2");
+
+        // act
+        await local.CopyToAsync([await GetEntryAsync(local, "file%2a1")], destination,
+            new CopyOptions(UaeMetadata: UaeMetadataFormat.UaeMetafile));
+
+        // assert - the source keeps its entries
+        Assert.Equal(["file%2a1", "file%2a1.uaem"], ListLocalNames(Path.Combine(_rootPath, "local2")));
+        Assert.StartsWith("-s--rwed ",
+            await File.ReadAllTextAsync(Path.Combine(_rootPath, "local2", "file%2a1.uaem")));
+        Assert.Equal(["dir%231", "dir%231.uaem", "file%2a1", "file%2a1.uaem", "plain.txt"],
+            ListLocalNames(Path.Combine(_rootPath, "local")));
+    }
+
+    [Fact]
+    public async Task When_CopyingBetweenLocalDirectoriesWithoutUaeMetadataHandling_Then_MetadataFilesAreCopied()
+    {
+        // arrange
+        var source = await CreateAdfWithEntriesAsync("source.adf");
+        var local = CreateLocalVolume("local");
+        await source.CopyToAsync(await ListAsync(source), local);
+        var destination = CreateLocalVolume("local2");
+
+        // act
+        await local.CopyToAsync([await GetEntryAsync(local, "_UAEFSDB.___")], destination,
+            new CopyOptions(UaeMetadata: UaeMetadataFormat.None));
+
+        // assert
+        Assert.Equal(["_UAEFSDB.___"], ListLocalNames(Path.Combine(_rootPath, "local2")));
     }
 
     [Fact]
@@ -275,5 +316,254 @@ public class GivenVolumeCopyWithUaeMetadata : IDisposable
         var localPath = Path.Combine(_rootPath, "local");
         Assert.Equal(["_UAEFSDB.___", "__uae___dir_1", "plain.txt"], ListLocalNames(localPath));
         Assert.Equal(["dir#1"], (await ReadFsDbNodesAsync(localPath)).Select(node => node.AmigaName));
+    }
+
+    [Fact]
+    public async Task When_MovingBetweenLocalDirectories_Then_UaeMetadataIsMovedWithTheEntries()
+    {
+        // arrange
+        var source = await CreateAdfWithEntriesAsync("source.adf");
+        var local = CreateLocalVolume("local");
+        await source.CopyToAsync(await ListAsync(source), local);
+        var destination = CreateLocalVolume("local2");
+
+        // act
+        await local.MoveToAsync([await GetEntryAsync(local, "__uae___file_1")], destination);
+
+        // assert
+        var destinationPath = Path.Combine(_rootPath, "local2");
+        Assert.Equal(["_UAEFSDB.___", "__uae___file_1"], ListLocalNames(destinationPath));
+        var node = Assert.Single(await ReadFsDbNodesAsync(destinationPath));
+        Assert.Equal("file*1", node.AmigaName);
+        Assert.Equal(0x40U, node.Mode);
+        var localPath = Path.Combine(_rootPath, "local");
+        Assert.Equal(["_UAEFSDB.___", "__uae___dir_1", "plain.txt"], ListLocalNames(localPath));
+        Assert.Equal(["dir#1"], (await ReadFsDbNodesAsync(localPath)).Select(node => node.AmigaName));
+    }
+
+    [Fact]
+    public async Task When_CopyingFromLocalToAmigaWithoutUaeMetadataHandling_Then_MetadataFilesAreCopied()
+    {
+        // arrange
+        var source = await CreateAdfWithEntriesAsync("source.adf");
+        var local = CreateLocalVolume("local");
+        await source.CopyToAsync(await ListAsync(source), local);
+        var destination = await CreateAdfVolumeAsync("destination.adf");
+
+        // act
+        await local.CopyToAsync(await ListAsync(local), destination,
+            new CopyOptions(UaeMetadata: UaeMetadataFormat.None));
+
+        // assert
+        Assert.Equal(["_UAEFSDB.___", "__uae___dir_1", "__uae___file_1", "plain.txt"],
+            (await ListAsync(destination)).Select(entry => entry.Name).Order(StringComparer.Ordinal));
+    }
+
+    /// <summary>
+    /// Creates a local directory with the entries of <see cref="CreateAdfWithEntriesAsync" /> and their UAE metadata,
+    /// and a navigation context showing it.
+    /// </summary>
+    private async Task<(NavigationContext Context, string Path)> CreateLocalContextAsync(UaeMetadataFormat format,
+        string name = "local")
+    {
+        var source = await CreateAdfWithEntriesAsync($"{name}.adf");
+        var local = CreateLocalVolume(name);
+        await source.CopyToAsync(await ListAsync(source), local, new CopyOptions(UaeMetadata: format));
+        return CreateContext(name, format);
+    }
+
+    private (NavigationContext Context, string Path) CreateContext(string name, UaeMetadataFormat format)
+    {
+        var path = Directory.CreateDirectory(Path.Combine(_rootPath, name)).FullName;
+        var context = new NavigationContext(path) { UaeMetadata = format };
+        _disposables.Push(context);
+        return (context, path);
+    }
+
+    private static async Task<IEntry> GetEntryAsync(NavigationContext context, string name) =>
+        (await context.ListEntriesAsync()).Single(entry => entry.Name == name);
+
+    [Fact]
+    public async Task When_RenamingEntryWithUaeFsDbNode_Then_NewNameIsTheAmigaName()
+    {
+        // arrange
+        var (context, path) = await CreateLocalContextAsync(UaeMetadataFormat.UaeFsDb);
+
+        // act
+        await context.RenameAsync(await GetEntryAsync(context, "__uae___file_1"), "file*2");
+
+        // assert - the entry gets a normal name for the Amiga name and keeps its protection bits and comment
+        Assert.Equal(["_UAEFSDB.___", "__uae___dir_1", "__uae___file_2", "plain.txt"], ListLocalNames(path));
+        var node = (await ReadFsDbNodesAsync(path)).Single(node => node.NormalName == "__uae___file_2");
+        Assert.Equal("file*2", node.AmigaName);
+        Assert.Equal(0x40U, node.Mode);
+        Assert.Equal("Comment 1", node.Comment);
+        Assert.Equal(2, (await ReadFsDbNodesAsync(path)).Count);
+    }
+
+    [Fact]
+    public async Task When_RenamingEntryWithUaeFsDbNodeToUsableName_Then_ProtectionBitsAndCommentAreKept()
+    {
+        // arrange
+        var (context, path) = await CreateLocalContextAsync(UaeMetadataFormat.UaeFsDb);
+
+        // act
+        await context.RenameAsync(await GetEntryAsync(context, "__uae___file_1"), "readme.txt");
+
+        // assert
+        Assert.Equal(["_UAEFSDB.___", "__uae___dir_1", "plain.txt", "readme.txt"], ListLocalNames(path));
+        var node = (await ReadFsDbNodesAsync(path)).Single(node => node.NormalName == "readme.txt");
+        Assert.Equal("readme.txt", node.AmigaName);
+        Assert.Equal(0x40U, node.Mode);
+    }
+
+    [Fact]
+    public async Task When_RenamingEntryWithMetafile_Then_NameIsEncodedAndMetafileIsRenamed()
+    {
+        // arrange
+        var (context, path) = await CreateLocalContextAsync(UaeMetadataFormat.UaeMetafile);
+
+        // act
+        await context.RenameAsync(await GetEntryAsync(context, "file%2a1"), "file?2");
+
+        // assert
+        Assert.Equal(["dir%231", "dir%231.uaem", "file%3f2", "file%3f2.uaem", "plain.txt"], ListLocalNames(path));
+        var metafile = await File.ReadAllTextAsync(Path.Combine(path, "file%3f2.uaem"));
+        Assert.StartsWith("-s--rwed ", metafile);
+        Assert.EndsWith(" Comment 1\n", metafile);
+    }
+
+    [Fact]
+    public async Task When_RenamingEntryToAmigaNameOfAnotherEntry_Then_IOExceptionIsThrown()
+    {
+        // arrange
+        var (context, _) = await CreateLocalContextAsync(UaeMetadataFormat.UaeFsDb);
+
+        // act & assert
+        await Assert.ThrowsAsync<IOException>(async () =>
+            await context.RenameAsync(await GetEntryAsync(context, "__uae___file_1"), "DIR#1"));
+    }
+
+    [Fact]
+    public async Task When_RenamingEntryWithoutMetadataToNameWithSpecialCharacters_Then_ItGetsUaeMetadataOnWindows()
+    {
+        // arrange
+        var (context, path) = await CreateLocalContextAsync(UaeMetadataFormat.UaeFsDb);
+
+        // act
+        await context.RenameAsync(await GetEntryAsync(context, "plain.txt"), "a*b");
+
+        // assert - other systems than Windows can store the name as it is
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Equal(["_UAEFSDB.___", "__uae___a_b", "__uae___dir_1", "__uae___file_1"], ListLocalNames(path));
+            var node = (await ReadFsDbNodesAsync(path)).Single(node => node.NormalName == "__uae___a_b");
+            Assert.Equal("a*b", node.AmigaName);
+            Assert.Equal(0U, node.Mode);
+        }
+        else
+        {
+            Assert.Equal(["_UAEFSDB.___", "__uae___dir_1", "__uae___file_1", "a*b"], ListLocalNames(path));
+        }
+    }
+
+    [Fact]
+    public async Task When_RenamingWithoutUaeMetadataHandling_Then_EntryIsRenamedAsUsual()
+    {
+        // arrange
+        var (context, path) = await CreateLocalContextAsync(UaeMetadataFormat.UaeFsDb);
+        context.UaeMetadata = UaeMetadataFormat.None;
+
+        // act
+        await context.RenameAsync(await GetEntryAsync(context, "__uae___file_1"), "renamed");
+
+        // assert - the node isn't changed
+        Assert.Equal(["_UAEFSDB.___", "__uae___dir_1", "plain.txt", "renamed"], ListLocalNames(path));
+        Assert.Contains(await ReadFsDbNodesAsync(path), node => node.NormalName == "__uae___file_1");
+    }
+
+    [Theory]
+    [InlineData(UaeMetadataFormat.UaeFsDb, "__uae___file_1", new[] { "_UAEFSDB.___", "__uae___dir_1", "plain.txt" })]
+    [InlineData(UaeMetadataFormat.UaeMetafile, "file%2a1", new[] { "dir%231", "dir%231.uaem", "plain.txt" })]
+    public async Task When_DeletingEntryWithUaeMetadata_Then_ItsMetadataIsRemoved(UaeMetadataFormat format,
+        string name, string[] expectedNames)
+    {
+        // arrange
+        var (context, path) = await CreateLocalContextAsync(format);
+
+        // act
+        await context.DeleteAsync([await GetEntryAsync(context, name)]);
+
+        // assert
+        Assert.Equal(expectedNames, ListLocalNames(path));
+        if (format == UaeMetadataFormat.UaeFsDb)
+        {
+            Assert.Equal(["dir#1"], (await ReadFsDbNodesAsync(path)).Select(node => node.AmigaName));
+        }
+    }
+
+    [Fact]
+    public async Task When_DeletingAllEntriesWithUaeFsDbNodes_Then_UaeFsDbFileIsDeleted()
+    {
+        // arrange
+        var (context, path) = await CreateLocalContextAsync(UaeMetadataFormat.UaeFsDb);
+
+        // act
+        await context.DeleteAsync([
+            await GetEntryAsync(context, "__uae___file_1"), await GetEntryAsync(context, "__uae___dir_1")
+        ]);
+
+        // assert
+        Assert.Equal(["plain.txt"], ListLocalNames(path));
+    }
+
+    [Theory]
+    [InlineData(UaeMetadataFormat.UaeFsDb, "__uae___file_1", new[] { "_UAEFSDB.___", "__uae___file_1" },
+        new[] { "_UAEFSDB.___", "__uae___dir_1", "plain.txt" })]
+    [InlineData(UaeMetadataFormat.UaeMetafile, "file%2a1", new[] { "file%2a1", "file%2a1.uaem" },
+        new[] { "dir%231", "dir%231.uaem", "plain.txt" })]
+    public async Task When_MovingEntryWithUaeMetadataOnSameDrive_Then_ItsMetadataIsMoved(UaeMetadataFormat format,
+        string name, string[] expectedDestinationNames, string[] expectedSourceNames)
+    {
+        // arrange
+        var (context, path) = await CreateLocalContextAsync(format);
+        var (destinationContext, destinationPath) = CreateContext("local2", format);
+
+        // act
+        await context.MoveAsync([await GetEntryAsync(context, name)], destinationContext,
+            destinationContext.CurrentPath, "*");
+
+        // assert
+        Assert.Equal(expectedDestinationNames, ListLocalNames(destinationPath));
+        Assert.Equal(expectedSourceNames, ListLocalNames(path));
+        if (format == UaeMetadataFormat.UaeFsDb)
+        {
+            var node = Assert.Single(await ReadFsDbNodesAsync(destinationPath));
+            Assert.Equal("file*1", node.AmigaName);
+            Assert.Equal(0x40U, node.Mode);
+        }
+    }
+
+    [Fact]
+    public async Task When_MovingEntryWhoseAmigaNameIsInDestination_Then_ExistingEntryIsOverwritten()
+    {
+        // arrange - both directories have "file*1" as "__uae___file_1"
+        var (context, path) = await CreateLocalContextAsync(UaeMetadataFormat.UaeFsDb);
+        var (destinationContext, destinationPath) =
+            await CreateLocalContextAsync(UaeMetadataFormat.UaeFsDb, "local2");
+        File.Move(Path.Combine(destinationPath, "__uae___file_1"), Path.Combine(destinationPath, "other"));
+        var nodes = await ReadFsDbNodesAsync(destinationPath);
+        nodes.Single(node => node.AmigaName == "file*1").NormalName = "other";
+        await File.WriteAllBytesAsync(Path.Combine(destinationPath, "_UAEFSDB.___"),
+            nodes.SelectMany(UaeFsDbWriter.Build).ToArray());
+
+        // act
+        await context.MoveAsync([await GetEntryAsync(context, "__uae___file_1")], destinationContext,
+            destinationContext.CurrentPath, "*");
+
+        // assert - copied over the entry with the Amiga name
+        Assert.Equal(["_UAEFSDB.___", "__uae___dir_1", "other", "plain.txt"], ListLocalNames(destinationPath));
+        Assert.Equal("Amiga", await File.ReadAllTextAsync(Path.Combine(destinationPath, "other")));
+        Assert.Equal(["_UAEFSDB.___", "__uae___dir_1", "plain.txt"], ListLocalNames(path));
     }
 }
