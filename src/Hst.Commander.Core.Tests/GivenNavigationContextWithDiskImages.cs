@@ -67,6 +67,36 @@ public class GivenNavigationContextWithDiskImages : IDisposable
     }
 
     [Fact]
+    public async Task When_AttributesOfFatEntryAreChanged_Then_TheyAreWritten()
+    {
+        // arrange
+        await using (var disk = DiskTestData.CreateMbrDisk())
+        {
+            await DiskTestData.WriteToFile(disk, Path.Combine(_rootPath, "disk.img"));
+        }
+
+        using var navigationContext = new NavigationContext(_rootPath);
+        await OpenAsync(navigationContext, "disk.img");
+        await OpenAsync(navigationContext, "mbr");
+        await OpenAsync(navigationContext, "1");
+        await navigationContext.CreateDirectoryAsync("dir1");
+        var entry = (await navigationContext.ListEntriesAsync()).Single(entry => entry.Name == "dir1");
+        var properties = await navigationContext.GetPropertiesAsync([entry]);
+        var attributes = Assert.Single(properties.FlagGroups);
+
+        // act
+        var changed = await navigationContext.ChangeFlagsAsync(properties,
+            [attributes.Flags.Select(flag => flag.Label is "Read-only" or "Hidden").ToList()]);
+
+        // assert
+        Assert.Equal(["Read-only", "Hidden", "System", "Archive"], attributes.Flags.Select(flag => flag.Label));
+        Assert.True(attributes.CanChange);
+        Assert.True(changed);
+        var changedEntry = (await navigationContext.ListEntriesAsync()).Single(entry => entry.Name == "dir1");
+        Assert.Equal(EntryAttributes.ReadOnly | EntryAttributes.Hidden, changedEntry.Attributes);
+    }
+
+    [Fact]
     public async Task When_HybridDiskIsOpened_Then_PartitionTablesAreListed()
     {
         // arrange

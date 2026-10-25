@@ -9,21 +9,37 @@ namespace Hst.Commander.Gui;
 
 /// <summary>
 ///     Modal properties dialog (Alt+Enter) showing the name and the sections of lines of <see cref="EntryProperties" />
-///     separated by lines, and the used space of drives as a progress bar. Clicking the icon shows it in a higher
-///     resolution in the <see cref="IconViewerDialog" />. When opened it counts the size and contents
-///     in the background and updates the lines; closing the dialog cancels counting.
+///     separated by lines, the used space of drives as a progress bar and the check boxes of
+///     <see cref="EntryProperties.FlagGroups" /> (attributes and Amiga protection bits), enabled when they can be
+///     changed. Clicking the icon shows it in a higher resolution in the <see cref="IconViewerDialog" />. When opened it
+///     counts the size and contents in the background and updates the lines; closing the dialog cancels counting. OK
+///     sets <see cref="CheckedFlags" /> when check boxes can be changed.
 /// </summary>
 public partial class PropertiesDialog : Window
 {
     private readonly CancellationTokenSource _cancellationTokenSource = new();
     private readonly List<SelectableTextBlock> _valueTexts = [];
+    private readonly List<List<CheckBox>> _flagCheckBoxes = [];
     private bool _closed;
 
     public PropertiesDialog()
     {
         InitializeComponent();
 
-        OkButton.Click += (_, _) => Close();
+        OkButton.Click += (_, _) =>
+        {
+            if (CancelButton.IsVisible)
+            {
+                CheckedFlags = _flagCheckBoxes
+                    .Select(checkBoxes => (IReadOnlyList<bool>)checkBoxes
+                        .Select(checkBox => checkBox.IsChecked == true)
+                        .ToList())
+                    .ToList();
+            }
+
+            Close();
+        };
+        CancelButton.Click += (_, _) => Close();
         Closed += (_, _) =>
         {
             _closed = true;
@@ -67,6 +83,8 @@ public partial class PropertiesDialog : Window
         }
 
         AddLines(properties.GetSections());
+        AddFlagGroups(properties.FlagGroups);
+        CancelButton.IsVisible = properties.CanChangeFlags;
         if (properties.UsedFraction is { } usedFraction)
         {
             UsedProgressBar.Value = usedFraction;
@@ -142,6 +160,52 @@ public partial class PropertiesDialog : Window
                 LinesGrid.Children.Add(valueText);
                 _valueTexts.Add(valueText);
             }
+        }
+    }
+
+    /// <summary>
+    ///     Whether each check box of each flag group is checked when OK was pressed and check boxes can be changed,
+    ///     for <see cref="NavigationContext.ChangeFlagsAsync" />. Null otherwise.
+    /// </summary>
+    public IReadOnlyList<IReadOnlyList<bool>>? CheckedFlags { get; private set; }
+
+    private void AddFlagGroups(IReadOnlyList<PropertyFlagGroup> groups)
+    {
+        if (groups.Count == 0)
+        {
+            return;
+        }
+
+        AddRow(new Separator { Margin = new Thickness(0, 4) }, 0, 2);
+        foreach (var group in groups)
+        {
+            var row = AddRow(new TextBlock
+            {
+                Text = $"{group.Label}:",
+                Margin = new Thickness(0, 2, 16, 2),
+                VerticalAlignment = VerticalAlignment.Center
+            }, 0, 1);
+            var panel = new WrapPanel();
+            var checkBoxes = new List<CheckBox>();
+            foreach (var flag in group.Flags)
+            {
+                var checkBox = new CheckBox
+                {
+                    Content = flag.Label,
+                    IsChecked = flag.IsSet,
+                    IsEnabled = group.CanChange,
+                    Margin = new Thickness(0, 0, 12, 0),
+                    MinWidth = 0
+                };
+                ToolTip.SetTip(checkBox, flag.Description);
+                checkBoxes.Add(checkBox);
+                panel.Children.Add(checkBox);
+            }
+
+            Grid.SetRow(panel, row);
+            Grid.SetColumn(panel, 1);
+            LinesGrid.Children.Add(panel);
+            _flagCheckBoxes.Add(checkBoxes);
         }
     }
 

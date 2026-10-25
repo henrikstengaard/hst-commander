@@ -11,3 +11,5 @@ Plugins reference only this library: implement `IPlugin` returning `IVolumeProvi
 Entries can give a name shown in the panes (`IEntry.DisplayName`) and details shown in the properties dialog (`IEntry.Details`, `EntryDetails` with `EntryProperty` lines), e.g. the drive and volume name of an Amiga partition.
 
 Volumes storing Amiga names, protection bits and comments (Amiga file systems) return true from `IVolume.SupportsAmigaMetadata`, give entries their `IEntry.AmigaMetadata` and set them with `IVolume.SetAmigaMetadata`; Hst Commander keeps them when copying between such volumes and stores them as UAE metadata on other volumes.
+
+The properties dialog shows check boxes for `IEntry.Attributes` (DOS/Windows attributes, `EntryAttributes`) and the Amiga protection bits. Volumes that can change them return the attributes from `IVolume.GetChangeableAttributes` and set them with `IVolume.SetAttributes`, and return true from `IVolume.CanSetAmigaMetadata` when `IVolume.SetAmigaMetadata` can change the protection bits; the check boxes are disabled otherwise.

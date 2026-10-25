@@ -6,13 +6,17 @@ namespace Hst.Commander.Plugins.Disk;
 
 /// <summary>
 /// Volume browsing a file system read by DiscUtils, e.g. FAT or NTFS of a partition, writable when the file system is
-/// (mounted from a writable stream). Names are case-insensitive like the file systems. Errors of the file system are
-/// thrown as <see cref="IOException" />.
+/// (mounted from a writable stream). Names are case-insensitive like the file systems. Entries have their attributes,
+/// which can be changed when writable. Errors of the file system are thrown as <see cref="IOException" />.
 /// </summary>
 public sealed class DiscFileSystemVolume : IVolume, IDisposable
 {
     private const char Separator = '\\';
     private static readonly char[] InvalidNameCharacters = ['\\', '/', ':', '*', '?', '"', '<', '>', '|'];
+
+    /// <summary>Attributes of the file systems shown and changed as <see cref="EntryAttributes" />.</summary>
+    private const EntryAttributes ChangeableAttributes =
+        EntryAttributes.ReadOnly | EntryAttributes.Hidden | EntryAttributes.System | EntryAttributes.Archive;
 
     private readonly DiscFileSystem _fileSystem;
     private List<string> _currentPathComponents = [];
@@ -51,10 +55,11 @@ public sealed class DiscFileSystemVolume : IVolume, IDisposable
             var directoryInfo = _fileSystem.GetDirectoryInfo(GetPath(_currentPathComponents));
             return directoryInfo.GetDirectories()
                 .Select(directory => (IEntry)new DiscEntry(directory.Name, EntryType.Container, null,
-                    directory.LastWriteTimeUtc))
+                    directory.LastWriteTimeUtc, ToEntryAttributes(directory.Attributes)))
                 .OrderBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase)
                 .Concat(directoryInfo.GetFiles()
-                    .Select(file => new DiscEntry(file.Name, EntryType.Item, file.Length, file.LastWriteTimeUtc))
+                    .Select(file => new DiscEntry(file.Name, EntryType.Item, file.Length, file.LastWriteTimeUtc,
+                        ToEntryAttributes(file.Attributes)))
                     .OrderBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase))
                 .ToList();
         });
@@ -108,12 +113,15 @@ public sealed class DiscFileSystemVolume : IVolume, IDisposable
         if (info.IsDirectory)
         {
             await ChangeDirectory([info.Name], cancellationToken);
+            var path = GetPath(_currentPathComponents);
             return new DiscEntry(info.Name, EntryType.Container, null,
-                Run(() => _fileSystem.GetLastWriteTimeUtc(GetPath(_currentPathComponents))));
+                Run(() => _fileSystem.GetLastWriteTimeUtc(path)),
+                ToEntryAttributes(Run(() => _fileSystem.GetAttributes(path))));
         }
 
         var fileInfo = Run(() => _fileSystem.GetFileInfo(GetPath(info.Name)));
-        return new DiscEntry(fileInfo.Name, EntryType.Item, fileInfo.Length, fileInfo.LastWriteTimeUtc);
+        return new DiscEntry(fileInfo.Name, EntryType.Item, fileInfo.Length, fileInfo.LastWriteTimeUtc,
+            ToEntryAttributes(Run(() => fileInfo.Attributes)));
     }
 
     public Task<Stream> OpenRead(string name, CancellationToken cancellationToken = default)
@@ -254,6 +262,26 @@ public sealed class DiscFileSystemVolume : IVolume, IDisposable
         return Task.CompletedTask;
     }
 
+    public Task<EntryAttributes> GetChangeableAttributes(CancellationToken cancellationToken = default) =>
+        Task.FromResult(_fileSystem.CanWrite ? ChangeableAttributes : EntryAttributes.None);
+
+    public Task SetAttributes(string name, EntryAttributes attributes, CancellationToken cancellationToken = default)
+    {
+        ThrowIfReadOnly();
+
+        var info = FindEntry(_currentPathComponents, name) ?? throw new FileNotFoundException($"Entry '{name}' not found");
+        var path = GetPath(info.Name);
+        Run(() =>
+        {
+            var fileAttributes = _fileSystem.GetAttributes(path) & ~(FileAttributes)ChangeableAttributes;
+            _fileSystem.SetAttributes(path, fileAttributes | (FileAttributes)(attributes & ChangeableAttributes));
+        });
+        return Task.CompletedTask;
+    }
+
+    private static EntryAttributes ToEntryAttributes(FileAttributes attributes) =>
+        (EntryAttributes)attributes & ChangeableAttributes;
+
     /// <summary>
     /// Finds an entry in a directory, case-insensitive like the file systems, with the name as stored. Null when not
     /// found or the name is invalid.
@@ -328,5 +356,6 @@ public sealed class DiscFileSystemVolume : IVolume, IDisposable
     /// <summary>Entry found in a directory, with its name as stored.</summary>
     private sealed record FoundEntry(string Name, bool IsDirectory);
 
-    private sealed record DiscEntry(string Name, EntryType Type, long? Size, DateTime? ModifiedDate) : IEntry;
+    private sealed record DiscEntry(string Name, EntryType Type, long? Size, DateTime? ModifiedDate,
+        EntryAttributes? Attributes) : IEntry;
 }

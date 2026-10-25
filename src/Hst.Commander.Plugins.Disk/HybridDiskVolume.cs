@@ -157,6 +157,16 @@ public sealed class HybridDiskVolume : IVolume, IDisposable
     public Task SetAmigaMetadata(string name, AmigaMetadata metadata, CancellationToken cancellationToken = default) =>
         _currentVolume?.SetAmigaMetadata(name, metadata, cancellationToken) ?? throw ReadOnly();
 
+    public Task<bool> CanSetAmigaMetadata(CancellationToken cancellationToken = default) =>
+        _currentVolume?.CanSetAmigaMetadata(cancellationToken) ?? Task.FromResult(false);
+
+    public Task<EntryAttributes> GetChangeableAttributes(CancellationToken cancellationToken = default) =>
+        _currentVolume?.GetChangeableAttributes(cancellationToken) ?? Task.FromResult(EntryAttributes.None);
+
+    public Task SetAttributes(string name, EntryAttributes attributes, CancellationToken cancellationToken = default) =>
+        _currentVolume?.SetAttributes(name, attributes, cancellationToken) ??
+        throw ReadOnly();
+
     private static NotSupportedException ReadOnly() =>
         new("The partition table list is read-only, open a partition to change its files");
 

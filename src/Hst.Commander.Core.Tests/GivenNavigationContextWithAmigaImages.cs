@@ -457,6 +457,21 @@ public class GivenNavigationContextWithAmigaImages : IDisposable
     private static Dictionary<string, string> GetLines(EntryProperties properties) =>
         properties.GetSections().SelectMany(section => section).ToDictionary(line => line.Label, line => line.Value);
 
+    private static PropertyFlagGroup GetProtectionBits(EntryProperties properties) =>
+        Assert.Single(properties.FlagGroups, group => group.Label == "Protection bits");
+
+    /// <summary>The checked protection bits like the Amiga List command, e.g. "----rwed".</summary>
+    private static string FormatFlags(PropertyFlagGroup group) =>
+        string.Concat(group.Flags.Select(flag => flag.IsSet ? flag.Label : "-"));
+
+    /// <summary>Check boxes of the protection bits checked for the letters, e.g. "-sp-rwe-".</summary>
+    private static IReadOnlyList<IReadOnlyList<bool>> CheckProtectionBits(EntryProperties properties, string letters) =>
+        properties.FlagGroups
+            .Select(group => (IReadOnlyList<bool>)group.Flags
+                .Select((flag, index) => group.Label == "Protection bits" ? letters[index] != '-' : flag.IsSet)
+                .ToList())
+            .ToList();
+
     [Fact]
     public async Task When_PropertiesOfAdfEntryAreShown_Then_ProtectionBitsAndCommentAreShown()
     {
@@ -471,9 +486,48 @@ public class GivenNavigationContextWithAmigaImages : IDisposable
 
         // assert
         var lines = GetLines(properties);
-        Assert.Equal("-s--rwed", lines["Protection bits"]);
+        Assert.Equal("-s--rwed", FormatFlags(GetProtectionBits(properties)));
+        Assert.True(GetProtectionBits(properties).CanChange);
         Assert.Equal("Comment", lines["Comment"]);
         Assert.DoesNotContain("Amiga name", lines.Keys);
+        Assert.DoesNotContain(properties.FlagGroups, group => group.Label == "Attributes");
+    }
+
+    [Fact]
+    public async Task When_ProtectionBitsOfAdfEntryAreChanged_Then_TheyAreWrittenWithTheComment()
+    {
+        // arrange
+        await CreateAdfWithItemAsync(Path.Combine(_rootPath, "disk.adf"));
+        using var navigationContext = new NavigationContext(_rootPath);
+        await OpenAsync(navigationContext, "disk.adf");
+        var entry = (await navigationContext.ListEntriesAsync()).First(entry => entry.Name == "file*1");
+        var properties = await navigationContext.GetPropertiesAsync([entry]);
+
+        // act
+        var changed = await navigationContext.ChangeFlagsAsync(properties, CheckProtectionBits(properties, "-sp-rwe-"));
+
+        // assert
+        Assert.True(changed);
+        var changedEntry = (await navigationContext.ListEntriesAsync()).First(entry => entry.Name == "file*1");
+        Assert.Equal(new AmigaMetadata(0x61, "Comment"), changedEntry.AmigaMetadata);
+        Assert.Equal("-sp-rwe-", FormatFlags(GetProtectionBits(await navigationContext.GetPropertiesAsync([changedEntry]))));
+    }
+
+    [Fact]
+    public async Task When_PropertiesOfLhaEntryAreShown_Then_ProtectionBitsCantBeChanged()
+    {
+        // arrange
+        File.Copy(ArchiveTestData.GetPath("special_chars.lha"), Path.Combine(_rootPath, "special_chars.lha"));
+        using var navigationContext = new NavigationContext(_rootPath);
+        await OpenAsync(navigationContext, "special_chars.lha");
+        var entry = (await navigationContext.ListEntriesAsync()).First(entry => entry.Name != Paths.Parent);
+
+        // act
+        var properties = await navigationContext.GetPropertiesAsync([entry]);
+
+        // assert
+        Assert.False(GetProtectionBits(properties).CanChange);
+        Assert.False(properties.CanChangeFlags);
     }
 
     [Theory]
@@ -505,9 +559,44 @@ public class GivenNavigationContextWithAmigaImages : IDisposable
         Assert.Equal(localEntry.Name, properties.Name);
         var lines = GetLines(properties);
         Assert.Equal("file*1", lines["Amiga name"]);
-        Assert.Equal("-s--rwed", lines["Protection bits"]);
+        Assert.Equal("-s--rwed", FormatFlags(GetProtectionBits(properties)));
+        Assert.True(GetProtectionBits(properties).CanChange);
         Assert.Equal("Comment", lines["Comment"]);
-        Assert.DoesNotContain("Protection bits", GetLines(plainProperties).Keys);
+        Assert.Contains(properties.FlagGroups, group => group.Label == "Attributes");
+        Assert.DoesNotContain(plainProperties.FlagGroups, group => group.Label == "Protection bits");
+    }
+
+    [Theory]
+    [InlineData(UaeMetadataFormat.UaeFsDb)]
+    [InlineData(UaeMetadataFormat.UaeMetafile)]
+    public async Task When_ProtectionBitsOfLocalEntryWithUaeMetadataAreChanged_Then_MetadataIsWritten(
+        UaeMetadataFormat format)
+    {
+        // arrange - an Amiga item copied to a local directory with UAE metadata
+        await CreateAdfWithItemAsync(Path.Combine(_rootPath, "disk.adf"));
+        var localPath = Directory.CreateDirectory(Path.Combine(_rootPath, "local")).FullName;
+        using var adfContext = new NavigationContext(_rootPath) { UaeMetadata = format };
+        using var localContext = new NavigationContext(localPath);
+        await OpenAsync(adfContext, "disk.adf");
+        await adfContext.CopyAsync([(await adfContext.ListEntriesAsync()).First(entry => entry.Name == "file*1")],
+            localContext, localContext.CurrentPath, "*");
+        var localNames = await ListNamesAsync(localContext);
+        var localEntry = (await localContext.ListEntriesAsync()).Single(entry => entry.Name != Paths.Parent &&
+            entry.Name != "_UAEFSDB.___" && !entry.Name.EndsWith(".uaem"));
+        var properties = await localContext.GetPropertiesAsync([localEntry]);
+
+        // act
+        var changed = await localContext.ChangeFlagsAsync(properties, CheckProtectionBits(properties, "-sp-rwe-"));
+
+        // assert - the metadata is changed in the same metadata file
+        Assert.True(changed);
+        Assert.Equal(localNames, await ListNamesAsync(localContext));
+        var changedProperties = await localContext.GetPropertiesAsync(
+            [(await localContext.ListEntriesAsync()).Single(entry => entry.Name == localEntry.Name)]);
+        var lines = GetLines(changedProperties);
+        Assert.Equal("file*1", lines["Amiga name"]);
+        Assert.Equal("Comment", lines["Comment"]);
+        Assert.Equal("-sp-rwe-", FormatFlags(GetProtectionBits(changedProperties)));
     }
 
     [Theory]

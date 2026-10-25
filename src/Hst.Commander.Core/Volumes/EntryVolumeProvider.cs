@@ -56,4 +56,13 @@ public class EntryVolumeProvider(IEntry entry, IVolume volumeProvider) : IVolume
 
     public Task SetAmigaMetadata(string name, AmigaMetadata metadata, CancellationToken cancellationToken = default) =>
         volumeProvider.SetAmigaMetadata(name, metadata, cancellationToken);
+
+    public Task<bool> CanSetAmigaMetadata(CancellationToken cancellationToken = default) =>
+        volumeProvider.CanSetAmigaMetadata(cancellationToken);
+
+    public Task<EntryAttributes> GetChangeableAttributes(CancellationToken cancellationToken = default) =>
+        volumeProvider.GetChangeableAttributes(cancellationToken);
+
+    public Task SetAttributes(string name, EntryAttributes attributes, CancellationToken cancellationToken = default) =>
+        volumeProvider.SetAttributes(name, attributes, cancellationToken);
 }

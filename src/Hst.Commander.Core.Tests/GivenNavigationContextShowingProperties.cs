@@ -1,4 +1,4 @@
-using Hst.Commander.Core.Volumes;
+﻿using Hst.Commander.Core.Volumes;
 using Hst.Commander.Abstractions;
 
 namespace Hst.Commander.Core.Tests;
@@ -115,6 +115,40 @@ public class GivenNavigationContextShowingProperties
     }
 
     [Fact]
+    public async Task When_ReadOnlyIsCheckedForLocalFile_Then_FileIsReadOnly()
+    {
+        // arrange
+        var rootPath = CreateTempDirectory();
+        var path = Path.Combine(rootPath, "a.txt");
+        try
+        {
+            await File.WriteAllTextAsync(path, "a");
+            using var navigationContext = new NavigationContext(rootPath);
+            var entry = (await navigationContext.ListEntriesAsync()).Single(entry => entry.Name == "a.txt");
+            var properties = await navigationContext.GetPropertiesAsync([entry]);
+            var attributes = Assert.Single(properties.FlagGroups);
+
+            // act
+            var changed = await navigationContext.ChangeFlagsAsync(properties,
+                [attributes.Flags.Select(flag => flag.Label == "Read-only" || flag.IsSet).ToList()]);
+
+            // assert
+            Assert.True(attributes.CanChange);
+            Assert.True(properties.CanChangeFlags);
+            Assert.True(changed);
+            Assert.True(File.GetAttributes(path).HasFlag(FileAttributes.ReadOnly));
+            var changedProperties = await navigationContext.GetPropertiesAsync(
+                [(await navigationContext.ListEntriesAsync()).Single(entry => entry.Name == "a.txt")]);
+            Assert.True(changedProperties.FlagGroups[0].Flags.Single(flag => flag.Label == "Read-only").IsSet);
+        }
+        finally
+        {
+            File.SetAttributes(path, FileAttributes.Normal);
+            Directory.Delete(rootPath, true);
+        }
+    }
+
+    [Fact]
     public async Task When_GetPropertiesOfLocalDirectory_Then_DatesAttributesAndContentsAreShown()
     {
         // arrange
@@ -141,7 +175,11 @@ public class GivenNavigationContextShowingProperties
             Assert.Contains("Created", lines.Keys);
             Assert.Contains("Modified", lines.Keys);
             Assert.Contains("Accessed", lines.Keys);
-            Assert.Contains("Attributes", lines.Keys);
+            var attributes = Assert.Single(properties.FlagGroups);
+            Assert.Equal("Attributes", attributes.Label);
+            Assert.Equal(OperatingSystem.IsWindows() ? ["Read-only", "Hidden", "System", "Archive"] : ["Read-only"],
+                attributes.Flags.Select(flag => flag.Label));
+            Assert.False(attributes.CanChange);
             Assert.Equal(OperatingSystem.IsWindows(), lines.ContainsKey("Size on disk"));
             Assert.Equal(!OperatingSystem.IsWindows(), lines.ContainsKey("Permissions"));
             if (OperatingSystem.IsWindows())

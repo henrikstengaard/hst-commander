@@ -647,6 +647,36 @@ internal static class UaeMetadataUpdater
     }
 
     /// <summary>
+    ///     Sets the protection bits and comment of an entry with UAE metadata in the current directory, keeping its
+    ///     Amiga name. Entries with metadata in the "_UAEFSDB.___" file or a metafile keep using it, other entries get
+    ///     metadata in <paramref name="format" /> (WinUAE's alternate data streams are replaced). Throws
+    ///     <see cref="IOException" /> when the entry has no UAE metadata.
+    /// </summary>
+    public static async Task SetMetadataAsync(IVolume volume, IEntry entry, AmigaMetadata amigaMetadata,
+        UaeMetadataFormat format, string? localDirectory, CancellationToken cancellationToken)
+    {
+        var metadata = await ReadAsync(volume, format, true, localDirectory, cancellationToken);
+        if (metadata.Find(entry.Name) is not { } node || !node.NormalName.Equals(entry.Name, StringComparison.Ordinal))
+        {
+            throw new IOException($"'{entry.Name}' has no UAE metadata");
+        }
+
+        var writerFormat = metadata.IsFsDbNode(node)
+            ? UaeMetadataFormat.UaeFsDb
+            : metadata.MetafileNames.ContainsKey(entry.Name)
+                ? UaeMetadataFormat.UaeMetafile
+                : format;
+        var writer = await UaeMetadataWriter.CreateAsync(volume, writerFormat, cancellationToken);
+        await writer.SetAsync(volume, node.AmigaName, entry.Name, amigaMetadata, entry.ModifiedDate,
+            cancellationToken);
+        await writer.FlushAsync(volume, cancellationToken);
+        if (metadata.IsAlternateDataStreamNode(node) && localDirectory != null)
+        {
+            DeleteAlternateDataStream(Path.Combine(localDirectory, entry.Name));
+        }
+    }
+
+    /// <summary>
     ///     Moves the metadata of entries moved from the current directory of the source volume to the current
     ///     directory of the destination volume with their names (e.g. with <see cref="File.Move(string, string)" />):
     ///     "_UAEFSDB.___" nodes are written to the destination's "_UAEFSDB.___" file and metafiles are moved (WinUAE's

@@ -8,6 +8,40 @@ namespace Hst.Commander.Core;
 public sealed record PropertyLine(string Label, string Value);
 
 /// <summary>
+///     A check box of the properties dialog, e.g. the attribute "Read-only" or the Amiga protection bit "r" (described
+///     as "Readable").
+/// </summary>
+public sealed record PropertyFlag(string Label, string Description, bool IsSet)
+{
+    /// <summary>Attribute or protection bit of the check box.</summary>
+    internal int Value { get; init; }
+}
+
+/// <summary>
+///     A line of check boxes of the properties dialog, e.g. the "Attributes" of a file or the "Protection bits" of an
+///     Amiga file, which can be changed with <see cref="NavigationContext.ChangeFlagsAsync" /> when
+///     <see cref="CanChange" /> is true.
+/// </summary>
+public sealed record PropertyFlagGroup(string Label, IReadOnlyList<PropertyFlag> Flags, bool CanChange)
+{
+    internal PropertyFlagKind Kind { get; init; }
+}
+
+internal enum PropertyFlagKind
+{
+    Attributes,
+    ProtectionBits
+}
+
+/// <summary>What the properties dialog can change of a single entry.</summary>
+/// <param name="Attributes">Attributes the volume can change (<see cref="IVolume.GetChangeableAttributes" />).</param>
+/// <param name="ProtectionBits">True when the Amiga protection bits can be changed.</param>
+internal sealed record PropertyChanges(EntryAttributes Attributes, bool ProtectionBits)
+{
+    public static PropertyChanges None { get; } = new(EntryAttributes.None, false);
+}
+
+/// <summary>
 ///     Properties of entries shown in the properties dialog (Alt+Enter) of both front-ends, with similar details as the
 ///     properties of Windows Explorer: type, location, size, contents, dates and attributes of files and directories,
 ///     or the type, file system and space of drives. Created by <see cref="NavigationContext.GetProperties" />.
@@ -19,13 +53,33 @@ public sealed class EntryProperties
     /// <summary>Value of the lines counted by <see cref="NavigationContext.CountContentsAsync" /> until counted.</summary>
     public const string Calculating = "Calculating...";
 
+    /// <summary>Attributes shown as check boxes, in order.</summary>
+    private static readonly (EntryAttributes Attribute, string Label)[] AttributeFlags =
+    [
+        (EntryAttributes.ReadOnly, "Read-only"),
+        (EntryAttributes.Hidden, "Hidden"),
+        (EntryAttributes.System, "System"),
+        (EntryAttributes.Archive, "Archive")
+    ];
+
+    private const EntryAttributes AllAttributes =
+        EntryAttributes.ReadOnly | EntryAttributes.Hidden | EntryAttributes.System | EntryAttributes.Archive;
+
+    /// <summary>Amiga protection bits shown as check boxes, bits 7 to 0.</summary>
+    private static readonly string[] ProtectionBitDescriptions =
+        ["Hidden", "Script", "Pure", "Archived", "Readable", "Writable", "Executable", "Deletable"];
+
     private readonly IReadOnlyList<IReadOnlyList<Field>> _sections;
 
-    private EntryProperties(string name, IReadOnlyList<IReadOnlyList<Field>> sections, double? usedFraction = null)
+    private EntryProperties(string name, IReadOnlyList<IReadOnlyList<Field>> sections, double? usedFraction = null,
+        IReadOnlyList<PropertyFlagGroup>? flagGroups = null, IEntry? entry = null, UaeMetadataNode? uaeMetadata = null)
     {
         Name = name;
         _sections = sections;
         UsedFraction = usedFraction;
+        FlagGroups = flagGroups ?? [];
+        Entry = entry;
+        UaeMetadata = uaeMetadata;
     }
 
     /// <summary>Name shown at the top, e.g. "a.txt" or "3 Files, 2 Folders".</summary>
@@ -33,6 +87,22 @@ public sealed class EntryProperties
 
     /// <summary>Fraction of the space used of drives, between 0 and 1. Null for files and directories.</summary>
     public double? UsedFraction { get; }
+
+    /// <summary>
+    ///     Lines of check boxes shown after the sections of a single entry: the attributes of entries with them (e.g.
+    ///     local files, FAT and NTFS partitions) and the Amiga protection bits (Amiga volumes, lha/lzx archives and
+    ///     entries with UAE metadata). Empty for several entries and drives.
+    /// </summary>
+    public IReadOnlyList<PropertyFlagGroup> FlagGroups { get; }
+
+    /// <summary>True when check boxes of <see cref="FlagGroups" /> can be changed.</summary>
+    public bool CanChangeFlags => FlagGroups.Any(group => group.CanChange);
+
+    /// <summary>The single entry the properties are of, null for several entries and drives.</summary>
+    internal IEntry? Entry { get; }
+
+    /// <summary>UAE metadata of <see cref="Entry" />, null when it has none.</summary>
+    internal UaeMetadataNode? UaeMetadata { get; }
 
     /// <summary>True when lines show contents counted by <see cref="NavigationContext.CountContentsAsync" />.</summary>
     public bool HasContents => _sections.Any(section => section.Any(line => line.Contents != ContentsField.None));
@@ -81,8 +151,9 @@ public sealed class EntryProperties
     /// <param name="localDirectory">Local directory of the location, null inside images and other volumes.</param>
     /// <param name="isDriveList">True when the entries are local drives.</param>
     /// <param name="uaeMetadata">UAE metadata of a single entry, shown with its Amiga name.</param>
+    /// <param name="changes">What can be changed of a single entry, nothing by default.</param>
     internal static EntryProperties Create(IReadOnlyList<IEntry> entries, string location, string? localDirectory,
-        bool isDriveList, UaeMetadataNode? uaeMetadata = null)
+        bool isDriveList, UaeMetadataNode? uaeMetadata = null, PropertyChanges? changes = null)
     {
         ArgumentNullException.ThrowIfNull(entries);
         if (entries.Count == 0)
@@ -96,7 +167,7 @@ public sealed class EntryProperties
         }
 
         return entries.Count == 1
-            ? CreateForEntry(entries[0], location, localDirectory, uaeMetadata)
+            ? CreateForEntry(entries[0], location, localDirectory, uaeMetadata, changes ?? PropertyChanges.None)
             : CreateForEntries(entries, location, localDirectory);
     }
 
@@ -118,8 +189,56 @@ public sealed class EntryProperties
         return new string(characters);
     }
 
+    /// <summary>
+    ///     Attributes or protection bits with the check boxes of a group changed, given whether each check box is
+    ///     checked, in the order of <see cref="PropertyFlagGroup.Flags" />. Other bits are kept.
+    /// </summary>
+    internal static int GetValue(PropertyFlagGroup group, int value, IReadOnlyList<bool> isChecked)
+    {
+        for (var index = 0; index < group.Flags.Count && index < isChecked.Count; index++)
+        {
+            var flag = group.Flags[index];
+            // the Amiga protection bits rwed are set when not allowed, so their check boxes are inverted
+            var isSet = group.Kind == PropertyFlagKind.ProtectionBits && flag.Value < 1 << 4
+                ? !isChecked[index]
+                : isChecked[index];
+            value = isSet ? value | flag.Value : value & ~flag.Value;
+        }
+
+        return value;
+    }
+
+    private static PropertyFlagGroup CreateAttributeGroup(EntryAttributes attributes, EntryAttributes shown,
+        EntryAttributes changeable) =>
+        new("Attributes", AttributeFlags
+            .Where(flag => shown.HasFlag(flag.Attribute))
+            .Select(flag => new PropertyFlag(flag.Label, flag.Label, attributes.HasFlag(flag.Attribute))
+            {
+                Value = (int)flag.Attribute
+            })
+            .ToList(), changeable != EntryAttributes.None)
+        {
+            Kind = PropertyFlagKind.Attributes
+        };
+
+    private static PropertyFlagGroup CreateProtectionBitsGroup(int protectionBits, bool canChange)
+    {
+        var letters = FormatProtectionBits(protectionBits);
+        const string allLetters = "hsparwed";
+        return new PropertyFlagGroup("Protection bits", allLetters
+            .Select((letter, index) => new PropertyFlag(letter.ToString(), ProtectionBitDescriptions[index],
+                letters[index] != '-')
+            {
+                Value = 1 << (allLetters.Length - 1 - index)
+            })
+            .ToList(), canChange)
+        {
+            Kind = PropertyFlagKind.ProtectionBits
+        };
+    }
+
     private static EntryProperties CreateForEntry(IEntry entry, string location, string? localDirectory,
-        UaeMetadataNode? uaeMetadata)
+        UaeMetadataNode? uaeMetadata, PropertyChanges changes)
     {
         var isContainer = entry.Type == EntryType.Container;
         var info = GetLocalInfo(entry, localDirectory);
@@ -146,14 +265,32 @@ public sealed class EntryProperties
             dateSection.Add(new Field("Modified", FormatDate(modifiedDate)));
         }
 
+        var flagGroups = new List<PropertyFlagGroup>();
         var attributeSection = new List<Field>();
         if (info != null)
         {
-            attributeSection.Add(new Field("Attributes", FileSystemDetails.FormatAttributes(info.Attributes)));
+            // the attributes not shown as check boxes, e.g. compressed or a link
+            var otherAttributes = info.Attributes & ~(FileAttributes)LocalVolume.ChangeableAttributes;
+            if (FileSystemDetails.FormatAttributes(otherAttributes) is var otherText && otherText != "None")
+            {
+                attributeSection.Add(new Field("Other attributes", otherText));
+            }
+
             if (!OperatingSystem.IsWindows())
             {
                 attributeSection.Add(new Field("Permissions", FileSystemDetails.FormatUnixMode(info.UnixFileMode)));
             }
+        }
+
+        if ((entry.Attributes ?? (info != null ? (EntryAttributes)info.Attributes : null)) is { } attributes)
+        {
+            // volumes that can't change attributes show those of DOS/Windows, local files those of the host OS
+            var shown = changes.Attributes != EntryAttributes.None
+                ? changes.Attributes
+                : info != null
+                    ? LocalVolume.ChangeableAttributes
+                    : AllAttributes;
+            flagGroups.Add(CreateAttributeGroup(attributes & AllAttributes, shown, changes.Attributes));
         }
 
         // Amiga entries and entries with UAE metadata, e.g. copied from an Amiga volume to a local directory
@@ -165,8 +302,8 @@ public sealed class EntryProperties
 
         if ((entry.AmigaMetadata ?? uaeMetadata?.Metadata) is { } amigaMetadata)
         {
-            amigaSection.Add(new Field("Protection bits", FormatProtectionBits(amigaMetadata.ProtectionBits)));
             amigaSection.Add(new Field("Comment", amigaMetadata.Comment));
+            flagGroups.Add(CreateProtectionBitsGroup(amigaMetadata.ProtectionBits, changes.ProtectionBits));
         }
 
         var detailSections = details?.Sections
@@ -174,7 +311,8 @@ public sealed class EntryProperties
             .ToArray() ?? [];
         return new EntryProperties(entry.DisplayName,
             WithoutEmpty([typeSection, ..detailSections, sizeSection, dateSection, attributeSection, amigaSection]),
-            details?.UsedFraction is { } usedFraction ? Math.Clamp(usedFraction, 0, 1) : null);
+            details?.UsedFraction is { } usedFraction ? Math.Clamp(usedFraction, 0, 1) : null, flagGroups, entry,
+            uaeMetadata);
     }
 
     /// <summary>Type of an entry: the type of its details (e.g. "Amiga partition") or the file type.</summary>

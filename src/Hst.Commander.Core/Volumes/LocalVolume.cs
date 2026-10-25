@@ -196,6 +196,32 @@ public class LocalVolume(string path) : IVolume
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Attributes of local entries that can be changed: read-only, hidden, system and archive on Windows, read-only
+    /// (the write permissions) on other systems. None in the drive list.
+    /// </summary>
+    public Task<EntryAttributes> GetChangeableAttributes(CancellationToken cancellationToken = default) =>
+        Task.FromResult(_currentPath == null ? EntryAttributes.None : ChangeableAttributes);
+
+    public Task SetAttributes(string name, EntryAttributes attributes, CancellationToken cancellationToken = default)
+    {
+        var path = GetItemPath(name);
+        var fileAttributes = File.GetAttributes(path);
+        var changedAttributes = fileAttributes & ~(FileAttributes)ChangeableAttributes |
+                                (FileAttributes)(attributes & ChangeableAttributes);
+        if (changedAttributes != fileAttributes)
+        {
+            File.SetAttributes(path, changedAttributes);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Attributes of local entries that can be changed on the host OS.</summary>
+    public static EntryAttributes ChangeableAttributes { get; } = OperatingSystem.IsWindows()
+        ? EntryAttributes.ReadOnly | EntryAttributes.Hidden | EntryAttributes.System | EntryAttributes.Archive
+        : EntryAttributes.ReadOnly;
+
     public Task SetModifiedDate(string name, DateTime modifiedDate, CancellationToken cancellationToken = default)
     {
         var path = GetItemPath(name);

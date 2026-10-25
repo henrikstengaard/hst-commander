@@ -1243,18 +1243,102 @@ public sealed class NavigationContext : IDisposable
     ///     Properties like <see cref="GetProperties" />, with the Amiga name, protection bits and comment of a single
     ///     entry from the UAE metadata of the current directory (see <see cref="UaeMetadataReader" />) in volumes not
     ///     storing them, e.g. a file copied from an Amiga volume to a local directory. Reads with the pane's volume,
-    ///     so call it on the thread using the pane. Not with <see cref="UaeMetadataFormat.None" />.
+    ///     so call it on the thread using the pane. Not with <see cref="UaeMetadataFormat.None" />. The check boxes of
+    ///     a single entry (<see cref="EntryProperties.FlagGroups" />) can be changed when the volume can change its
+    ///     attributes (<see cref="IVolume.GetChangeableAttributes" />) or Amiga protection bits
+    ///     (<see cref="IVolume.CanSetAmigaMetadata" />, or UAE metadata in a writable location).
     /// </summary>
     public async Task<EntryProperties> GetPropertiesAsync(IReadOnlyList<IEntry> entries,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(entries);
 
-        var uaeMetadata = entries is [{ AmigaMetadata: null } entry] && !IsDriveList && entry.Name != Paths.Parent
-            ? await FindUaeMetadataAsync(entry, cancellationToken)
-            : null;
+        if (entries is not [var entry] || IsDriveList || entry.Name == Paths.Parent)
+        {
+            return GetProperties(entries);
+        }
+
+        var uaeMetadata = entry.AmigaMetadata == null ? await FindUaeMetadataAsync(entry, cancellationToken) : null;
+        var changes = new PropertyChanges(await _nestedVolume.GetChangeableAttributes(cancellationToken),
+            entry.AmigaMetadata != null
+                ? await _nestedVolume.CanSetAmigaMetadata(cancellationToken)
+                : uaeMetadata != null && MoveNotSupportedMessage == null);
         var localDirectory = !IsInImage ? LocalPath : null;
-        return EntryProperties.Create(entries, CurrentPath, localDirectory, IsDriveList, uaeMetadata);
+        return EntryProperties.Create(entries, CurrentPath, localDirectory, IsDriveList, uaeMetadata, changes);
+    }
+
+    /// <summary>
+    ///     Changes the attributes and Amiga protection bits of the entry of properties from
+    ///     <see cref="GetPropertiesAsync" /> to its check boxes, given whether each check box of each
+    ///     <see cref="EntryProperties.FlagGroups" /> is checked. Only groups that can be changed and differ are changed:
+    ///     attributes with <see cref="IVolume.SetAttributes" />, protection bits with
+    ///     <see cref="IVolume.SetAmigaMetadata" /> or in the UAE metadata of the entry (see
+    ///     <see cref="UaeMetadataUpdater.SetMetadataAsync" />). Changes with the pane's volume, so call it on the thread
+    ///     using the pane. Returns true when something was changed.
+    /// </summary>
+    public async Task<bool> ChangeFlagsAsync(EntryProperties properties, IReadOnlyList<IReadOnlyList<bool>> isChecked,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(properties);
+        ArgumentNullException.ThrowIfNull(isChecked);
+
+        if (properties.Entry is not { } entry)
+        {
+            return false;
+        }
+
+        var changed = false;
+        for (var index = 0; index < properties.FlagGroups.Count && index < isChecked.Count; index++)
+        {
+            var group = properties.FlagGroups[index];
+            if (!group.CanChange)
+            {
+                continue;
+            }
+
+            switch (group.Kind)
+            {
+                case PropertyFlagKind.Attributes:
+                {
+                    var attributes = group.Flags.Where(flag => flag.IsSet).Sum(flag => flag.Value);
+                    var newAttributes = EntryProperties.GetValue(group, attributes, isChecked[index]);
+                    if (newAttributes != attributes)
+                    {
+                        await _nestedVolume.SetAttributes(entry.Name, (EntryAttributes)newAttributes,
+                            cancellationToken);
+                        changed = true;
+                    }
+
+                    break;
+                }
+                case PropertyFlagKind.ProtectionBits
+                    when (entry.AmigaMetadata ?? properties.UaeMetadata?.Metadata) is { } metadata:
+                {
+                    var protectionBits = EntryProperties.GetValue(group, metadata.ProtectionBits, isChecked[index]);
+                    if (protectionBits == metadata.ProtectionBits)
+                    {
+                        break;
+                    }
+
+                    if (entry.AmigaMetadata != null)
+                    {
+                        await _nestedVolume.SetAmigaMetadata(entry.Name,
+                            metadata with { ProtectionBits = protectionBits }, cancellationToken);
+                    }
+                    else
+                    {
+                        await UaeMetadataUpdater.SetMetadataAsync(_nestedVolume, entry,
+                            metadata with { ProtectionBits = protectionBits }, UaeMetadata,
+                            !IsInImage ? LocalPath : null, cancellationToken);
+                    }
+
+                    changed = true;
+                    break;
+                }
+            }
+        }
+
+        return changed;
     }
 
     private async Task<UaeMetadataNode?> FindUaeMetadataAsync(IEntry entry, CancellationToken cancellationToken)

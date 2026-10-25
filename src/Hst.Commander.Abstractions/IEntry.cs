@@ -31,4 +31,11 @@ public interface IEntry
     /// <see cref="IVolume.SupportsAmigaMetadata" />). Defaults to null.
     /// </summary>
     AmigaMetadata? AmigaMetadata => null;
+
+    /// <summary>
+    /// DOS/Windows attributes of an entry, e.g. in a FAT or NTFS partition, null for volumes without them. Shown as
+    /// check boxes in the properties dialog, which can change them when <see cref="IVolume.GetChangeableAttributes" />
+    /// has them. Defaults to null.
+    /// </summary>
+    EntryAttributes? Attributes => null;
 }

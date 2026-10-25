@@ -297,7 +297,7 @@ public partial class MainWindow : Window
         var initialIcon = entries.All(entry => entry.Type == EntryType.Container)
             ? FileIcons.DefaultFolderIcon
             : FileIcons.DefaultFileIcon;
-        await new PropertiesDialog(properties,
+        var dialog = new PropertiesDialog(properties,
             (progress, cancellationToken) =>
                 pane.NavigationContext.CountContentsAsync(entries, progress, cancellationToken),
             initialIcon,
@@ -308,8 +308,37 @@ public partial class MainWindow : Window
             !typeOnly || sameType
                 ? cancellationToken =>
                     FileIcons.LoadIconsAsync(iconEntry, pane.NavigationContext, typeOnly, cancellationToken)
-                : null).ShowDialog(this);
+                : null);
+        await dialog.ShowDialog(this);
+        if (dialog.CheckedFlags is { } checkedFlags)
+        {
+            await ChangeFlagsAsync(pane, properties, checkedFlags);
+        }
+
         pane.FocusEntries();
+    }
+
+    /// <summary>
+    ///     Changes the attributes and Amiga protection bits of the entry of the properties dialog to its check boxes,
+    ///     refreshing both panes when changed, as the other pane may show the same location.
+    /// </summary>
+    private async Task ChangeFlagsAsync(PaneView pane, EntryProperties properties,
+        IReadOnlyList<IReadOnlyList<bool>> checkedFlags)
+    {
+        try
+        {
+            if (!await pane.NavigationContext.ChangeFlagsAsync(properties, checkedFlags))
+            {
+                return;
+            }
+        }
+        catch (Exception exception)
+        {
+            await ShowErrorAsync(exception);
+        }
+
+        await LeftPane.RefreshEntriesAsync();
+        await RightPane.RefreshEntriesAsync();
     }
 
     /// <summary>

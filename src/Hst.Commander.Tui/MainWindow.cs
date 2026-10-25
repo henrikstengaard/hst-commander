@@ -505,8 +505,37 @@ public sealed class MainWindow : Window
         }
 
         Application.Run(dialog);
+        var checkedFlags = dialog.CheckedFlags;
         dialog.Dispose();
+        if (checkedFlags != null)
+        {
+            await ChangeFlagsAsync(pane, properties, checkedFlags);
+        }
+
         pane.TableView.SetFocus();
+    }
+
+    /// <summary>
+    ///     Changes the attributes and Amiga protection bits of the entry of the properties dialog to its check boxes,
+    ///     refreshing both panes when changed, as the other pane may show the same location.
+    /// </summary>
+    private async Task ChangeFlagsAsync(Pane pane, EntryProperties properties,
+        IReadOnlyList<IReadOnlyList<bool>> checkedFlags)
+    {
+        try
+        {
+            if (!await pane.NavigationContext.ChangeFlagsAsync(properties, checkedFlags))
+            {
+                return;
+            }
+        }
+        catch (Exception exception)
+        {
+            MessageBox.ErrorQuery("Error", exception.Message, "OK");
+        }
+
+        await RefreshPaneAsync(_leftPane);
+        await RefreshPaneAsync(_rightPane);
     }
 
     /// <summary>

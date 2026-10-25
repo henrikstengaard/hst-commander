@@ -251,6 +251,19 @@ internal sealed class SharedImageVolume : IVolume, IDisposable
             return true;
         }, cancellationToken);
 
+    public Task<bool> CanSetAmigaMetadata(CancellationToken cancellationToken = default) =>
+        RunAsync(volume => volume.CanSetAmigaMetadata(cancellationToken), cancellationToken);
+
+    public Task<EntryAttributes> GetChangeableAttributes(CancellationToken cancellationToken = default) =>
+        RunAsync(volume => volume.GetChangeableAttributes(cancellationToken), cancellationToken);
+
+    public Task SetAttributes(string name, EntryAttributes attributes, CancellationToken cancellationToken = default) =>
+        RunAsync(async volume =>
+        {
+            await volume.SetAttributes(name, attributes, cancellationToken);
+            return true;
+        }, cancellationToken);
+
     /// <summary>
     ///     Runs an operation on the shared volume in the view's current directory, holding the image's lock. It runs on
     ///     the thread pool, so the lock is never held by work waiting for a UI thread, which may be blocked waiting for

@@ -232,6 +232,16 @@ public abstract class VolumeListVolume : IVolume, IDisposable
         CurrentVolume?.SetAmigaMetadata(name, metadata, cancellationToken) ??
         throw new NotSupportedException(ReadOnlyMessage);
 
+    public Task<bool> CanSetAmigaMetadata(CancellationToken cancellationToken = default) =>
+        CurrentVolume?.CanSetAmigaMetadata(cancellationToken) ?? Task.FromResult(false);
+
+    public Task<EntryAttributes> GetChangeableAttributes(CancellationToken cancellationToken = default) =>
+        CurrentVolume?.GetChangeableAttributes(cancellationToken) ?? Task.FromResult(EntryAttributes.None);
+
+    public Task SetAttributes(string name, EntryAttributes attributes, CancellationToken cancellationToken = default) =>
+        CurrentVolume?.SetAttributes(name, attributes, cancellationToken) ??
+        throw new NotSupportedException(ReadOnlyMessage);
+
     /// <summary>Disposes resources after the mounted volumes, e.g. the streams of the partitions.</summary>
     protected virtual void DisposeResources()
     {

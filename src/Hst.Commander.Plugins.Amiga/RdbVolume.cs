@@ -323,6 +323,9 @@ public class RdbVolume : IVolume, IDisposable
     public Task SetAmigaMetadata(string name, AmigaMetadata metadata, CancellationToken cancellationToken = default) =>
         CurrentVolume?.SetAmigaMetadata(name, metadata, cancellationToken) ?? throw PartitionsReadOnly();
 
+    public Task<bool> CanSetAmigaMetadata(CancellationToken cancellationToken = default) =>
+        CurrentVolume?.CanSetAmigaMetadata(cancellationToken) ?? Task.FromResult(false);
+
     private static NotSupportedException PartitionsReadOnly() =>
         new("The partition list is read-only, open a partition to change its files");
 

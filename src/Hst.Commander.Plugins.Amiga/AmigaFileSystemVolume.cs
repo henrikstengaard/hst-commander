@@ -241,6 +241,9 @@ public class AmigaFileSystemVolume : IVolume, IDisposable
 
     public Task<bool> SupportsAmigaMetadata(CancellationToken cancellationToken = default) => Task.FromResult(true);
 
+    public Task<bool> CanSetAmigaMetadata(CancellationToken cancellationToken = default) =>
+        Task.FromResult(_isWritable);
+
     public async Task SetAmigaMetadata(string name, AmigaMetadata metadata,
         CancellationToken cancellationToken = default)
     {
