@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <ImplicitUsings>enable</ImplicitUsings>
@@ -17,8 +17,11 @@
 
     <ItemGroup>
       <!-- UAE metadata (UAEFSDB and metafiles) when copying to and from Amiga volumes -->
-      <PackageReference Include="Hst.Amiga" Version="0.6.243" />
+      <PackageReference Include="Hst.Amiga" Version="0.6.245" />
       <PackageReference Include="LTRData.DiscUtils" Version="1.0.54" />
       <PackageReference Include="LTRData.DiscUtils.Iso9660" Version="1.0.54" />
+      <!-- decoding standard image formats viewed with F3 (PNG, JPEG, GIF, BMP, WebP), the version Avalonia uses -->
+      <PackageReference Include="SkiaSharp" Version="3.119.4" />
+      <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="3.119.4" />
     </ItemGroup>
 </Project>

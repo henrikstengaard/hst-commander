@@ -1,8 +1,8 @@
 namespace Hst.Commander.Abstractions;
 
 /// <summary>
-/// Interface for a plugin extending Hst Commander with volume providers, file volume providers, volume creators and
-/// icon providers.
+/// Interface for a plugin extending Hst Commander with volume providers, file volume providers, volume creators, icon
+/// providers, navigation modes and image providers.
 /// </summary>
 public interface IPlugin
 {
@@ -44,6 +44,13 @@ public interface IPlugin
     /// Workbench showing icons at their positions.
     /// </summary>
     IEnumerable<INavigationMode> NavigationModes => [];
+
+    /// <summary>
+    /// Image providers reading the images of files viewed with F3, e.g. Amiga icons and IFF ILBM pictures. Asked in
+    /// plugin order before the built-in ones (standard image formats and Windows icon files); the first provider
+    /// reading images from a file is used.
+    /// </summary>
+    IEnumerable<IImageProvider> ImageProviders => [];
 
     /// <summary>
     /// Called once by Hst Commander when the plugin is loaded, before it is used, with the services of Hst Commander,

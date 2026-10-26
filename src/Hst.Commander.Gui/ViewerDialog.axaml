@@ -1,0 +1,90 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="using:Hst.Commander.Gui"
+        x:Class="Hst.Commander.Gui.ViewerDialog"
+        Title="View"
+        Width="1000" Height="700"
+        MinWidth="400" MinHeight="300"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner">
+    <DockPanel>
+        <DockPanel DockPanel.Dock="Top">
+            <!-- the images of a file with several, e.g. an icon file, shown in the image view -->
+            <ComboBox x:Name="ImageComboBox" DockPanel.Dock="Right" Margin="4,2" MinWidth="240" Focusable="False"
+                      IsVisible="False" />
+            <!-- zooming the image view: out, the zoom (Fit or a level) and in -->
+            <StackPanel x:Name="ZoomPanel" DockPanel.Dock="Right" Orientation="Horizontal" Margin="4,2" Spacing="2"
+                        IsVisible="False">
+                <Button x:Name="ZoomOutButton" Content="−" Focusable="False" MinWidth="28"
+                        HorizontalContentAlignment="Center" ToolTip.Tip="Zoom out (-)" />
+                <ComboBox x:Name="ZoomComboBox" MinWidth="90" Focusable="False" ToolTip.Tip="Zoom (0 fits, 1 is 100%)" />
+                <Button x:Name="ZoomInButton" Content="+" Focusable="False" MinWidth="28"
+                        HorizontalContentAlignment="Center" ToolTip.Tip="Zoom in (+)" />
+                <!-- background of the image view, the theme's background by default -->
+                <local:BackgroundPicker x:Name="BackgroundPicker" Margin="6,0,0,0" IncludeThemeBackground="True"
+                                        IsButtonFocusable="False" FlyoutPlacement="BottomEdgeAlignedRight" />
+            </StackPanel>
+            <TextBlock x:Name="StatusText" Margin="8,4" VerticalAlignment="Center" />
+        </DockPanel>
+        <!-- function key bar like the main window; the buttons aren't focusable so the view keeps the focus -->
+        <UniformGrid DockPanel.Dock="Bottom" Rows="1">
+            <UniformGrid.Styles>
+                <Style Selector="Button.functionKey">
+                    <Setter Property="Focusable" Value="False" />
+                    <Setter Property="HorizontalAlignment" Value="Stretch" />
+                    <Setter Property="HorizontalContentAlignment" Value="Left" />
+                    <Setter Property="Margin" Value="1" />
+                    <Setter Property="Padding" Value="0" />
+                </Style>
+                <Style Selector="Button.functionKey TextBlock">
+                    <Setter Property="Padding" Value="6,3" />
+                </Style>
+                <Style Selector="Button.functionKey TextBlock.key">
+                    <Setter Property="FontWeight" Value="Bold" />
+                    <Setter Property="Padding" Value="6,3,0,3" />
+                </Style>
+            </UniformGrid.Styles>
+            <Button x:Name="HexButton" Classes="functionKey">
+                <StackPanel Orientation="Horizontal"><TextBlock Classes="key" Text="F4" /><TextBlock x:Name="HexButtonText" Text="Hex" /></StackPanel>
+            </Button>
+            <Button x:Name="NextButton" Classes="functionKey">
+                <StackPanel Orientation="Horizontal"><TextBlock Classes="key" Text="F5" /><TextBlock Text="Next" /></StackPanel>
+            </Button>
+            <Button x:Name="PreviousButton" Classes="functionKey">
+                <StackPanel Orientation="Horizontal"><TextBlock Classes="key" Text="F6" /><TextBlock Text="Previous" /></StackPanel>
+            </Button>
+            <Button x:Name="SearchButton" Classes="functionKey">
+                <StackPanel Orientation="Horizontal"><TextBlock Classes="key" Text="F7" /><TextBlock Text="Search" /></StackPanel>
+            </Button>
+            <Button x:Name="CloseButton" Classes="functionKey">
+                <StackPanel Orientation="Horizontal"><TextBlock Classes="key" Text="F10" /><TextBlock Text="Close" /></StackPanel>
+            </Button>
+            <Button x:Name="CopyButton" Classes="functionKey">
+                <StackPanel Orientation="Horizontal"><TextBlock Classes="key" Text="Ctrl+C" /><TextBlock Text="Copy" /></StackPanel>
+            </Button>
+        </UniformGrid>
+        <Border BorderBrush="{DynamicResource PaneBorder}" BorderThickness="1">
+            <Grid ColumnDefinitions="*,Auto" RowDefinitions="*,Auto" Background="{DynamicResource PaneBackground}">
+                <local:ViewerControl x:Name="View" Grid.Column="0" Grid.Row="0" Margin="4,2,0,0"
+                                     Background="{DynamicResource PaneBackground}"
+                                     Foreground="{DynamicResource ItemForeground}"
+                                     OffsetForeground="{DynamicResource HeaderForeground}"
+                                     MatchBackground="{DynamicResource ActivePathBackground}"
+                                     MatchForeground="{DynamicResource ActivePathForeground}"
+                                     SelectionBackground="{DynamicResource ViewerSelectionBackground}"
+                                     SelectionForeground="{DynamicResource ViewerSelectionForeground}">
+                    <local:ViewerControl.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem x:Name="CopyMenuItem" Header="_Copy" InputGesture="Ctrl+C" />
+                            <MenuItem x:Name="SelectAllMenuItem" Header="Select _all" InputGesture="Ctrl+A" />
+                        </ContextMenu>
+                    </local:ViewerControl.ContextMenu>
+                </local:ViewerControl>
+                <ScrollBar x:Name="VerticalScrollBar" Grid.Column="1" Grid.Row="0" Orientation="Vertical"
+                           AllowAutoHide="False" Minimum="0" Maximum="1000" />
+                <ScrollBar x:Name="HorizontalScrollBar" Grid.Column="0" Grid.Row="1" Orientation="Horizontal"
+                           AllowAutoHide="False" Minimum="0" />
+            </Grid>
+        </Border>
+    </DockPanel>
+</Window>

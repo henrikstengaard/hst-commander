@@ -39,6 +39,7 @@ public partial class MainWindow : Window
         LeftPane.EntriesChanged += async (_, _) => await RightPane.RefreshEntriesAsync();
         RightPane.EntriesChanged += async (_, _) => await LeftPane.RefreshEntriesAsync();
         BuildViewMenu();
+        ViewMenuItem.Click += async (_, _) => await ViewAsync(_activePane);
         CopyMenuItem.Click += async (_, _) => await CopyAsync(_activePane);
         MoveMenuItem.Click += async (_, _) => await MoveAsync(_activePane);
         MakeDirectoryMenuItem.Click += async (_, _) => await MakeDirectoryAsync(_activePane);
@@ -53,6 +54,7 @@ public partial class MainWindow : Window
         SelectGroupMenuItem.Click += async (_, _) => await SelectGroupAsync(_activePane, true);
         UnselectGroupMenuItem.Click += async (_, _) => await SelectGroupAsync(_activePane, false);
         InvertSelectionMenuItem.Click += (_, _) => InvertSelection(_activePane);
+        ViewButton.Click += async (_, _) => await ViewAsync(_activePane);
         CopyButton.Click += async (_, _) => await CopyAsync(_activePane);
         MoveButton.Click += async (_, _) => await MoveAsync(_activePane);
         MkdirButton.Click += async (_, _) => await MakeDirectoryAsync(_activePane);
@@ -210,6 +212,10 @@ public partial class MainWindow : Window
                 e.Handled = true;
                 await ShowLocationAsync(_activePane);
                 break;
+            case Key.F3:
+                e.Handled = true;
+                await ViewAsync(_activePane);
+                break;
             case Key.F5:
                 e.Handled = true;
                 await CopyAsync(_activePane);
@@ -328,6 +334,37 @@ public partial class MainWindow : Window
     private static void InvertSelection(PaneView pane)
     {
         pane.InvertMarks();
+        pane.FocusEntries();
+    }
+
+    /// <summary>
+    ///     Views the file under the cursor of a pane in the viewer (F3), reading only the part of the file shown.
+    ///     Directories aren't viewed.
+    /// </summary>
+    private async Task ViewAsync(PaneView pane)
+    {
+        if (pane.SelectedEntry is not { Type: EntryType.Item } entry)
+        {
+            return;
+        }
+
+        ViewerSession session;
+        try
+        {
+            session = await pane.NavigationContext.OpenViewerAsync(entry);
+        }
+        catch (Exception exception)
+        {
+            await ShowErrorAsync(exception);
+            pane.FocusEntries();
+            return;
+        }
+
+        using (session)
+        {
+            await new ViewerDialog(entry.Name, session).ShowDialog(this);
+        }
+
         pane.FocusEntries();
     }
 

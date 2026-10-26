@@ -1102,6 +1102,64 @@ public sealed class NavigationContext : IDisposable
     }
 
     /// <summary>
+    ///     Opens a listed file for viewing (F3). Local files are read directly (shared with writers), files inside
+    ///     images and other volumes with a volume of their own (<see cref="OpenLocationAsync" />), so the viewer can read
+    ///     and search on a background thread; a file that isn't seekable (e.g. inside a zip archive) is copied to a
+    ///     temporary file first. The images of the file are read with the image providers (default
+    ///     <see cref="VolumeProviders.Images" />; none, e.g. for the TUI, views images as binary files), so an image
+    ///     starts in the image view. Directories throw
+    ///     <see cref="IOException" />.
+    /// </summary>
+    public async Task<ViewerSession> OpenViewerAsync(IEntry entry, IEnumerable<IImageProvider>? imageProviders = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+
+        var document = await OpenViewerDocumentAsync(entry, cancellationToken);
+        try
+        {
+            var images = await document.ReadImagesAsync(entry.Name, imageProviders ?? VolumeProviders.Images,
+                cancellationToken);
+            return new ViewerSession(document, images);
+        }
+        catch
+        {
+            document.Dispose();
+            throw;
+        }
+    }
+
+    private async Task<ViewerDocument> OpenViewerDocumentAsync(IEntry entry, CancellationToken cancellationToken)
+    {
+        if (entry.Type == EntryType.Container)
+        {
+            throw new IOException($"'{entry.Name}' is a directory and can't be viewed");
+        }
+
+        if (GetLocalPath(entry) is { } localPath)
+        {
+            return await Task.Run(() => ViewerDocument.Open(new FileStream(localPath, FileMode.Open, FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete, 0, FileOptions.RandomAccess)), cancellationToken);
+        }
+
+        var location = await OpenLocationAsync(cancellationToken);
+        Stream stream;
+        try
+        {
+            stream = await OpenSeekableAsync(token => location.Volume.OpenRead(entry.Name, token),
+                cancellationToken);
+        }
+        catch
+        {
+            location.Dispose();
+            throw;
+        }
+
+        // the document owns the stream and the location, also when opening fails
+        return await Task.Run(() => ViewerDocument.Open(stream, location), CancellationToken.None);
+    }
+
+    /// <summary>
     ///     Opens a volume of its own at the current location, so it can be used, e.g. for copying, without changing the
     ///     current directory of this context. Images are opened again from their files, images inside images from the
     ///     image they are in.

@@ -18,6 +18,8 @@
                     <SolidColorBrush x:Key="ActivePathForeground" Color="#000000" />
                     <SolidColorBrush x:Key="SelectedEntryForeground" Color="#000000" />
                     <SolidColorBrush x:Key="MarkedEntryForeground" Color="#FFFF55" />
+                    <SolidColorBrush x:Key="ViewerSelectionBackground" Color="#00AAAA" />
+                    <SolidColorBrush x:Key="ViewerSelectionForeground" Color="#000000" />
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Light">
                     <SolidColorBrush x:Key="PaneBackground" Color="#FFFFFF" />
@@ -31,6 +33,8 @@
                     <SolidColorBrush x:Key="ActivePathForeground" Color="#FFFFFF" />
                     <SolidColorBrush x:Key="SelectedEntryForeground" Color="#000000" />
                     <SolidColorBrush x:Key="MarkedEntryForeground" Color="#B07800" />
+                    <SolidColorBrush x:Key="ViewerSelectionBackground" Color="#ADD6FF" />
+                    <SolidColorBrush x:Key="ViewerSelectionForeground" Color="#000000" />
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Dark">
                     <SolidColorBrush x:Key="PaneBackground" Color="#202020" />
@@ -44,6 +48,8 @@
                     <SolidColorBrush x:Key="ActivePathForeground" Color="#000000" />
                     <SolidColorBrush x:Key="SelectedEntryForeground" Color="#FFFFFF" />
                     <SolidColorBrush x:Key="MarkedEntryForeground" Color="#FFD700" />
+                    <SolidColorBrush x:Key="ViewerSelectionBackground" Color="#264F78" />
+                    <SolidColorBrush x:Key="ViewerSelectionForeground" Color="#FFFFFF" />
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
         </ResourceDictionary>

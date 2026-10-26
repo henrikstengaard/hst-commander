@@ -44,6 +44,7 @@ public sealed class MainWindow : Window
             [
                 new MenuBarItem("_File", new MenuItem[]
                 {
+                    new("Vie_w...", "F3", ViewInActivePane),
                     new("_Copy...", "F5", CopyFromActivePane),
                     new("Mo_ve/rename...", "F6", MoveFromActivePane),
                     new("_Make directory...", "F7", MakeDirectoryInActivePane),
@@ -78,7 +79,7 @@ public sealed class MainWindow : Window
             Height = 1,
             Items =
             [
-                new FunctionKeyItem("F3", "View"),
+                new FunctionKeyItem("F3", "View", ViewInActivePane),
                 new FunctionKeyItem("F4", "Edit"),
                 new FunctionKeyItem("F5", "Copy", CopyFromActivePane),
                 new FunctionKeyItem("F6", "Move", MoveFromActivePane),
@@ -413,6 +414,11 @@ public sealed class MainWindow : Window
                 key.Handled = true;
                 ChooseRightVolumeProvider();
             }
+            else if (key.KeyCode == KeyCode.F3)
+            {
+                key.Handled = true;
+                _ = ViewAsync(pane);
+            }
             else if (key.KeyCode == KeyCode.F5)
             {
                 key.Handled = true;
@@ -441,6 +447,8 @@ public sealed class MainWindow : Window
         };
     }
 
+    private void ViewInActivePane() => _ = ViewAsync(_activePane);
+
     private void CopyFromActivePane() => _ = CopyAsync(_activePane, _activePane == _leftPane ? _rightPane : _leftPane);
 
     private void MoveFromActivePane() => _ = MoveAsync(_activePane, _activePane == _leftPane ? _rightPane : _leftPane);
@@ -467,6 +475,40 @@ public sealed class MainWindow : Window
     private void ShowLocationOfActivePane() => _ = ShowLocationAsync(_activePane);
 
     private void ShowPropertiesOfActivePane() => _ = ShowPropertiesAsync(_activePane);
+
+    /// <summary>
+    ///     Views the file under the cursor in the viewer (F3), reading only the part of the file shown. Directories
+    ///     aren't viewed.
+    /// </summary>
+    private async Task ViewAsync(Pane pane)
+    {
+        if (GetCurrentEntry(pane) is not { Type: EntryType.Item } entry)
+        {
+            return;
+        }
+
+        ViewerSession session;
+        try
+        {
+            // a terminal can't show images, so they are viewed as binary files in the hex view
+            session = await pane.NavigationContext.OpenViewerAsync(entry, []);
+        }
+        catch (Exception exception)
+        {
+            MessageBox.ErrorQuery("Error", exception.Message, "OK");
+            pane.TableView.SetFocus();
+            return;
+        }
+
+        using (session)
+        {
+            var dialog = new ViewerDialog(entry.Name, session, _palette);
+            Application.Run(dialog);
+            dialog.Dispose();
+        }
+
+        pane.TableView.SetFocus();
+    }
 
     /// <summary>
     ///     Shows the properties of the marked entries, or the entry under the cursor, of a pane. The size and contents
