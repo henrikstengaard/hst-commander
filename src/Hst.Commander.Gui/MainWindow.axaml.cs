@@ -35,6 +35,10 @@ public partial class MainWindow : Window
         ApplyUaeMetadata(settings.UaeMetadata);
         LeftPane.NavigationFailed += async (_, exception) => await ShowErrorAsync(exception);
         RightPane.NavigationFailed += async (_, exception) => await ShowErrorAsync(exception);
+        // e.g. icon files written when saving icon positions, which the other pane may show
+        LeftPane.EntriesChanged += async (_, _) => await RightPane.RefreshEntriesAsync();
+        RightPane.EntriesChanged += async (_, _) => await LeftPane.RefreshEntriesAsync();
+        BuildViewMenu();
         CopyMenuItem.Click += async (_, _) => await CopyAsync(_activePane);
         MoveMenuItem.Click += async (_, _) => await MoveAsync(_activePane);
         MakeDirectoryMenuItem.Click += async (_, _) => await MakeDirectoryAsync(_activePane);
@@ -66,8 +70,9 @@ public partial class MainWindow : Window
         AddHandler(KeyDownEvent, OnWindowKeyDown, RoutingStrategies.Tunnel);
         Opened += async (_, _) =>
         {
-            await LeftPane.InitializeAsync();
-            await RightPane.InitializeAsync();
+            // setting the navigation modes lists the entries
+            await LeftPane.SetNavigationModeAsync(PaneNavigationMode.Find(settings.LeftNavigationMode));
+            await RightPane.SetNavigationModeAsync(PaneNavigationMode.Find(settings.RightNavigationMode));
             LeftPane.FocusEntries();
             if (StartupError is { } startupError)
             {
@@ -85,6 +90,61 @@ public partial class MainWindow : Window
 
     /// <summary>Error shown when the window is opened, e.g. plugins that failed to load.</summary>
     public string? StartupError { get; set; }
+
+    /// <summary>
+    ///     Adds the navigation modes to the View menu, acting on the active pane: the built-in list and thumbnail modes
+    ///     and the navigation modes of the plugins, the first nine with Ctrl+1 to Ctrl+9.
+    /// </summary>
+    private void BuildViewMenu()
+    {
+        var navigationModes = PaneNavigationMode.All;
+        for (var index = 0; index < navigationModes.Count; index++)
+        {
+            var navigationMode = navigationModes[index];
+            var menuItem = new MenuItem
+            {
+                Header = navigationMode.Name,
+                ToggleType = MenuItemToggleType.Radio,
+                GroupName = "NavigationMode",
+                Tag = navigationMode
+            };
+            ToolTip.SetTip(menuItem, navigationMode.Description);
+            if (index < 9)
+            {
+                menuItem.InputGesture = new KeyGesture(Key.D1 + index, KeyModifiers.Control);
+            }
+
+            menuItem.Click += async (_, _) => await SetNavigationModeAsync(_activePane, navigationMode);
+            ViewMenu.Items.Add(menuItem);
+        }
+
+        ViewMenu.SubmenuOpened += (_, _) =>
+        {
+            foreach (var menuItem in ViewMenu.Items.OfType<MenuItem>())
+            {
+                menuItem.IsChecked = Equals(menuItem.Tag, _activePane.NavigationMode);
+            }
+        };
+    }
+
+    /// <summary>Shows the entries of a pane in a navigation mode, remembered in the settings.</summary>
+    private async Task SetNavigationModeAsync(PaneView pane, PaneNavigationMode navigationMode)
+    {
+        await pane.SetNavigationModeAsync(navigationMode);
+        pane.FocusEntries();
+        try
+        {
+            var settings = GuiSettings.Load();
+            (pane == LeftPane
+                ? settings with { LeftNavigationMode = navigationMode.Name }
+                : settings with { RightNavigationMode = navigationMode.Name }).Save();
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            await ShowErrorAsync(new IOException(
+                $"Failed to save settings to '{GuiSettings.FilePath}': {exception.Message}", exception));
+        }
+    }
 
     /// <summary>Makes a pane the active pane, only the active pane shows the current entry.</summary>
     private void SetActivePane(PaneView pane)
@@ -120,6 +180,14 @@ public partial class MainWindow : Window
 
         switch (e.Key)
         {
+            case >= Key.D1 and <= Key.D9 when e.KeyModifiers == KeyModifiers.Control:
+                if (e.Key - Key.D1 < PaneNavigationMode.All.Count)
+                {
+                    e.Handled = true;
+                    await SetNavigationModeAsync(_activePane, PaneNavigationMode.All[e.Key - Key.D1]);
+                }
+
+                break;
             case Key.Tab:
                 // tab always switches between the panes instead of moving focus through the controls
                 e.Handled = true;

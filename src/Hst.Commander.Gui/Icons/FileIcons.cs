@@ -1,4 +1,4 @@
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
@@ -36,10 +36,11 @@ internal static class FileIcons
 
     /// <summary>
     ///     Loads the icons of the listed entries, first the type icons and then the icons contained in files, which
-    ///     are read from the pane's volume. Stops when cancelled, e.g. when the pane lists other entries.
+    ///     are read from the pane's volume. Stops when cancelled, e.g. when the pane lists other entries. Type icons are
+    ///     cached without their size, unless <paramref name="isLarge" /> (e.g. thumbnails), which are cached by size.
     /// </summary>
     public static async Task LoadAsync(IReadOnlyList<EntryItem> items, NavigationContext navigationContext, int size,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, bool isLarge = false)
     {
         foreach (var item in items)
         {
@@ -48,7 +49,8 @@ internal static class FileIcons
                 return;
             }
 
-            item.Icon = await GetEntryTypeIconAsync(item.Entry, navigationContext, size, string.Empty);
+            item.Icon = await GetEntryTypeIconAsync(item.Entry, navigationContext, size,
+                isLarge ? $"@{size}" : string.Empty);
         }
 
         foreach (var item in items.Where(item => !item.IsContainer || navigationContext.HasIcon(item.Entry)))
@@ -360,7 +362,8 @@ internal static class FileIcons
         return OperatingSystem.IsLinux() || OperatingSystem.IsFreeBSD() ? new FreedesktopFileIconProvider() : null;
     }
 
-    private static Bitmap? CreateBitmap(IconImage? iconImage)
+    /// <summary>Bitmap of an icon image (PNG data or BGRA pixels), null when there is none or it's invalid.</summary>
+    public static Bitmap? CreateBitmap(IconImage? iconImage)
     {
         try
         {

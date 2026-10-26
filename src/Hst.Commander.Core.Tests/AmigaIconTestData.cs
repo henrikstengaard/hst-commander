@@ -1,4 +1,4 @@
-using Hst.Amiga.DataTypes.DiskObjects;
+﻿using Hst.Amiga.DataTypes.DiskObjects;
 using Hst.Amiga.DataTypes.DiskObjects.NewIcons;
 using Hst.Imaging;
 
@@ -9,12 +9,19 @@ public static class AmigaIconTestData
 {
     /// <summary>
     /// Creates a project icon with a 4x2 planar image using the Workbench pens 0, 1, 2, 3 on the first row and 3, 2,
-    /// 1, 0 on the second, and a selected image with the pens in reverse order when <paramref name="withSelectedImage" />.
+    /// 1, 0 on the second, and a selected image with the pens in reverse order when <paramref name="withSelectedImage" />,
+    /// at a position on the Workbench when given.
     /// </summary>
-    public static async Task<byte[]> CreatePlanarIcon(bool withSelectedImage = false)
+    public static async Task<byte[]> CreatePlanarIcon(bool withSelectedImage = false, (int X, int Y)? position = null)
     {
         var image = new Image(4, 2, 8, AmigaOsPalette.FourColors(), [0, 1, 2, 3, 3, 2, 1, 0]);
         var diskObject = DiskObjectHelper.CreateProjectInfo();
+        if (position is { } iconPosition)
+        {
+            diskObject.CurrentX = iconPosition.X;
+            diskObject.CurrentY = iconPosition.Y;
+        }
+
         DiskObjectHelper.SetFirstImage(diskObject, ImageDataEncoder.Encode(image, 2));
         if (withSelectedImage)
         {

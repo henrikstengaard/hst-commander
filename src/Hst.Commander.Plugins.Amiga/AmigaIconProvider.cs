@@ -1,4 +1,4 @@
-using Hst.Amiga.DataTypes.DiskObjects;
+﻿using Hst.Amiga.DataTypes.DiskObjects;
 using Hst.Amiga.DataTypes.DiskObjects.NewIcons;
 using Hst.Commander.Abstractions;
 using Hst.Imaging;
@@ -16,6 +16,9 @@ public class AmigaIconProvider : IIconProvider
 
     /// <summary>Icon of an Amiga volume, in its root.</summary>
     public const string DiskIconFileName = "Disk.info";
+
+    /// <summary>Position of a disk object without a position on the Workbench, NO_ICON_POSITION.</summary>
+    internal const int NoIconPosition = unchecked((int)0x80000000);
 
     private static readonly byte[] DiskObjectMagic = [0xe3, 0x10];
     private static readonly byte[] PngMagic = [0x89, 0x50, 0x4e, 0x47];
@@ -42,6 +45,42 @@ public class AmigaIconProvider : IIconProvider
         (await ReadIcons(name, stream, cancellationToken)).FirstOrDefault()?.Images[0];
 
     /// <summary>
+    /// The type of the icon (disk object), e.g. "Drawer", and its position on the Workbench, e.g. "10, 20", or "None"
+    /// when the Workbench places it.
+    /// </summary>
+    public async Task<IReadOnlyList<EntryProperty>> ReadIconProperties(string name, Stream stream,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+
+        if (await ReadAmigaIconAsync(stream, cancellationToken) is not { DiskObject: { } diskObject })
+        {
+            return [];
+        }
+
+        var hasPosition = diskObject.CurrentX != NoIconPosition && diskObject.CurrentY != NoIconPosition;
+        return
+        [
+            new EntryProperty("Icon type", GetTypeName(diskObject.Type)),
+            new EntryProperty("Icon position", hasPosition ? $"{diskObject.CurrentX}, {diskObject.CurrentY}" : "None")
+        ];
+    }
+
+    /// <summary>Name of a disk object type, WBDISK to WBAPPICON.</summary>
+    private static string GetTypeName(int type) => type switch
+    {
+        1 => "Disk",
+        2 => "Drawer",
+        3 => "Tool",
+        4 => "Project",
+        5 => "Trashcan",
+        6 => "Device",
+        7 => "Kickstart",
+        8 => "AppIcon",
+        _ => $"Unknown ({type})"
+    };
+
+    /// <summary>
     /// Reads all images of an Amiga icon, best first: the true color (PNG) images, the color icon (GlowIcon) images,
     /// the NewIcon images and the planar images, each normal and selected when present.
     /// </summary>
@@ -50,24 +89,54 @@ public class AmigaIconProvider : IIconProvider
     {
         ArgumentNullException.ThrowIfNull(stream);
 
+        return GetIcons(await ReadAmigaIconAsync(stream, cancellationToken)).ToList();
+    }
+
+    /// <summary>Reads an Amiga icon, null when the stream isn't a valid icon.</summary>
+    private static async Task<AmigaIcon?> ReadAmigaIconAsync(Stream stream, CancellationToken cancellationToken)
+    {
         var magic = new byte[4];
         if (await stream.ReadAtLeastAsync(magic, magic.Length, false, cancellationToken) < magic.Length ||
             !(magic.AsSpan(0, 2).SequenceEqual(DiskObjectMagic) || magic.AsSpan().SequenceEqual(PngMagic)))
         {
-            return [];
+            return null;
         }
 
         try
         {
             stream.Position = 0;
-            return GetIcons(await AmigaIconHelper.ReadAmigaIcon(stream)).ToList();
+            return await AmigaIconHelper.ReadAmigaIcon(stream);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
             // Hst.Amiga throws various exceptions for invalid icon files, which just have no icon
-            return [];
+            return null;
         }
     }
+
+    /// <summary>
+    /// Normal and selected image of the best kind of image of an icon (see <see cref="ReadIcons" />), null when the
+    /// icon has no image or no selected image of that kind.
+    /// </summary>
+    internal static (IconImage? Normal, IconImage? Selected) GetImages(AmigaIcon amigaIcon)
+    {
+        var icons = GetIcons(amigaIcon).ToList();
+        if (icons.Count == 0)
+        {
+            return (null, null);
+        }
+
+        // the icons are named by image and kind, e.g. "Normal (planar)" and "Selected (planar)"
+        var kind = icons[0].Name[icons[0].Name.IndexOf('(')..];
+        var selected = icons.FirstOrDefault(icon => icon.Name == $"{GetImageName(1)} {kind}");
+        return (icons[0].Images[0], selected?.Images[0]);
+    }
+
+    /// <summary>Planar image of a disk object drawn with the full AmigaOS palette, null when it has none.</summary>
+    internal static IconImage? DecodePlanarImage(ImageData? imageData) =>
+        imageData is { Width: > 0, Height: > 0 }
+            ? ToIconImage(ImageDataDecoder.Decode(imageData, AmigaOsPalette.FullPalette(), true), imageData.Depth)
+            : null;
 
     private static IEnumerable<EntryIcon> GetIcons(AmigaIcon? amigaIcon)
     {
@@ -114,9 +183,7 @@ public class AmigaIconProvider : IIconProvider
         {
             // the 8 colors of the full AmigaOS palette, so both 4 color and 8 color (e.g. MagicWB) icons are drawn
             // with the colors they were designed for
-            if (planarImages[index] is { Width: > 0, Height: > 0 } imageData &&
-                ToIconImage(ImageDataDecoder.Decode(imageData, AmigaOsPalette.FullPalette(), true), imageData.Depth)
-                    is { } iconImage)
+            if (DecodePlanarImage(planarImages[index]) is { } iconImage)
             {
                 yield return new EntryIcon($"{GetImageName(index)} (planar)", [iconImage]);
             }

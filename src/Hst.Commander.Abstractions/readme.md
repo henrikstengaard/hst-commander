@@ -13,3 +13,7 @@ Entries can give a name shown in the panes (`IEntry.DisplayName`) and details sh
 Volumes storing Amiga names, protection bits and comments (Amiga file systems) return true from `IVolume.SupportsAmigaMetadata`, give entries their `IEntry.AmigaMetadata` and set them with `IVolume.SetAmigaMetadata`; Hst Commander keeps them when copying between such volumes and stores them as UAE metadata on other volumes.
 
 The properties dialog shows check boxes for `IEntry.Attributes` (DOS/Windows attributes, `EntryAttributes`) and the Amiga protection bits. Volumes that can change them return the attributes from `IVolume.GetChangeableAttributes` and set them with `IVolume.SetAttributes`, and return true from `IVolume.CanSetAmigaMetadata` when `IVolume.SetAmigaMetadata` can change the protection bits; the check boxes are disabled otherwise.
+
+Icon providers can add lines to the properties dialog of an entry with an icon file with `IIconProvider.ReadIconProperties`, e.g. the position of an Amiga icon.
+
+Navigation modes (`IPlugin.NavigationModes`, `INavigationMode`) show the entries of a directory in the GUI panes as icons at positions, next to the built-in list and thumbnail modes, e.g. the Amiga Workbench. `INavigationMode.Layout` returns the icons with their images and positions (icons without a position are placed by Hst Commander, which also shows a `..` button going to the parent) and `INavigationMode.SavePositions` stores the positions of icons the user dragged.

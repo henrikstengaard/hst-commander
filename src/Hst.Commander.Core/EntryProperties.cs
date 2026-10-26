@@ -152,8 +152,12 @@ public sealed class EntryProperties
     /// <param name="isDriveList">True when the entries are local drives.</param>
     /// <param name="uaeMetadata">UAE metadata of a single entry, shown with its Amiga name.</param>
     /// <param name="changes">What can be changed of a single entry, nothing by default.</param>
+    /// <param name="iconProperties">
+    ///     Properties of the icon file of a single entry read by its icon provider, e.g. the position of an Amiga icon.
+    /// </param>
     internal static EntryProperties Create(IReadOnlyList<IEntry> entries, string location, string? localDirectory,
-        bool isDriveList, UaeMetadataNode? uaeMetadata = null, PropertyChanges? changes = null)
+        bool isDriveList, UaeMetadataNode? uaeMetadata = null, PropertyChanges? changes = null,
+        IReadOnlyList<EntryProperty>? iconProperties = null)
     {
         ArgumentNullException.ThrowIfNull(entries);
         if (entries.Count == 0)
@@ -167,7 +171,8 @@ public sealed class EntryProperties
         }
 
         return entries.Count == 1
-            ? CreateForEntry(entries[0], location, localDirectory, uaeMetadata, changes ?? PropertyChanges.None)
+            ? CreateForEntry(entries[0], location, localDirectory, uaeMetadata, changes ?? PropertyChanges.None,
+                iconProperties ?? [])
             : CreateForEntries(entries, location, localDirectory);
     }
 
@@ -238,7 +243,7 @@ public sealed class EntryProperties
     }
 
     private static EntryProperties CreateForEntry(IEntry entry, string location, string? localDirectory,
-        UaeMetadataNode? uaeMetadata, PropertyChanges changes)
+        UaeMetadataNode? uaeMetadata, PropertyChanges changes, IReadOnlyList<EntryProperty> iconProperties)
     {
         var isContainer = entry.Type == EntryType.Container;
         var info = GetLocalInfo(entry, localDirectory);
@@ -310,7 +315,8 @@ public sealed class EntryProperties
             .Select(section => section.Select(CreateField).ToList())
             .ToArray() ?? [];
         return new EntryProperties(entry.DisplayName,
-            WithoutEmpty([typeSection, ..detailSections, sizeSection, dateSection, attributeSection, amigaSection]),
+            WithoutEmpty([typeSection, ..detailSections, sizeSection, dateSection, attributeSection, amigaSection,
+                iconProperties.Select(CreateField).ToList()]),
             details?.UsedFraction is { } usedFraction ? Math.Clamp(usedFraction, 0, 1) : null, flagGroups, entry,
             uaeMetadata);
     }

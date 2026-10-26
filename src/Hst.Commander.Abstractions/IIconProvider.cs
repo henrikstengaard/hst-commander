@@ -55,4 +55,15 @@ public interface IIconProvider
     async Task<IReadOnlyList<EntryIcon>> ReadIcons(string name, Stream stream,
         CancellationToken cancellationToken = default) =>
         await ReadIcon(name, stream, 256, cancellationToken) is { } icon ? [new EntryIcon("Icon", [icon])] : [];
+
+    /// <summary>
+    /// Reads properties of an icon file shown in the properties dialog of the entry it belongs to and of the icon file
+    /// itself, e.g. the type and the position of an Amiga icon. Defaults to none.
+    /// </summary>
+    /// <param name="name">Name of the icon file.</param>
+    /// <param name="stream">Contents of the icon file, seekable and positioned at the start.</param>
+    /// <param name="cancellationToken"></param>
+    /// <returns>Properties of the icon, empty when the file has none or isn't an icon.</returns>
+    Task<IReadOnlyList<EntryProperty>> ReadIconProperties(string name, Stream stream,
+        CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<EntryProperty>>([]);
 }

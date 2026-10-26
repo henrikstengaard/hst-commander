@@ -1264,7 +1264,30 @@ public sealed class NavigationContext : IDisposable
                 ? await _nestedVolume.CanSetAmigaMetadata(cancellationToken)
                 : uaeMetadata != null && MoveNotSupportedMessage == null);
         var localDirectory = !IsInImage ? LocalPath : null;
-        return EntryProperties.Create(entries, CurrentPath, localDirectory, IsDriveList, uaeMetadata, changes);
+        return EntryProperties.Create(entries, CurrentPath, localDirectory, IsDriveList, uaeMetadata, changes,
+            await ReadIconPropertiesAsync(entry, cancellationToken));
+    }
+
+    /// <summary>
+    ///     Properties of the icon file of a listed entry read by its icon provider
+    ///     (<see cref="IIconProvider.ReadIconProperties" />), e.g. the type and position of an Amiga icon, after the name
+    ///     of the icon file, for the entry and the icon file itself (e.g. "file" and "file.info") and volume entries
+    ///     (e.g. the Disk.info of a partition). Empty when it has none.
+    /// </summary>
+    private async Task<IReadOnlyList<EntryProperty>> ReadIconPropertiesAsync(IEntry entry,
+        CancellationToken cancellationToken)
+    {
+        if (!HasIcon(entry))
+        {
+            return [];
+        }
+
+        var properties = await ReadIconFileAsync(entry,
+            (provider, name, stream) => provider.ReadIconProperties(name, stream, cancellationToken), [],
+            cancellationToken) ?? [];
+        return properties.Count > 0 && GetIconFile(entry) is { } iconFile
+            ? [new EntryProperty("Icon file", iconFile.Name), ..properties]
+            : properties;
     }
 
     /// <summary>
@@ -1340,6 +1363,49 @@ public sealed class NavigationContext : IDisposable
 
         return changed;
     }
+
+    /// <summary>
+    ///     True when icon positions of a navigation mode can be saved in the current location (see
+    ///     <see cref="SaveIconPositionsAsync" />): not in the drive list or inside a read-only image.
+    /// </summary>
+    public bool CanSaveIconPositions => CreateDirectoryNotSupportedMessage == null;
+
+    /// <summary>
+    ///     Lays out listed entries of the current location as icons of a navigation mode of a plugin (see
+    ///     <see cref="INavigationMode.Layout" />), without the parent entry "..". Reads with the pane's volume, so call it
+    ///     on the thread using the pane.
+    /// </summary>
+    public Task<NavigationLayout> LayoutAsync(INavigationMode navigationMode, IReadOnlyList<IEntry> entries,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(navigationMode);
+        ArgumentNullException.ThrowIfNull(entries);
+
+        return navigationMode.Layout(_nestedVolume, LayoutEntries(entries), cancellationToken);
+    }
+
+    /// <summary>
+    ///     Saves the positions of icons of a navigation mode moved by the user in the current location (see
+    ///     <see cref="INavigationMode.SavePositions" />). Writes with the pane's volume, so call it on the thread using
+    ///     the pane. Throws <see cref="NotSupportedException" /> when <see cref="CanSaveIconPositions" /> is false.
+    /// </summary>
+    public Task SaveIconPositionsAsync(INavigationMode navigationMode, IReadOnlyList<IEntry> entries,
+        IReadOnlyList<NavigationIconPosition> positions, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(navigationMode);
+        ArgumentNullException.ThrowIfNull(entries);
+        ArgumentNullException.ThrowIfNull(positions);
+
+        if (!CanSaveIconPositions)
+        {
+            throw new NotSupportedException("Icon positions can't be saved in a read-only location");
+        }
+
+        return navigationMode.SavePositions(_nestedVolume, LayoutEntries(entries), positions, cancellationToken);
+    }
+
+    private static List<IEntry> LayoutEntries(IEnumerable<IEntry> entries) =>
+        entries.Where(entry => entry.Name != Paths.Parent).ToList();
 
     private async Task<UaeMetadataNode?> FindUaeMetadataAsync(IEntry entry, CancellationToken cancellationToken)
     {

@@ -30,6 +30,8 @@
                 <Separator />
                 <MenuItem x:Name="QuitMenuItem" Header="_Quit" InputGesture="Alt+F4" />
             </MenuItem>
+            <!-- the navigation modes of the active pane, added by the code-behind -->
+            <MenuItem x:Name="ViewMenu" Header="_View" />
             <MenuItem Header="_Help">
                 <MenuItem x:Name="AboutMenuItem" Header="_About..." />
             </MenuItem>

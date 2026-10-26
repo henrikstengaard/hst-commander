@@ -1,4 +1,4 @@
-using Hst.Commander.Core.Volumes;
+﻿using Hst.Commander.Core.Volumes;
 using Hst.Commander.Abstractions;
 
 namespace Hst.Commander.Core;
@@ -6,7 +6,8 @@ namespace Hst.Commander.Core;
 /// <summary>
 ///     Volume providers listed when choosing what a pane shows (Alt+F1/Alt+F2), the local volume provider first, and file
 ///     volume providers opening files as volumes, the built-in ones first followed by those of the <see cref="Plugins" />,
-///     the volume creators of the plugins creating new volumes as files and the icon providers of the plugins.
+///     the volume creators of the plugins creating new volumes as files, the icon providers and the navigation modes of the
+///     plugins.
 /// </summary>
 public static class VolumeProviders
 {
@@ -35,6 +36,12 @@ public static class VolumeProviders
     /// </summary>
     public static IReadOnlyList<IIconProvider> Icons => GetLists().Icons;
 
+    /// <summary>
+    ///     Navigation modes of the plugins added to the GUI panes after the built-in list and thumbnail modes, e.g. the
+    ///     Amiga Workbench, in plugin order.
+    /// </summary>
+    public static IReadOnlyList<INavigationMode> NavigationModes => GetLists().NavigationModes;
+
     private static Lists GetLists()
     {
         var plugins = Plugins.All;
@@ -47,7 +54,8 @@ public static class VolumeProviders
             [Local, ..plugins.SelectMany(plugin => plugin.VolumeProviders)],
             [Iso9660, ..plugins.SelectMany(plugin => plugin.FileVolumeProviders)],
             [..plugins.Where(plugin => plugin.CanCreateVolumes).SelectMany(plugin => plugin.VolumeCreators)],
-            [..plugins.SelectMany(plugin => plugin.IconProviders)]);
+            [..plugins.SelectMany(plugin => plugin.IconProviders)],
+            [..plugins.SelectMany(plugin => plugin.NavigationModes)]);
         _lists = lists;
         return lists;
     }
@@ -57,5 +65,6 @@ public static class VolumeProviders
         IReadOnlyList<IVolumeProvider> All,
         IReadOnlyList<IFileVolumeProvider> Files,
         IReadOnlyList<IVolumeCreator> Creators,
-        IReadOnlyList<IIconProvider> Icons);
+        IReadOnlyList<IIconProvider> Icons,
+        IReadOnlyList<INavigationMode> NavigationModes);
 }
