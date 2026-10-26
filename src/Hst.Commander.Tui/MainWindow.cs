@@ -63,7 +63,7 @@ public sealed class MainWindow : Window
                     null!,
                     new("_Settings...", string.Empty, ShowSettings),
                     null!,
-                    new("_Quit", string.Empty, () => Application.RequestStop())
+                    new("_Quit", "F10", Quit)
                 }),
                 new MenuBarItem("_Help", new MenuItem[]
                 {
@@ -85,11 +85,12 @@ public sealed class MainWindow : Window
                 new FunctionKeyItem("F6", "Move", MoveFromActivePane),
                 new FunctionKeyItem("F7", "Mkdir", MakeDirectoryInActivePane),
                 new FunctionKeyItem("F8", "Delete", DeleteFromActivePane),
-                new FunctionKeyItem("F9", "Create", CreateVolumeInActivePane)
+                new FunctionKeyItem("F9", "Create", CreateVolumeInActivePane),
+                new FunctionKeyItem("F10", "Quit", Quit)
             ]
         };
-        // f9 creates a volume, so f10 opens the menu (alt+f too)
-        _menuBar.Key = Key.F10;
+        // the panes handle f9 (create volume) and f10 (quit) before the menu bar's key, so alt+f opens the menu
+        Closing += (_, e) => e.Cancel = !ConfirmClosing();
         _leftPane = CreatePane(new NavigationContext(initialPath, StartFile), 0);
         _rightPane = CreatePane(new NavigationContext(initialPath, StartFile), 50);
         _activePane = _leftPane;
@@ -133,6 +134,16 @@ public sealed class MainWindow : Window
         _pendingTerminalAction = null;
         return action;
     }
+
+    /// <summary>Quits the application (F10, File > Quit), after confirming when the window is closing.</summary>
+    private void Quit() => Application.RequestStop(this);
+
+    /// <summary>
+    ///     Confirms quitting when the window is stopped by F10, File > Quit or Esc (<see cref="Application.QuitKey" />);
+    ///     stopping it for a terminal action isn't quitting. Esc in the confirm dialog answers no.
+    /// </summary>
+    private bool ConfirmClosing() => _pendingTerminalAction != null ||
+                                     MessageBox.Query("Quit", AppInfo.Current.QuitQuestion, "_Yes", "_No") == 0;
 
     /// <summary>Stops the window, so the action is done in the terminal while the TUI is shut down.</summary>
     private void RequestTerminalAction(TerminalAction action)
@@ -443,6 +454,11 @@ public sealed class MainWindow : Window
             {
                 key.Handled = true;
                 _ = CreateVolumeAsync(pane, otherPane);
+            }
+            else if (key.KeyCode == KeyCode.F10)
+            {
+                key.Handled = true;
+                Quit();
             }
         };
     }

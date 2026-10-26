@@ -21,4 +21,7 @@ public record AppInfo(string Name, string Author, string Version)
     public string NameAndVersion => $"{Name} v{Version}";
 
     public string AboutText => $"{NameAndVersion}\n\nCreated by {Author}";
+
+    /// <summary>Question confirming quitting the application, e.g. <c>Do you want to quit Hst Commander?</c></summary>
+    public string QuitQuestion => $"Do you want to quit {Name}?";
 }

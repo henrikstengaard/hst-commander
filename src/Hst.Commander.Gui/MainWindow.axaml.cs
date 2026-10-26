@@ -12,6 +12,7 @@ public partial class MainWindow : Window
     private PaneView _activePane;
     private VolumeProviderKeys _volumeProviderKeys;
     private string _selectGroupFilter = SelectGroupOptions.Default.Filter;
+    private bool _quitConfirmed;
 
     public MainWindow() : this(Environment.CurrentDirectory)
     {
@@ -60,6 +61,7 @@ public partial class MainWindow : Window
         MkdirButton.Click += async (_, _) => await MakeDirectoryAsync(_activePane);
         DeleteButton.Click += async (_, _) => await DeleteAsync(_activePane);
         CreateButton.Click += async (_, _) => await CreateVolumeAsync(_activePane);
+        QuitButton.Click += (_, _) => Close();
         LeftVolumeMenuItem.Click += async (_, _) => await ChooseVolumeProviderAsync(LeftPane);
         RightVolumeMenuItem.Click += async (_, _) => await ChooseVolumeProviderAsync(RightPane);
         LocationMenuItem.Click += async (_, _) => await ShowLocationAsync(_activePane);
@@ -83,6 +85,7 @@ public partial class MainWindow : Window
                 LeftPane.FocusEntries();
             }
         };
+        Closing += OnClosing;
         Closed += (_, _) =>
         {
             LeftPane.NavigationContext.Dispose();
@@ -237,7 +240,38 @@ public partial class MainWindow : Window
                 e.Handled = true;
                 await CreateVolumeAsync(_activePane);
                 break;
+            case Key.F10:
+                e.Handled = true;
+                Close();
+                break;
         }
+    }
+
+    /// <summary>
+    ///     Confirms quitting (F10, File > Quit, Alt+F4 or closing the window) with <see cref="QuitDialog" />: closing is
+    ///     cancelled while the dialog is shown and the window is closed again on yes.
+    /// </summary>
+    private async void OnClosing(object? sender, WindowClosingEventArgs e)
+    {
+        if (_quitConfirmed || e.CloseReason is WindowCloseReason.OSShutdown or WindowCloseReason.ApplicationShutdown)
+        {
+            return;
+        }
+
+        e.Cancel = true;
+        if (OwnedWindows.Count > 0)
+        {
+            return;
+        }
+
+        if (await new QuitDialog().ShowDialog<bool?>(this) != true)
+        {
+            _activePane.FocusEntries();
+            return;
+        }
+
+        _quitConfirmed = true;
+        Close();
     }
 
     private KeyModifiers VolumeProviderModifier => _volumeProviderKeys == VolumeProviderKeys.ShiftFunctionKeys
