@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using Hst.Commander.Abstractions;
 
 namespace Hst.Commander.Core.Volumes;
@@ -11,10 +11,16 @@ namespace Hst.Commander.Core.Volumes;
 /// <param name="ConfirmOverwrite">
 /// Asks whether to overwrite an item that already exists in the destination. Null overwrites existing items.
 /// </param>
+/// <param name="UaeMetadata">
+/// How Amiga names, protection bits and comments are stored when copying from a volume storing them (see
+/// <see cref="IVolume.SupportsAmigaMetadata" />) to one that doesn't, e.g. from an Amiga disk to a local directory.
+/// <see cref="UaeMetadataFormat.None" /> doesn't handle UAE metadata: it isn't read or copied with entries.
+/// </param>
 public record CopyOptions(
     string Filter = EntryFilter.All,
     string? TargetName = null,
-    Func<OverwriteRequest, CancellationToken, Task<OverwriteAnswer>>? ConfirmOverwrite = null);
+    Func<OverwriteRequest, CancellationToken, Task<OverwriteAnswer>>? ConfirmOverwrite = null,
+    UaeMetadataFormat UaeMetadata = UaeMetadataFormat.UaeFsDb);
 
 /// <summary>
 /// Copies entries from one volume to another using the stream and container methods of <see cref="IVolume" />,
@@ -33,6 +39,10 @@ public static class VolumeCopy
     /// containers are preserved; containers get their dates last, as copying into them changes them. Both volumes
     /// are changed back to
     /// their current directories when the copy is done.
+    /// Amiga names, protection bits and comments are kept between volumes storing them (Amiga file systems), stored
+    /// as UAE metadata (<see cref="CopyOptions.UaeMetadata" />) when copying from them to other volumes and read from
+    /// UAE metadata when copying from other volumes to them, without copying the metadata files. Between other
+    /// volumes, the UAE metadata of the copied entries is copied with them.
     /// </summary>
     /// <param name="source">Volume to copy entries from.</param>
     /// <param name="entries">Entries in the current directory of the source volume to copy.</param>
@@ -48,7 +58,8 @@ public static class VolumeCopy
     /// <summary>
     /// Copies entries like <see cref="CopyToAsync" />. With <paramref name="deleteSource" /> (used by
     /// <see cref="VolumeMove" />), each item is deleted from the source once it is copied and each container once it
-    /// is empty, so items skipped or not matching the filter are kept with their containers.
+    /// is empty, so items skipped or not matching the filter are kept with their containers. UAE metadata of moved
+    /// entries is removed from the source.
     /// </summary>
     internal static async Task TransferAsync(IVolume source, IEnumerable<IEntry> entries, IVolume destination,
         CopyOptions? options, IProgress<CopyProgress>? progress, bool deleteSource,
@@ -59,11 +70,23 @@ public static class VolumeCopy
         ArgumentNullException.ThrowIfNull(destination);
         options ??= new CopyOptions();
 
+        var metadataMode = await GetMetadataModeAsync(source, destination, options.UaeMetadata, cancellationToken);
+        var readsUae = metadataMode is MetadataMode.ReadUae or MetadataMode.CopyUae;
+        var sourceMetadata = new Dictionary<string, UaeDirectoryMetadata>();
+        var metadata = UaeDirectoryMetadata.Empty;
+        if (readsUae)
+        {
+            var sourceEntries = await source.ListEntries(cancellationToken).ToListAsync(cancellationToken);
+            metadata = await UaeMetadataReader.ReadAsync(source, sourceEntries, true, cancellationToken);
+            sourceMetadata[GetKey([])] = metadata;
+        }
+
         var filter = new EntryFilter(options.Filter);
         var items = new List<CopyItem>();
         foreach (var entry in entries)
         {
-            await AddCopyItemsAsync(source, [], entry, filter, items, cancellationToken);
+            await AddCopyItemsAsync(source, [], entry, filter, metadata, readsUae, sourceMetadata, items,
+                cancellationToken);
         }
 
         var state = new CopyState(items, progress);
@@ -72,99 +95,267 @@ public static class VolumeCopy
         var existingEntries = new ExistingEntries(destination);
         var overwriteAll = options.ConfirmOverwrite == null;
 
-        foreach (var item in items)
+        // directories in the destination by the directories in the source, as names can differ with UAE metadata
+        var destinationDirectories = new Dictionary<string, IReadOnlyList<string>> { [GetKey([])] = [] };
+        var writers = new Dictionary<string, (IReadOnlyList<string> Directory, UaeMetadataWriter Writer)>();
+
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            await ChangeDirectoryAsync(source, sourceDirectory, item.Directory, cancellationToken);
-            await ChangeDirectoryAsync(destination, destinationDirectory, item.Directory, cancellationToken);
-
-            if (item.Entry.Type == EntryType.Container)
+            foreach (var item in items)
             {
-                await destination.CreateContainer(item.Entry.Name, cancellationToken);
-                continue;
-            }
+                cancellationToken.ThrowIfCancellationRequested();
+                await ChangeDirectoryAsync(source, sourceDirectory, item.Directory, cancellationToken);
+                var itemDestinationDirectory = destinationDirectories[GetKey(item.Directory)];
+                await ChangeDirectoryAsync(destination, destinationDirectory, itemDestinationDirectory,
+                    cancellationToken);
 
-            var targetName = item.Directory.Count == 0 && options.TargetName != null
-                ? options.TargetName
-                : item.Entry.Name;
+                var amigaName = item.Directory.Count == 0 && options.TargetName != null
+                    ? options.TargetName
+                    : item.AmigaName ?? item.Entry.Name;
+                // entries without metadata copied between volumes not storing Amiga metadata keep their names
+                var writer = metadataMode == MetadataMode.WriteUae ||
+                             (metadataMode == MetadataMode.CopyUae && item.AmigaName != null)
+                    ? await GetWriterAsync(destination, itemDestinationDirectory, options.UaeMetadata, writers,
+                        cancellationToken)
+                    : null;
+                var targetName = writer?.GetName(amigaName) ?? amigaName;
+                item.DestinationName = targetName;
 
-            if (!overwriteAll && options.ConfirmOverwrite != null &&
-                await existingEntries.GetAsync(destinationDirectory, targetName, cancellationToken) is
-                    { } existingEntry)
-            {
-                state.Pause();
-                var answer = await options.ConfirmOverwrite(
-                    new OverwriteRequest(targetName, item.Entry, existingEntry), cancellationToken);
-                state.Resume();
-
-                if (answer == OverwriteAnswer.No)
+                if (item.Entry.Type == EntryType.Container)
                 {
-                    state.SkipItem(item);
+                    await destination.CreateContainer(targetName, cancellationToken);
+                    destinationDirectories[GetKey([..item.Directory, item.Entry.Name])] =
+                        [..itemDestinationDirectory, targetName];
+                    if (writer != null)
+                    {
+                        await writer.SetAsync(destination, amigaName, targetName, item.Metadata,
+                            item.Entry.ModifiedDate, cancellationToken);
+                    }
+
                     continue;
                 }
 
-                overwriteAll = answer == OverwriteAnswer.All;
+                if (!overwriteAll && options.ConfirmOverwrite != null &&
+                    await existingEntries.GetAsync(itemDestinationDirectory, targetName, cancellationToken) is
+                        { } existingEntry)
+                {
+                    state.Pause();
+                    var answer = await options.ConfirmOverwrite(
+                        new OverwriteRequest(targetName, item.Entry, existingEntry), cancellationToken);
+                    state.Resume();
+
+                    if (answer == OverwriteAnswer.No)
+                    {
+                        state.SkipItem(item);
+                        continue;
+                    }
+
+                    overwriteAll = answer == OverwriteAnswer.All;
+                }
+
+                await CopyItemAsync(source, destination, item, targetName, state, cancellationToken);
+                if (writer != null)
+                {
+                    await writer.SetAsync(destination, amigaName, targetName, item.Metadata, item.Entry.ModifiedDate,
+                        cancellationToken);
+                }
+                else
+                {
+                    await SetAmigaMetadataAsync(destination, targetName, item, metadataMode, cancellationToken);
+                }
+
+                await SetModifiedDateAsync(destination, targetName, item.Entry, cancellationToken);
+                if (deleteSource)
+                {
+                    await source.Delete(item.Entry.Name, cancellationToken);
+                }
             }
 
-            await CopyItemAsync(source, destination, item, targetName, state, cancellationToken);
-            await SetModifiedDateAsync(destination, targetName, item.Entry, cancellationToken);
-            if (deleteSource)
-            {
-                await source.Delete(item.Entry.Name, cancellationToken);
-            }
+            // the "_UAEFSDB.___" files are written before the dates of the containers, as writing changes them
+            await FlushWritersAsync(destination, destinationDirectory, writers, cancellationToken);
+        }
+        catch
+        {
+            // the metadata of the entries copied is kept, as they may have normal names
+            await FlushWritersAfterErrorAsync(destination, destinationDirectory, writers);
+            throw;
         }
 
         // containers are in the order they are created, so in reverse their entries come before them
         foreach (var item in items.Where(item => item.Entry.Type == EntryType.Container).Reverse())
         {
-            await ChangeDirectoryAsync(destination, destinationDirectory, item.Directory, cancellationToken);
-            await SetModifiedDateAsync(destination, item.Entry.Name, item.Entry, cancellationToken);
+            await ChangeDirectoryAsync(destination, destinationDirectory,
+                destinationDirectories[GetKey(item.Directory)], cancellationToken);
+            await SetAmigaMetadataAsync(destination, item.DestinationName, item, metadataMode, cancellationToken);
+            await SetModifiedDateAsync(destination, item.DestinationName, item.Entry, cancellationToken);
             if (deleteSource)
             {
+                // the metadata of moved entries is removed first, so the container is empty
+                List<string> containerDirectory = [..item.Directory, item.Entry.Name];
+                if (sourceMetadata.TryGetValue(GetKey(containerDirectory), out var containerMetadata))
+                {
+                    await ChangeDirectoryAsync(source, sourceDirectory, containerDirectory, cancellationToken);
+                    await UaeMetadataReader.RemoveMissingAsync(source, containerMetadata, cancellationToken);
+                }
+
                 await ChangeDirectoryAsync(source, sourceDirectory, item.Directory, cancellationToken);
                 await DeleteIfEmptyAsync(source, item.Entry.Name, cancellationToken);
             }
         }
 
         await ChangeDirectoryAsync(source, sourceDirectory, [], cancellationToken);
+        if (deleteSource && sourceMetadata.TryGetValue(GetKey([]), out var startMetadata))
+        {
+            await UaeMetadataReader.RemoveMissingAsync(source, startMetadata, cancellationToken);
+        }
+
         await ChangeDirectoryAsync(destination, destinationDirectory, [], cancellationToken);
         state.Report(force: true);
     }
 
+    /// <summary>How Amiga names, protection bits and comments are copied, by the volumes storing them or not.</summary>
+    private enum MetadataMode
+    {
+        /// <summary>Neither volume stores them, entries are copied as they are.</summary>
+        None,
+
+        /// <summary>Both volumes store them, they are copied as they are.</summary>
+        Amiga,
+
+        /// <summary>Only the source stores them, they are written as UAE metadata in the destination.</summary>
+        WriteUae,
+
+        /// <summary>Only the destination stores them, they are read from UAE metadata in the source.</summary>
+        ReadUae,
+
+        /// <summary>
+        /// Neither volume stores them: UAE metadata of the copied entries is read in the source and written in the
+        /// destination, without copying the metadata files.
+        /// </summary>
+        CopyUae
+    }
+
+    private static async Task<MetadataMode> GetMetadataModeAsync(IVolume source, IVolume destination,
+        UaeMetadataFormat format, CancellationToken cancellationToken) =>
+        (await source.SupportsAmigaMetadata(cancellationToken),
+                await destination.SupportsAmigaMetadata(cancellationToken)) switch
+            {
+                (true, true) => MetadataMode.Amiga,
+                (true, false) => MetadataMode.WriteUae,
+                (false, true) when format != UaeMetadataFormat.None => MetadataMode.ReadUae,
+                (false, false) when format != UaeMetadataFormat.None => MetadataMode.CopyUae,
+                _ => MetadataMode.None
+            };
+
+    /// <summary>Key of a directory relative to the directory the copy started in.</summary>
+    private static string GetKey(IEnumerable<string> directory) => string.Join('\0', directory);
+
     /// <summary>
     /// Adds the entry to copy and, for containers, the entries within it. Containers are added before their
-    /// entries, so they are created before entries are copied into them.
+    /// entries, so they are created before entries are copied into them. The entries get their Amiga names,
+    /// protection bits and comments from the UAE metadata of their directory, whose metadata files are skipped; with
+    /// <paramref name="readMetadata" />, the UAE metadata of each container is read.
     /// </summary>
     private static async Task AddCopyItemsAsync(IVolume source, IReadOnlyList<string> directory, IEntry entry,
-        EntryFilter filter, List<CopyItem> items, CancellationToken cancellationToken)
+        EntryFilter filter, UaeDirectoryMetadata metadata, bool readMetadata,
+        Dictionary<string, UaeDirectoryMetadata> sourceMetadata, List<CopyItem> items,
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (entry.Name.Equals(Paths.Parent, StringComparison.Ordinal))
+        if (entry.Name.Equals(Paths.Parent, StringComparison.Ordinal) ||
+            (entry.Type == EntryType.Item && metadata.IsMetadataFile(entry.Name)))
         {
             return;
         }
 
+        var node = metadata.Find(entry.Name);
+        var item = new CopyItem(directory, entry, node?.AmigaName, entry.AmigaMetadata ?? node?.Metadata);
         if (entry.Type == EntryType.Item)
         {
             if (filter.IsMatch(entry.Name))
             {
-                items.Add(new CopyItem(directory, entry));
+                items.Add(item);
             }
 
             return;
         }
 
-        items.Add(new CopyItem(directory, entry));
+        items.Add(item);
 
         await source.ChangeDirectory([entry.Name], cancellationToken);
         var childEntries = await source.ListEntries(cancellationToken).ToListAsync(cancellationToken);
         var childDirectory = directory.Append(entry.Name).ToList();
+        var childMetadata = UaeDirectoryMetadata.Empty;
+        if (readMetadata)
+        {
+            childMetadata = await UaeMetadataReader.ReadAsync(source, childEntries, true, cancellationToken);
+            if (!childMetadata.IsEmpty)
+            {
+                sourceMetadata[GetKey(childDirectory)] = childMetadata;
+            }
+        }
+
         foreach (var childEntry in childEntries)
         {
-            await AddCopyItemsAsync(source, childDirectory, childEntry, filter, items, cancellationToken);
+            await AddCopyItemsAsync(source, childDirectory, childEntry, filter, childMetadata, readMetadata,
+                sourceMetadata, items, cancellationToken);
         }
 
         await source.ChangeDirectory([Paths.Parent], cancellationToken);
+    }
+
+    /// <summary>
+    /// Sets the Amiga protection bits and comment of a copied entry when the destination stores them, from the
+    /// source entry or its UAE metadata.
+    /// </summary>
+    private static async Task SetAmigaMetadataAsync(IVolume destination, string name, CopyItem item,
+        MetadataMode metadataMode, CancellationToken cancellationToken)
+    {
+        if (metadataMode is MetadataMode.Amiga or MetadataMode.ReadUae && item.Metadata is { } metadata)
+        {
+            await destination.SetAmigaMetadata(name, metadata, cancellationToken);
+        }
+    }
+
+    /// <summary>Writer of the UAE metadata of a destination directory, created when first used.</summary>
+    private static async Task<UaeMetadataWriter> GetWriterAsync(IVolume destination,
+        IReadOnlyList<string> directory, UaeMetadataFormat format,
+        Dictionary<string, (IReadOnlyList<string> Directory, UaeMetadataWriter Writer)> writers,
+        CancellationToken cancellationToken)
+    {
+        var key = GetKey(directory);
+        if (!writers.TryGetValue(key, out var directoryWriter))
+        {
+            directoryWriter = (directory, await UaeMetadataWriter.CreateAsync(destination, format, cancellationToken));
+            writers[key] = directoryWriter;
+        }
+
+        return directoryWriter.Writer;
+    }
+
+    private static async Task FlushWritersAsync(IVolume destination, List<string> destinationDirectory,
+        Dictionary<string, (IReadOnlyList<string> Directory, UaeMetadataWriter Writer)> writers,
+        CancellationToken cancellationToken)
+    {
+        foreach (var (directory, writer) in writers.Values)
+        {
+            await ChangeDirectoryAsync(destination, destinationDirectory, directory, cancellationToken);
+            await writer.FlushAsync(destination, cancellationToken);
+        }
+    }
+
+    private static async Task FlushWritersAfterErrorAsync(IVolume destination, List<string> destinationDirectory,
+        Dictionary<string, (IReadOnlyList<string> Directory, UaeMetadataWriter Writer)> writers)
+    {
+        try
+        {
+            await FlushWritersAsync(destination, destinationDirectory, writers, CancellationToken.None);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException
+                                              or NotSupportedException)
+        {
+            // keep the error that stopped the copy rather than the failed metadata
+        }
     }
 
     private static async Task CopyItemAsync(IVolume source, IVolume destination, CopyItem item, string targetName,
@@ -309,8 +500,21 @@ public static class VolumeCopy
         }
     }
 
-    /// <summary>An entry to copy and the directory containing it, relative to the directory the copy started in.</summary>
-    private sealed record CopyItem(IReadOnlyList<string> Directory, IEntry Entry);
+    /// <summary>
+    /// An entry to copy and the directory containing it, relative to the directory the copy started in, with its
+    /// Amiga name from UAE metadata (null when none) and its Amiga protection bits and comment (null when none).
+    /// </summary>
+    private sealed class CopyItem(IReadOnlyList<string> directory, IEntry entry, string? amigaName,
+        AmigaMetadata? metadata)
+    {
+        public IReadOnlyList<string> Directory { get; } = directory;
+        public IEntry Entry { get; } = entry;
+        public string? AmigaName { get; } = amigaName;
+        public AmigaMetadata? Metadata { get; } = metadata;
+
+        /// <summary>Name in the destination, set when it is copied.</summary>
+        public string DestinationName { get; set; } = entry.Name;
+    }
 
     /// <summary>Tracks copied bytes and items and reports progress with speed and estimated time left.</summary>
     private sealed class CopyState(IReadOnlyList<CopyItem> items, IProgress<CopyProgress>? progress)

@@ -21,6 +21,7 @@ Hst Commander comes with two front-ends that have the same functionality:
 
 - Dual-pane browsing of local drives and directories.
 - Browsing ISO 9660 images as if they were directories, also as the source or destination of copying.
+- Creating volumes provided by plugins with F9, e.g. empty Amiga disk files (adf), formatted and bootable.
 - Copying, moving, renaming, making directories and deleting, with progress dialogs, speed and ETA, filters and overwrite confirmation.
 - Selecting entries one by one or as a group with wildcards or regular expressions, and inverting the selection.
 - Properties of files, directories and drives, with the size and contents counted in the background.
@@ -43,11 +44,12 @@ Hst Commander comes with two front-ends that have the same functionality:
 | F6 | Move or rename |
 | F7 | Make directory |
 | F8 / Delete | Delete |
+| F9 | Create a volume, e.g. an Amiga disk file |
 | Ctrl+P / Alt+Enter | Properties |
 | Ctrl+L | Change location |
 | Alt+F1 / Alt+F2 (Windows), Shift+F1 / Shift+F2 (Linux and macOS) | Choose the volume provider of the left / right pane (configurable in settings) |
 | Ctrl+O | Show the terminal output (TUI only) |
-| F9 / Alt+F | Open the menu (TUI) |
+| F10 / Alt+F | Open the menu (TUI) |
 
 ## Download
 

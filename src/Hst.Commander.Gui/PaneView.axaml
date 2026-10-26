@@ -55,8 +55,25 @@
             <Setter Property="Foreground" Value="{DynamicResource ActivePathForeground}" />
         </Style>
     </UserControl.Styles>
+    <UserControl.Resources>
+        <!-- thumbnail navigation mode: large icons with the names below, row by row -->
+        <ItemsPanelTemplate x:Key="WrapPanelTemplate">
+            <WrapPanel />
+        </ItemsPanelTemplate>
+        <DataTemplate x:Key="ThumbnailTemplate" x:DataType="local:EntryItem">
+            <Grid Classes="row" Classes.container="{Binding IsContainer}"
+                  Classes.executable="{Binding IsExecutable}"
+                  Classes.marked="{Binding IsMarked}" Background="Transparent"
+                  Width="112" RowDefinitions="Auto,Auto" ToolTip.Tip="{Binding DisplayName}">
+                <Image Width="80" Height="80" Margin="0,6,0,2" Source="{Binding Icon}" Stretch="Uniform"
+                       RenderOptions.BitmapInterpolationMode="HighQuality" />
+                <TextBlock Grid.Row="1" Text="{Binding DisplayName}" TextAlignment="Center" TextWrapping="Wrap"
+                           MaxLines="2" />
+            </Grid>
+        </DataTemplate>
+    </UserControl.Resources>
 
-    <Grid RowDefinitions="Auto,*">
+    <Grid RowDefinitions="Auto,*,Auto">
         <!-- bordered panel above the pane with the current path, highlighted when the pane is active,
              and below it the summary of the marked entries and the free/total disk space of the current drive -->
         <Border Grid.Row="0" Background="{DynamicResource PaneBackground}" BorderBrush="{DynamicResource PaneBorder}"
@@ -77,12 +94,12 @@
                 BorderThickness="1" Margin="2">
             <Grid RowDefinitions="Auto,*">
                 <!-- column dividers continue below the last entry -->
-                <Grid Grid.RowSpan="2" IsHitTestVisible="False" ColumnDefinitions="*,90,150">
+                <Grid x:Name="DividersGrid" Grid.RowSpan="2" IsHitTestVisible="False" ColumnDefinitions="*,90,150">
                     <Border Grid.Column="1" BorderBrush="{DynamicResource PaneBorder}" BorderThickness="1,0,0,0" />
                     <Border Grid.Column="2" BorderBrush="{DynamicResource PaneBorder}" BorderThickness="1,0,0,0" />
                 </Grid>
 
-                <Grid Grid.Row="0" Classes="header" ColumnDefinitions="*,90,150">
+                <Grid x:Name="HeaderGrid" Grid.Row="0" Classes="header" ColumnDefinitions="*,90,150">
                     <TextBlock Grid.Column="0" Text="Name" />
                     <TextBlock Grid.Column="1" Text="Size" />
                     <TextBlock Grid.Column="2" Text="Modified" />
@@ -98,7 +115,7 @@
                                 <DockPanel Grid.Column="0">
                                     <Image DockPanel.Dock="Left" Width="16" Height="16" Margin="4,0,0,0"
                                            Source="{Binding Icon}" RenderOptions.BitmapInterpolationMode="HighQuality" />
-                                    <TextBlock Text="{Binding Name}" />
+                                    <TextBlock Text="{Binding DisplayName}" />
                                 </DockPanel>
                                 <TextBlock Grid.Column="1" Text="{Binding Size}" TextAlignment="Right" />
                                 <TextBlock Grid.Column="2" Text="{Binding Modified}" />
@@ -106,7 +123,21 @@
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>
+
+                <!-- navigation modes of plugins: icons at positions, e.g. the Amiga Workbench -->
+                <local:IconLayoutView x:Name="IconLayout" Grid.Row="0" Grid.RowSpan="2" IsVisible="False" />
             </Grid>
+        </Border>
+
+        <!-- shown when icons were moved in a navigation mode of a plugin -->
+        <Border x:Name="IconPositionsBar" Grid.Row="2" IsVisible="False" Background="{DynamicResource PaneBackground}"
+                BorderBrush="{DynamicResource PaneBorder}" BorderThickness="1" Margin="2,0,2,2" Padding="4,2">
+            <DockPanel>
+                <Button x:Name="ResetPositionsButton" DockPanel.Dock="Right" Content="Reset" Margin="4,0,0,0" />
+                <Button x:Name="SavePositionsButton" DockPanel.Dock="Right" Content="Save" />
+                <TextBlock Text="Icon positions changed" VerticalAlignment="Center" Margin="4,0"
+                           Foreground="{DynamicResource PathForeground}" />
+            </DockPanel>
         </Border>
     </Grid>
 </UserControl>

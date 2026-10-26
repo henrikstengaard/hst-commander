@@ -1,4 +1,4 @@
-using Hst.Commander.Core.Volumes;
+﻿using Hst.Commander.Core.Volumes;
 using Hst.Commander.Abstractions;
 
 namespace Hst.Commander.Core;
@@ -13,6 +13,11 @@ public sealed class NavigationContext : IDisposable
     private readonly HashSet<string> _executableNames = new(StringComparer.Ordinal);
     private readonly Action<string> _startFile;
     private readonly IReadOnlyList<IFileVolumeProvider> _fileVolumeProviders;
+    private readonly IReadOnlyList<IIconProvider> _iconProviders;
+    private readonly Dictionary<string, IconFile> _iconFiles = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, IReadOnlyList<VolumeIconFile>> _volumeIconFiles = new(StringComparer.Ordinal);
+    private readonly SemaphoreSlim _iconLocationLock = new(1, 1);
+    private Task<VolumeLocation>? _iconLocation;
     private string? _newEntryName;
     private bool _selectFirstEntry;
 
@@ -25,11 +30,17 @@ public sealed class NavigationContext : IDisposable
     ///     File volume providers asked in order whether a file opened with <see cref="OpenEntryAsync" /> is browsed as a
     ///     volume (an image), e.g. an ISO image or a zip archive. Defaults to <see cref="VolumeProviders.Files" />.
     /// </param>
+    /// <param name="iconProviders">
+    ///     Icon providers reading icons from icon files next to the listed entries, e.g. Amiga .info files (see
+    ///     <see cref="GetIconFile" />). Defaults to <see cref="VolumeProviders.Icons" />.
+    /// </param>
     public NavigationContext(string initialPath, Action<string>? startFile = null,
-        IReadOnlyList<IFileVolumeProvider>? fileVolumeProviders = null)
+        IReadOnlyList<IFileVolumeProvider>? fileVolumeProviders = null,
+        IReadOnlyList<IIconProvider>? iconProviders = null)
     {
         _startFile = startFile ?? FileStarter.StartWithShell;
         _fileVolumeProviders = fileVolumeProviders ?? VolumeProviders.Files;
+        _iconProviders = iconProviders ?? VolumeProviders.Icons;
         _volumeProvider = VolumeProviders.Local;
         _rootVolume = new LocalVolume(initialPath);
         _nestedVolume = new NestedVolume(_rootVolume);
@@ -460,6 +471,7 @@ public sealed class NavigationContext : IDisposable
         }
 
         UpdateExecutableNames(entries);
+        UpdateIconFiles(entries);
 
         // keep marks of entries still present, refreshed with the listed entries so sizes are current
         var markedEntries = entries.Where(IsMarked).ToList();
@@ -491,6 +503,260 @@ public sealed class NavigationContext : IDisposable
             {
                 _executableNames.Add(entry.Name);
             }
+        }
+    }
+
+    /// <summary>Largest icon file read by <see cref="ReadIconAsync" />, larger files have no icon.</summary>
+    private const long MaxIconFileSize = 4 * 1024 * 1024;
+
+    private sealed record IconFile(IIconProvider Provider, IEntry Entry);
+
+    /// <summary>
+    ///     Finds the icon files of the listed entries with the icon providers: the first provider whose icon file for
+    ///     an entry (e.g. "file.info" for "file" and for "file.info" itself) is a listed file, matched exactly,
+    ///     otherwise case-insensitive. Not in the drive list.
+    /// </summary>
+    private void UpdateIconFiles(IReadOnlyList<IEntry> entries)
+    {
+        _iconFiles.Clear();
+        _volumeIconFiles.Clear();
+        CloseIconLocation();
+        if (_iconProviders.Count == 0 || IsDriveList)
+        {
+            return;
+        }
+
+        var exactItems = new Dictionary<string, IEntry>(StringComparer.Ordinal);
+        var items = new Dictionary<string, IEntry>(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in entries.Where(entry => entry.Type == EntryType.Item))
+        {
+            exactItems.TryAdd(item.Name, item);
+            items.TryAdd(item.Name, item);
+        }
+
+        foreach (var entry in entries.Where(entry => !entry.Name.Equals(Paths.Parent, StringComparison.Ordinal)))
+        {
+            foreach (var provider in _iconProviders)
+            {
+                if (provider.GetIconFileName(entry.Name) is { } iconFileName &&
+                    (exactItems.GetValueOrDefault(iconFileName) ?? items.GetValueOrDefault(iconFileName)) is
+                    { } iconFile)
+                {
+                    _iconFiles[entry.Name] = new IconFile(provider, iconFile);
+                    break;
+                }
+            }
+
+            // volumes, e.g. partitions, can hold their icon inside, looked up when the icon is read
+            if (!_iconFiles.ContainsKey(entry.Name) && entry is { IsVolume: true, Type: EntryType.Container })
+            {
+                var volumeIconFiles = _iconProviders
+                    .Select(provider => (Provider: provider, FileName: provider.GetVolumeIconFileName(entry.Name)))
+                    .Where(volumeIconFile => volumeIconFile.FileName != null)
+                    .Select(volumeIconFile => new VolumeIconFile(volumeIconFile.Provider, volumeIconFile.FileName!))
+                    .ToList();
+                if (volumeIconFiles.Count > 0)
+                {
+                    _volumeIconFiles[entry.Name] = volumeIconFiles;
+                }
+            }
+        }
+    }
+
+    /// <summary>Icon file inside a volume entry, e.g. Disk.info in an Amiga partition.</summary>
+    private sealed record VolumeIconFile(IIconProvider Provider, string FileName);
+
+    /// <summary>
+    ///     Icon file holding the icon of a listed entry, e.g. "file.info" for "file" and for "file.info" itself, null
+    ///     when no icon provider has an icon file listed for it. Updated by <see cref="ListEntriesAsync" />.
+    /// </summary>
+    public IEntry? GetIconFile(IEntry entry) => _iconFiles.GetValueOrDefault(entry.Name)?.Entry;
+
+    /// <summary>
+    ///     True when a listed entry can have an icon read by <see cref="ReadIconAsync" />: it has an icon file (see
+    ///     <see cref="GetIconFile" />), or it is a volume (<see cref="IEntry.IsVolume" />, e.g. a partition) and an icon
+    ///     provider has an icon file inside volumes (e.g. Disk.info), which may not exist.
+    /// </summary>
+    public bool HasIcon(IEntry entry) =>
+        _iconFiles.ContainsKey(entry.Name) || _volumeIconFiles.ContainsKey(entry.Name);
+
+    /// <summary>
+    ///     Reads the icon of a listed entry from its icon file (see <see cref="GetIconFile" />) with the icon provider,
+    ///     null when it has no icon file or the icon can't be read. Local files are read on a background thread, files
+    ///     inside images and other volumes with the pane's own volume, so it must not run concurrently with navigation.
+    /// </summary>
+    /// <param name="entry">Listed entry.</param>
+    /// <param name="size">Wanted width/height in pixels.</param>
+    /// <param name="cancellationToken"></param>
+    public Task<IconImage?> ReadIconAsync(IEntry entry, int size, CancellationToken cancellationToken = default) =>
+        ReadIconFileAsync(entry, (provider, name, stream) => provider.ReadIcon(name, stream, size, cancellationToken),
+            null, cancellationToken);
+
+    /// <summary>
+    ///     Reads all icons of the icon file of a listed entry (see <see cref="GetIconFile" />) with the icon provider,
+    ///     e.g. the normal and the selected image of an Amiga icon, empty when it has no icon file or the icons can't be
+    ///     read. Like <see cref="ReadIconAsync" />, it must not run concurrently with navigation.
+    /// </summary>
+    public async Task<IReadOnlyList<EntryIcon>> ReadIconsAsync(IEntry entry,
+        CancellationToken cancellationToken = default) =>
+        await ReadIconFileAsync(entry, (provider, name, stream) => provider.ReadIcons(name, stream, cancellationToken),
+            [], cancellationToken) ?? [];
+
+    /// <summary>
+    ///     Reads the icon file of a listed entry into memory and reads it with the icon provider on the thread pool,
+    ///     returning <paramref name="none" /> when there is no icon file, it can't be read or the provider fails.
+    /// </summary>
+    private async Task<T?> ReadIconFileAsync<T>(IEntry entry, Func<IIconProvider, string, Stream, Task<T>> read,
+        T? none, CancellationToken cancellationToken)
+    {
+        if (_volumeIconFiles.TryGetValue(entry.Name, out var volumeIconFiles))
+        {
+            return await ReadVolumeIconFileAsync(entry, volumeIconFiles, read, none, cancellationToken);
+        }
+
+        if (!_iconFiles.TryGetValue(entry.Name, out var iconFile) || iconFile.Entry.Size > MaxIconFileSize)
+        {
+            return none;
+        }
+
+        try
+        {
+            var localPath = GetLocalPath(iconFile.Entry);
+            var data = new MemoryStream();
+            if (localPath != null)
+            {
+                await Task.Run(async () =>
+                {
+                    await using var stream = new FileStream(localPath, FileMode.Open, FileAccess.Read,
+                        FileShare.ReadWrite);
+                    await CopyIconFileAsync(stream, data, cancellationToken);
+                }, cancellationToken);
+            }
+            else
+            {
+                await using var stream = await OpenReadAsync(iconFile.Entry, cancellationToken);
+                await CopyIconFileAsync(stream, data, cancellationToken);
+            }
+
+            data.Position = 0;
+            return await Task.Run(() => read(iconFile.Provider, iconFile.Entry.Name, data), cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // an unreadable or invalid icon file just has no icon, also when a plugin fails reading it
+            return none;
+        }
+    }
+
+    /// <summary>
+    ///     Reads the icon file inside a volume entry (e.g. Disk.info in an Amiga partition) with the first provider whose
+    ///     icon file exists. The volume entry is opened on a volume of its own (<see cref="OpenLocationAsync" />, opened
+    ///     once per listing and shared by the volume entries), on the thread pool, so the pane's volume isn't changed.
+    /// </summary>
+    private async Task<T?> ReadVolumeIconFileAsync<T>(IEntry entry, IReadOnlyList<VolumeIconFile> volumeIconFiles,
+        Func<IIconProvider, string, Stream, Task<T>> read, T? none, CancellationToken cancellationToken)
+    {
+        // opened on the calling (UI) thread, as it reads the pane's state
+        var locationTask = _iconLocation ??= OpenLocationAsync(CancellationToken.None);
+        try
+        {
+            return await Task.Run(async () =>
+            {
+                await _iconLocationLock.WaitAsync(cancellationToken);
+                try
+                {
+                    var volume = (await locationTask).Volume;
+                    // a failing change keeps the directory, so only a successful one is changed back
+                    await volume.ChangeDirectory([entry.Name], cancellationToken);
+                    try
+                    {
+                        foreach (var volumeIconFile in volumeIconFiles)
+                        {
+                            var data = new MemoryStream();
+                            try
+                            {
+                                await using var stream = await volume.OpenRead(volumeIconFile.FileName,
+                                    cancellationToken);
+                                await CopyIconFileAsync(stream, data, cancellationToken);
+                            }
+                            catch (Exception exception) when (exception is IOException
+                                                                  or UnauthorizedAccessException
+                                                                  or NotSupportedException)
+                            {
+                                // e.g. the volume has no icon file of this provider
+                                continue;
+                            }
+
+                            data.Position = 0;
+                            return await read(volumeIconFile.Provider, volumeIconFile.FileName, data);
+                        }
+
+                        return none;
+                    }
+                    finally
+                    {
+                        await volume.ChangeDirectory([Paths.Parent], CancellationToken.None);
+                    }
+                }
+                finally
+                {
+                    _iconLocationLock.Release();
+                }
+            }, cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // e.g. a partition that can't be mounted just has no icon
+            return none;
+        }
+    }
+
+    /// <summary>
+    ///     Closes the location volume icons are read from, once no icon is read from it, e.g. when the entries are
+    ///     listed again.
+    /// </summary>
+    private void CloseIconLocation()
+    {
+        if (_iconLocation is not { } locationTask)
+        {
+            return;
+        }
+
+        _iconLocation = null;
+        _ = CloseAsync();
+        return;
+
+        async Task CloseAsync()
+        {
+            await _iconLocationLock.WaitAsync();
+            try
+            {
+                (await locationTask).Dispose();
+            }
+            catch (Exception)
+            {
+                // the location failed to open, nothing to close
+            }
+            finally
+            {
+                _iconLocationLock.Release();
+            }
+        }
+    }
+
+    private static async Task CopyIconFileAsync(Stream source, MemoryStream destination,
+        CancellationToken cancellationToken)
+    {
+        var buffer = new byte[81920];
+        int read;
+        while ((read = await source.ReadAsync(buffer, cancellationToken)) > 0)
+        {
+            if (destination.Length + read > MaxIconFileSize)
+            {
+                throw new IOException("Icon file is too large");
+            }
+
+            destination.Write(buffer, 0, read);
         }
     }
 
@@ -595,6 +861,13 @@ public sealed class NavigationContext : IDisposable
     public EnterFileAction EnterFileAction { get; set; } = EnterFileAction.OpenAsVolume;
 
     /// <summary>
+    ///     How <see cref="CopyAsync" /> and <see cref="MoveAsync" /> store Amiga names, protection bits and comments
+    ///     when copying from an Amiga volume to other volumes, e.g. a local directory (see
+    ///     <see cref="CopyOptions.UaeMetadata" />).
+    /// </summary>
+    public UaeMetadataFormat UaeMetadata { get; set; } = UaeMetadataFormat.UaeFsDb;
+
+    /// <summary>
     ///     Opens an entry as a volume (Ctrl+PageDown): a file detected by any file volume provider is browsed as an
     ///     image regardless of its extension, e.g. a .docx document as a zip archive. Directories and ".." are opened
     ///     like <see cref="OpenEntryAsync" />. Throws <see cref="IOException" /> when no file volume provider detects
@@ -631,9 +904,13 @@ public sealed class NavigationContext : IDisposable
             return false;
         }
 
-        // an image inside another image is opened again from the directory it's in, e.g. for copying
+        // a local file is shared when it can be written, otherwise an image inside another image is opened again
+        // from the directory it's in, e.g. for copying
         var parentPathComponents = IsInImage ? _images.Peek().Volume.CurrentPathComponents.ToList() : [];
-        var image = await OpenImageAsync(fileVolumeProvider, entry.Name, parentPathComponents,
+        var sharedPath = fileVolumeProvider.CanWrite && !IsInImage && LocalPath is { } localPath
+            ? Path.Combine(localPath, entry.Name)
+            : null;
+        var image = await OpenImageAsync(fileVolumeProvider, entry.Name, parentPathComponents, sharedPath,
             token => volume.OpenRead(entry.Name, token), cancellationToken);
         _nestedVolume.PushVolume(new EntryVolumeProvider(entry, image.Volume));
         _images.Push(image);
@@ -697,16 +974,29 @@ public sealed class NavigationContext : IDisposable
         return null;
     }
 
-    /// <summary>Opens a file as an image with a file volume provider.</summary>
+    /// <summary>
+    ///     Opens a file as an image with a file volume provider. A local file opened by a file volume provider that can
+    ///     write (<paramref name="sharedPath" />) is shared with the other pane and file operations (see
+    ///     <see cref="SharedImages" />), other files are opened for reading.
+    /// </summary>
     private static async Task<OpenedImage> OpenImageAsync(IFileVolumeProvider fileVolumeProvider, string name,
-        IReadOnlyList<string> parentPathComponents, Func<CancellationToken, Task<Stream>> openRead,
+        IReadOnlyList<string> parentPathComponents, string? sharedPath, Func<CancellationToken, Task<Stream>> openRead,
         CancellationToken cancellationToken)
     {
+        if (sharedPath != null)
+        {
+            var sharedVolume = await SharedImages.OpenAsync(sharedPath, fileVolumeProvider, cancellationToken);
+            return new OpenedImage(fileVolumeProvider, name, parentPathComponents, sharedVolume, null, sharedPath,
+                sharedVolume.IsWritable);
+        }
+
         var stream = await OpenSeekableAsync(openRead, cancellationToken);
         try
         {
-            var volume = await fileVolumeProvider.CreateVolume(stream, cancellationToken);
-            return new OpenedImage(fileVolumeProvider, name, parentPathComponents, volume, stream);
+            // a file volume provider that can write gets a read-only stream, e.g. of a temporary copy of the file
+            var volume = await fileVolumeProvider.CreateVolume(
+                fileVolumeProvider.CanWrite ? new ReadOnlyStream(stream) : stream, cancellationToken);
+            return new OpenedImage(fileVolumeProvider, name, parentPathComponents, volume, stream, null, false);
         }
         catch
         {
@@ -838,7 +1128,8 @@ public sealed class NavigationContext : IDisposable
 
                 var parentVolume = volume;
                 var openedImage = await OpenImageAsync(image.FileVolumeProvider, image.Name,
-                    image.ParentPathComponents, token => parentVolume.OpenRead(image.Name, token), cancellationToken);
+                    image.ParentPathComponents, image.SharedPath, token => parentVolume.OpenRead(image.Name, token),
+                    cancellationToken);
                 resources.Push(openedImage);
                 volume = openedImage.Volume;
             }
@@ -902,14 +1193,15 @@ public sealed class NavigationContext : IDisposable
         {
             ThrowIfCopyingOntoItself(source.Path, entries, destination.Path, targetName, "copy");
             await source.Volume.CopyToAsync(entries, destination.Volume,
-                new CopyOptions(filter, targetName, confirmOverwrite), progress, cancellationToken);
+                new CopyOptions(filter, targetName, confirmOverwrite, UaeMetadata), progress, cancellationToken);
         }
     }
 
     /// <summary>
     ///     Deletes entries in the current location, directories with everything in them. Like copying, it uses a volume
-    ///     of its own, so it can run on a background thread. Images are read-only and throw
-    ///     <see cref="NotSupportedException" />.
+    ///     of its own, so it can run on a background thread. Read-only images throw
+    ///     <see cref="NotSupportedException" />. The UAE metadata of deleted entries is removed (see
+    ///     <see cref="UaeMetadata" />).
     /// </summary>
     public async Task DeleteAsync(IReadOnlyCollection<IEntry> entries, IProgress<DeleteProgress>? progress = null,
         CancellationToken cancellationToken = default)
@@ -917,7 +1209,20 @@ public sealed class NavigationContext : IDisposable
         ArgumentNullException.ThrowIfNull(entries);
 
         using var location = await OpenLocationAsync(cancellationToken);
-        await location.Volume.DeleteAsync(entries, progress, cancellationToken);
+        var metadata = await UaeMetadataUpdater.ReadAsync(location.Volume, UaeMetadata, false, null,
+            cancellationToken);
+        try
+        {
+            await location.Volume.DeleteAsync(entries, progress, cancellationToken);
+        }
+        catch
+        {
+            // the metadata of the entries deleted so far is removed, also when deleting fails
+            await UaeMetadataUpdater.TryRemoveMissingAsync(location.Volume, metadata);
+            throw;
+        }
+
+        await UaeMetadataReader.RemoveMissingAsync(location.Volume, metadata, cancellationToken);
     }
 
     /// <summary>
@@ -932,6 +1237,195 @@ public sealed class NavigationContext : IDisposable
 
         var localDirectory = !IsInImage ? LocalPath : null;
         return EntryProperties.Create(entries, CurrentPath, localDirectory, IsDriveList);
+    }
+
+    /// <summary>
+    ///     Properties like <see cref="GetProperties" />, with the Amiga name, protection bits and comment of a single
+    ///     entry from the UAE metadata of the current directory (see <see cref="UaeMetadataReader" />) in volumes not
+    ///     storing them, e.g. a file copied from an Amiga volume to a local directory. Reads with the pane's volume,
+    ///     so call it on the thread using the pane. Not with <see cref="UaeMetadataFormat.None" />. The check boxes of
+    ///     a single entry (<see cref="EntryProperties.FlagGroups" />) can be changed when the volume can change its
+    ///     attributes (<see cref="IVolume.GetChangeableAttributes" />) or Amiga protection bits
+    ///     (<see cref="IVolume.CanSetAmigaMetadata" />, or UAE metadata in a writable location).
+    /// </summary>
+    public async Task<EntryProperties> GetPropertiesAsync(IReadOnlyList<IEntry> entries,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+
+        if (entries is not [var entry] || IsDriveList || entry.Name == Paths.Parent)
+        {
+            return GetProperties(entries);
+        }
+
+        var uaeMetadata = entry.AmigaMetadata == null ? await FindUaeMetadataAsync(entry, cancellationToken) : null;
+        var changes = new PropertyChanges(await _nestedVolume.GetChangeableAttributes(cancellationToken),
+            entry.AmigaMetadata != null
+                ? await _nestedVolume.CanSetAmigaMetadata(cancellationToken)
+                : uaeMetadata != null && MoveNotSupportedMessage == null);
+        var localDirectory = !IsInImage ? LocalPath : null;
+        return EntryProperties.Create(entries, CurrentPath, localDirectory, IsDriveList, uaeMetadata, changes,
+            await ReadIconPropertiesAsync(entry, cancellationToken));
+    }
+
+    /// <summary>
+    ///     Properties of the icon file of a listed entry read by its icon provider
+    ///     (<see cref="IIconProvider.ReadIconProperties" />), e.g. the type and position of an Amiga icon, after the name
+    ///     of the icon file, for the entry and the icon file itself (e.g. "file" and "file.info") and volume entries
+    ///     (e.g. the Disk.info of a partition). Empty when it has none.
+    /// </summary>
+    private async Task<IReadOnlyList<EntryProperty>> ReadIconPropertiesAsync(IEntry entry,
+        CancellationToken cancellationToken)
+    {
+        if (!HasIcon(entry))
+        {
+            return [];
+        }
+
+        var properties = await ReadIconFileAsync(entry,
+            (provider, name, stream) => provider.ReadIconProperties(name, stream, cancellationToken), [],
+            cancellationToken) ?? [];
+        return properties.Count > 0 && GetIconFile(entry) is { } iconFile
+            ? [new EntryProperty("Icon file", iconFile.Name), ..properties]
+            : properties;
+    }
+
+    /// <summary>
+    ///     Changes the attributes and Amiga protection bits of the entry of properties from
+    ///     <see cref="GetPropertiesAsync" /> to its check boxes, given whether each check box of each
+    ///     <see cref="EntryProperties.FlagGroups" /> is checked. Only groups that can be changed and differ are changed:
+    ///     attributes with <see cref="IVolume.SetAttributes" />, protection bits with
+    ///     <see cref="IVolume.SetAmigaMetadata" /> or in the UAE metadata of the entry (see
+    ///     <see cref="UaeMetadataUpdater.SetMetadataAsync" />). Changes with the pane's volume, so call it on the thread
+    ///     using the pane. Returns true when something was changed.
+    /// </summary>
+    public async Task<bool> ChangeFlagsAsync(EntryProperties properties, IReadOnlyList<IReadOnlyList<bool>> isChecked,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(properties);
+        ArgumentNullException.ThrowIfNull(isChecked);
+
+        if (properties.Entry is not { } entry)
+        {
+            return false;
+        }
+
+        var changed = false;
+        for (var index = 0; index < properties.FlagGroups.Count && index < isChecked.Count; index++)
+        {
+            var group = properties.FlagGroups[index];
+            if (!group.CanChange)
+            {
+                continue;
+            }
+
+            switch (group.Kind)
+            {
+                case PropertyFlagKind.Attributes:
+                {
+                    var attributes = group.Flags.Where(flag => flag.IsSet).Sum(flag => flag.Value);
+                    var newAttributes = EntryProperties.GetValue(group, attributes, isChecked[index]);
+                    if (newAttributes != attributes)
+                    {
+                        await _nestedVolume.SetAttributes(entry.Name, (EntryAttributes)newAttributes,
+                            cancellationToken);
+                        changed = true;
+                    }
+
+                    break;
+                }
+                case PropertyFlagKind.ProtectionBits
+                    when (entry.AmigaMetadata ?? properties.UaeMetadata?.Metadata) is { } metadata:
+                {
+                    var protectionBits = EntryProperties.GetValue(group, metadata.ProtectionBits, isChecked[index]);
+                    if (protectionBits == metadata.ProtectionBits)
+                    {
+                        break;
+                    }
+
+                    if (entry.AmigaMetadata != null)
+                    {
+                        await _nestedVolume.SetAmigaMetadata(entry.Name,
+                            metadata with { ProtectionBits = protectionBits }, cancellationToken);
+                    }
+                    else
+                    {
+                        await UaeMetadataUpdater.SetMetadataAsync(_nestedVolume, entry,
+                            metadata with { ProtectionBits = protectionBits }, UaeMetadata,
+                            !IsInImage ? LocalPath : null, cancellationToken);
+                    }
+
+                    changed = true;
+                    break;
+                }
+            }
+        }
+
+        return changed;
+    }
+
+    /// <summary>
+    ///     True when icon positions of a navigation mode can be saved in the current location (see
+    ///     <see cref="SaveIconPositionsAsync" />): not in the drive list or inside a read-only image.
+    /// </summary>
+    public bool CanSaveIconPositions => CreateDirectoryNotSupportedMessage == null;
+
+    /// <summary>
+    ///     Lays out listed entries of the current location as icons of a navigation mode of a plugin (see
+    ///     <see cref="INavigationMode.Layout" />), without the parent entry "..". Reads with the pane's volume, so call it
+    ///     on the thread using the pane.
+    /// </summary>
+    public Task<NavigationLayout> LayoutAsync(INavigationMode navigationMode, IReadOnlyList<IEntry> entries,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(navigationMode);
+        ArgumentNullException.ThrowIfNull(entries);
+
+        return navigationMode.Layout(_nestedVolume, LayoutEntries(entries), cancellationToken);
+    }
+
+    /// <summary>
+    ///     Saves the positions of icons of a navigation mode moved by the user in the current location (see
+    ///     <see cref="INavigationMode.SavePositions" />). Writes with the pane's volume, so call it on the thread using
+    ///     the pane. Throws <see cref="NotSupportedException" /> when <see cref="CanSaveIconPositions" /> is false.
+    /// </summary>
+    public Task SaveIconPositionsAsync(INavigationMode navigationMode, IReadOnlyList<IEntry> entries,
+        IReadOnlyList<NavigationIconPosition> positions, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(navigationMode);
+        ArgumentNullException.ThrowIfNull(entries);
+        ArgumentNullException.ThrowIfNull(positions);
+
+        if (!CanSaveIconPositions)
+        {
+            throw new NotSupportedException("Icon positions can't be saved in a read-only location");
+        }
+
+        return navigationMode.SavePositions(_nestedVolume, LayoutEntries(entries), positions, cancellationToken);
+    }
+
+    private static List<IEntry> LayoutEntries(IEnumerable<IEntry> entries) =>
+        entries.Where(entry => entry.Name != Paths.Parent).ToList();
+
+    private async Task<UaeMetadataNode?> FindUaeMetadataAsync(IEntry entry, CancellationToken cancellationToken)
+    {
+        if (UaeMetadata == UaeMetadataFormat.None || await _nestedVolume.SupportsAmigaMetadata(cancellationToken))
+        {
+            return null;
+        }
+
+        // only the entry and the metadata files it can have are read
+        var metafileName = entry.Name + Hst.Amiga.DataTypes.UaeMetafiles.Constants.UaeMetafileExtension;
+        var entries = await _nestedVolume.ListEntries(cancellationToken)
+            .Where(listedEntry => listedEntry.Name.Equals(entry.Name, StringComparison.Ordinal) ||
+                                  listedEntry.Name.Equals(Hst.Amiga.DataTypes.UaeFsDbs.Constants.UaeFsDbFileName,
+                                      StringComparison.OrdinalIgnoreCase) ||
+                                  listedEntry.Name.Equals(metafileName, StringComparison.OrdinalIgnoreCase))
+            .ToListAsync(cancellationToken);
+        var localDirectory = !IsInImage ? LocalPath : null;
+        var metadata = await UaeMetadataReader.ReadAsync(_nestedVolume, entries, localDirectory != null,
+            cancellationToken, localDirectory);
+        return metadata.Find(entry.Name);
     }
 
     /// <summary>
@@ -958,13 +1452,14 @@ public sealed class NavigationContext : IDisposable
 
     /// <summary>
     ///     Why a directory can't be created in the current location, e.g. in the local drive list or inside a read-only
-    ///     image. Null when creating a directory is supported, front-ends then ask for its name.
+    ///     image (images are writable when their file volume provider can write and their local file can be written).
+    ///     Null when creating a directory is supported, front-ends then ask for its name.
     /// </summary>
     public string? CreateDirectoryNotSupportedMessage =>
         _rootVolume is LocalVolume && !_nestedVolume.CurrentPathComponents.Any()
             ? "Creating a directory is not supported in the drive list"
-            : IsInImage
-                ? "Creating a directory is not supported in an image, images are read-only"
+            : IsInImage && !_images.Peek().IsWritable
+                ? "Creating a directory is not supported in a read-only image"
                 : null;
 
     /// <summary>
@@ -993,14 +1488,139 @@ public sealed class NavigationContext : IDisposable
     }
 
     /// <summary>
+    ///     Why a volume can't be created in the current location, e.g. in the local drive list, inside a read-only image
+    ///     or when no plugin can create volumes. Null when supported, front-ends then show the create dialog.
+    /// </summary>
+    public string? GetCreateVolumeNotSupportedMessage(IReadOnlyCollection<IVolumeCreator> creators)
+    {
+        ArgumentNullException.ThrowIfNull(creators);
+
+        return creators.Count == 0
+            ? "No plugin can create volumes"
+            : _rootVolume is LocalVolume && !_nestedVolume.CurrentPathComponents.Any()
+                ? "Creating a volume is not supported in the drive list"
+                : IsInImage && !_images.Peek().IsWritable
+                    ? "Creating a volume is not supported in a read-only image"
+                    : null;
+    }
+
+    /// <summary>
+    ///     Creates a volume as a file in the current location with a volume creator, e.g. an empty Amiga disk file. The
+    ///     file name gets the creator's extension when missing (see <see cref="VolumeCreation.GetFileName" />) and the
+    ///     input entered for the creator's fields is checked (see <see cref="VolumeCreation.GetValues" />). Local files are
+    ///     written directly, otherwise the volume is created in a temporary file and copied. The created file is selected
+    ///     by <see cref="GetSelectedIndex" /> when the entries are listed again. Throws <see cref="NotSupportedException" />
+    ///     when the location doesn't support it and <see cref="IOException" /> when the name or input is invalid or an
+    ///     entry with the name already exists; a partially created file is deleted.
+    /// </summary>
+    public async Task CreateVolumeAsync(IVolumeCreator creator, string fileName,
+        IReadOnlyDictionary<string, object?> input, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(creator);
+        ArgumentNullException.ThrowIfNull(fileName);
+        ArgumentNullException.ThrowIfNull(input);
+
+        if (GetCreateVolumeNotSupportedMessage([creator]) is { } message)
+        {
+            throw new NotSupportedException(message);
+        }
+
+        var name = ValidateName(VolumeCreation.GetFileName(creator, fileName), "File name");
+        var values = VolumeCreation.GetValues(creator, input);
+        if (await FindEntryAsync(name, cancellationToken) is { } existingEntry)
+        {
+            throw new IOException($"'{existingEntry.Name}' already exists");
+        }
+
+        if (!IsInImage && LocalPath is { } localPath)
+        {
+            await CreateLocalVolumeAsync(creator, Path.Combine(localPath, name), values, cancellationToken);
+        }
+        else
+        {
+            await CreateVolumeInVolumeAsync(creator, name, values, cancellationToken);
+        }
+
+        _newEntryName = name;
+    }
+
+    /// <summary>Creates a volume in a new local file, on the thread pool as creating may take a while.</summary>
+    private static async Task CreateLocalVolumeAsync(IVolumeCreator creator, string path, VolumeCreatorValues values,
+        CancellationToken cancellationToken)
+    {
+        await Task.Run(async () =>
+        {
+            var stream = new FileStream(path, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None);
+            try
+            {
+                await using (stream)
+                {
+                    await creator.Create(stream, values, cancellationToken);
+                }
+            }
+            catch (Exception)
+            {
+                TryDeleteFile(path);
+                throw;
+            }
+        }, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Creates a volume in a temporary file and copies it to the current volume, e.g. a writable image, as the
+    ///     volume's streams may not be seekable.
+    /// </summary>
+    private async Task CreateVolumeInVolumeAsync(IVolumeCreator creator, string name, VolumeCreatorValues values,
+        CancellationToken cancellationToken)
+    {
+        await using var temporaryStream = new FileStream(Path.GetTempFileName(), FileMode.Create,
+            FileAccess.ReadWrite, FileShare.None, 4096, FileOptions.DeleteOnClose);
+        await Task.Run(() => creator.Create(temporaryStream, values, cancellationToken), cancellationToken);
+        temporaryStream.Position = 0;
+
+        var written = false;
+        try
+        {
+            await using var stream = await _nestedVolume.OpenWrite(name, cancellationToken);
+            written = true;
+            await temporaryStream.CopyToAsync(stream, cancellationToken);
+        }
+        catch (Exception) when (written)
+        {
+            try
+            {
+                await _nestedVolume.Delete(name, CancellationToken.None);
+            }
+            catch (Exception)
+            {
+                // keep the original error
+            }
+
+            throw;
+        }
+    }
+
+    private static void TryDeleteFile(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (Exception)
+        {
+            // keep the original error
+        }
+    }
+
+    /// <summary>
     ///     Why entries can't be moved from the current location, e.g. in the local drive list or inside a read-only
     ///     image. Null when moving is supported, front-ends then show the move dialog.
     /// </summary>
     public string? MoveNotSupportedMessage =>
         _rootVolume is LocalVolume && !_nestedVolume.CurrentPathComponents.Any()
             ? "Moving is not supported in the drive list"
-            : IsInImage
-                ? "Moving is not supported in an image, images are read-only"
+            : IsInImage && !_images.Peek().IsWritable
+                ? "Moving is not supported in a read-only image"
                 : null;
 
     /// <summary>
@@ -1033,7 +1653,10 @@ public sealed class NavigationContext : IDisposable
     ///     Renames an entry in the current location. The renamed entry is selected by <see cref="GetSelectedIndex" />
     ///     when the entries are listed again. Throws <see cref="NotSupportedException" /> when the location doesn't
     ///     support it (see <see cref="MoveNotSupportedMessage" />) and <see cref="IOException" /> when the name is
-    ///     invalid or another entry with the name already exists.
+    ///     invalid or another entry with the name already exists. When UAE metadata is handled (see
+    ///     <see cref="UaeMetadata" />) in a volume not storing Amiga metadata, the name is the new Amiga name of
+    ///     entries with UAE metadata and can contain characters the volume can't store, see
+    ///     <see cref="UaeMetadataUpdater.RenameAsync" />.
     /// </summary>
     public async Task RenameAsync(IEntry entry, string newName, CancellationToken cancellationToken = default)
     {
@@ -1045,7 +1668,9 @@ public sealed class NavigationContext : IDisposable
             throw new NotSupportedException(message);
         }
 
-        newName = ValidateName(newName, "Name");
+        var handlesUaeMetadata = UaeMetadata != UaeMetadataFormat.None &&
+                                 !await _nestedVolume.SupportsAmigaMetadata(cancellationToken);
+        newName = ValidateName(newName, "Name", !handlesUaeMetadata);
         if (newName.Equals(entry.Name, StringComparison.Ordinal))
         {
             return;
@@ -1058,9 +1683,18 @@ public sealed class NavigationContext : IDisposable
             throw new IOException($"'{existingEntry.Name}' already exists");
         }
 
-        await _nestedVolume.Rename(entry.Name, newName, cancellationToken);
+        var localDirectory = !IsInImage ? LocalPath : null;
+        var normalName = handlesUaeMetadata
+            ? await UaeMetadataUpdater.RenameAsync(_nestedVolume, entry, newName, UaeMetadata, localDirectory,
+                cancellationToken)
+            : null;
+        if (normalName == null)
+        {
+            await _nestedVolume.Rename(entry.Name, newName, cancellationToken);
+        }
+
         _markedEntries.Remove(entry.Name);
-        _newEntryName = newName;
+        _newEntryName = normalName ?? newName;
     }
 
     /// <summary>
@@ -1096,12 +1730,12 @@ public sealed class NavigationContext : IDisposable
         using (destination)
         {
             ThrowIfCopyingOntoItself(source.Path, entries, destination.Path, targetName, "move");
-            var remainingEntries = MoveOnSameDrive(source, entries, destination, filter, targetName, progress,
-                cancellationToken);
+            var remainingEntries = await MoveOnSameDriveAsync(source, entries, destination, filter, targetName,
+                progress, cancellationToken);
             if (remainingEntries.Count > 0)
             {
                 await source.Volume.MoveToAsync(remainingEntries, destination.Volume,
-                    new CopyOptions(filter, targetName, confirmOverwrite), progress, cancellationToken);
+                    new CopyOptions(filter, targetName, confirmOverwrite, UaeMetadata), progress, cancellationToken);
             }
         }
     }
@@ -1110,11 +1744,13 @@ public sealed class NavigationContext : IDisposable
     ///     Moves entries by renaming them when both locations are local directories on the same drive and all items
     ///     are moved, which is fast and needs no extra space. Returns the entries left to move by copying: all entries
     ///     when renaming isn't possible, otherwise entries that exist in the destination (to confirm overwriting and
-    ///     merge directories).
+    ///     merge directories). When UAE metadata is handled, the metadata of moved entries is moved too, while
+    ///     entries with metadata moved to another name or whose Amiga name is in the destination's metadata are left
+    ///     to copy, which gives them their names in the destination. The metadata files themselves aren't moved.
     /// </summary>
-    private static IReadOnlyList<IEntry> MoveOnSameDrive(VolumeLocation source, IReadOnlyCollection<IEntry> entries,
-        VolumeLocation destination, string filter, string? targetName, IProgress<CopyProgress>? progress,
-        CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<IEntry>> MoveOnSameDriveAsync(VolumeLocation source,
+        IReadOnlyCollection<IEntry> entries, VolumeLocation destination, string filter, string? targetName,
+        IProgress<CopyProgress>? progress, CancellationToken cancellationToken)
     {
         if (source.Volume is not LocalVolume || destination.Volume is not LocalVolume ||
             !(string.IsNullOrWhiteSpace(filter) || filter.Trim() is EntryFilter.All or "*.*") ||
@@ -1124,35 +1760,76 @@ public sealed class NavigationContext : IDisposable
             return entries.ToList();
         }
 
+        // alternate data streams move with the entries
+        var sourceMetadata = await UaeMetadataUpdater.ReadAsync(source.Volume, UaeMetadata, false, null,
+            cancellationToken);
+        var destinationMetadata = sourceMetadata.IsEmpty
+            ? UaeDirectoryMetadata.Empty
+            : await UaeMetadataUpdater.ReadAsync(destination.Volume, UaeMetadata, false, null, cancellationToken);
+
         var remainingEntries = new List<IEntry>();
-        var movedEntries = 0;
-        foreach (var entry in entries)
+        var movedEntries = new List<IEntry>();
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            var sourcePath = Path.Combine(source.Path, entry.Name);
-            var destinationPath = Path.Combine(destination.Path, targetName ?? entry.Name);
-            if (File.Exists(destinationPath) || Directory.Exists(destinationPath))
+            foreach (var entry in entries)
             {
-                remainingEntries.Add(entry);
-                continue;
+                cancellationToken.ThrowIfCancellationRequested();
+                if (entry.Type == EntryType.Item && sourceMetadata.IsMetadataFile(entry.Name))
+                {
+                    continue;
+                }
+
+                var sourcePath = Path.Combine(source.Path, entry.Name);
+                var destinationPath = Path.Combine(destination.Path, targetName ?? entry.Name);
+                var node = sourceMetadata.Find(entry.Name);
+                if (File.Exists(destinationPath) || Directory.Exists(destinationPath) ||
+                    (node != null && (targetName != null ||
+                                      destinationMetadata.FindOtherByAmigaName(node.AmigaName, null) != null)))
+                {
+                    remainingEntries.Add(entry);
+                    continue;
+                }
+
+                progress?.Report(new CopyProgress(entry.Name, 0, 0, 0, 0, movedEntries.Count, entries.Count, 0,
+                    null));
+                if (entry.Type == EntryType.Container)
+                {
+                    Directory.Move(sourcePath, destinationPath);
+                }
+                else
+                {
+                    File.Move(sourcePath, destinationPath);
+                }
+
+                movedEntries.Add(entry);
+            }
+        }
+        catch when (!sourceMetadata.IsEmpty)
+        {
+            // the metadata of the entries moved so far is moved too, keeping the error that stopped the move
+            try
+            {
+                await UaeMetadataUpdater.MoveAsync(source.Volume, sourceMetadata, destination.Volume, movedEntries,
+                    CancellationToken.None);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException
+                                                  or NotSupportedException)
+            {
             }
 
-            progress?.Report(new CopyProgress(entry.Name, 0, 0, 0, 0, movedEntries, entries.Count, 0, null));
-            if (entry.Type == EntryType.Container)
-            {
-                Directory.Move(sourcePath, destinationPath);
-            }
-            else
-            {
-                File.Move(sourcePath, destinationPath);
-            }
-
-            movedEntries++;
+            throw;
         }
 
-        if (movedEntries > 0)
+        if (!sourceMetadata.IsEmpty)
         {
-            progress?.Report(new CopyProgress(string.Empty, 0, 0, 0, 0, movedEntries, entries.Count, 0, null));
+            await UaeMetadataUpdater.MoveAsync(source.Volume, sourceMetadata, destination.Volume, movedEntries,
+                cancellationToken);
+        }
+
+        if (movedEntries.Count > 0)
+        {
+            progress?.Report(new CopyProgress(string.Empty, 0, 0, 0, 0, movedEntries.Count, entries.Count, 0,
+                null));
         }
 
         return remainingEntries;
@@ -1163,9 +1840,10 @@ public sealed class NavigationContext : IDisposable
 
     /// <summary>
     ///     Trims an entry name entered by the user and checks it's valid: an empty name, "." and "..", and names with
-    ///     path separators or invalid file name characters throw <see cref="IOException" />.
+    ///     path separators, control characters or (with <paramref name="checkFileNameCharacters" />) invalid file name
+    ///     characters throw <see cref="IOException" />.
     /// </summary>
-    private static string ValidateName(string name, string description)
+    private static string ValidateName(string name, string description, bool checkFileNameCharacters = true)
     {
         name = name.Trim();
         if (name.Length == 0)
@@ -1173,8 +1851,8 @@ public sealed class NavigationContext : IDisposable
             throw new IOException($"{description} is empty");
         }
 
-        if (name is "." or ".." || name.IndexOfAny(['/', '\\']) >= 0 ||
-            name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+        if (name is "." or ".." || name.IndexOfAny(['/', '\\']) >= 0 || name.Any(char.IsControl) ||
+            (checkFileNameCharacters && name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0))
         {
             throw new IOException($"Invalid {description.ToLowerInvariant()} '{name}'");
         }
@@ -1276,7 +1954,11 @@ public sealed class NavigationContext : IDisposable
         (_rootVolume as IDisposable)?.Dispose();
     }
 
-    public void Dispose() => CloseVolumes();
+    public void Dispose()
+    {
+        CloseIconLocation();
+        CloseVolumes();
+    }
 
     /// <summary>
     ///     A file opened as a volume (an image) by a file volume provider.
@@ -1286,10 +1968,13 @@ public sealed class NavigationContext : IDisposable
     /// <param name="parentPathComponents">
     ///     Directory of the file in the image it's in, used to open it again. Empty for a file in the root volume.
     /// </param>
-    /// <param name="volume">Volume of the image.</param>
-    /// <param name="stream">Stream of the file, closed after the volume.</param>
+    /// <param name="volume">Volume of the image, a view of a shared image when shared.</param>
+    /// <param name="stream">Stream of the file, closed after the volume. Null when shared.</param>
+    /// <param name="sharedPath">Path of the local file of a shared image (see <see cref="SharedImages" />).</param>
+    /// <param name="isWritable">True when the image can be changed.</param>
     private sealed class OpenedImage(IFileVolumeProvider fileVolumeProvider, string name,
-        IReadOnlyList<string> parentPathComponents, IVolume volume, Stream stream) : IDisposable
+        IReadOnlyList<string> parentPathComponents, IVolume volume, Stream? stream, string? sharedPath,
+        bool isWritable) : IDisposable
     {
         public IFileVolumeProvider FileVolumeProvider { get; } = fileVolumeProvider;
 
@@ -1299,10 +1984,14 @@ public sealed class NavigationContext : IDisposable
 
         public IVolume Volume { get; } = volume;
 
+        public string? SharedPath { get; } = sharedPath;
+
+        public bool IsWritable { get; } = isWritable;
+
         public void Dispose()
         {
             (Volume as IDisposable)?.Dispose();
-            stream.Dispose();
+            stream?.Dispose();
         }
     }
 

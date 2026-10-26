@@ -1,4 +1,4 @@
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
@@ -9,8 +9,8 @@ using Hst.Commander.Abstractions;
 namespace Hst.Commander.Gui.Icons;
 
 /// <summary>
-///     Loads the icons shown left of the entry names: the icon contained in the file (e.g. a program or an .ico file,
-///     also inside images), otherwise the icon the host OS has registered for the file type, folders or drives, and
+///     Loads the icons shown left of the entry names: the icon of a plugin's icon file next to the entry (e.g. an Amiga
+///     .info file), the icon contained in the file (e.g. a program or an .ico file, also inside images), otherwise the icon the host OS has registered for the file type, folders or drives, and
 ///     a built-in icon when the OS has none. Used on the UI thread; icons are cached.
 /// </summary>
 internal static class FileIcons
@@ -36,10 +36,11 @@ internal static class FileIcons
 
     /// <summary>
     ///     Loads the icons of the listed entries, first the type icons and then the icons contained in files, which
-    ///     are read from the pane's volume. Stops when cancelled, e.g. when the pane lists other entries.
+    ///     are read from the pane's volume. Stops when cancelled, e.g. when the pane lists other entries. Type icons are
+    ///     cached without their size, unless <paramref name="isLarge" /> (e.g. thumbnails), which are cached by size.
     /// </summary>
     public static async Task LoadAsync(IReadOnlyList<EntryItem> items, NavigationContext navigationContext, int size,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, bool isLarge = false)
     {
         foreach (var item in items)
         {
@@ -48,10 +49,11 @@ internal static class FileIcons
                 return;
             }
 
-            item.Icon = await GetEntryTypeIconAsync(item.Entry, navigationContext, size, string.Empty);
+            item.Icon = await GetEntryTypeIconAsync(item.Entry, navigationContext, size,
+                isLarge ? $"@{size}" : string.Empty);
         }
 
-        foreach (var item in items.Where(item => !item.IsContainer))
+        foreach (var item in items.Where(item => !item.IsContainer || navigationContext.HasIcon(item.Entry)))
         {
             if (cancellationToken.IsCancellationRequested)
             {
@@ -76,11 +78,117 @@ internal static class FileIcons
     {
         // type icons of the panes are cached without their size, so cache other sizes separately
         var typeIcon = await GetEntryTypeIconAsync(entry, navigationContext, size, $"@{size}");
-        return !typeOnly && entry.Type != EntryType.Container &&
-               await GetFileIconAsync(entry, navigationContext, size, cancellationToken) is { } fileIcon
+        return !typeOnly && await GetFileIconAsync(entry, navigationContext, size, cancellationToken) is { } fileIcon
             ? fileIcon
             : typeIcon;
     }
+
+    /// <summary>Sizes the OS icons are asked for when viewing all icons, the OS has them in some of these sizes.</summary>
+    private static readonly int[] ViewerIconSizes = [16, 24, 32, 48, 64, 96, 128, 256];
+
+    /// <summary>
+    ///     Loads all icons of a single entry for the icon viewer, each with its images: the icons of its plugin icon
+    ///     file (e.g. the normal and selected image of an Amiga icon), the icons contained in the file (e.g. all icons
+    ///     of a Windows program or all images of an .ico file), otherwise the OS icon of the file or its type in the
+    ///     sizes the OS has. Only the type icon when <paramref name="typeOnly" />. Falls back to the built-in icon.
+    /// </summary>
+    public static async Task<IReadOnlyList<ViewerIcon>> LoadIconsAsync(IEntry entry,
+        NavigationContext navigationContext, bool typeOnly, CancellationToken cancellationToken)
+    {
+        var localPath = navigationContext.GetLocalPath(entry);
+        if (!typeOnly)
+        {
+            if (navigationContext.HasIcon(entry) &&
+                await navigationContext.ReadIconsAsync(entry, cancellationToken) is { Count: > 0 } iconFileIcons)
+            {
+                return ToViewerIcons(iconFileIcons);
+            }
+
+            if (entry.Type != EntryType.Container && EmbeddedIconReader.HasEmbeddedIcon(entry.Name) &&
+                await ReadEmbeddedIconsAsync(entry, navigationContext, localPath, cancellationToken) is
+                    { Count: > 0 } embeddedIcons)
+            {
+                return ToViewerIcons(embeddedIcons);
+            }
+
+            if (entry.Type != EntryType.Container && localPath != null && Provider?.HasFileIcon(entry.Name) == true &&
+                await LoadOsIconAsync(size => provider => provider.GetFileIcon(localPath, size)) is { } fileIcon)
+            {
+                return [fileIcon];
+            }
+        }
+
+        var extension = Path.GetExtension(entry.Name);
+        Func<int, Func<IFileIconProvider, IconImage?>> getTypeIcon = entry.Type != EntryType.Container
+            ? size => provider => provider.GetFileTypeIcon(extension, size)
+            : navigationContext.IsDriveList && localPath != null
+                ? size => provider => provider.GetDriveIcon(localPath, size)
+                : size => provider => provider.GetFolderIcon(size);
+        if (await LoadOsIconAsync(getTypeIcon) is { } typeIcon)
+        {
+            return [typeIcon];
+        }
+
+        var defaultIcon = entry.Type == EntryType.Container ? DefaultFolderIcon : DefaultFileIcon;
+        return
+        [
+            new ViewerIcon("Icon", [new ViewerIconImage((int)defaultIcon.Size.Width, (int)defaultIcon.Size.Height,
+                null, () => defaultIcon)])
+        ];
+    }
+
+    private static async Task<IReadOnlyList<EntryIcon>> ReadEmbeddedIconsAsync(IEntry entry,
+        NavigationContext navigationContext, string? localPath, CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (localPath != null)
+            {
+                return await Task.Run(() =>
+                {
+                    using var stream = new FileStream(localPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                    return EmbeddedIconReader.ReadIcons(entry.Name, stream);
+                }, cancellationToken);
+            }
+
+            // files inside images are read on the UI thread, as the pane's volume is not thread safe
+            await using var imageStream = await navigationContext.OpenReadAsync(entry, cancellationToken);
+            var data = new MemoryStream();
+            await imageStream.CopyToAsync(data, cancellationToken);
+            data.Position = 0;
+            return await Task.Run(() => EmbeddedIconReader.ReadIcons(entry.Name, data), cancellationToken);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException
+                                              or NotSupportedException or ObjectDisposedException)
+        {
+            return [];
+        }
+    }
+
+    /// <summary>OS icon in the sizes the OS has (distinct pixel sizes), null when the OS has none.</summary>
+    private static async Task<ViewerIcon?> LoadOsIconAsync(Func<int, Func<IFileIconProvider, IconImage?>> getIcon)
+    {
+        var images = new List<IconImage>();
+        foreach (var size in ViewerIconSizes)
+        {
+            if (await RunProviderAsync(getIcon(size)) is { } image &&
+                !images.Any(other => other.Width == image.Width && other.Height == image.Height))
+            {
+                images.Add(image);
+            }
+        }
+
+        return images.Count == 0 ? null : ToViewerIcons([new EntryIcon("Icon", images)])[0];
+    }
+
+    private static IReadOnlyList<ViewerIcon> ToViewerIcons(IEnumerable<EntryIcon> icons) => icons
+        .Select(icon => new ViewerIcon(icon.Name, icon.Images
+            .OrderByDescending(image => image.Width * image.Height)
+            .ThenByDescending(image => image.BitsPerPixel ?? 0)
+            .Select(image => new ViewerIconImage(image.Width, image.Height, image.BitsPerPixel,
+                () => CreateBitmap(image)))
+            .ToList()))
+        .ToList();
 
     /// <summary>Type icon of an entry: the drive icon in the drive list, the folder icon or the file type icon.</summary>
     private static async Task<IImage> GetEntryTypeIconAsync(IEntry entry, NavigationContext navigationContext,
@@ -113,10 +221,24 @@ internal static class FileIcons
         return icon;
     }
 
-    /// <summary>Icon of the file itself, null when it has none and its type icon is shown.</summary>
+    /// <summary>
+    ///     Icon of the entry itself, null when it has none and its type icon is shown: the icon of its icon file (also
+    ///     for directories), otherwise for files the icon contained in the file or the OS icon of the file.
+    /// </summary>
     private static async Task<IImage?> GetFileIconAsync(IEntry entry, NavigationContext navigationContext, int size,
         CancellationToken cancellationToken)
     {
+        if (navigationContext.HasIcon(entry) &&
+            await GetIconFileIconAsync(entry, navigationContext, size, cancellationToken) is { } iconFileIcon)
+        {
+            return iconFileIcon;
+        }
+
+        if (entry.Type == EntryType.Container)
+        {
+            return null;
+        }
+
         var localPath = navigationContext.GetLocalPath(entry);
         var hasEmbeddedIcon = EmbeddedIconReader.HasEmbeddedIcon(entry.Name);
         var hasOsFileIcon = localPath != null && Provider?.HasFileIcon(entry.Name) == true;
@@ -161,14 +283,50 @@ internal static class FileIcons
             return null;
         }
 
+        var icon = CreateBitmap(iconImage);
+        AddFileIcon(key, icon);
+        return icon;
+    }
+
+    /// <summary>
+    ///     Icon read from the icon file of an entry by the icon provider of a plugin, cached by the icon file, so an
+    ///     entry and its icon file (e.g. "file" and "file.info") share it. The icon of a volume entry (e.g. the
+    ///     Disk.info of a partition) is read each time, as its icon file isn't listed.
+    /// </summary>
+    private static async Task<IImage?> GetIconFileIconAsync(IEntry entry, NavigationContext navigationContext,
+        int size, CancellationToken cancellationToken)
+    {
+        if (navigationContext.GetIconFile(entry) is not { } iconFile)
+        {
+            var volumeIcon = CreateBitmap(await navigationContext.ReadIconAsync(entry, size, cancellationToken));
+            return cancellationToken.IsCancellationRequested ? null : volumeIcon;
+        }
+
+        var location = navigationContext.GetLocalPath(iconFile) ?? navigationContext.CurrentPath + "|" + iconFile.Name;
+        var key = $"icon:{location}|{iconFile.Size}|{iconFile.ModifiedDate:O}|{size}";
+        if (FileIconCache.TryGetValue(key, out var cachedIcon))
+        {
+            return cachedIcon;
+        }
+
+        var icon = CreateBitmap(await navigationContext.ReadIconAsync(entry, size, cancellationToken));
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return null;
+        }
+
+        AddFileIcon(key, icon);
+        return icon;
+    }
+
+    private static void AddFileIcon(string key, IImage? icon)
+    {
         if (FileIconCache.Count >= MaxFileIcons)
         {
             FileIconCache.Clear();
         }
 
-        var icon = CreateBitmap(iconImage);
         FileIconCache[key] = icon;
-        return icon;
     }
 
     private static async Task<IconImage?> RunProviderAsync(Func<IFileIconProvider, IconImage?> getIcon)
@@ -204,7 +362,8 @@ internal static class FileIcons
         return OperatingSystem.IsLinux() || OperatingSystem.IsFreeBSD() ? new FreedesktopFileIconProvider() : null;
     }
 
-    private static Bitmap? CreateBitmap(IconImage? iconImage)
+    /// <summary>Bitmap of an icon image (PNG data or BGRA pixels), null when there is none or it's invalid.</summary>
+    public static Bitmap? CreateBitmap(IconImage? iconImage)
     {
         try
         {

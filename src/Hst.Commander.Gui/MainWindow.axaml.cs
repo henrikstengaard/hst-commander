@@ -1,4 +1,4 @@
-using Avalonia.Controls;
+﻿using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Hst.Commander.Core;
@@ -32,12 +32,18 @@ public partial class MainWindow : Window
         LeftPane.NavigationContext = new NavigationContext(initialPath);
         RightPane.NavigationContext = new NavigationContext(initialPath);
         ApplyEnterFileAction(settings.EnterFileAction);
+        ApplyUaeMetadata(settings.UaeMetadata);
         LeftPane.NavigationFailed += async (_, exception) => await ShowErrorAsync(exception);
         RightPane.NavigationFailed += async (_, exception) => await ShowErrorAsync(exception);
+        // e.g. icon files written when saving icon positions, which the other pane may show
+        LeftPane.EntriesChanged += async (_, _) => await RightPane.RefreshEntriesAsync();
+        RightPane.EntriesChanged += async (_, _) => await LeftPane.RefreshEntriesAsync();
+        BuildViewMenu();
         CopyMenuItem.Click += async (_, _) => await CopyAsync(_activePane);
         MoveMenuItem.Click += async (_, _) => await MoveAsync(_activePane);
         MakeDirectoryMenuItem.Click += async (_, _) => await MakeDirectoryAsync(_activePane);
         DeleteMenuItem.Click += async (_, _) => await DeleteAsync(_activePane);
+        CreateVolumeMenuItem.Click += async (_, _) => await CreateVolumeAsync(_activePane);
         PropertiesMenuItem.Click += async (_, _) => await ShowPropertiesAsync(_activePane);
         OpenAsVolumeMenuItem.Click += async (_, _) =>
         {
@@ -51,6 +57,7 @@ public partial class MainWindow : Window
         MoveButton.Click += async (_, _) => await MoveAsync(_activePane);
         MkdirButton.Click += async (_, _) => await MakeDirectoryAsync(_activePane);
         DeleteButton.Click += async (_, _) => await DeleteAsync(_activePane);
+        CreateButton.Click += async (_, _) => await CreateVolumeAsync(_activePane);
         LeftVolumeMenuItem.Click += async (_, _) => await ChooseVolumeProviderAsync(LeftPane);
         RightVolumeMenuItem.Click += async (_, _) => await ChooseVolumeProviderAsync(RightPane);
         LocationMenuItem.Click += async (_, _) => await ShowLocationAsync(_activePane);
@@ -63,8 +70,9 @@ public partial class MainWindow : Window
         AddHandler(KeyDownEvent, OnWindowKeyDown, RoutingStrategies.Tunnel);
         Opened += async (_, _) =>
         {
-            await LeftPane.InitializeAsync();
-            await RightPane.InitializeAsync();
+            // setting the navigation modes lists the entries
+            await LeftPane.SetNavigationModeAsync(PaneNavigationMode.Find(settings.LeftNavigationMode));
+            await RightPane.SetNavigationModeAsync(PaneNavigationMode.Find(settings.RightNavigationMode));
             LeftPane.FocusEntries();
             if (StartupError is { } startupError)
             {
@@ -82,6 +90,61 @@ public partial class MainWindow : Window
 
     /// <summary>Error shown when the window is opened, e.g. plugins that failed to load.</summary>
     public string? StartupError { get; set; }
+
+    /// <summary>
+    ///     Adds the navigation modes to the View menu, acting on the active pane: the built-in list and thumbnail modes
+    ///     and the navigation modes of the plugins, the first nine with Ctrl+1 to Ctrl+9.
+    /// </summary>
+    private void BuildViewMenu()
+    {
+        var navigationModes = PaneNavigationMode.All;
+        for (var index = 0; index < navigationModes.Count; index++)
+        {
+            var navigationMode = navigationModes[index];
+            var menuItem = new MenuItem
+            {
+                Header = navigationMode.Name,
+                ToggleType = MenuItemToggleType.Radio,
+                GroupName = "NavigationMode",
+                Tag = navigationMode
+            };
+            ToolTip.SetTip(menuItem, navigationMode.Description);
+            if (index < 9)
+            {
+                menuItem.InputGesture = new KeyGesture(Key.D1 + index, KeyModifiers.Control);
+            }
+
+            menuItem.Click += async (_, _) => await SetNavigationModeAsync(_activePane, navigationMode);
+            ViewMenu.Items.Add(menuItem);
+        }
+
+        ViewMenu.SubmenuOpened += (_, _) =>
+        {
+            foreach (var menuItem in ViewMenu.Items.OfType<MenuItem>())
+            {
+                menuItem.IsChecked = Equals(menuItem.Tag, _activePane.NavigationMode);
+            }
+        };
+    }
+
+    /// <summary>Shows the entries of a pane in a navigation mode, remembered in the settings.</summary>
+    private async Task SetNavigationModeAsync(PaneView pane, PaneNavigationMode navigationMode)
+    {
+        await pane.SetNavigationModeAsync(navigationMode);
+        pane.FocusEntries();
+        try
+        {
+            var settings = GuiSettings.Load();
+            (pane == LeftPane
+                ? settings with { LeftNavigationMode = navigationMode.Name }
+                : settings with { RightNavigationMode = navigationMode.Name }).Save();
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            await ShowErrorAsync(new IOException(
+                $"Failed to save settings to '{GuiSettings.FilePath}': {exception.Message}", exception));
+        }
+    }
 
     /// <summary>Makes a pane the active pane, only the active pane shows the current entry.</summary>
     private void SetActivePane(PaneView pane)
@@ -117,6 +180,14 @@ public partial class MainWindow : Window
 
         switch (e.Key)
         {
+            case >= Key.D1 and <= Key.D9 when e.KeyModifiers == KeyModifiers.Control:
+                if (e.Key - Key.D1 < PaneNavigationMode.All.Count)
+                {
+                    e.Handled = true;
+                    await SetNavigationModeAsync(_activePane, PaneNavigationMode.All[e.Key - Key.D1]);
+                }
+
+                break;
             case Key.Tab:
                 // tab always switches between the panes instead of moving focus through the controls
                 e.Handled = true;
@@ -156,6 +227,10 @@ public partial class MainWindow : Window
                 e.Handled = true;
                 await DeleteAsync(_activePane);
                 break;
+            case Key.F9:
+                e.Handled = true;
+                await CreateVolumeAsync(_activePane);
+                break;
         }
     }
 
@@ -176,6 +251,13 @@ public partial class MainWindow : Window
     {
         LeftPane.NavigationContext.EnterFileAction = action;
         RightPane.NavigationContext.EnterFileAction = action;
+    }
+
+    /// <summary>Sets how both panes store Amiga names, protection bits and comments when copying from Amiga volumes.</summary>
+    private void ApplyUaeMetadata(UaeMetadataFormat format)
+    {
+        LeftPane.NavigationContext.UaeMetadata = format;
+        RightPane.NavigationContext.UaeMetadata = format;
     }
 
     /// <summary>
@@ -264,7 +346,7 @@ public partial class MainWindow : Window
         EntryProperties properties;
         try
         {
-            properties = pane.NavigationContext.GetProperties(entries);
+            properties = await pane.NavigationContext.GetPropertiesAsync(entries);
         }
         catch (Exception exception)
         {
@@ -283,15 +365,48 @@ public partial class MainWindow : Window
         var initialIcon = entries.All(entry => entry.Type == EntryType.Container)
             ? FileIcons.DefaultFolderIcon
             : FileIcons.DefaultFileIcon;
-        await new PropertiesDialog(properties,
+        var dialog = new PropertiesDialog(properties,
             (progress, cancellationToken) =>
                 pane.NavigationContext.CountContentsAsync(entries, progress, cancellationToken),
             initialIcon,
             !typeOnly || sameType
                 ? (size, cancellationToken) =>
                     FileIcons.LoadIconAsync(iconEntry, pane.NavigationContext, size, typeOnly, cancellationToken)
-                : null).ShowDialog(this);
+                : null,
+            !typeOnly || sameType
+                ? cancellationToken =>
+                    FileIcons.LoadIconsAsync(iconEntry, pane.NavigationContext, typeOnly, cancellationToken)
+                : null);
+        await dialog.ShowDialog(this);
+        if (dialog.CheckedFlags is { } checkedFlags)
+        {
+            await ChangeFlagsAsync(pane, properties, checkedFlags);
+        }
+
         pane.FocusEntries();
+    }
+
+    /// <summary>
+    ///     Changes the attributes and Amiga protection bits of the entry of the properties dialog to its check boxes,
+    ///     refreshing both panes when changed, as the other pane may show the same location.
+    /// </summary>
+    private async Task ChangeFlagsAsync(PaneView pane, EntryProperties properties,
+        IReadOnlyList<IReadOnlyList<bool>> checkedFlags)
+    {
+        try
+        {
+            if (!await pane.NavigationContext.ChangeFlagsAsync(properties, checkedFlags))
+            {
+                return;
+            }
+        }
+        catch (Exception exception)
+        {
+            await ShowErrorAsync(exception);
+        }
+
+        await LeftPane.RefreshEntriesAsync();
+        await RightPane.RefreshEntriesAsync();
     }
 
     /// <summary>
@@ -313,6 +428,52 @@ public partial class MainWindow : Window
         {
             await pane.CreateDirectoryAsync(name);
             await otherPane.RefreshEntriesAsync();
+        }
+
+        pane.FocusEntries();
+    }
+
+    /// <summary>
+    ///     Creates a volume as a file in the current location of a pane: the volume to create is chosen in the create
+    ///     dialog, then its file name and fields are entered. When creating fails, the error is shown and the fields are
+    ///     asked again with the input entered. The created file is selected and the other pane is refreshed too, as it
+    ///     may show the same location.
+    /// </summary>
+    private async Task CreateVolumeAsync(PaneView pane)
+    {
+        var otherPane = pane == LeftPane ? RightPane : LeftPane;
+        var creators = VolumeProviders.Creators;
+        if (pane.NavigationContext.GetCreateVolumeNotSupportedMessage(creators) is { } message)
+        {
+            await new ErrorDialog(message).ShowDialog(this);
+            pane.FocusEntries();
+            return;
+        }
+
+        var creator = await new CreateVolumeDialog(creators).ShowDialog<IVolumeCreator?>(this);
+        VolumeCreatorInput? input = null;
+        while (creator != null)
+        {
+            input = await new CreateVolumeFieldsDialog(creator, input).ShowDialog<VolumeCreatorInput?>(this);
+            if (input == null)
+            {
+                // icons may have been stopped by a failed attempt
+                await pane.RefreshEntriesAsync();
+                break;
+            }
+
+            try
+            {
+                await pane.CreateVolumeAsync(creator, input);
+            }
+            catch (Exception exception)
+            {
+                await ShowErrorAsync(exception);
+                continue;
+            }
+
+            await otherPane.RefreshEntriesAsync();
+            break;
         }
 
         pane.FocusEntries();
@@ -484,6 +645,7 @@ public partial class MainWindow : Window
         ThemeManager.Apply(settings.Theme);
         ApplyVolumeProviderKeys(settings.EffectiveVolumeProviderKeys);
         ApplyEnterFileAction(settings.EnterFileAction);
+        ApplyUaeMetadata(settings.UaeMetadata);
         try
         {
             settings.Save();

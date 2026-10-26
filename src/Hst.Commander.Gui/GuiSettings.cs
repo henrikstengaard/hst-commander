@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 using Hst.Commander.Core;
 
@@ -27,6 +27,15 @@ public sealed record GuiSettings
 
     /// <summary>What Enter does with files: browse images as volumes or start them with the host operating system.</summary>
     public EnterFileAction EnterFileAction { get; init; } = EnterFileAction.OpenAsVolume;
+
+    /// <summary>How Amiga names, protection bits and comments are stored when copying from Amiga volumes to others.</summary>
+    public UaeMetadataFormat UaeMetadata { get; init; } = UaeMetadataFormat.UaeFsDb;
+
+    /// <summary>Name of the navigation mode of the left pane (see <see cref="PaneNavigationMode" />), null for list.</summary>
+    public string? LeftNavigationMode { get; init; }
+
+    /// <summary>Name of the navigation mode of the right pane (see <see cref="PaneNavigationMode" />), null for list.</summary>
+    public string? RightNavigationMode { get; init; }
 
     /// <summary>Keys opening the volume provider lists, the chosen ones or the default of the host operating system.</summary>
     [JsonIgnore]

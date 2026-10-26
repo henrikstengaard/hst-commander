@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\Hst.Commander.Abstractions\Hst.Commander.Abstractions.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="LTRData.DiscUtils.Core" Version="1.0.54" />
+      <PackageReference Include="LTRData.DiscUtils.Fat" Version="1.0.54" />
+      <PackageReference Include="LTRData.DiscUtils.Ntfs" Version="1.0.54" />
+      <PackageReference Include="LTRData.DiscUtils.Vhd" Version="1.0.54" />
+    </ItemGroup>
+
+</Project>

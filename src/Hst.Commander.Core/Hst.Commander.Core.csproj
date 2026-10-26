@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <ImplicitUsings>enable</ImplicitUsings>
@@ -11,9 +11,13 @@
       <!-- plugins included with Hst Commander by default, see Plugins -->
       <ProjectReference Include="..\Hst.Commander.Plugins.Zip\Hst.Commander.Plugins.Zip.csproj" />
       <ProjectReference Include="..\Hst.Commander.Plugins.LhaLzx\Hst.Commander.Plugins.LhaLzx.csproj" />
+      <ProjectReference Include="..\Hst.Commander.Plugins.Disk\Hst.Commander.Plugins.Disk.csproj" />
+      <ProjectReference Include="..\Hst.Commander.Plugins.Amiga\Hst.Commander.Plugins.Amiga.csproj" />
     </ItemGroup>
 
     <ItemGroup>
+      <!-- UAE metadata (UAEFSDB and metafiles) when copying to and from Amiga volumes -->
+      <PackageReference Include="Hst.Amiga" Version="0.6.243" />
       <PackageReference Include="LTRData.DiscUtils" Version="1.0.54" />
       <PackageReference Include="LTRData.DiscUtils.Iso9660" Version="1.0.54" />
     </ItemGroup>

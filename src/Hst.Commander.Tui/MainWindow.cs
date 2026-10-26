@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using Hst.Commander.Core;
 using Hst.Commander.Core.Volumes;
 using Hst.Commander.Abstractions;
@@ -47,6 +47,7 @@ public sealed class MainWindow : Window
                     new("_Copy...", "F5", CopyFromActivePane),
                     new("Mo_ve/rename...", "F6", MoveFromActivePane),
                     new("_Make directory...", "F7", MakeDirectoryInActivePane),
+                    new("Cr_eate volume...", "F9", CreateVolumeInActivePane),
                     new("_Delete...", "F8", DeleteFromActivePane),
                     new("_Properties...", "Ctrl+P", ShowPropertiesOfActivePane),
                     new("Ope_n as volume", "Ctrl+PgDn", OpenAsVolumeInActivePane),
@@ -82,9 +83,12 @@ public sealed class MainWindow : Window
                 new FunctionKeyItem("F5", "Copy", CopyFromActivePane),
                 new FunctionKeyItem("F6", "Move", MoveFromActivePane),
                 new FunctionKeyItem("F7", "Mkdir", MakeDirectoryInActivePane),
-                new FunctionKeyItem("F8", "Delete", DeleteFromActivePane)
+                new FunctionKeyItem("F8", "Delete", DeleteFromActivePane),
+                new FunctionKeyItem("F9", "Create", CreateVolumeInActivePane)
             ]
         };
+        // f9 creates a volume, so f10 opens the menu (alt+f too)
+        _menuBar.Key = Key.F10;
         _leftPane = CreatePane(new NavigationContext(initialPath, StartFile), 0);
         _rightPane = CreatePane(new NavigationContext(initialPath, StartFile), 50);
         _activePane = _leftPane;
@@ -93,6 +97,7 @@ public sealed class MainWindow : Window
         ApplyTheme(theme);
         ApplyVolumeProviderKeys(settings.EffectiveVolumeProviderKeys);
         ApplyEnterFileAction(settings.EnterFileAction);
+        ApplyUaeMetadata(settings.UaeMetadata);
         ConfigurePaneKeys(_leftPane, _rightPane);
         ConfigurePaneKeys(_rightPane, _leftPane);
         // also when run again after a program has run in the terminal
@@ -194,6 +199,13 @@ public sealed class MainWindow : Window
         _rightPane.NavigationContext.EnterFileAction = action;
     }
 
+    /// <summary>Sets how both panes store Amiga names, protection bits and comments when copying from Amiga volumes.</summary>
+    private void ApplyUaeMetadata(UaeMetadataFormat format)
+    {
+        _leftPane.NavigationContext.UaeMetadata = format;
+        _rightPane.NavigationContext.UaeMetadata = format;
+    }
+
     private Key LeftVolumeProviderKey => WithVolumeProviderModifier(Key.F1);
 
     private Key RightVolumeProviderKey => WithVolumeProviderModifier(Key.F2);
@@ -238,6 +250,7 @@ public sealed class MainWindow : Window
         ApplyTheme(result.Theme);
         ApplyVolumeProviderKeys(result.EffectiveVolumeProviderKeys);
         ApplyEnterFileAction(result.EnterFileAction);
+        ApplyUaeMetadata(result.UaeMetadata);
         try
         {
             result.Save();
@@ -378,7 +391,7 @@ public sealed class MainWindow : Window
             else if (key == Key.P.WithCtrl || key == Key.Enter.WithAlt)
             {
                 key.Handled = true;
-                ShowProperties(pane);
+                _ = ShowPropertiesAsync(pane);
             }
             else if (key == Key.O.WithCtrl)
             {
@@ -420,6 +433,11 @@ public sealed class MainWindow : Window
                 key.Handled = true;
                 _ = DeleteAsync(pane, otherPane);
             }
+            else if (key.KeyCode == KeyCode.F9)
+            {
+                key.Handled = true;
+                _ = CreateVolumeAsync(pane, otherPane);
+            }
         };
     }
 
@@ -433,6 +451,9 @@ public sealed class MainWindow : Window
     private void MakeDirectoryInActivePane() =>
         _ = MakeDirectoryAsync(_activePane, _activePane == _leftPane ? _rightPane : _leftPane);
 
+    private void CreateVolumeInActivePane() =>
+        _ = CreateVolumeAsync(_activePane, _activePane == _leftPane ? _rightPane : _leftPane);
+
     private void SelectGroupInActivePane() => SelectGroup(_activePane, true);
 
     private void UnselectGroupInActivePane() => SelectGroup(_activePane, false);
@@ -445,13 +466,13 @@ public sealed class MainWindow : Window
 
     private void ShowLocationOfActivePane() => _ = ShowLocationAsync(_activePane);
 
-    private void ShowPropertiesOfActivePane() => ShowProperties(_activePane);
+    private void ShowPropertiesOfActivePane() => _ = ShowPropertiesAsync(_activePane);
 
     /// <summary>
     ///     Shows the properties of the marked entries, or the entry under the cursor, of a pane. The size and contents
     ///     are counted in the background while the dialog is open; closing it stops counting.
     /// </summary>
-    private void ShowProperties(Pane pane)
+    private async Task ShowPropertiesAsync(Pane pane)
     {
         var entries = pane.NavigationContext.GetOperationEntries(GetCurrentEntry(pane));
         if (entries.Count == 0)
@@ -462,7 +483,7 @@ public sealed class MainWindow : Window
         EntryProperties properties;
         try
         {
-            properties = pane.NavigationContext.GetProperties(entries);
+            properties = await pane.NavigationContext.GetPropertiesAsync(entries);
         }
         catch (Exception exception)
         {
@@ -484,8 +505,37 @@ public sealed class MainWindow : Window
         }
 
         Application.Run(dialog);
+        var checkedFlags = dialog.CheckedFlags;
         dialog.Dispose();
+        if (checkedFlags != null)
+        {
+            await ChangeFlagsAsync(pane, properties, checkedFlags);
+        }
+
         pane.TableView.SetFocus();
+    }
+
+    /// <summary>
+    ///     Changes the attributes and Amiga protection bits of the entry of the properties dialog to its check boxes,
+    ///     refreshing both panes when changed, as the other pane may show the same location.
+    /// </summary>
+    private async Task ChangeFlagsAsync(Pane pane, EntryProperties properties,
+        IReadOnlyList<IReadOnlyList<bool>> checkedFlags)
+    {
+        try
+        {
+            if (!await pane.NavigationContext.ChangeFlagsAsync(properties, checkedFlags))
+            {
+                return;
+            }
+        }
+        catch (Exception exception)
+        {
+            MessageBox.ErrorQuery("Error", exception.Message, "OK");
+        }
+
+        await RefreshPaneAsync(_leftPane);
+        await RefreshPaneAsync(_rightPane);
     }
 
     /// <summary>
@@ -661,6 +711,57 @@ public sealed class MainWindow : Window
 
         await RunNavigationAsync(pane, () => pane.NavigationContext.CreateDirectoryAsync(name));
         await InitializePaneAsync(otherPane);
+    }
+
+    /// <summary>
+    ///     Creates a volume as a file in the current location of a pane: the volume to create is chosen in the create
+    ///     dialog, then its file name and fields are entered. When creating fails, the error is shown and the fields are
+    ///     asked again with the input entered. The created file is selected and the other pane is refreshed too, as it
+    ///     may show the same location.
+    /// </summary>
+    private async Task CreateVolumeAsync(Pane pane, Pane otherPane)
+    {
+        var creators = VolumeProviders.Creators;
+        if (pane.NavigationContext.GetCreateVolumeNotSupportedMessage(creators) is { } message)
+        {
+            MessageBox.ErrorQuery("Error", message, "OK");
+            pane.TableView.SetFocus();
+            return;
+        }
+
+        var dialog = new CreateVolumeDialog(creators, _palette);
+        Application.Run(dialog);
+        var creator = dialog.Result;
+        dialog.Dispose();
+
+        VolumeCreatorInput? input = null;
+        while (creator != null)
+        {
+            var fieldsDialog = new CreateVolumeFieldsDialog(creator, input, _palette);
+            Application.Run(fieldsDialog);
+            input = fieldsDialog.Result;
+            fieldsDialog.Dispose();
+            if (input == null)
+            {
+                break;
+            }
+
+            try
+            {
+                await pane.NavigationContext.CreateVolumeAsync(creator, input.FileName, input.Values);
+            }
+            catch (Exception exception)
+            {
+                MessageBox.ErrorQuery("Error", exception.Message, "OK");
+                continue;
+            }
+
+            await InitializePaneAsync(pane);
+            await InitializePaneAsync(otherPane);
+            break;
+        }
+
+        pane.TableView.SetFocus();
     }
 
     private static IEntry? GetCurrentEntry(Pane pane)
@@ -867,7 +968,7 @@ public sealed class MainWindow : Window
         {
             var size = SizeFormatter.FormatEntrySize(entry);
             var modifiedDate = entry.ModifiedDate?.ToString("yyyy-MM-dd HH:mm") ?? string.Empty;
-            table.Rows.Add(entry.Name, size, modifiedDate);
+            table.Rows.Add(entry.DisplayName, size, modifiedDate);
         }
 
         pane.TableView.Table = new DataTableSource(table);
@@ -906,7 +1007,7 @@ public sealed class MainWindow : Window
         for (var rowIndex = 0; rowIndex < pane.Entries.Count; rowIndex++)
         {
             pane.DataTable.Rows[rowIndex][0] = FormatEntryName(
-                pane.Entries[rowIndex].Name,
+                pane.Entries[rowIndex].DisplayName,
                 pane.Entries[rowIndex].Type,
                 widths.Name);
         }

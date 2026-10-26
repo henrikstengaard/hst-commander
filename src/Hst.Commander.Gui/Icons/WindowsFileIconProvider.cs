@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
-using Hst.Commander.Core;
+using Hst.Commander.Abstractions;
 
 namespace Hst.Commander.Gui.Icons;
 

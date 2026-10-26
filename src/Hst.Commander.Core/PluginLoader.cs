@@ -45,7 +45,10 @@ public static class PluginLoader
     /// </summary>
     /// <param name="directories">Plugin directories, scanned in order; a directory listed twice is scanned once.</param>
     /// <param name="loadedPlugins">Plugins already loaded, e.g. the ones included with Hst Commander.</param>
-    public static PluginLoadResult Load(IEnumerable<string> directories, IEnumerable<IPlugin> loadedPlugins)
+    /// <param name="host">Host the loaded plugins are initialized with (<see cref="IPlugin.Initialize" />), null to not
+    /// initialize them.</param>
+    public static PluginLoadResult Load(IEnumerable<string> directories, IEnumerable<IPlugin> loadedPlugins,
+        IPluginHost? host = null)
     {
         ArgumentNullException.ThrowIfNull(directories);
         ArgumentNullException.ThrowIfNull(loadedPlugins);
@@ -72,6 +75,12 @@ public static class PluginLoader
                     {
                         if (pluginTypeNames.Add(plugin.GetType().FullName))
                         {
+                            // a plugin failing to initialize is reported like failing to load
+                            if (host != null)
+                            {
+                                plugin.Initialize(host);
+                            }
+
                             plugins.Add(plugin);
                         }
                     }

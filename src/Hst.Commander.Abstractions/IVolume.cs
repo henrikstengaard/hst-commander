@@ -82,4 +82,47 @@ public interface IVolume
     /// <param name="modifiedDate">Modified date. Dates of kind unspecified are treated as UTC.</param>
     /// <param name="cancellationToken"></param>
     Task SetModifiedDate(string name, DateTime modifiedDate, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// True when the current directory stores Amiga names, protection bits and comments as they are, e.g. an Amiga
+    /// file system. Copying between such volumes keeps them; copying to or from other volumes uses UAE metadata files.
+    /// Defaults to false.
+    /// </summary>
+    Task<bool> SupportsAmigaMetadata(CancellationToken cancellationToken = default) => Task.FromResult(false);
+
+    /// <summary>
+    /// Set the Amiga protection bits and comment of an item or container in current directory.
+    /// Throws <see cref="NotSupportedException"/> when the volume doesn't store them (the default) or is read-only.
+    /// </summary>
+    /// <param name="name">Name of entry to set the protection bits and comment of.</param>
+    /// <param name="metadata">Protection bits and comment.</param>
+    /// <param name="cancellationToken"></param>
+    Task SetAmigaMetadata(string name, AmigaMetadata metadata, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("Amiga protection bits and comments are not supported");
+
+    /// <summary>
+    /// True when <see cref="SetAmigaMetadata" /> can change the protection bits and comments of entries in the current
+    /// directory, e.g. a writable Amiga file system. The properties dialog then lets the protection bits be changed.
+    /// Defaults to false.
+    /// </summary>
+    Task<bool> CanSetAmigaMetadata(CancellationToken cancellationToken = default) => Task.FromResult(false);
+
+    /// <summary>
+    /// Attributes (<see cref="IEntry.Attributes" />) of entries in the current directory that
+    /// <see cref="SetAttributes" /> can change, shown as check boxes the properties dialog can change. Defaults to
+    /// none.
+    /// </summary>
+    Task<EntryAttributes> GetChangeableAttributes(CancellationToken cancellationToken = default) =>
+        Task.FromResult(EntryAttributes.None);
+
+    /// <summary>
+    /// Set the attributes of an item or container in current directory. Only the attributes of
+    /// <see cref="GetChangeableAttributes" /> are changed, other attributes are kept.
+    /// Throws <see cref="NotSupportedException"/> when the volume can't change attributes (the default) or is read-only.
+    /// </summary>
+    /// <param name="name">Name of entry to set the attributes of.</param>
+    /// <param name="attributes">Attributes of the entry.</param>
+    /// <param name="cancellationToken"></param>
+    Task SetAttributes(string name, EntryAttributes attributes, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("Changing attributes is not supported");
 }

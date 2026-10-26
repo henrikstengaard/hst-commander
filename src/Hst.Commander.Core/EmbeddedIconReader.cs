@@ -1,14 +1,7 @@
 using System.Buffers.Binary;
+using Hst.Commander.Abstractions;
 
 namespace Hst.Commander.Core;
-
-/// <summary>
-///     Icon image read from a file: either PNG data or 32-bit BGRA pixels (not premultiplied, top-down rows).
-/// </summary>
-public sealed record IconImage(int Width, int Height, byte[]? PngData, byte[]? BgraPixels)
-{
-    public bool IsPng => PngData != null;
-}
 
 /// <summary>
 ///     Reads the icon contained in a file without any OS support, so it works for files inside images too: the first
@@ -39,14 +32,7 @@ public static class EmbeddedIconReader
 
         try
         {
-            if (!stream.CanSeek)
-            {
-                var memoryStream = new MemoryStream();
-                stream.CopyTo(memoryStream);
-                memoryStream.Position = 0;
-                stream = memoryStream;
-            }
-
+            stream = EnsureSeekable(stream);
             return Path.GetExtension(name).Equals(".ico", StringComparison.OrdinalIgnoreCase)
                 ? ReadIcoFile(stream, size)
                 : ReadExecutableIcon(stream, size);
@@ -58,25 +44,137 @@ public static class EmbeddedIconReader
         }
     }
 
+    /// <summary>Most icons read from an executable by <see cref="ReadIcons" />, e.g. system libraries have hundreds.</summary>
+    public const int MaxIcons = 1000;
+
+    /// <summary>
+    ///     Reads all icons of a file, empty when it has none or the file is invalid: an .ico file is one icon with all
+    ///     its images, an executable has an icon for each icon group in its resources (named by the resource name or
+    ///     number, e.g. "#1"), at most <see cref="MaxIcons" />. The images are ordered largest first, then with the most
+    ///     colors.
+    /// </summary>
+    /// <param name="name">File name, the extension tells the format.</param>
+    /// <param name="stream">File data, copied to memory when not seekable.</param>
+    public static IReadOnlyList<EntryIcon> ReadIcons(string name, Stream stream)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+
+        try
+        {
+            stream = EnsureSeekable(stream);
+            if (Path.GetExtension(name).Equals(".ico", StringComparison.OrdinalIgnoreCase))
+            {
+                var images = ReadIcoEntries(stream)
+                    .Select(entry => DecodeImage(ReadAt(stream, entry.OffsetOrId, CheckSize(entry.Size))))
+                    .OfType<IconImage>()
+                    .ToList();
+                return images.Count == 0 ? [] : [new EntryIcon("Icon", SortImages(images))];
+            }
+
+            if (OpenResources(stream) is not { } resources)
+            {
+                return [];
+            }
+
+            var icons = new List<EntryIcon>();
+            foreach (var group in resources.ReadAll(ResourceTypeGroupIcon).Take(MaxIcons))
+            {
+                var images = ReadGroupEntries(group.Data)
+                    .Select(entry => ReadImage(() => resources.ReadFirst(ResourceTypeIcon, entry.OffsetOrId)))
+                    .OfType<IconImage>()
+                    .ToList();
+                if (images.Count > 0)
+                {
+                    icons.Add(new EntryIcon(group.Name, SortImages(images)));
+                }
+            }
+
+            return icons;
+        }
+        catch (Exception exception) when (exception is IOException or EndOfStreamException
+                                              or ArgumentException or InvalidDataException or OverflowException)
+        {
+            return [];
+        }
+    }
+
+    /// <summary>Decodes an image, null when it is invalid, so the other images of an icon are still read.</summary>
+    private static IconImage? ReadImage(Func<byte[]?> readData)
+    {
+        try
+        {
+            return readData() is { } data ? DecodeImage(data) : null;
+        }
+        catch (Exception exception) when (exception is IOException or EndOfStreamException
+                                              or ArgumentException or InvalidDataException or OverflowException)
+        {
+            return null;
+        }
+    }
+
+    private static IReadOnlyList<IconImage> SortImages(IEnumerable<IconImage> images) => images
+        .OrderByDescending(image => image.Width * image.Height)
+        .ThenByDescending(image => image.BitsPerPixel ?? 0)
+        .ToList();
+
+    private static Stream EnsureSeekable(Stream stream)
+    {
+        if (stream.CanSeek)
+        {
+            return stream;
+        }
+
+        var memoryStream = new MemoryStream();
+        stream.CopyTo(memoryStream);
+        memoryStream.Position = 0;
+        return memoryStream;
+    }
+
     private sealed record IconDirectoryEntry(int Width, int Height, int BitCount, uint Size, uint OffsetOrId);
 
     private static IconImage? ReadIcoFile(Stream stream, int size)
+    {
+        var entries = ReadIcoEntries(stream);
+        if (entries.Count == 0)
+        {
+            return null;
+        }
+
+        var entry = ChooseEntry(entries, size);
+        return DecodeImage(ReadAt(stream, entry.OffsetOrId, CheckSize(entry.Size)));
+    }
+
+    private static IReadOnlyList<IconDirectoryEntry> ReadIcoEntries(Stream stream)
     {
         var header = ReadAt(stream, 0, 6);
         var count = BinaryPrimitives.ReadUInt16LittleEndian(header.AsSpan(4));
         if (BinaryPrimitives.ReadUInt16LittleEndian(header) != 0 ||
             BinaryPrimitives.ReadUInt16LittleEndian(header.AsSpan(2)) != 1 || count == 0)
         {
-            return null;
+            return [];
         }
 
         var entriesData = ReadAt(stream, 6, count * 16);
-        var entries = Enumerable.Range(0, count)
+        return Enumerable.Range(0, count)
             .Select(index => ReadIconDirectoryEntry(entriesData.AsSpan(index * 16),
                 BinaryPrimitives.ReadUInt32LittleEndian(entriesData.AsSpan(index * 16 + 12))))
             .ToList();
-        var entry = ChooseEntry(entries, size);
-        return DecodeImage(ReadAt(stream, entry.OffsetOrId, CheckSize(entry.Size)));
+    }
+
+    /// <summary>Entries of an icon group resource, the offsets are the ids of the icon resources.</summary>
+    private static IReadOnlyList<IconDirectoryEntry> ReadGroupEntries(byte[]? groupData)
+    {
+        if (groupData == null || groupData.Length < 6)
+        {
+            return [];
+        }
+
+        var count = BinaryPrimitives.ReadUInt16LittleEndian(groupData.AsSpan(4));
+        return Enumerable.Range(0, count)
+            .Where(index => 6 + (index + 1) * 14 <= groupData.Length)
+            .Select(index => ReadIconDirectoryEntry(groupData.AsSpan(6 + index * 14),
+                BinaryPrimitives.ReadUInt16LittleEndian(groupData.AsSpan(6 + index * 14 + 12))))
+            .ToList();
     }
 
     private static IconDirectoryEntry ReadIconDirectoryEntry(ReadOnlySpan<byte> data, uint offsetOrId) => new(
@@ -98,6 +196,24 @@ public static class EmbeddedIconReader
     }
 
     private static IconImage? ReadExecutableIcon(Stream stream, int size)
+    {
+        if (OpenResources(stream) is not { } resources)
+        {
+            return null;
+        }
+
+        var entries = ReadGroupEntries(resources.ReadFirst(ResourceTypeGroupIcon, null));
+        if (entries.Count == 0)
+        {
+            return null;
+        }
+
+        var iconData = resources.ReadFirst(ResourceTypeIcon, ChooseEntry(entries, size).OffsetOrId);
+        return iconData == null ? null : DecodeImage(iconData);
+    }
+
+    /// <summary>Resources of a Windows executable, null when it isn't one or has no resources.</summary>
+    private static ResourceReader? OpenResources(Stream stream)
     {
         var dosHeader = ReadAt(stream, 0, 64);
         if (dosHeader[0] != 'M' || dosHeader[1] != 'Z')
@@ -141,27 +257,7 @@ public static class EmbeddedIconReader
                     BinaryPrimitives.ReadUInt32LittleEndian(sectionTable.AsSpan(index * 40 + 16))),
                 BinaryPrimitives.ReadUInt32LittleEndian(sectionTable.AsSpan(index * 40 + 20))))
             .ToList();
-        var resources = new ResourceReader(stream, sections, RvaToOffset(sections, resourceRva));
-
-        var groupData = resources.ReadFirst(ResourceTypeGroupIcon, null);
-        if (groupData == null || groupData.Length < 6)
-        {
-            return null;
-        }
-
-        var count = BinaryPrimitives.ReadUInt16LittleEndian(groupData.AsSpan(4));
-        var entries = Enumerable.Range(0, count)
-            .Where(index => 6 + (index + 1) * 14 <= groupData.Length)
-            .Select(index => ReadIconDirectoryEntry(groupData.AsSpan(6 + index * 14),
-                BinaryPrimitives.ReadUInt16LittleEndian(groupData.AsSpan(6 + index * 14 + 12))))
-            .ToList();
-        if (entries.Count == 0)
-        {
-            return null;
-        }
-
-        var iconData = resources.ReadFirst(ResourceTypeIcon, ChooseEntry(entries, size).OffsetOrId);
-        return iconData == null ? null : DecodeImage(iconData);
+        return new ResourceReader(stream, sections, RvaToOffset(sections, resourceRva));
     }
 
     private sealed record Section(uint VirtualAddress, uint VirtualSize, uint RawDataOffset);
@@ -184,11 +280,36 @@ public static class EmbeddedIconReader
             var typeOffset = FindEntry(0, type);
             var nameOffset = typeOffset is { } typeDirectory ? FindEntry(typeDirectory, id) : null;
             var languageOffset = nameOffset is { } nameDirectory ? FindEntry(nameDirectory, null) : null;
-            if (languageOffset is not { } dataEntryOffset)
+            return languageOffset is { } dataEntryOffset ? ReadData(dataEntryOffset) : null;
+        }
+
+        /// <summary>
+        ///     Data of all resources of a type in their first language, named by the resource name or "#" and the id.
+        /// </summary>
+        public IEnumerable<(string Name, byte[]? Data)> ReadAll(uint type)
+        {
+            if (FindEntry(0, type) is not { } typeDirectory)
             {
-                return null;
+                yield break;
             }
 
+            foreach (var (nameOrId, nameDirectory) in ReadEntries(typeDirectory))
+            {
+                var name = (nameOrId & 0x80000000) != 0 ? ReadName(nameOrId & 0x7fffffff) : $"#{nameOrId}";
+                var languageOffset = FindEntry(nameDirectory, null);
+                yield return (name, languageOffset is { } dataEntryOffset ? ReadData(dataEntryOffset) : null);
+            }
+        }
+
+        /// <summary>Resource name: its length in characters followed by the UTF-16 characters.</summary>
+        private string ReadName(uint offset)
+        {
+            var length = BinaryPrimitives.ReadUInt16LittleEndian(ReadAt(stream, rootOffset + offset, 2));
+            return System.Text.Encoding.Unicode.GetString(ReadAt(stream, rootOffset + offset + 2, length * 2));
+        }
+
+        private byte[] ReadData(uint dataEntryOffset)
+        {
             var dataEntry = ReadAt(stream, rootOffset + dataEntryOffset, 16);
             var dataRva = BinaryPrimitives.ReadUInt32LittleEndian(dataEntry);
             var dataSize = BinaryPrimitives.ReadUInt32LittleEndian(dataEntry.AsSpan(4));
@@ -199,22 +320,25 @@ public static class EmbeddedIconReader
         ///     Offset (relative to the resource root) the entry with the id points to, or of the first entry when
         ///     no id is given. Subdirectory offsets have the high bit cleared.
         /// </summary>
-        private uint? FindEntry(uint directoryOffset, uint? id)
+        private uint? FindEntry(uint directoryOffset, uint? id) => ReadEntries(directoryOffset)
+            .Where(entry => id == null || entry.NameOrId == id)
+            .Select(entry => (uint?)entry.Offset)
+            .FirstOrDefault();
+
+        /// <summary>
+        ///     Entries of a resource directory: the name (offset with the high bit set) or id, and the offset it points
+        ///     to (relative to the resource root, subdirectory offsets with the high bit cleared).
+        /// </summary>
+        private List<(uint NameOrId, uint Offset)> ReadEntries(uint directoryOffset)
         {
             var header = ReadAt(stream, rootOffset + directoryOffset, 16);
             var count = BinaryPrimitives.ReadUInt16LittleEndian(header.AsSpan(12)) +
                         BinaryPrimitives.ReadUInt16LittleEndian(header.AsSpan(14));
             var entries = ReadAt(stream, rootOffset + directoryOffset + 16, count * 8);
-            for (var index = 0; index < count; index++)
-            {
-                var nameOrId = BinaryPrimitives.ReadUInt32LittleEndian(entries.AsSpan(index * 8));
-                if (id == null || nameOrId == id)
-                {
-                    return BinaryPrimitives.ReadUInt32LittleEndian(entries.AsSpan(index * 8 + 4)) & 0x7fffffff;
-                }
-            }
-
-            return null;
+            return Enumerable.Range(0, count)
+                .Select(index => (BinaryPrimitives.ReadUInt32LittleEndian(entries.AsSpan(index * 8)),
+                    BinaryPrimitives.ReadUInt32LittleEndian(entries.AsSpan(index * 8 + 4)) & 0x7fffffff))
+                .ToList();
         }
     }
 
@@ -225,7 +349,11 @@ public static class EmbeddedIconReader
         {
             var pngWidth = BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(16));
             var pngHeight = BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(20));
-            return new IconImage(pngWidth, pngHeight, data, null);
+            // bit depth per sample and color type: 6 rgba, 2 rgb, 4 gray with alpha, otherwise one sample
+            int? pngBitsPerPixel = data.Length >= 26
+                ? data[24] * data[25] switch { 6 => 4, 2 => 3, 4 => 2, _ => 1 }
+                : null;
+            return new IconImage(pngWidth, pngHeight, data, null, pngBitsPerPixel);
         }
 
         if (data.Length < 40)
@@ -301,7 +429,7 @@ public static class EmbeddedIconReader
             }
         }
 
-        return new IconImage(width, height, null, pixels);
+        return new IconImage(width, height, null, pixels, bitCount);
     }
 
     private static int CheckSize(uint size) => size is > 0 and <= MaxResourceSize

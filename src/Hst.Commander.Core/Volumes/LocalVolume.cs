@@ -14,6 +14,9 @@ public class LocalVolume(string path) : IVolume
 
     public IEnumerable<string> CurrentPathComponents => _currentPathComponents;
 
+    /// <summary>Full path of the current directory, null in the drive list.</summary>
+    public string? LocalPath => _currentPath;
+
     public async IAsyncEnumerable<IEntry> ListEntries([EnumeratorCancellation] CancellationToken cancellationToken =
         default)
     {
@@ -132,9 +135,13 @@ public class LocalVolume(string path) : IVolume
         return Task.FromResult(fileEntry);
     }
 
+    /// <summary>
+    /// Opens an item for reading, shared with writers, e.g. a writable image opened in a pane (see
+    /// <c>SharedImages</c>), so it can still be detected as an image or copied.
+    /// </summary>
     public Task<Stream> OpenRead(string name, CancellationToken cancellationToken = default) =>
-        Task.FromResult<Stream>(new FileStream(GetItemPath(name), FileMode.Open, FileAccess.Read, FileShare.Read,
-            BufferSize, true));
+        Task.FromResult<Stream>(new FileStream(GetItemPath(name), FileMode.Open, FileAccess.Read,
+            FileShare.ReadWrite, BufferSize, true));
 
     public Task<Stream> OpenWrite(string name, CancellationToken cancellationToken = default) =>
         Task.FromResult<Stream>(new FileStream(GetItemPath(name), FileMode.Create, FileAccess.Write, FileShare.None,
@@ -188,6 +195,32 @@ public class LocalVolume(string path) : IVolume
 
         return Task.CompletedTask;
     }
+
+    /// <summary>
+    /// Attributes of local entries that can be changed: read-only, hidden, system and archive on Windows, read-only
+    /// (the write permissions) on other systems. None in the drive list.
+    /// </summary>
+    public Task<EntryAttributes> GetChangeableAttributes(CancellationToken cancellationToken = default) =>
+        Task.FromResult(_currentPath == null ? EntryAttributes.None : ChangeableAttributes);
+
+    public Task SetAttributes(string name, EntryAttributes attributes, CancellationToken cancellationToken = default)
+    {
+        var path = GetItemPath(name);
+        var fileAttributes = File.GetAttributes(path);
+        var changedAttributes = fileAttributes & ~(FileAttributes)ChangeableAttributes |
+                                (FileAttributes)(attributes & ChangeableAttributes);
+        if (changedAttributes != fileAttributes)
+        {
+            File.SetAttributes(path, changedAttributes);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Attributes of local entries that can be changed on the host OS.</summary>
+    public static EntryAttributes ChangeableAttributes { get; } = OperatingSystem.IsWindows()
+        ? EntryAttributes.ReadOnly | EntryAttributes.Hidden | EntryAttributes.System | EntryAttributes.Archive
+        : EntryAttributes.ReadOnly;
 
     public Task SetModifiedDate(string name, DateTime modifiedDate, CancellationToken cancellationToken = default)
     {

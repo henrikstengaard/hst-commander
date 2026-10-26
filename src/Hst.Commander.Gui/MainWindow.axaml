@@ -13,6 +13,7 @@
                 <MenuItem x:Name="MoveMenuItem" Header="Mo_ve/rename..." InputGesture="F6" />
                 <MenuItem x:Name="MakeDirectoryMenuItem" Header="_Make directory..." InputGesture="F7" />
                 <MenuItem x:Name="DeleteMenuItem" Header="_Delete..." InputGesture="F8" />
+                <MenuItem x:Name="CreateVolumeMenuItem" Header="Cr_eate volume..." InputGesture="F9" />
                 <MenuItem x:Name="PropertiesMenuItem" Header="_Properties..." InputGesture="Alt+Enter" />
                 <MenuItem x:Name="OpenAsVolumeMenuItem" Header="Ope_n as volume" InputGesture="Ctrl+PageDown" />
                 <Separator />
@@ -29,6 +30,8 @@
                 <Separator />
                 <MenuItem x:Name="QuitMenuItem" Header="_Quit" InputGesture="Alt+F4" />
             </MenuItem>
+            <!-- the navigation modes of the active pane, added by the code-behind -->
+            <MenuItem x:Name="ViewMenu" Header="_View" />
             <MenuItem Header="_Help">
                 <MenuItem x:Name="AboutMenuItem" Header="_About..." />
             </MenuItem>
@@ -68,6 +71,9 @@
             </Button>
             <Button x:Name="DeleteButton" Classes="functionKey">
                 <StackPanel Orientation="Horizontal"><TextBlock Classes="key" Text="F8" /><TextBlock Text="Delete" /></StackPanel>
+            </Button>
+            <Button x:Name="CreateButton" Classes="functionKey">
+                <StackPanel Orientation="Horizontal"><TextBlock Classes="key" Text="F9" /><TextBlock Text="Create" /></StackPanel>
             </Button>
         </UniformGrid>
         <Grid ColumnDefinitions="*,*">

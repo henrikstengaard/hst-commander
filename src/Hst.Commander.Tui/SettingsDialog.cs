@@ -1,4 +1,4 @@
-using Hst.Commander.Core;
+﻿using Hst.Commander.Core;
 using Terminal.Gui;
 
 namespace Hst.Commander.Tui;
@@ -19,6 +19,7 @@ public sealed class SettingsDialog : Dialog
     private readonly RadioGroup _themeRadioGroup;
     private readonly RadioGroup _volumeProviderKeysRadioGroup;
     private readonly RadioGroup _enterFileActionRadioGroup;
+    private readonly RadioGroup _uaeMetadataRadioGroup;
     private readonly TuiSettings _settings;
     private readonly Action<TuiTheme> _preview;
 
@@ -27,8 +28,8 @@ public sealed class SettingsDialog : Dialog
         _settings = settings;
         _preview = preview;
         Title = "Settings";
-        Width = 50;
-        Height = 16;
+        Width = 56;
+        Height = 20;
         ColorScheme = palette.DialogColorScheme;
 
         var themeLabel = new Label { X = 1, Y = 1, Text = "Theme:" };
@@ -61,10 +62,24 @@ public sealed class SettingsDialog : Dialog
             SelectedItem = Math.Max(0, EnterFileActions.All.ToList().IndexOf(settings.EnterFileAction))
         };
 
+        var uaeMetadataLabel = new Label { X = 1, Y = 11, Text = "UAE metadata:" };
+        _uaeMetadataRadioGroup = new RadioGroup
+        {
+            X = 15,
+            Y = 11,
+            RadioLabels = UaeMetadataFormats.All.Select(UaeMetadataFormats.GetName).ToArray(),
+            SelectedItem = Math.Max(0, UaeMetadataFormats.All.ToList().IndexOf(settings.UaeMetadata))
+        };
+
         var okButton = new Button { Text = "OK", IsDefault = true };
         okButton.Accepting += (_, e) =>
         {
-            Result = (_settings with { Theme = SelectedTheme, EnterFileAction = SelectedEnterFileAction })
+            Result = (_settings with
+                {
+                    Theme = SelectedTheme,
+                    EnterFileAction = SelectedEnterFileAction,
+                    UaeMetadata = SelectedUaeMetadata
+                })
                 .WithVolumeProviderKeys(SelectedVolumeProviderKeys);
             e.Cancel = true;
             Application.RequestStop(this);
@@ -77,7 +92,7 @@ public sealed class SettingsDialog : Dialog
         };
 
         Add(themeLabel, _themeRadioGroup, volumeProviderKeysLabel, _volumeProviderKeysRadioGroup,
-            enterFileActionLabel, _enterFileActionRadioGroup);
+            enterFileActionLabel, _enterFileActionRadioGroup, uaeMetadataLabel, _uaeMetadataRadioGroup);
         AddButton(okButton);
         AddButton(cancelButton);
         Initialized += (_, _) => _themeRadioGroup.SetFocus();
@@ -93,6 +108,9 @@ public sealed class SettingsDialog : Dialog
 
     private EnterFileAction SelectedEnterFileAction =>
         EnterFileActions.All[Math.Max(0, _enterFileActionRadioGroup.SelectedItem)];
+
+    private UaeMetadataFormat SelectedUaeMetadata =>
+        UaeMetadataFormats.All[Math.Max(0, _uaeMetadataRadioGroup.SelectedItem)];
 
     private void Preview(TuiTheme theme)
     {

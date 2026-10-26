@@ -1,4 +1,6 @@
-using Avalonia.Controls;
+﻿using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
+using Avalonia.Controls.Templates;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Hst.Commander.Core;
@@ -8,10 +10,16 @@ using Hst.Commander.Gui.Icons;
 namespace Hst.Commander.Gui;
 
 /// <summary>
-///     Navigation pane listing the entries of the current location of a <see cref="NavigationContext" />.
+///     Navigation pane showing the entries of the current location of a <see cref="NavigationContext" /> in a
+///     navigation mode (see <see cref="PaneNavigationMode" />): a list, thumbnails or the icons of a plugin's navigation
+///     mode at their positions (<see cref="IconLayoutView" />). The list holds the entries and the current entry in all
+///     modes.
 /// </summary>
 public partial class PaneView : UserControl
 {
+    private readonly IDataTemplate? _listItemTemplate;
+    private readonly ITemplate<Panel?> _listItemsPanel;
+    private readonly ScrollBarVisibility _listHorizontalScrollBarVisibility;
     private NavigationContext? _navigationContext;
     private CancellationTokenSource? _iconsCancellation;
 
@@ -19,16 +27,133 @@ public partial class PaneView : UserControl
     {
         InitializeComponent();
 
+        _listItemTemplate = EntriesList.ItemTemplate;
+        _listItemsPanel = EntriesList.ItemsPanel;
+        _listHorizontalScrollBarVisibility = ScrollViewer.GetHorizontalScrollBarVisibility(EntriesList);
         EntriesList.AddHandler(KeyDownEvent, OnEntriesKeyDown, RoutingStrategies.Tunnel);
         EntriesList.DoubleTapped += async (_, _) => await ActivateSelectedEntryAsync();
+        EntriesList.SelectionChanged += (_, _) => UpdateIconSelection();
         PathBadge.DoubleTapped += (_, _) => PathDoubleClicked?.Invoke(this, EventArgs.Empty);
         EntriesList.PropertyChanged += (_, e) =>
         {
             if (e.Property == IsKeyboardFocusWithinProperty)
             {
-                PathBadge.Classes.Set("active", EntriesList.IsKeyboardFocusWithin);
+                UpdatePathBadge();
             }
         };
+
+        IconLayout.AddHandler(KeyDownEvent, OnEntriesKeyDown, RoutingStrategies.Tunnel);
+        IconLayout.PropertyChanged += (_, e) =>
+        {
+            if (e.Property == IsKeyboardFocusWithinProperty)
+            {
+                UpdatePathBadge();
+            }
+        };
+        IconLayout.ItemClicked += (_, item) => EntriesList.SelectedItem = item;
+        IconLayout.ItemToggled += (_, item) =>
+        {
+            EntriesList.SelectedItem = item;
+            item.IsMarked = NavigationContext.ToggleMark(item.Entry);
+            UpdateSummary();
+        };
+        IconLayout.ItemActivated += async (_, item) =>
+        {
+            EntriesList.SelectedItem = item;
+            await ActivateSelectedEntryAsync();
+        };
+        IconLayout.BackgroundClicked += (_, _) => EntriesList.SelectedItem = null;
+        IconLayout.ParentClicked += async (_, _) =>
+        {
+            await RunNavigationAsync(() => NavigationContext.GoParentAsync());
+            FocusEntries();
+        };
+        IconLayout.PositionsChanged += (_, _) => IconPositionsBar.IsVisible = IconLayout.ChangedPositions.Count > 0;
+        SavePositionsButton.Click += async (_, _) => await SaveIconPositionsAsync();
+        ResetPositionsButton.Click += (_, _) =>
+        {
+            IconLayout.Reset();
+            FocusEntries();
+        };
+    }
+
+    /// <summary>Raised when entries of the current location were changed by the pane, e.g. icon files written.</summary>
+    public event EventHandler? EntriesChanged;
+
+    /// <summary>Navigation mode the entries are shown in, the list by default.</summary>
+    public PaneNavigationMode NavigationMode { get; private set; } = PaneNavigationMode.List;
+
+    /// <summary>Shows the entries in another navigation mode, listing them again.</summary>
+    public Task SetNavigationModeAsync(PaneNavigationMode navigationMode)
+    {
+        ArgumentNullException.ThrowIfNull(navigationMode);
+
+        var hadFocus = EntriesList.IsKeyboardFocusWithin || IconLayout.IsKeyboardFocusWithin;
+        _iconsCancellation?.Cancel();
+        NavigationMode = navigationMode;
+        var isThumbnail = navigationMode == PaneNavigationMode.Thumbnail;
+        var isPluginMode = navigationMode.PluginMode != null;
+        EntriesList.ItemTemplate = isThumbnail ? (IDataTemplate)Resources["ThumbnailTemplate"]! : _listItemTemplate;
+        EntriesList.ItemsPanel = isThumbnail ? (ITemplate<Panel?>)Resources["WrapPanelTemplate"]! : _listItemsPanel;
+        // the wrap panel wraps at the width of the list, so it doesn't scroll horizontally
+        ScrollViewer.SetHorizontalScrollBarVisibility(EntriesList,
+            isThumbnail ? ScrollBarVisibility.Disabled : _listHorizontalScrollBarVisibility);
+        HeaderGrid.IsVisible = DividersGrid.IsVisible = !isThumbnail && !isPluginMode;
+        EntriesList.IsVisible = !isPluginMode;
+        IconLayout.IsVisible = isPluginMode;
+        IconPositionsBar.IsVisible = false;
+        if (!isPluginMode)
+        {
+            IconLayout.Clear();
+        }
+
+        // the entries are listed again with the icons of the mode
+        return hadFocus ? RefreshAndFocusAsync() : RefreshEntriesAsync();
+    }
+
+    private async Task RefreshAndFocusAsync()
+    {
+        await RefreshEntriesAsync();
+        FocusEntries();
+    }
+
+    private void UpdatePathBadge() =>
+        PathBadge.Classes.Set("active", EntriesList.IsKeyboardFocusWithin || IconLayout.IsKeyboardFocusWithin);
+
+    /// <summary>Shows the icon of the current entry selected in a navigation mode of a plugin.</summary>
+    private void UpdateIconSelection()
+    {
+        if (NavigationMode.PluginMode != null)
+        {
+            IconLayout.UpdateSelection(EntriesList.SelectedItem as EntryItem, IsActive);
+        }
+    }
+
+    /// <summary>
+    ///     Saves the positions of the icons moved in a navigation mode of a plugin and shows the entries again, e.g.
+    ///     with the .info files written by the Workbench navigation mode.
+    /// </summary>
+    private async Task SaveIconPositionsAsync()
+    {
+        if (NavigationMode.PluginMode is not { } navigationMode)
+        {
+            return;
+        }
+
+        var entries = (EntriesList.ItemsSource as IReadOnlyList<EntryItem> ?? []).Select(item => item.Entry).ToList();
+        var positions = IconLayout.ChangedPositions;
+        var saved = false;
+        await RunNavigationAsync(async () =>
+        {
+            await NavigationContext.SaveIconPositionsAsync(navigationMode, entries, positions);
+            saved = true;
+        });
+        if (saved)
+        {
+            EntriesChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        FocusEntries();
     }
 
     /// <summary>Raised when navigation fails, so the window can show the error.</summary>
@@ -48,12 +173,14 @@ public partial class PaneView : UserControl
     public bool IsActive
     {
         get => EntriesList.Classes.Contains("active");
-        set => EntriesList.Classes.Set("active", value);
+        set
+        {
+            EntriesList.Classes.Set("active", value);
+            UpdateIconSelection();
+        }
     }
 
     public IEntry? SelectedEntry => (EntriesList.SelectedItem as EntryItem)?.Entry;
-
-    public Task InitializeAsync() => RefreshEntriesAsync();
 
     /// <summary>Lists the entries of the current location again, e.g. after copying.</summary>
     public Task RefreshEntriesAsync() => RunNavigationAsync(() => Task.CompletedTask);
@@ -70,12 +197,32 @@ public partial class PaneView : UserControl
     public Task CreateDirectoryAsync(string name) =>
         RunNavigationAsync(() => NavigationContext.CreateDirectoryAsync(name));
 
+    /// <summary>
+    ///     Creates a volume as a file in the current location and selects it, see
+    ///     <see cref="NavigationContext.CreateVolumeAsync" />. Unlike navigating, an error is thrown, so the input can be
+    ///     asked again.
+    /// </summary>
+    public async Task CreateVolumeAsync(IVolumeCreator creator, VolumeCreatorInput input)
+    {
+        // icons of files inside images are read from the pane's volume, so stop before writing to it
+        _iconsCancellation?.Cancel();
+        await NavigationContext.CreateVolumeAsync(creator, input.FileName, input.Values);
+        await RefreshEntriesAsync();
+    }
+
     /// <summary>Renames an entry in the current location and selects it, see <see cref="NavigationContext.RenameAsync" />.</summary>
     public Task RenameAsync(IEntry entry, string newName) =>
         RunNavigationAsync(() => NavigationContext.RenameAsync(entry, newName));
 
     public void FocusEntries()
     {
+        // icons of a plugin's navigation mode have no current entry until one is clicked, like the Workbench
+        if (NavigationMode.PluginMode != null)
+        {
+            IconLayout.Focus(NavigationMethod.Tab);
+            return;
+        }
+
         if (EntriesList.SelectedIndex < 0 && EntriesList.ItemCount > 0)
         {
             EntriesList.SelectedIndex = 0;
@@ -109,6 +256,29 @@ public partial class PaneView : UserControl
 
         switch (e.Key)
         {
+            // icons of a plugin's navigation mode are moved through by their positions
+            case Key.Left or Key.Up or Key.Right or Key.Down when NavigationMode.PluginMode != null &&
+                                                                 e.KeyModifiers == KeyModifiers.None:
+                e.Handled = true;
+                EntriesList.SelectedItem = IconLayout.GetItem(EntriesList.SelectedItem as EntryItem, e.Key switch
+                {
+                    Key.Left => NavigationDirection.Left,
+                    Key.Up => NavigationDirection.Up,
+                    Key.Right => NavigationDirection.Right,
+                    _ => NavigationDirection.Down
+                });
+                break;
+            // thumbnails move by rows and entries, the wrap panel's own navigation doesn't go up and down
+            case Key.Up or Key.Down when NavigationMode == PaneNavigationMode.Thumbnail &&
+                                         e.KeyModifiers == KeyModifiers.None:
+                e.Handled = true;
+                MoveThumbnailRow(e.Key == Key.Down);
+                break;
+            case Key.Left or Key.Right when NavigationMode == PaneNavigationMode.Thumbnail &&
+                                            e.KeyModifiers == KeyModifiers.None:
+                e.Handled = true;
+                MoveSelection(e.Key == Key.Right ? 1 : -1);
+                break;
             case Key.Enter:
                 e.Handled = true;
                 await ActivateSelectedEntryAsync();
@@ -159,11 +329,53 @@ public partial class PaneView : UserControl
     {
         var container = EntriesList.ContainerFromIndex(Math.Max(EntriesList.SelectedIndex, 0));
         var itemHeight = container?.Bounds.Height ?? 0;
-        return itemHeight > 0 ? Math.Max(1, (int)(EntriesList.Bounds.Height / itemHeight) - 1) : 1;
+        // thumbnails show several entries per row
+        var itemsPerRow = NavigationMode == PaneNavigationMode.Thumbnail ? GetThumbnailsPerRow() : 1;
+        return itemHeight > 0 ? Math.Max(1, (int)(EntriesList.Bounds.Height / itemHeight) - 1) * itemsPerRow : 1;
+    }
+
+    /// <summary>
+    ///     Moves the current thumbnail to the entry in the same column of the previous or next row. Moving down from the
+    ///     row above a shorter last row goes to the last entry.
+    /// </summary>
+    private void MoveThumbnailRow(bool down)
+    {
+        var itemsPerRow = GetThumbnailsPerRow();
+        var index = Math.Max(EntriesList.SelectedIndex, 0);
+        var lastIndex = EntriesList.ItemCount - 1;
+        if (down && index / itemsPerRow < lastIndex / itemsPerRow)
+        {
+            MoveSelection(Math.Min(index + itemsPerRow, lastIndex) - index);
+        }
+        else if (!down && index >= itemsPerRow)
+        {
+            MoveSelection(-itemsPerRow);
+        }
+    }
+
+    /// <summary>Number of thumbnails in a row: the entries at the height of the first one.</summary>
+    private int GetThumbnailsPerRow()
+    {
+        var top = EntriesList.ContainerFromIndex(0)?.Bounds.Top;
+        var itemsPerRow = 0;
+        while (top != null && itemsPerRow < EntriesList.ItemCount &&
+               EntriesList.ContainerFromIndex(itemsPerRow) is { } container &&
+               Math.Abs(container.Bounds.Top - top.Value) < 1)
+        {
+            itemsPerRow++;
+        }
+
+        return Math.Max(1, itemsPerRow);
     }
 
     private void MoveSelection(int offset)
     {
+        if (NavigationMode.PluginMode != null)
+        {
+            EntriesList.SelectedItem = IconLayout.GetItem(EntriesList.SelectedItem as EntryItem, offset);
+            return;
+        }
+
         if (EntriesList.ItemCount == 0)
         {
             return;
@@ -272,7 +484,7 @@ public partial class PaneView : UserControl
 
     private async Task RefreshAsync()
     {
-        var hadFocus = EntriesList.IsKeyboardFocusWithin;
+        var hadFocus = EntriesList.IsKeyboardFocusWithin || IconLayout.IsKeyboardFocusWithin;
         var selectedIndex = EntriesList.SelectedIndex;
         var navigationEntries = await NavigationContext.ListEntriesAsync();
         var entries = navigationEntries
@@ -285,9 +497,21 @@ public partial class PaneView : UserControl
         UpdateSummary();
         EntriesList.ItemsSource = entries;
         EntriesList.SelectedIndex = NavigationContext.GetSelectedIndex(navigationEntries, previousPath, selectedIndex);
-        if (EntriesList.SelectedItem != null)
+        if (EntriesList.SelectedItem != null && NavigationMode.PluginMode == null)
         {
             EntriesList.ScrollIntoView(EntriesList.SelectedItem);
+        }
+
+        if (NavigationMode.PluginMode is { } navigationMode)
+        {
+            // opening a directory shows its icons only
+            await ShowLayoutAsync(navigationMode, entries);
+            if (hadFocus)
+            {
+                FocusEntries();
+            }
+
+            return;
         }
 
         if (hadFocus)
@@ -299,15 +523,80 @@ public partial class PaneView : UserControl
         LoadIcons(entries);
     }
 
-    /// <summary>Loads the icons of the listed entries in the background, replacing the initial icons.</summary>
+    /// <summary>
+    ///     Shows the icons of the entries laid out by a navigation mode of a plugin, replacing the icons shown. When
+    ///     laying out fails, the error is shown and the entries are shown with their icons without positions.
+    /// </summary>
+    private async Task ShowLayoutAsync(INavigationMode navigationMode, IReadOnlyList<EntryItem> entries)
+    {
+        _iconsCancellation?.Cancel();
+        var cancellation = _iconsCancellation = new CancellationTokenSource();
+        IconLayout.Clear();
+        IconPositionsBar.IsVisible = false;
+        NavigationLayout layout;
+        try
+        {
+            layout = await NavigationContext.LayoutAsync(navigationMode, entries.Select(item => item.Entry).ToList(),
+                cancellation.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (Exception exception)
+        {
+            NavigationFailed?.Invoke(this, exception);
+            layout = new NavigationLayout(entries
+                .Where(item => item.Name != Hst.Commander.Abstractions.Paths.Parent)
+                .Select(item => new NavigationIcon(item.Name, null, null, null, null))
+                .ToList());
+        }
+
+        if (cancellation.IsCancellationRequested)
+        {
+            return;
+        }
+
+        IconLayout.CanMove = NavigationContext.CanSaveIconPositions;
+        IconLayout.Show(navigationMode.Style, layout, entries);
+        IconLayout.SetToolbar(GetDirectoryName(NavigationContext.CurrentPath), NavigationContext.HasParent);
+        // like the Workbench, opening a drawer selects no icon (the list selects ".."), the current entry is only
+        // kept when it's shown
+        if (EntriesList.SelectedItem is EntryItem selectedItem && !IconLayout.Contains(selectedItem))
+        {
+            EntriesList.SelectedItem = null;
+        }
+
+        UpdateIconSelection();
+        var namesWithoutImage = layout.Icons.Where(icon => icon.Image == null).Select(icon => icon.Name)
+            .ToHashSet(StringComparer.Ordinal);
+        if (namesWithoutImage.Count > 0)
+        {
+            LoadIcons(entries.Where(item => namesWithoutImage.Contains(item.Name)).ToList());
+        }
+    }
+
+    /// <summary>Name of the directory of a path shown in the toolbar of the icons, e.g. "dir" for "c:\dir".</summary>
+    private static string GetDirectoryName(string path)
+    {
+        var trimmedPath = path.TrimEnd('\\', '/');
+        var name = trimmedPath[(trimmedPath.LastIndexOfAny(['\\', '/']) + 1)..];
+        return name.Length > 0 ? name : path;
+    }
+
+    /// <summary>
+    ///     Loads the icons of the listed entries in the background, replacing the initial icons: small icons in the list,
+    ///     large icons for thumbnails and icons without an image in a navigation mode of a plugin.
+    /// </summary>
     private async void LoadIcons(IReadOnlyList<EntryItem> entries)
     {
         _iconsCancellation?.Cancel();
         var cancellation = _iconsCancellation = new CancellationTokenSource();
-        var size = (int)Math.Ceiling(16 * (TopLevel.GetTopLevel(this)?.RenderScaling ?? 1));
+        var pixels = NavigationMode == PaneNavigationMode.Thumbnail ? 80 : NavigationMode.PluginMode != null ? 32 : 16;
+        var size = (int)Math.Ceiling(pixels * (TopLevel.GetTopLevel(this)?.RenderScaling ?? 1));
         try
         {
-            await FileIcons.LoadAsync(entries, NavigationContext, size, cancellation.Token);
+            await FileIcons.LoadAsync(entries, NavigationContext, size, cancellation.Token, pixels > 16);
         }
         catch (Exception)
         {

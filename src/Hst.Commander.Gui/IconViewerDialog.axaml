@@ -1,0 +1,83 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:icons="using:Hst.Commander.Gui.Icons"
+        x:Class="Hst.Commander.Gui.IconViewerDialog"
+        Title="Icon"
+        Width="800" Height="600"
+        MinWidth="320" MinHeight="320"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner">
+    <DockPanel Margin="16">
+        <DockPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
+            <Button x:Name="OkButton" DockPanel.Dock="Right" Content="OK" MinWidth="80"
+                    HorizontalContentAlignment="Center" IsDefault="True" IsCancel="True" />
+            <TextBlock DockPanel.Dock="Left" Text="Zoom:" VerticalAlignment="Center" Margin="0,0,8,0" />
+            <ComboBox x:Name="ZoomComboBox" DockPanel.Dock="Left" MinWidth="100" />
+            <TextBlock DockPanel.Dock="Left" Text="Background:" VerticalAlignment="Center" Margin="16,0,8,0" />
+            <!-- background of the icon preview: a palette of common colors and a custom color -->
+            <Button x:Name="BackgroundButton" DockPanel.Dock="Left" ToolTip.Tip="Background color of the preview">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <Border x:Name="BackgroundSwatch" Width="20" Height="14" BorderBrush="Gray" BorderThickness="1" />
+                    <TextBlock x:Name="BackgroundText" VerticalAlignment="Center" />
+                </StackPanel>
+                <Button.Flyout>
+                    <Flyout Placement="TopEdgeAlignedLeft">
+                        <StackPanel Spacing="8" Width="240">
+                            <!-- swatches of the common colors are added by the code-behind -->
+                            <StackPanel x:Name="SwatchesPanel" />
+                            <Separator />
+                            <TextBlock Text="Custom" FontWeight="Bold" />
+                            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="4">
+                                <TextBlock Grid.Row="0" Text="Red:" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <NumericUpDown x:Name="RedUpDown" Grid.Row="0" Grid.Column="1" Minimum="0"
+                                               Maximum="255" Increment="1" FormatString="0" />
+                                <TextBlock Grid.Row="1" Text="Green:" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <NumericUpDown x:Name="GreenUpDown" Grid.Row="1" Grid.Column="1" Minimum="0"
+                                               Maximum="255" Increment="1" FormatString="0" />
+                                <TextBlock Grid.Row="2" Text="Blue:" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <NumericUpDown x:Name="BlueUpDown" Grid.Row="2" Grid.Column="1" Minimum="0"
+                                               Maximum="255" Increment="1" FormatString="0" />
+                                <TextBlock Grid.Row="3" Text="Hex:" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <TextBox x:Name="HexTextBox" Grid.Row="3" Grid.Column="1" PlaceholderText="#RRGGBB" />
+                            </Grid>
+                            <DockPanel>
+                                <Button x:Name="ApplyCustomButton" DockPanel.Dock="Right" Content="Apply" MinWidth="80"
+                                        HorizontalContentAlignment="Center" />
+                                <Border x:Name="CustomSwatch" Width="40" Height="24" BorderBrush="Gray"
+                                        BorderThickness="1" HorizontalAlignment="Left" />
+                            </DockPanel>
+                        </StackPanel>
+                    </Flyout>
+                </Button.Flyout>
+            </Button>
+        </DockPanel>
+        <!-- the icons of the file, shown when it has more than one -->
+        <ListBox x:Name="IconsList" DockPanel.Dock="Left" Width="200" Margin="0,0,12,0" IsVisible="False"
+                 SelectionMode="Single">
+            <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="icons:ViewerIcon">
+                    <DockPanel>
+                        <Image DockPanel.Dock="Left" Width="32" Height="32" Margin="0,0,8,0"
+                               Source="{Binding Thumbnail}" RenderOptions.BitmapInterpolationMode="HighQuality" />
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding Description}" FontSize="11" Opacity="0.7" />
+                        </StackPanel>
+                    </DockPanel>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+        <!-- the images of the selected icon, e.g. sizes and color depths of a Windows icon -->
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,12">
+            <TextBlock Text="Image:" VerticalAlignment="Center" />
+            <ComboBox x:Name="ImagesComboBox" MinWidth="160" />
+            <TextBlock x:Name="ImagesText" VerticalAlignment="Center" Opacity="0.7" />
+        </StackPanel>
+        <!-- the checkerboard background shows the transparent parts of the icon -->
+        <Border x:Name="ImageBorder" BorderBrush="Gray" BorderThickness="1">
+            <ScrollViewer x:Name="ImageScrollViewer">
+                <Image x:Name="IconImage" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </ScrollViewer>
+        </Border>
+    </DockPanel>
+</Window>
