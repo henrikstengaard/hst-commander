@@ -1,4 +1,4 @@
-﻿using System.Runtime.CompilerServices;
+using System.Runtime.CompilerServices;
 using Hst.Amiga.FileSystems;
 using Hst.Amiga.FileSystems.Exceptions;
 using Hst.Commander.Abstractions;
@@ -420,6 +420,7 @@ public class AmigaFileSystemVolume : IVolume, IDisposable
 
         public override long Seek(long offset, SeekOrigin origin) => stream.Seek(offset, origin);
         public override void SetLength(long value) => stream.SetLength(value);
+
         public override void Write(byte[] buffer, int offset, int count) => stream.Write(buffer, offset, count);
 
         public override Task WriteAsync(byte[] buffer, int offset, int count,

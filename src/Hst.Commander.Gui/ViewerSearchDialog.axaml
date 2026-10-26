@@ -1,0 +1,25 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Hst.Commander.Gui.ViewerSearchDialog"
+        Title="Search"
+        Width="440"
+        SizeToContent="Height"
+        CanResize="False"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner">
+    <StackPanel Margin="16" Spacing="8">
+        <TextBlock Text="Search for:" />
+        <TextBox x:Name="SearchTextBox" />
+        <StackPanel Orientation="Horizontal" Spacing="16">
+            <CheckBox x:Name="RegexCheckBox" Content="_Regular expression" />
+            <CheckBox x:Name="CaseSensitiveCheckBox" Content="C_ase sensitive" />
+            <CheckBox x:Name="BackwardsCheckBox" Content="_Backwards" />
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,8,0,0">
+            <Button x:Name="OkButton" Content="OK" MinWidth="80" HorizontalContentAlignment="Center"
+                    IsDefault="True" />
+            <Button x:Name="CancelButton" Content="Cancel" MinWidth="80" HorizontalContentAlignment="Center"
+                    IsCancel="True" />
+        </StackPanel>
+    </StackPanel>
+</Window>

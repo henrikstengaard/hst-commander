@@ -9,6 +9,7 @@
     <DockPanel>
         <Menu DockPanel.Dock="Top">
             <MenuItem Header="_File">
+                <MenuItem x:Name="ViewMenuItem" Header="Vie_w..." InputGesture="F3" />
                 <MenuItem x:Name="CopyMenuItem" Header="_Copy..." InputGesture="F5" />
                 <MenuItem x:Name="MoveMenuItem" Header="Mo_ve/rename..." InputGesture="F6" />
                 <MenuItem x:Name="MakeDirectoryMenuItem" Header="_Make directory..." InputGesture="F7" />

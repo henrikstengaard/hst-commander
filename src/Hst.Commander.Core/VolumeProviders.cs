@@ -7,7 +7,7 @@ namespace Hst.Commander.Core;
 ///     Volume providers listed when choosing what a pane shows (Alt+F1/Alt+F2), the local volume provider first, and file
 ///     volume providers opening files as volumes, the built-in ones first followed by those of the <see cref="Plugins" />,
 ///     the volume creators of the plugins creating new volumes as files, the icon providers and the navigation modes of the
-///     plugins.
+///     plugins and the image providers of the viewer, those of the plugins first followed by the built-in ones.
 /// </summary>
 public static class VolumeProviders
 {
@@ -17,6 +17,12 @@ public static class VolumeProviders
     public static IVolumeProvider Local { get; } = new LocalVolumeProvider();
 
     public static IFileVolumeProvider Iso9660 { get; } = new Iso9660FileVolumeProvider();
+
+    /// <summary>Built-in image provider of Windows icon files (.ico).</summary>
+    public static IImageProvider WindowsIcons { get; } = new WindowsIconImageProvider();
+
+    /// <summary>Built-in image provider of the standard image formats (PNG, JPEG, GIF, BMP, WebP).</summary>
+    public static IImageProvider StandardImages { get; } = new StandardImageProvider();
 
     public static IReadOnlyList<IVolumeProvider> All => GetLists().All;
 
@@ -42,6 +48,12 @@ public static class VolumeProviders
     /// </summary>
     public static IReadOnlyList<INavigationMode> NavigationModes => GetLists().NavigationModes;
 
+    /// <summary>
+    ///     Image providers asked in order for the images of a file viewed with F3: those of the plugins first (e.g.
+    ///     Amiga icons, which can be PNG files), then the built-in Windows icons and standard image formats.
+    /// </summary>
+    public static IReadOnlyList<IImageProvider> Images => GetLists().Images;
+
     private static Lists GetLists()
     {
         var plugins = Plugins.All;
@@ -55,7 +67,8 @@ public static class VolumeProviders
             [Iso9660, ..plugins.SelectMany(plugin => plugin.FileVolumeProviders)],
             [..plugins.Where(plugin => plugin.CanCreateVolumes).SelectMany(plugin => plugin.VolumeCreators)],
             [..plugins.SelectMany(plugin => plugin.IconProviders)],
-            [..plugins.SelectMany(plugin => plugin.NavigationModes)]);
+            [..plugins.SelectMany(plugin => plugin.NavigationModes)],
+            [..plugins.SelectMany(plugin => plugin.ImageProviders), WindowsIcons, StandardImages]);
         _lists = lists;
         return lists;
     }
@@ -66,5 +79,6 @@ public static class VolumeProviders
         IReadOnlyList<IFileVolumeProvider> Files,
         IReadOnlyList<IVolumeCreator> Creators,
         IReadOnlyList<IIconProvider> Icons,
-        IReadOnlyList<INavigationMode> NavigationModes);
+        IReadOnlyList<INavigationMode> NavigationModes,
+        IReadOnlyList<IImageProvider> Images);
 }

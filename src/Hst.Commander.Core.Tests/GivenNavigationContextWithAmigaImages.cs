@@ -74,6 +74,51 @@ public class GivenNavigationContextWithAmigaImages : IDisposable
     }
 
     [Fact]
+    public async Task When_ViewingFileLargerThanABlockInAdf_Then_ItIsReadAndStreamsReadIntoBufferOffsetsAndSeek()
+    {
+        // arrange: a file of many blocks, as the Amiga file system reads a block at a time
+        var adfPath = Path.Combine(_rootPath, "disk.adf");
+        await AmigaTestData.CreateAdf(adfPath);
+        var data = Enumerable.Range(0, 100_000).Select(index => (byte)index).ToArray();
+        await File.WriteAllBytesAsync(Path.Combine(_rootPath, "data.bin"), data);
+
+        using var adfContext = new NavigationContext(_rootPath);
+        using var localContext = new NavigationContext(_rootPath);
+        await OpenAsync(adfContext, "disk.adf");
+        var localEntries = await localContext.ListEntriesAsync();
+        await localContext.CopyAsync([localEntries.First(entry => entry.Name == "data.bin")], adfContext,
+            adfContext.CurrentPath, "*");
+        var entry = (await adfContext.ListEntriesAsync()).First(e => e.Name == "data.bin");
+
+        // act
+        byte[] viewed;
+        using (var session = await adfContext.OpenViewerAsync(entry))
+        {
+            viewed = session.Document.ReadBytes(70_000, 1000);
+        }
+
+        var buffer = new byte[2000];
+        var afterSeek = new byte[1000];
+        var afterSeekBack = new byte[1000];
+        await using (var stream = await adfContext.OpenReadAsync(entry))
+        {
+            stream.ReadExactly(buffer, 1000, 1000);
+
+            // past the 72 data blocks of the file header, into the extension blocks
+            Assert.Equal(90_000, stream.Seek(90_000, SeekOrigin.Begin));
+            stream.ReadExactly(afterSeek);
+            stream.Position = 488 * 3;
+            stream.ReadExactly(afterSeekBack);
+        }
+
+        // assert
+        Assert.Equal(data[70_000..71_000], viewed);
+        Assert.Equal(data[..1000], buffer[1000..]);
+        Assert.Equal(data[90_000..91_000], afterSeek);
+        Assert.Equal(data[(488 * 3)..(488 * 3 + 1000)], afterSeekBack);
+    }
+
+    [Fact]
     public async Task When_AdfIsOpenInBothPanes_Then_ChangesInOnePaneAreSeenInTheOther()
     {
         // arrange
