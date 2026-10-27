@@ -23,6 +23,9 @@ public partial class PaneView : UserControl
     private NavigationContext? _navigationContext;
     private CancellationTokenSource? _iconsCancellation;
 
+    /// <summary>Values of the options of the navigation modes changed by the user, by mode and option name.</summary>
+    private readonly Dictionary<INavigationMode, Dictionary<string, bool>> _navigationModeOptions = [];
+
     public PaneView()
     {
         InitializeComponent();
@@ -66,6 +69,17 @@ public partial class PaneView : UserControl
         IconLayout.ParentClicked += async (_, _) =>
         {
             await RunNavigationAsync(() => NavigationContext.GoParentAsync());
+            FocusEntries();
+        };
+        IconLayout.OptionChanged += async (_, change) =>
+        {
+            if (NavigationMode.PluginMode is not { } navigationMode)
+            {
+                return;
+            }
+
+            GetOptions(navigationMode)[change.Option.Name] = change.Value;
+            await ShowLayoutAsync(navigationMode, EntriesList.ItemsSource as IReadOnlyList<EntryItem> ?? []);
             FocusEntries();
         };
         IconLayout.PositionsChanged += (_, _) => IconPositionsBar.IsVisible = IconLayout.ChangedPositions.Count > 0;
@@ -537,7 +551,7 @@ public partial class PaneView : UserControl
         try
         {
             layout = await NavigationContext.LayoutAsync(navigationMode, entries.Select(item => item.Entry).ToList(),
-                cancellation.Token);
+                GetOptions(navigationMode), cancellation.Token);
         }
         catch (OperationCanceledException)
         {
@@ -559,7 +573,8 @@ public partial class PaneView : UserControl
 
         IconLayout.CanMove = NavigationContext.CanSaveIconPositions;
         IconLayout.Show(navigationMode.Style, layout, entries);
-        IconLayout.SetToolbar(GetDirectoryName(NavigationContext.CurrentPath), NavigationContext.HasParent);
+        IconLayout.SetToolbar(NavigationContext.HasParent);
+        IconLayout.SetOptions(navigationMode.Options, GetOptions(navigationMode));
         // like the Workbench, opening a drawer selects no icon (the list selects ".."), the current entry is only
         // kept when it's shown
         if (EntriesList.SelectedItem is EntryItem selectedItem && !IconLayout.Contains(selectedItem))
@@ -576,12 +591,16 @@ public partial class PaneView : UserControl
         }
     }
 
-    /// <summary>Name of the directory of a path shown in the toolbar of the icons, e.g. "dir" for "c:\dir".</summary>
-    private static string GetDirectoryName(string path)
+    /// <summary>Values of the options of a navigation mode changed in this pane, the defaults until changed.</summary>
+    private Dictionary<string, bool> GetOptions(INavigationMode navigationMode)
     {
-        var trimmedPath = path.TrimEnd('\\', '/');
-        var name = trimmedPath[(trimmedPath.LastIndexOfAny(['\\', '/']) + 1)..];
-        return name.Length > 0 ? name : path;
+        if (!_navigationModeOptions.TryGetValue(navigationMode, out var options))
+        {
+            options = new Dictionary<string, bool>(StringComparer.Ordinal);
+            _navigationModeOptions[navigationMode] = options;
+        }
+
+        return options;
     }
 
     /// <summary>

@@ -1431,15 +1431,15 @@ public sealed class NavigationContext : IDisposable
     /// <summary>
     ///     Lays out listed entries of the current location as icons of a navigation mode of a plugin (see
     ///     <see cref="INavigationMode.Layout" />), without the parent entry "..". Reads with the pane's volume, so call it
-    ///     on the thread using the pane.
+    ///     on the thread using the pane. The options are the values of <see cref="INavigationMode.Options" /> by name.
     /// </summary>
     public Task<NavigationLayout> LayoutAsync(INavigationMode navigationMode, IReadOnlyList<IEntry> entries,
-        CancellationToken cancellationToken = default)
+        IReadOnlyDictionary<string, bool>? options = null, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(navigationMode);
         ArgumentNullException.ThrowIfNull(entries);
 
-        return navigationMode.Layout(_nestedVolume, LayoutEntries(entries), cancellationToken);
+        return navigationMode.Layout(_nestedVolume, LayoutEntries(entries), options, cancellationToken);
     }
 
     /// <summary>

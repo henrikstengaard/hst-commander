@@ -2,6 +2,7 @@ using Hst.Amiga.DataTypes.DiskObjects;
 using Hst.Commander.Abstractions;
 using Hst.Commander.Core.Volumes;
 using Hst.Commander.Plugins.Amiga;
+using SkiaSharp;
 
 namespace Hst.Commander.Core.Tests;
 
@@ -38,6 +39,22 @@ public class GivenWorkbenchNavigationMode : IDisposable
     }
 
     [Fact]
+    public async Task When_LayoutWithIconsOnly_Then_EntriesWithoutInfoFileAreHidden()
+    {
+        // arrange
+        await CreateEntriesAsync();
+        var (volume, entries) = await ListAsync();
+
+        // act
+        var layout = await _navigationMode.Layout(volume, entries,
+            new Dictionary<string, bool> { [WorkbenchNavigationMode.IconsOnlyOption.Name] = true });
+
+        // assert
+        Assert.Equal(["file1", "orphan.info"], layout.Icons.Select(icon => icon.Name));
+        Assert.False(WorkbenchNavigationMode.IconsOnlyOption.DefaultValue);
+    }
+
+    [Fact]
     public async Task When_Layout_Then_IconsHaveTheirPositionsAndInfoFilesOfEntriesAndDiskInfoAreHidden()
     {
         // arrange
@@ -63,6 +80,85 @@ public class GivenWorkbenchNavigationMode : IDisposable
         Assert.Equal(255, file1.SelectedImage!.BgraPixels![3]);
         Assert.NotNull(layout.Icons[2].Image);
         Assert.Null(layout.Icons[3].X);
+    }
+
+    /// <summary>Def icons in a directory of their own, reading images with the built-in image providers.</summary>
+    private DefIcons CreateDefIcons() => new()
+    {
+        Directory = Directory.CreateDirectory(Path.Combine(_rootPath, "defs")).FullName,
+        Host = new PluginHost(() => [], () => VolumeProviders.Images)
+    };
+
+    private static byte[] CreatePng(int width, int height)
+    {
+        using var bitmap = new SKBitmap(width, height);
+        bitmap.Erase(SKColors.Red);
+        using var data = bitmap.Encode(SKEncodedImageFormat.Png, 100);
+        return data.ToArray();
+    }
+
+    [Fact]
+    public async Task When_LayoutWithDefIcons_Then_EntriesWithoutIconGetTheDefIcons()
+    {
+        // arrange - a .info def icon for drawers and a PNG def icon for projects
+        await CreateEntriesAsync();
+        var defIcons = CreateDefIcons();
+        await File.WriteAllBytesAsync(Path.Combine(defIcons.Directory!, "DEF_Drawer.info"),
+            await AmigaIconTestData.CreatePlanarIcon());
+        await File.WriteAllBytesAsync(Path.Combine(defIcons.Directory!, "def_project.png"), CreatePng(10, 12));
+        var navigationMode = new WorkbenchNavigationMode(defIcons);
+        var volume = new LocalVolume(_rootPath);
+        var entries = (await volume.ListEntries().ToListAsync()).Where(entry => entry.Name != "defs").ToList();
+
+        // act
+        var layout = await navigationMode.Layout(volume, entries);
+
+        // assert
+        Assert.Equal(["dir1", "file1", "file2", "orphan.info"], layout.Icons.Select(icon => icon.Name));
+        Assert.Equal((4, 2), (layout.Icons[0].Image!.Width, layout.Icons[0].Image!.Height));
+        Assert.NotNull(layout.Icons[0].SelectedImage);
+        Assert.Equal((10, 12), (layout.Icons[2].Image!.Width, layout.Icons[2].Image!.Height));
+        Assert.Null(layout.Icons[2].SelectedImage);
+    }
+
+    [Fact]
+    public async Task When_SavePositionWithInfoDefIcon_Then_IconIsCreatedFromDefIcon()
+    {
+        // arrange
+        await CreateEntriesAsync();
+        var defIcons = CreateDefIcons();
+        await File.WriteAllBytesAsync(Path.Combine(defIcons.Directory!, "def_drawer.info"),
+            await AmigaIconTestData.CreatePlanarIcon());
+        var navigationMode = new WorkbenchNavigationMode(defIcons);
+        var (volume, entries) = await ListAsync();
+
+        // act
+        await navigationMode.SavePositions(volume, entries, [new NavigationIconPosition("dir1", 5, 6)]);
+
+        // assert - the def icon's image at the position
+        await using var stream = File.OpenRead(Path.Combine(_rootPath, "dir1.info"));
+        var icons = await new AmigaIconProvider().ReadIcons("dir1.info", stream);
+        Assert.Equal((4, 2), (icons[0].Images[0].Width, icons[0].Images[0].Height));
+        stream.Position = 0;
+        var properties = await new AmigaIconProvider().ReadIconProperties("dir1.info", stream);
+        Assert.Equal("5, 6", properties.Last().Value);
+    }
+
+    [Fact]
+    public async Task When_LayoutAmigaExecutableWithoutIcon_Then_ItGetsTheToolIcon()
+    {
+        // arrange
+        await File.WriteAllBytesAsync(Path.Combine(_rootPath, "tool"), [0x00, 0x00, 0x03, 0xf3, 0, 0, 0, 0]);
+        await File.WriteAllTextAsync(Path.Combine(_rootPath, "text"), "text");
+        var (volume, entries) = await ListAsync();
+
+        // act
+        var layout = await _navigationMode.Layout(volume, entries);
+
+        // assert - the color images of the default tool and project icons, a pixel larger on each side
+        var sizes = layout.Icons.ToDictionary(icon => icon.Name, icon => (icon.Image!.Width, icon.Image.Height));
+        Assert.Equal((34, 26), sizes["tool"]);
+        Assert.Equal((26, 30), sizes["text"]);
     }
 
     [Fact]
