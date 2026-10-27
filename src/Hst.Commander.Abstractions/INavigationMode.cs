@@ -18,6 +18,12 @@ public interface INavigationMode
     NavigationModeStyle Style { get; }
 
     /// <summary>
+    /// Options shown as check boxes next to the button going to the parent, e.g. showing only entries with icons.
+    /// Their values are passed to <see cref="Layout" />.
+    /// </summary>
+    IReadOnlyList<NavigationModeOption> Options => [];
+
+    /// <summary>
     /// Lays out the entries of the current directory of a volume: the icons of the entries shown, in order, with their
     /// images and positions. Entries without an icon are hidden, e.g. icon files. The parent entry ".." isn't included,
     /// Hst Commander shows a button going to the parent above the icons. Reads with the volume, which
@@ -26,9 +32,12 @@ public interface INavigationMode
     /// </summary>
     /// <param name="volume">Volume at the directory.</param>
     /// <param name="entries">Entries of the directory.</param>
+    /// <param name="options">
+    /// Values of the <see cref="Options" /> by name, null or a missing option for its default value.
+    /// </param>
     /// <param name="cancellationToken"></param>
     Task<NavigationLayout> Layout(IVolume volume, IReadOnlyList<IEntry> entries,
-        CancellationToken cancellationToken = default);
+        IReadOnlyDictionary<string, bool>? options = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Saves the positions of icons moved by the user in the current directory of a volume, e.g. in their icon files,
@@ -50,6 +59,18 @@ public interface INavigationMode
 /// <param name="FontSize">Font size of the icon names, null for the pane's font size.</param>
 public sealed record NavigationModeStyle(string Background, string Foreground, string? FontFamily = null,
     double? FontSize = null);
+
+/// <summary>Option of a navigation mode shown as a check box, see <see cref="INavigationMode.Options" />.</summary>
+/// <param name="Name">Name of the option in the values passed to <see cref="INavigationMode.Layout" />.</param>
+/// <param name="Label">Text of the check box, e.g. "Icons only".</param>
+/// <param name="Description">Description shown as tooltip.</param>
+/// <param name="DefaultValue">Value until the user changes it.</param>
+public sealed record NavigationModeOption(string Name, string Label, string Description, bool DefaultValue = false)
+{
+    /// <summary>The value of the option in values passed to <see cref="INavigationMode.Layout" />.</summary>
+    public bool GetValue(IReadOnlyDictionary<string, bool>? options) =>
+        options != null && options.TryGetValue(Name, out var value) ? value : DefaultValue;
+}
 
 /// <summary>Icons of the entries of a directory shown in a navigation mode, in order.</summary>
 public sealed record NavigationLayout(IReadOnlyList<NavigationIcon> Icons);

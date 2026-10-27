@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Documents;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
@@ -18,8 +19,8 @@ namespace Hst.Commander.Gui;
 ///     right, continuing on the next row at the right edge, skipping places taken by icons with a position. Icons can be
 ///     dragged to other positions when <see cref="CanMove" />; <see cref="ChangedPositions" /> holds the moved icons
 ///     until they are saved or <see cref="Reset" />. A small toolbar above the icons has a ".." button going to the
-///     parent (<see cref="ParentClicked" />) and the name of the directory, drawn in the colors of the mode with
-///     raised (Workbench style) edges.
+///     parent (<see cref="ParentClicked" />), check boxes for the options of the mode
+///     (<see cref="OptionChanged" />) and a "Sort by name" button (<see cref="SortByName" />), drawn in the colors of the mode with raised (Workbench style) edges.
 /// </summary>
 internal sealed class IconLayoutView : UserControl
 {
@@ -32,11 +33,11 @@ internal sealed class IconLayoutView : UserControl
     private readonly ScrollViewer _scrollViewer;
     private readonly Canvas _canvas;
     private readonly Border _toolbar;
-    private readonly Border _parentButton;
-    private readonly Border _parentButtonInner;
-    private readonly TextBlock _parentText;
-    private readonly TextBlock _titleText;
-    private bool _canGoParent;
+    private readonly ToolbarButton _parentButton;
+    private readonly ToolbarButton _sortButton;
+    private readonly StackPanel _optionsPanel;
+    private readonly List<CheckBox> _optionCheckBoxes = [];
+    private IReadOnlyList<NavigationModeOption> _options = [];
     private readonly List<IconVisual> _icons = [];
     private readonly Dictionary<string, PixelPoint> _changedPositions = new(StringComparer.Ordinal);
     private NavigationModeStyle _style = new("#AAAAAA", "#000000");
@@ -64,28 +65,27 @@ internal sealed class IconLayoutView : UserControl
             HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
             VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto
         };
-        // the parent button has raised edges, white at the top and left, dark at the bottom and right, swapped while
-        // pressed
-        _parentText = new TextBlock { Text = Paths.Parent, VerticalAlignment = VerticalAlignment.Center };
-        _parentButtonInner = new Border { BorderThickness = new Thickness(0, 0, 1, 1), Padding = new Thickness(8, 0),
-            Child = _parentText };
-        _parentButton = new Border
+        _parentButton = new ToolbarButton(Paths.Parent, "Parent");
+        _parentButton.Clicked += (_, _) => ParentClicked?.Invoke(this, EventArgs.Empty);
+        _sortButton = new ToolbarButton("Sort by name", "Place the icons in rows sorted by name")
         {
-            BorderThickness = new Thickness(1, 1, 0, 0),
-            Child = _parentButtonInner,
-            Cursor = new Cursor(StandardCursorType.Hand)
+            Margin = new Thickness(8, 0, 0, 0),
+            IsButtonEnabled = false
         };
-        ToolTip.SetTip(_parentButton, "Parent");
-        _titleText = new TextBlock
+        _sortButton.Clicked += (_, _) =>
         {
-            Margin = new Thickness(8, 0, 4, 0),
-            VerticalAlignment = VerticalAlignment.Center,
-            TextTrimming = TextTrimming.CharacterEllipsis
+            Focus(NavigationMethod.Pointer);
+            SortByName();
         };
-        var toolbarPanel = new DockPanel();
-        DockPanel.SetDock(_parentButton, Dock.Left);
+        _optionsPanel = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        var toolbarPanel = new StackPanel { Orientation = Orientation.Horizontal };
         toolbarPanel.Children.Add(_parentButton);
-        toolbarPanel.Children.Add(_titleText);
+        toolbarPanel.Children.Add(_optionsPanel);
+        toolbarPanel.Children.Add(_sortButton);
         _toolbar = new Border
         {
             BorderThickness = new Thickness(0, 0, 0, 1),
@@ -99,31 +99,6 @@ internal sealed class IconLayoutView : UserControl
         Content = panel;
         ClipToBounds = true;
         ApplyStyle();
-
-        _parentButton.PointerPressed += (_, e) =>
-        {
-            if (_canGoParent && e.GetCurrentPoint(_parentButton).Properties.IsLeftButtonPressed)
-            {
-                e.Handled = true;
-                e.Pointer.Capture(_parentButton);
-                SetParentButtonPressed(true);
-            }
-        };
-        _parentButton.PointerReleased += (_, e) =>
-        {
-            if (e.Pointer.Captured != _parentButton)
-            {
-                return;
-            }
-
-            e.Pointer.Capture(null);
-            SetParentButtonPressed(false);
-            // released on the button, not after moving off it
-            if (new Rect(_parentButton.Bounds.Size).Contains(e.GetPosition(_parentButton)))
-            {
-                ParentClicked?.Invoke(this, EventArgs.Empty);
-            }
-        };
 
         // clicking the background deselects the current icon, like the Workbench
         _canvas.PointerPressed += (_, e) =>
@@ -158,6 +133,9 @@ internal sealed class IconLayoutView : UserControl
     /// <summary>Raised when the ".." button in the toolbar is clicked, going to the parent.</summary>
     public event EventHandler? ParentClicked;
 
+    /// <summary>Raised when the check box of an option of the mode is changed by the user.</summary>
+    public event EventHandler<(NavigationModeOption Option, bool Value)>? OptionChanged;
+
     /// <summary>Raised when an icon was dragged to another position, or the positions were reset.</summary>
     public event EventHandler? PositionsChanged;
 
@@ -172,21 +150,55 @@ internal sealed class IconLayoutView : UserControl
     /// <summary>The entries shown, in the order of the layout.</summary>
     public IReadOnlyList<EntryItem> Items => _icons.Select(icon => icon.Item).ToList();
 
-    /// <summary>Shows the name of the directory in the toolbar and enables the ".." button when it has a parent.</summary>
-    public void SetToolbar(string title, bool canGoParent)
-    {
-        _titleText.Text = title;
-        _canGoParent = canGoParent;
-        _parentButton.Opacity = canGoParent ? 1 : 0.4;
-        SetParentButtonPressed(false);
-    }
+    /// <summary>Enables the ".." button in the toolbar when the directory has a parent.</summary>
+    public void SetToolbar(bool canGoParent) => _parentButton.IsButtonEnabled = canGoParent;
 
-    private void SetParentButtonPressed(bool isPressed)
+    /// <summary>
+    ///     Shows a check box for each option of the mode next to the ".." button, checked by the values, kept while the
+    ///     options are the same.
+    /// </summary>
+    public void SetOptions(IReadOnlyList<NavigationModeOption> options, IReadOnlyDictionary<string, bool> values)
     {
-        var light = Brushes.White;
-        var dark = ParseBrush(_style.Foreground, Brushes.Black);
-        _parentButton.BorderBrush = isPressed ? dark : light;
-        _parentButtonInner.BorderBrush = isPressed ? light : dark;
+        if (!_options.SequenceEqual(options))
+        {
+            _options = options;
+            _optionsPanel.Children.Clear();
+            _optionCheckBoxes.Clear();
+            foreach (var option in options)
+            {
+                // not focusable, so the icons keep the keyboard focus
+                var checkBox = new CheckBox
+                {
+                    Content = option.Label,
+                    Focusable = false,
+                    Margin = new Thickness(8, 0, 0, 0),
+                    Padding = new Thickness(4, 0, 0, 0),
+                    MinHeight = 0,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                ToolTip.SetTip(checkBox, option.Description);
+                checkBox.IsCheckedChanged += (_, _) =>
+                {
+                    if (checkBox.Tag is not true)
+                    {
+                        OptionChanged?.Invoke(this, (option, checkBox.IsChecked == true));
+                    }
+                };
+                _optionCheckBoxes.Add(checkBox);
+                _optionsPanel.Children.Add(checkBox);
+            }
+
+            ApplyStyle();
+        }
+
+        for (var i = 0; i < options.Count; i++)
+        {
+            // the tag tells the change isn't made by the user
+            var checkBox = _optionCheckBoxes[i];
+            checkBox.Tag = true;
+            checkBox.IsChecked = options[i].GetValue(values);
+            checkBox.Tag = null;
+        }
     }
 
     /// <summary>Colors and font of the mode for the background, the toolbar and the names.</summary>
@@ -196,24 +208,22 @@ internal sealed class IconLayoutView : UserControl
         var foreground = ParseBrush(_style.Foreground, Brushes.Black);
         Background = background;
         _toolbar.Background = background;
-        // a background, so the whole button can be clicked
-        _parentButton.Background = background;
         _toolbar.BorderBrush = foreground;
-        foreach (var text in new[] { _parentText, _titleText })
+        _parentButton.SetColors(background, foreground);
+        _sortButton.SetColors(background, foreground);
+        foreach (var text in new Control[] { _parentButton, _sortButton }.Concat(_optionCheckBoxes))
         {
-            text.Foreground = foreground;
+            TextElement.SetForeground(text, foreground);
             if (_style.FontFamily is { } fontFamily)
             {
-                text.FontFamily = new FontFamily(fontFamily);
+                TextElement.SetFontFamily(text, new FontFamily(fontFamily));
             }
 
             if (_style.FontSize is { } fontSize)
             {
-                text.FontSize = fontSize;
+                TextElement.SetFontSize(text, fontSize);
             }
         }
-
-        SetParentButtonPressed(false);
     }
 
     /// <summary>
@@ -236,6 +246,7 @@ internal sealed class IconLayoutView : UserControl
             }
         }
 
+        _sortButton.IsButtonEnabled = _icons.Count > 0;
         PlaceIcons();
     }
 
@@ -248,6 +259,7 @@ internal sealed class IconLayoutView : UserControl
         }
 
         _icons.Clear();
+        _sortButton.IsButtonEnabled = false;
         _canvas.Children.Clear();
         _changedPositions.Clear();
         _pressedIcon = null;
@@ -517,14 +529,8 @@ internal sealed class IconLayoutView : UserControl
             icon.IsPlaced = false;
         }
 
-        var maxImageWidth = _icons.Select(icon => icon.Image.Width).DefaultIfEmpty(32).Max();
-        var maxImageHeight = _icons.Select(icon => icon.Image.Height).DefaultIfEmpty(32).Max();
-        var labelHeight = _icons.Select(icon => icon.LabelSize.Height).DefaultIfEmpty(16).Max();
-        var cellWidth = Math.Max(maxImageWidth, Math.Min(_icons.Select(icon => icon.LabelSize.Width).DefaultIfEmpty(0)
-            .Max(), 120)) + 16;
-        var cellHeight = maxImageHeight + labelHeight + 12;
+        var (cellWidth, cellHeight, maxImageHeight, columns) = GetCells();
         var taken = _icons.Where(icon => icon.Position != null).Select(GetBounds).ToList();
-        var columns = Math.Max(1, (int)(_placedWidth / cellWidth));
         var cell = 0;
         foreach (var icon in _icons.Where(icon => icon.Position == null))
         {
@@ -553,6 +559,59 @@ internal sealed class IconLayoutView : UserControl
         }
 
         UpdateCanvasSize();
+    }
+
+    /// <summary>
+    ///     Size of the cells icons are placed in, fitting the largest image and a label of up to 120 pixels, the height
+    ///     of the largest image and the number of cells in a row of the view.
+    /// </summary>
+    private (double Width, double Height, double MaxImageHeight, int Columns) GetCells()
+    {
+        var maxImageWidth = _icons.Select(icon => icon.Image.Width).DefaultIfEmpty(32).Max();
+        var maxImageHeight = _icons.Select(icon => icon.Image.Height).DefaultIfEmpty(32).Max();
+        var labelHeight = _icons.Select(icon => icon.LabelSize.Height).DefaultIfEmpty(16).Max();
+        var cellWidth = Math.Max(maxImageWidth, Math.Min(_icons.Select(icon => icon.LabelSize.Width).DefaultIfEmpty(0)
+            .Max(), 120)) + 16;
+        var cellHeight = maxImageHeight + labelHeight + 12;
+        return (cellWidth, cellHeight, maxImageHeight, Math.Max(1, (int)(GetAvailableWidth() / cellWidth)));
+    }
+
+    /// <summary>
+    ///     Places all icons sorted by name from the upper left corner to the right in rows of cells, continuing on the
+    ///     next row at the right edge of the view, each image centered in its cell horizontally and on the middle of its
+    ///     row vertically, like Clean Up by name on the Workbench. The positions of movable icons become changed
+    ///     positions when icons can be moved, so they can be saved or reset.
+    /// </summary>
+    public void SortByName()
+    {
+        if (_icons.Count == 0)
+        {
+            return;
+        }
+
+        var (cellWidth, cellHeight, maxImageHeight, columns) = GetCells();
+        var sortedIcons = _icons
+            .OrderBy(icon => icon.Item.DisplayName, StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(icon => icon.Item.DisplayName, StringComparer.Ordinal)
+            .ToList();
+        for (var cell = 0; cell < sortedIcons.Count; cell++)
+        {
+            var icon = sortedIcons[cell];
+            var x = cell % columns * cellWidth + (cellWidth - icon.Image.Width) / 2;
+            var y = cell / columns * cellHeight + (maxImageHeight - icon.Image.Height) / 2;
+            var position = new PixelPoint((int)Math.Round(x), (int)Math.Round(y));
+            icon.Position = position;
+            icon.IsPlaced = false;
+            if (CanMove && icon.IsMovable)
+            {
+                _changedPositions[icon.Item.Name] = position;
+            }
+
+            PositionIcon(icon);
+        }
+
+        UpdateCanvasSize();
+        PositionsChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private double GetAvailableWidth() =>
@@ -602,6 +661,87 @@ internal sealed class IconLayoutView : UserControl
 
     private static IBrush ParseBrush(string color, IBrush fallback) =>
         Color.TryParse(color, out var parsedColor) ? new SolidColorBrush(parsedColor) : fallback;
+
+    /// <summary>
+    ///     Button of the toolbar with raised (Workbench style) edges, white at the top and left and the text color at the
+    ///     bottom and right, swapped while pressed; dimmed and not clickable when not enabled. Not focusable, so the
+    ///     icons keep the keyboard focus.
+    /// </summary>
+    private sealed class ToolbarButton : Border
+    {
+        private readonly Border _inner;
+        private IBrush _dark = Brushes.Black;
+        private bool _isButtonEnabled = true;
+
+        public ToolbarButton(string text, string toolTip)
+        {
+            _inner = new Border
+            {
+                BorderThickness = new Thickness(0, 0, 1, 1),
+                Padding = new Thickness(8, 0),
+                Child = new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center }
+            };
+            BorderThickness = new Thickness(1, 1, 0, 0);
+            Child = _inner;
+            Cursor = new Cursor(StandardCursorType.Hand);
+            VerticalAlignment = VerticalAlignment.Center;
+            ToolTip.SetTip(this, toolTip);
+            SetPressed(false);
+
+            PointerPressed += (_, e) =>
+            {
+                if (_isButtonEnabled && e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+                {
+                    e.Handled = true;
+                    e.Pointer.Capture(this);
+                    SetPressed(true);
+                }
+            };
+            PointerReleased += (_, e) =>
+            {
+                if (e.Pointer.Captured != this)
+                {
+                    return;
+                }
+
+                e.Pointer.Capture(null);
+                SetPressed(false);
+                // released on the button, not after moving off it
+                if (new Rect(Bounds.Size).Contains(e.GetPosition(this)))
+                {
+                    Clicked?.Invoke(this, EventArgs.Empty);
+                }
+            };
+        }
+
+        public event EventHandler? Clicked;
+
+        /// <summary>False to dim the button and ignore clicks, e.g. the ".." button without a parent.</summary>
+        public bool IsButtonEnabled
+        {
+            get => _isButtonEnabled;
+            set
+            {
+                _isButtonEnabled = value;
+                Opacity = value ? 1 : 0.4;
+                SetPressed(false);
+            }
+        }
+
+        /// <summary>Background (so the whole button can be clicked) and the color of the dark edges.</summary>
+        public void SetColors(IBrush background, IBrush foreground)
+        {
+            Background = background;
+            _dark = foreground;
+            SetPressed(false);
+        }
+
+        private void SetPressed(bool isPressed)
+        {
+            BorderBrush = isPressed ? _dark : Brushes.White;
+            _inner.BorderBrush = isPressed ? Brushes.White : _dark;
+        }
+    }
 
     /// <summary>An icon shown: its image and label controls, images, position and the size of its label.</summary>
     private sealed class IconVisual(EntryItem item, Image image, TextBlock label, Bitmap? normalImage,
