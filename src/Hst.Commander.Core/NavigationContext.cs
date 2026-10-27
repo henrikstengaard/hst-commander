@@ -1057,6 +1057,29 @@ public sealed class NavigationContext : IDisposable
     }
 
     /// <summary>
+    ///     Home directory of the user, e.g. "C:\Users\name" on Windows, "/Users/name" on macOS or "/home/name" on Linux:
+    ///     the user profile folder, otherwise the HOME or USERPROFILE environment variable. Null when there is none.
+    /// </summary>
+    public static string? HomeDirectory =>
+        new[]
+            {
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                Environment.GetEnvironmentVariable("HOME"),
+                Environment.GetEnvironmentVariable("USERPROFILE")
+            }
+            .FirstOrDefault(path => !string.IsNullOrWhiteSpace(path) && Path.IsPathRooted(path));
+
+    /// <summary>
+    ///     Goes to the home directory of the user (<see cref="HomeDirectory" />, Home in the location dialog), switching
+    ///     to the Local volume provider like <see cref="ChangeLocationAsync" />.
+    /// </summary>
+    /// <exception cref="IOException">There is no home directory.</exception>
+    public Task GoHomeAsync(CancellationToken cancellationToken = default) =>
+        HomeDirectory is { } homeDirectory
+            ? ChangeLocationAsync(homeDirectory, cancellationToken)
+            : throw new IOException("Home directory not found");
+
+    /// <summary>
     ///     Goes to the root of the current volume (Ctrl+\): the root of the local drive, e.g. "c:\" or "/", the root of
     ///     an image or the root of another volume provider's volume. At the root of an image, it goes to the root of the
     ///     drive or volume the image is in. The location is unchanged in the drive list or at the root. Either way the

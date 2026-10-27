@@ -207,6 +207,9 @@ public partial class PaneView : UserControl
     public Task ChangeLocationAsync(string path) =>
         RunNavigationAsync(() => NavigationContext.ChangeLocationAsync(path));
 
+    /// <summary>Goes to the user's home directory (Home in the location dialog), see <see cref="NavigationContext.GoHomeAsync" />.</summary>
+    public Task GoHomeAsync() => RunNavigationAsync(() => NavigationContext.GoHomeAsync());
+
     /// <summary>Creates a directory in the current location and selects it, see <see cref="NavigationContext.CreateDirectoryAsync" />.</summary>
     public Task CreateDirectoryAsync(string name) =>
         RunNavigationAsync(() => NavigationContext.CreateDirectoryAsync(name));

@@ -6,7 +6,7 @@ namespace Hst.Commander.Tui;
 /// <summary>
 ///     Modal location dialog of a pane, opened with Ctrl+L or by double-clicking the path. The path field starts with
 ///     the current path; OK changes to the entered path. Volumes opens the volume provider list, choosing one closes the
-///     dialog. <see cref="Result" /> holds the path or volume provider, or null on cancel.
+///     dialog. Home goes to the user's home directory. <see cref="Result" /> holds the path or volume provider, or null on cancel.
 /// </summary>
 public sealed class LocationDialog : Dialog
 {
@@ -38,6 +38,13 @@ public sealed class LocationDialog : Dialog
             Result = new LocationDialogResult(null, volumeProvider);
             Application.RequestStop(this);
         };
+        var homeButton = new Button { Text = "_Home" };
+        homeButton.Accepting += (_, e) =>
+        {
+            Result = new LocationDialogResult(null, null, true);
+            e.Cancel = true;
+            Application.RequestStop(this);
+        };
         var okButton = new Button { Text = "OK", IsDefault = true };
         okButton.Accepting += (_, e) =>
         {
@@ -54,6 +61,7 @@ public sealed class LocationDialog : Dialog
 
         Add(pathLabel, _pathField);
         AddButton(volumesButton);
+        AddButton(homeButton);
         AddButton(okButton);
         AddButton(cancelButton);
         Initialized += (_, _) => _pathField.SetFocus();
@@ -63,5 +71,7 @@ public sealed class LocationDialog : Dialog
     public LocationDialogResult? Result { get; private set; }
 }
 
-/// <summary>Result of the location dialog: either a path to change to or a volume provider to show.</summary>
-public sealed record LocationDialogResult(string? Path, IVolumeProvider? VolumeProvider);
+/// <summary>
+///     Result of the location dialog: a path to change to, a volume provider to show or going to the home directory.
+/// </summary>
+public sealed record LocationDialogResult(string? Path, IVolumeProvider? VolumeProvider, bool IsHome = false);

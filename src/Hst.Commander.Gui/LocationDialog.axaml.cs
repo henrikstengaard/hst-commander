@@ -6,7 +6,7 @@ namespace Hst.Commander.Gui;
 /// <summary>
 ///     Modal location dialog of a pane, opened with Ctrl+L or by double-clicking the path. The path text box starts
 ///     with the current path; OK returns the entered path. Volumes opens the volume provider list over this dialog,
-///     choosing one closes the dialog with it. The dialog returns null when cancelled.
+///     choosing one closes the dialog with it. Home goes to the user's home directory. The dialog returns null when cancelled.
 /// </summary>
 public partial class LocationDialog : Window
 {
@@ -32,6 +32,7 @@ public partial class LocationDialog : Window
 
             PathTextBox.Focus();
         };
+        HomeButton.Click += (_, _) => Close(new LocationDialogResult(null, null, true));
         OkButton.Click += (_, _) => Close(new LocationDialogResult(PathTextBox.Text ?? string.Empty, null));
         CancelButton.Click += (_, _) => Close(null);
         Opened += (_, _) =>
@@ -42,5 +43,7 @@ public partial class LocationDialog : Window
     }
 }
 
-/// <summary>Result of the location dialog: either a path to change to or a volume provider to show.</summary>
-public sealed record LocationDialogResult(string? Path, IVolumeProvider? VolumeProvider);
+/// <summary>
+///     Result of the location dialog: a path to change to, a volume provider to show or going to the home directory.
+/// </summary>
+public sealed record LocationDialogResult(string? Path, IVolumeProvider? VolumeProvider, bool IsHome = false);
