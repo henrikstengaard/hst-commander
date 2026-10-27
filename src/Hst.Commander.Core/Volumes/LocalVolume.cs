@@ -61,6 +61,14 @@ public class LocalVolume(string path) : IVolume
             currentPath = path;
         }
 
+        // a directory that can't be listed (e.g. c:\recovery, access denied) throws before changing to it, so the
+        // volume stays at the directory shown
+        if (currentPath != null && currentPath != _currentPath)
+        {
+            using var enumerator = Directory.EnumerateFileSystemEntries(currentPath).GetEnumerator();
+            enumerator.MoveNext();
+        }
+
         SetCurrentPath(currentPath);
         
         return Task.CompletedTask;
