@@ -11,8 +11,12 @@
         <TextBlock Text="Path:" />
         <TextBox x:Name="PathTextBox" />
         <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,8,0,0">
-            <Button x:Name="VolumesButton" Grid.Column="0" Content="_Volumes..." MinWidth="80"
-                    HorizontalContentAlignment="Center" />
+            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
+                <Button x:Name="VolumesButton" Content="_Volumes..." MinWidth="80"
+                        HorizontalContentAlignment="Center" />
+                <Button x:Name="HomeButton" Content="_Home" MinWidth="80" HorizontalContentAlignment="Center"
+                        ToolTip.Tip="Go to your home directory" />
+            </StackPanel>
             <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
                 <Button x:Name="OkButton" Content="OK" MinWidth="80" HorizontalContentAlignment="Center"
                         IsDefault="True" />

@@ -6,6 +6,22 @@ namespace Hst.Commander.Core.Tests;
 public class GivenNavigationContextChangingLocation
 {
     [Fact]
+    public async Task When_GoHome_Then_HomeDirectoryIsShown()
+    {
+        // arrange
+        var homeDirectory = NavigationContext.HomeDirectory;
+        Assert.NotNull(homeDirectory);
+        using var navigationContext = new NavigationContext(string.Empty);
+
+        // act
+        await navigationContext.GoHomeAsync();
+
+        // assert
+        Assert.Equal(Path.GetFullPath(homeDirectory), navigationContext.CurrentPath);
+        Assert.Same(VolumeProviders.Local, navigationContext.VolumeProvider);
+    }
+
+    [Fact]
     public async Task When_ChangeLocationToLocalDirectory_Then_DirectoryIsListed()
     {
         // arrange

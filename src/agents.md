@@ -44,7 +44,7 @@ src/
     SelectGroupDialog.cs                         Modal select/unselect group dialog (+/-): filter, case sensitive, files only, OK, Cancel
     PropertiesDialog.cs                          Modal properties dialog (Ctrl+P or Alt+Enter): name, sections of property lines, drive usage bar, OK
     VolumeProviderDialog.cs                      Modal list of volume providers for a pane (Alt+F1/Alt+F2), centered over the pane
-    LocationDialog.cs                            Modal location dialog (Ctrl+L or double-click path): path, Volumes, OK, Cancel
+    LocationDialog.cs                            Modal location dialog (Ctrl+L or double-click path): path, Volumes, Home, OK, Cancel
     TerminalScreen.cs                            Terminal output screen used while the TUI is shut down (like Midnight Commander): runs programs, Ctrl+O shows the output, own screen buffer on the classic Windows console
     TuiSettings.cs                               TUI settings record, loaded/saved as JSON
     TuiTheme.cs                                  Theme enum: MidnightCommander, Light, Dark
@@ -83,7 +83,7 @@ src/
     BackgroundPicker.axaml(.cs)                  Button choosing the background of an image preview (icon viewer, image view of the viewer): swatches of common colors, transparent (checkerboard), optionally the theme's background, and a custom color
     IconViewerDialog.axaml(.cs)                  Modal icon viewer opened from the properties dialog: all icons of the entry (list) and their images (sizes) in a higher resolution, fitted or zoomed (100%-800%), on a selectable background (transparent checkerboard, common colors or custom)
     VolumeProviderDialog.axaml(.cs)              Modal list of volume providers for a pane (Alt+F1/Alt+F2), centered over the pane
-    LocationDialog.axaml(.cs)                    Modal location dialog (Ctrl+L or double-click path): path, Volumes, OK, Cancel
+    LocationDialog.axaml(.cs)                    Modal location dialog (Ctrl+L or double-click path): path, Volumes, Home, OK, Cancel
     AboutDialog.axaml(.cs)                       Modal about dialog (Help > About): name, version and author
     GuiSettings.cs                               GUI settings record, loaded/saved as JSON
     GuiTheme.cs                                  Theme enum: MidnightCommander, Light, Dark
@@ -398,7 +398,7 @@ Opening any other local file (Enter or double-click in both front-ends) calls th
 
 ### Changing Location
 
-Ctrl+L, double-clicking the path of a pane or File > Location opens the location dialog of a pane (the active pane for Ctrl+L and the menu) in both front-ends: a path field filled with `NavigationContext.CurrentPath`, a `Volumes...` button opening the volume provider list of the pane (choosing one closes the location dialog and shows that provider with `ChangeVolumeProviderAsync`), OK and Cancel. The result is a `LocationDialogResult` (path or volume provider). OK calls `NavigationContext.ChangeLocationAsync(path)`, which leaves the location unchanged when the path fails (the error is shown) or equals the current path, and resolves:
+Ctrl+L, double-clicking the path of a pane or File > Location opens the location dialog of a pane (the active pane for Ctrl+L and the menu) in both front-ends: a path field filled with `NavigationContext.CurrentPath`, a `Volumes...` button opening the volume provider list of the pane (choosing one closes the location dialog and shows that provider with `ChangeVolumeProviderAsync`), a `Home` button (closes the dialog and goes to the user's home directory with `NavigationContext.GoHomeAsync`: `NavigationContext.HomeDirectory`, the user profile folder on Windows, macOS and Linux, otherwise the `HOME` or `USERPROFILE` environment variable, switching to the Local volume provider like a local path; `IOException` when there is none), OK and Cancel. The result is a `LocationDialogResult` (path, volume provider or `IsHome`). OK calls `NavigationContext.ChangeLocationAsync(path)`, which leaves the location unchanged when the path fails (the error is shown) or equals the current path, and resolves:
 - empty, or `Computer` in a local volume: the local drive list;
 - a local directory (relative to the current local directory; `c:` means `c:\`), switching to the Local volume provider;
 - a local path going into an image, e.g. `c:\images\disk.iso\dir1` or `c:\images\disk.iso\archive.zip\dir1` (the closest existing file in the path must be detected as an image, the remaining path components are directories or images; opened in a `NavigationContext` of its own so the location is unchanged when it fails);

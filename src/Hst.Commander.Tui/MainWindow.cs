@@ -651,8 +651,8 @@ public sealed class MainWindow : Window
     }
 
     /// <summary>
-    ///     Shows the location dialog of a pane with its current path, changing to the entered path on OK or showing the
-    ///     volume provider chosen with Volumes. The pane gets the focus.
+    ///     Shows the location dialog of a pane with its current path, changing to the entered path on OK, showing the
+    ///     volume provider chosen with Volumes or going to the home directory with Home. The pane gets the focus.
     /// </summary>
     private async Task ShowLocationAsync(Pane pane)
     {
@@ -665,6 +665,10 @@ public sealed class MainWindow : Window
         if (result?.VolumeProvider is { } volumeProvider)
         {
             await RunNavigationAsync(pane, () => pane.NavigationContext.ChangeVolumeProviderAsync(volumeProvider));
+        }
+        else if (result?.IsHome == true)
+        {
+            await RunNavigationAsync(pane, () => pane.NavigationContext.GoHomeAsync());
         }
         else if (result?.Path is { } path)
         {
