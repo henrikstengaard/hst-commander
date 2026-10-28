@@ -25,6 +25,12 @@ public record CopyProgress(
     double BytesPerSecond,
     TimeSpan? Eta)
 {
+    /// <summary>
+    /// Progress of writing the cached writes of a disk while copying is waiting for it, null otherwise (see
+    /// <see cref="DiskWriteProgress" />).
+    /// </summary>
+    public DiskWriteProgress? DiskWrite { get; init; }
+
     /// <summary>Fraction of the current item copied, between 0 and 1.</summary>
     public double CurrentFraction => GetFraction(CurrentBytes, CurrentSize);
 

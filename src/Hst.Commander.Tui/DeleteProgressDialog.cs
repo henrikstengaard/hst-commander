@@ -68,6 +68,13 @@ public sealed class DeleteProgressDialog : Dialog
             return;
         }
 
+        // cached writes of a disk being written, e.g. of a physical disk, take the place of the current entry
+        if (progress.DiskWrite is { } diskWrite)
+        {
+            _currentLabel.Text = $"{diskWrite.Text} ({diskWrite.Fraction:P0})";
+            return;
+        }
+
         if (!_cancellationTokenSource.IsCancellationRequested)
         {
             _currentLabel.Text = progress.CurrentName;

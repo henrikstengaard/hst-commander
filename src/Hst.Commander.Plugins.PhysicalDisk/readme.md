@@ -12,7 +12,7 @@ The PhysicalDisk plugin adds the physical disks of the computer, internal and ex
 
 ## Disk cache
 
-Disks are read and written through a cache of 64 KiB blocks, so the many small reads and writes of file systems (e.g. of allocation tables and directories) read and write the disk in large blocks. Changes are written when the file system is consistent: between file operations, about a second after the last operation, or right away when half the cache holds changes. They are only written in the middle of an operation when the whole cache holds changes, e.g. when writing a file larger than the cache, and always when the disk is closed.
+Disks are read and written through a cache of 64 KiB blocks, so the many small reads and writes of file systems (e.g. of allocation tables and directories) read and write the disk in large blocks. Changes are written when the file system is consistent: between file operations, about a second after the last operation, or right away when half the cache holds changes. They are only written in the middle of an operation when the whole cache holds changes, e.g. when writing a file larger than the cache, and always when the disk is closed. Copy, move and delete write the changes before they finish, and their progress dialog shows "Writing to disk" with the progress while changes are written.
 
 The cache is 32 MB for each disk opened by default. Change it with `CacheSize` in megabytes in `~/.hst-commander/plugins/physicaldisk/settings.json`, e.g. `{ "CacheSize": 64 }`, or turn it off with `0`; it is read when Hst Commander starts.
 

@@ -1208,6 +1208,7 @@ public sealed class NavigationContext : IDisposable
         try
         {
             var volume = rootLocation.Volume;
+            SharedImageVolume? sharedImage = null;
             foreach (var image in _images.Reverse())
             {
                 // the first image is in the root location, the others in a directory of the image before
@@ -1220,11 +1221,12 @@ public sealed class NavigationContext : IDisposable
                     image.ParentPathComponents, image.SharedId, volume, cancellationToken);
                 resources.Push(openedImage);
                 volume = openedImage.Volume;
+                sharedImage ??= volume as SharedImageVolume;
             }
 
             await volume.ChangeDirectory([Paths.Root, .._images.Peek().Volume.CurrentPathComponents],
                 cancellationToken);
-            return new VolumeLocation(volume, CurrentPath, new Resources(resources));
+            return new VolumeLocation(volume, CurrentPath, new Resources(resources)) { SharedImage = sharedImage };
         }
         catch
         {
@@ -1280,8 +1282,11 @@ public sealed class NavigationContext : IDisposable
         using (destination)
         {
             ThrowIfCopyingOntoItself(source.Path, entries, destination.Path, targetName, "copy");
-            await source.Volume.CopyToAsync(entries, destination.Volume,
-                new CopyOptions(filter, targetName, confirmOverwrite, UaeMetadata), progress, cancellationToken);
+            var operationProgress = CreateOperationProgress(progress);
+            await RunCommittingAsync([destination], operationProgress?.DiskWrite, () =>
+                source.Volume.CopyToAsync(entries, destination.Volume,
+                    new CopyOptions(filter, targetName, confirmOverwrite, UaeMetadata), operationProgress,
+                    cancellationToken));
         }
     }
 
@@ -1297,21 +1302,75 @@ public sealed class NavigationContext : IDisposable
         ArgumentNullException.ThrowIfNull(entries);
 
         using var location = await OpenLocationAsync(cancellationToken);
-        var metadata = await UaeMetadataUpdater.ReadAsync(location.Volume, UaeMetadata, false, null,
-            cancellationToken);
+        var operationProgress = progress == null
+            ? null
+            : new OperationProgress<DeleteProgress>(progress, new DeleteProgress(string.Empty, 0, 0),
+                (value, diskWrite) => value with { DiskWrite = diskWrite });
+        await RunCommittingAsync([location], operationProgress?.DiskWrite, async () =>
+        {
+            var metadata = await UaeMetadataUpdater.ReadAsync(location.Volume, UaeMetadata, false, null,
+                cancellationToken);
+            try
+            {
+                await location.Volume.DeleteAsync(entries, operationProgress, cancellationToken);
+            }
+            catch
+            {
+                // the metadata of the entries deleted so far is removed, also when deleting fails
+                await UaeMetadataUpdater.TryRemoveMissingAsync(location.Volume, metadata);
+                throw;
+            }
+
+            await UaeMetadataReader.RemoveMissingAsync(location.Volume, metadata, cancellationToken);
+        });
+    }
+
+    /// <summary>
+    ///     Runs a file operation, committing the cached writes of the shared images of its locations when it has
+    ///     stopped (see <see cref="SharedImages" />), also when it fails or is cancelled, so they are written while the
+    ///     progress dialog is shown instead of after it's closed. Commits while the operation runs (when the cache is
+    ///     filling up) and at the end report their progress to <paramref name="progress" />.
+    /// </summary>
+    private static async Task RunCommittingAsync(IReadOnlyList<VolumeLocation> locations,
+        IProgress<DiskWriteProgress>? progress, Func<Task> operation)
+    {
+        foreach (var location in locations)
+        {
+            location.DiskWriteProgress = progress;
+        }
+
         try
         {
-            await location.Volume.DeleteAsync(entries, progress, cancellationToken);
+            await operation();
         }
         catch
         {
-            // the metadata of the entries deleted so far is removed, also when deleting fails
-            await UaeMetadataUpdater.TryRemoveMissingAsync(location.Volume, metadata);
+            foreach (var location in locations)
+            {
+                try
+                {
+                    await location.CommitAsync();
+                }
+                catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+                {
+                    // the error of the operation is shown; the writes stay cached for the next commit
+                }
+            }
+
             throw;
         }
 
-        await UaeMetadataReader.RemoveMissingAsync(location.Volume, metadata, cancellationToken);
+        foreach (var location in locations)
+        {
+            await location.CommitAsync();
+        }
     }
+
+    private static OperationProgress<CopyProgress>? CreateOperationProgress(IProgress<CopyProgress>? progress) =>
+        progress == null
+            ? null
+            : new OperationProgress<CopyProgress>(progress, new CopyProgress(string.Empty, 0, 0, 0, 0, 0, 0, 0, null),
+                (value, diskWrite) => value with { DiskWrite = diskWrite });
 
     /// <summary>
     ///     Properties of entries in the current location shown in the properties dialog (Alt+Enter), e.g. of
@@ -1818,13 +1877,18 @@ public sealed class NavigationContext : IDisposable
         using (destination)
         {
             ThrowIfCopyingOntoItself(source.Path, entries, destination.Path, targetName, "move");
-            var remainingEntries = await MoveOnSameDriveAsync(source, entries, destination, filter, targetName,
-                progress, cancellationToken);
-            if (remainingEntries.Count > 0)
+            var operationProgress = CreateOperationProgress(progress);
+            await RunCommittingAsync([destination, source], operationProgress?.DiskWrite, async () =>
             {
-                await source.Volume.MoveToAsync(remainingEntries, destination.Volume,
-                    new CopyOptions(filter, targetName, confirmOverwrite, UaeMetadata), progress, cancellationToken);
-            }
+                var remainingEntries = await MoveOnSameDriveAsync(source, entries, destination, filter, targetName,
+                    operationProgress, cancellationToken);
+                if (remainingEntries.Count > 0)
+                {
+                    await source.Volume.MoveToAsync(remainingEntries, destination.Volume,
+                        new CopyOptions(filter, targetName, confirmOverwrite, UaeMetadata), operationProgress,
+                        cancellationToken);
+                }
+            });
         }
     }
 
@@ -2046,6 +2110,38 @@ public sealed class NavigationContext : IDisposable
     {
         CloseIconLocation();
         CloseVolumes();
+    }
+
+    /// <summary>
+    ///     Progress of a file operation that also reports the progress of committing cached writes, as the last
+    ///     progress of the operation with the disk write (e.g. <see cref="CopyProgress.DiskWrite" />), so the progress
+    ///     dialog shows it.
+    /// </summary>
+    private sealed class OperationProgress<T> : IProgress<T>
+    {
+        private readonly IProgress<T> _progress;
+        private T _last;
+
+        public OperationProgress(IProgress<T> progress, T initial, Func<T, DiskWriteProgress, T> withDiskWrite)
+        {
+            _progress = progress;
+            _last = initial;
+            DiskWrite = new ActionProgress<DiskWriteProgress>(value => _progress.Report(withDiskWrite(_last, value)));
+        }
+
+        /// <summary>Reports the progress of committing cached writes.</summary>
+        public IProgress<DiskWriteProgress> DiskWrite { get; }
+
+        public void Report(T value)
+        {
+            _last = value;
+            _progress.Report(value);
+        }
+
+        private sealed class ActionProgress<TValue>(Action<TValue> handler) : IProgress<TValue>
+        {
+            public void Report(TValue value) => handler(value);
+        }
     }
 
     /// <summary>

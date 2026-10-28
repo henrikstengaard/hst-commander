@@ -27,6 +27,7 @@ public sealed class CachedDiskStream : Stream, IWriteCache
 
     private byte[]? _writeBuffer;
     private int _dirtyBlocks;
+    private long _dirtyBytes;
     private long _position;
     private bool _disposed;
 
@@ -61,6 +62,8 @@ public sealed class CachedDiskStream : Stream, IWriteCache
     }
 
     public bool HasCachedWrites => _dirtyBlocks > 0;
+
+    public long CachedWriteBytes => _dirtyBytes;
 
     /// <summary>True when half of the cache holds writes.</summary>
     public bool ShouldFlush => _dirtyBlocks > 0 && _dirtyBlocks >= _maxBlocks / 2;
@@ -142,6 +145,7 @@ public sealed class CachedDiskStream : Stream, IWriteCache
             {
                 block.IsDirty = true;
                 _dirtyBlocks++;
+                _dirtyBytes += block.Length;
             }
 
             buffer = buffer[count..];
@@ -234,7 +238,8 @@ public sealed class CachedDiskStream : Stream, IWriteCache
     }
 
     /// <summary>Writes the blocks with writes in order of their position, consecutive blocks at once.</summary>
-    private void WriteDirtyBlocks()
+    /// <param name="progress">Reports the bytes written so far.</param>
+    private void WriteDirtyBlocks(IProgress<long>? progress = null)
     {
         if (_dirtyBlocks == 0)
         {
@@ -243,6 +248,7 @@ public sealed class CachedDiskStream : Stream, IWriteCache
 
         _writeBuffer ??= GC.AllocateUninitializedArray<byte>(MaxWriteLength);
         var dirty = _usage.Where(block => block.IsDirty).OrderBy(block => block.Index).ToList();
+        var written = 0L;
         var start = 0;
         while (start < dirty.Count)
         {
@@ -270,8 +276,11 @@ public sealed class CachedDiskStream : Stream, IWriteCache
             {
                 dirty[i].IsDirty = false;
                 _dirtyBlocks--;
+                _dirtyBytes -= dirty[i].Length;
             }
 
+            written += length;
+            progress?.Report(written);
             start = end + 1;
         }
     }
@@ -285,11 +294,11 @@ public sealed class CachedDiskStream : Stream, IWriteCache
     };
 
     /// <summary>Writes the cached writes and flushes the disk.</summary>
-    public void Commit()
+    public void Commit(IProgress<long>? progress = null)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        WriteDirtyBlocks();
+        WriteDirtyBlocks(progress);
         _stream.Flush();
     }
 

@@ -8,6 +8,12 @@ namespace Hst.Commander.Core.Volumes;
 /// <param name="TotalEntries">Total number of entries to delete, items and containers.</param>
 public record DeleteProgress(string CurrentName, int DeletedEntries, int TotalEntries)
 {
+    /// <summary>
+    /// Progress of writing the cached writes of a disk while deleting is waiting for it, null otherwise (see
+    /// <see cref="DiskWriteProgress" />).
+    /// </summary>
+    public DiskWriteProgress? DiskWrite { get; init; }
+
     /// <summary>Fraction of the entries deleted, between 0 and 1.</summary>
     public double TotalFraction => TotalEntries <= 0 ? 1 : Math.Clamp((double)DeletedEntries / TotalEntries, 0, 1);
 

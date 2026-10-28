@@ -76,6 +76,14 @@ public partial class CopyProgressDialog : Window
             return;
         }
 
+        // cached writes of a disk being written, e.g. of a physical disk, take the place of the current file
+        if (progress.DiskWrite is { } diskWrite)
+        {
+            CurrentText.Text = diskWrite.Text;
+            CurrentProgressBar.Value = diskWrite.Fraction;
+            return;
+        }
+
         if (!_cancellationTokenSource.IsCancellationRequested)
         {
             CurrentText.Text = progress.CurrentName;

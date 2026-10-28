@@ -50,12 +50,17 @@ public class GivenCachedDiskStream
         stream.Write(bytes);
         var writesBeforeFlush = _disk.Writes.Count;
         var hasCachedWrites = stream.HasCachedWrites;
-        stream.Commit();
+        var cachedWriteBytes = stream.CachedWriteBytes;
+        var written = new List<long>();
+        stream.Commit(new SynchronousProgress<long>(written.Add));
 
         // assert
         Assert.Equal(0, writesBeforeFlush);
         Assert.True(hasCachedWrites);
         Assert.False(stream.HasCachedWrites);
+        Assert.Equal(2 * BlockSize, cachedWriteBytes);
+        Assert.Equal(0, stream.CachedWriteBytes);
+        Assert.Equal([2L * BlockSize], written);
         Assert.Equal([(0L, 2 * BlockSize)], _disk.Writes);
         Assert.Equal(1, _disk.Flushes);
 
@@ -238,6 +243,11 @@ public class GivenCachedDiskStream
         // assert
         Assert.Equal(9, _disk.Data[3]);
         Assert.True(_disk.IsDisposed);
+    }
+
+    private sealed class SynchronousProgress<T>(Action<T> handler) : IProgress<T>
+    {
+        public void Report(T value) => handler(value);
     }
 
     /// <summary>Stream of bytes in memory recording the reads and writes, like a disk.</summary>

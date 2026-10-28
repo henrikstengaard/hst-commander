@@ -63,6 +63,13 @@ public partial class DeleteProgressDialog : Window
             return;
         }
 
+        // cached writes of a disk being written, e.g. of a physical disk, take the place of the current entry
+        if (progress.DiskWrite is { } diskWrite)
+        {
+            CurrentText.Text = $"{diskWrite.Text} ({diskWrite.Fraction:P0})";
+            return;
+        }
+
         if (!_cancellationTokenSource.IsCancellationRequested)
         {
             CurrentText.Text = progress.CurrentName;

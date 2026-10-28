@@ -1,4 +1,5 @@
 ﻿using Hst.Commander.Abstractions;
+using Hst.Commander.Core.Volumes;
 using Hst.Commander.Plugins.PhysicalDisk;
 
 namespace Hst.Commander.Core.Tests;
@@ -131,6 +132,65 @@ public class GivenNavigationContextWithPhysicalDisks : IDisposable
         }
 
         Assert.False(ReadDisk(diskPath).SequenceEqual(original));
+    }
+
+    [Fact]
+    public async Task When_FilesAreCopiedToDisk_Then_CachedWritesAreWrittenBeforeTheCopyEndsWithProgress()
+    {
+        // arrange
+        await AddMbrDisk("PhysicalDrive1");
+        var diskPath = Path.Combine(_rootPath, "PhysicalDrive1.img");
+        await File.WriteAllTextAsync(Path.Combine(_rootPath, "file1.txt"), "Disk");
+        using var diskContext = await CreateContextAsync();
+        using var localContext = new NavigationContext(_rootPath);
+        await diskContext.ChangeLocationAsync(Path.Combine("PhysicalDrive1", "mbr", "1"));
+        var original = ReadDisk(diskPath);
+        var progress = new List<CopyProgress>();
+
+        // act
+        var localEntries = await localContext.ListEntriesAsync();
+        await localContext.CopyAsync([localEntries.First(entry => entry.Name == "file1.txt")], diskContext,
+            diskContext.CurrentPath, "*", new SynchronousProgress<CopyProgress>(progress.Add));
+
+        // assert
+        Assert.False(ReadDisk(diskPath).SequenceEqual(original));
+        var diskWrites = progress.Select(value => value.DiskWrite).OfType<DiskWriteProgress>().ToList();
+        Assert.Equal(0, diskWrites[0].WrittenBytes);
+        Assert.True(diskWrites[0].TotalBytes > 0);
+        Assert.Equal(1, diskWrites[^1].Fraction);
+        Assert.Equal("file1.txt", progress[^1].CurrentName);
+    }
+
+    [Fact]
+    public async Task When_FilesAreDeletedFromDisk_Then_CachedWritesAreWrittenBeforeTheDeleteEndsWithProgress()
+    {
+        // arrange
+        await AddMbrDisk("PhysicalDrive1");
+        var diskPath = Path.Combine(_rootPath, "PhysicalDrive1.img");
+        using (var context = await CreateContextAsync())
+        {
+            await context.ChangeLocationAsync(Path.Combine("PhysicalDrive1", "mbr", "1"));
+            await context.CreateDirectoryAsync("dir1");
+        }
+
+        using var diskContext = await CreateContextAsync();
+        await diskContext.ChangeLocationAsync(Path.Combine("PhysicalDrive1", "mbr", "1"));
+        var original = ReadDisk(diskPath);
+        var progress = new List<DeleteProgress>();
+
+        // act
+        var entries = await diskContext.ListEntriesAsync();
+        await diskContext.DeleteAsync([entries.First(entry => entry.Name == "dir1")],
+            new SynchronousProgress<DeleteProgress>(progress.Add));
+
+        // assert
+        Assert.False(ReadDisk(diskPath).SequenceEqual(original));
+        Assert.Contains(progress, value => value.DiskWrite is { Fraction: 1 });
+    }
+
+    private sealed class SynchronousProgress<T>(Action<T> handler) : IProgress<T>
+    {
+        public void Report(T value) => handler(value);
     }
 
     /// <summary>Bytes of a disk image file, read while the disk is open.</summary>

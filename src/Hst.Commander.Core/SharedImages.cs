@@ -1,5 +1,6 @@
 ﻿using System.Runtime.CompilerServices;
 using Hst.Commander.Abstractions;
+using Hst.Commander.Core.Volumes;
 
 namespace Hst.Commander.Core;
 
@@ -113,6 +114,12 @@ internal static class SharedImages
     }
 
     /// <summary>An image shared by views. Operations are serialized with a lock, as volumes are not thread safe.</summary>
+    /// <summary>Progress calling a handler on the thread reporting it.</summary>
+    private sealed class ActionProgress<T>(Action<T> handler) : IProgress<T>
+    {
+        public void Report(T value) => handler(value);
+    }
+
     internal sealed class SharedImage(string id, IVolume volume, Stream stream)
     {
         private Timer? _idleFlushTimer;
@@ -142,10 +149,11 @@ internal static class SharedImages
 
         /// <summary>
         ///     Called holding <see cref="Lock" /> after an operation, when the file system is consistent unless a file is
-        ///     open for writing: flushes cached writes when the cache asks for it, otherwise they are flushed when
+        ///     open for writing: commits cached writes when the cache asks for it, otherwise they are committed when
         ///     nothing has been done for <see cref="IdleFlushDelay" />.
         /// </summary>
-        public void OperationCompleted()
+        /// <param name="progress">Reports the progress of a commit, e.g. to the progress dialog of a copy.</param>
+        public void OperationCompleted(IProgress<DiskWriteProgress>? progress)
         {
             if (_closed || stream is not IWriteCache { HasCachedWrites: true } cache)
             {
@@ -154,12 +162,46 @@ internal static class SharedImages
 
             if (cache.ShouldFlush && OpenWriteStreams == 0)
             {
-                cache.Commit();
+                Commit(cache, progress);
                 return;
             }
 
             _idleFlushTimer ??= new Timer(_ => _ = FlushWhenIdleAsync());
             _idleFlushTimer.Change(IdleFlushDelay, Timeout.InfiniteTimeSpan);
+        }
+
+        /// <summary>
+        ///     Commits the cached writes when no file is open for writing, e.g. at the end of a copy, so they aren't
+        ///     written after the progress dialog is closed. Runs on the thread pool, like the operations.
+        /// </summary>
+        public Task CommitAsync(IProgress<DiskWriteProgress>? progress) => Task.Run(async () =>
+        {
+            await Lock.WaitAsync();
+            try
+            {
+                if (!_closed && OpenWriteStreams == 0 && stream is IWriteCache { HasCachedWrites: true } cache)
+                {
+                    Commit(cache, progress);
+                }
+            }
+            finally
+            {
+                Lock.Release();
+            }
+        });
+
+        private static void Commit(IWriteCache cache, IProgress<DiskWriteProgress>? progress)
+        {
+            if (progress == null)
+            {
+                cache.Commit();
+                return;
+            }
+
+            var totalBytes = cache.CachedWriteBytes;
+            progress.Report(new DiskWriteProgress(0, totalBytes));
+            cache.Commit(new ActionProgress<long>(writtenBytes =>
+                progress.Report(new DiskWriteProgress(writtenBytes, totalBytes))));
         }
 
         private async Task FlushWhenIdleAsync()
@@ -224,6 +266,19 @@ internal sealed class SharedImageVolume : IVolume, IDisposable
 
     public IEnumerable<string> CurrentPathComponents => _currentPathComponents.ToList();
 
+    /// <summary>
+    ///     Reports the progress of committing cached writes after the operations of this view, e.g. to the progress
+    ///     dialog of a copy; null when not shown.
+    /// </summary>
+    public IProgress<DiskWriteProgress>? DiskWriteProgress { get; set; }
+
+    /// <summary>Commits the cached writes of the image (see <see cref="SharedImages.SharedImage.CommitAsync" />).</summary>
+    public Task CommitAsync()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return _image.CommitAsync(DiskWriteProgress);
+    }
+
     public async IAsyncEnumerable<IEntry> ListEntries(
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
@@ -272,7 +327,8 @@ internal sealed class SharedImageVolume : IVolume, IDisposable
     public Task<Stream> OpenWrite(string name, CancellationToken cancellationToken = default) =>
         RunAsync(async volume =>
         {
-            var stream = new LockedStream(await volume.OpenWrite(name, cancellationToken), _image, true);
+            var stream = new LockedStream(await volume.OpenWrite(name, cancellationToken), _image, true,
+                DiskWriteProgress);
             _image.OpenWriteStreams++;
             return (Stream)stream;
         }, cancellationToken);
@@ -350,7 +406,7 @@ internal sealed class SharedImageVolume : IVolume, IDisposable
                 }
 
                 var result = await operation(volume);
-                _image.OperationCompleted();
+                _image.OperationCompleted(DiskWriteProgress);
                 return result;
             }
             finally
@@ -375,7 +431,12 @@ internal sealed class SharedImageVolume : IVolume, IDisposable
     ///     Stream of an entry in a shared image, holding the image's lock while reading and writing. A file written is
     ///     counted as open for writing until disposed (<see cref="SharedImages.SharedImage.OpenWriteStreams" />).
     /// </summary>
-    private sealed class LockedStream(Stream stream, SharedImages.SharedImage image, bool isWrite) : Stream
+    /// <param name="stream">Stream of the entry.</param>
+    /// <param name="image">Image the entry is in.</param>
+    /// <param name="isWrite">True for a file opened for writing.</param>
+    /// <param name="diskWriteProgress">Progress of committing cached writes when a file written is closed.</param>
+    private sealed class LockedStream(Stream stream, SharedImages.SharedImage image, bool isWrite,
+        IProgress<DiskWriteProgress>? diskWriteProgress = null) : Stream
     {
         private readonly SemaphoreSlim _imageLock = image.Lock;
         private bool _disposed;
@@ -472,7 +533,7 @@ internal sealed class SharedImageVolume : IVolume, IDisposable
             if (isWrite)
             {
                 image.OpenWriteStreams--;
-                image.OperationCompleted();
+                image.OperationCompleted(diskWriteProgress);
             }
         }
 

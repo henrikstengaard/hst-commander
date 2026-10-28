@@ -16,9 +16,13 @@ public interface IWriteCache
     /// <summary>True when the cache holds writes not written yet.</summary>
     bool HasCachedWrites { get; }
 
+    /// <summary>Bytes of the cached writes, written by <see cref="Commit" />, e.g. to show the progress of a commit.</summary>
+    long CachedWriteBytes { get; }
+
     /// <summary>True when the cache is filling up with writes and should be flushed at the next consistent point.</summary>
     bool ShouldFlush { get; }
 
     /// <summary>Writes the cached writes and flushes them to the disk, called when the file system is consistent.</summary>
-    void Commit();
+    /// <param name="progress">Reports the bytes of the cached writes written so far.</param>
+    void Commit(IProgress<long>? progress = null);
 }
