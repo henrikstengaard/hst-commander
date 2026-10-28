@@ -20,7 +20,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 
 - Avalonia 12 with the Fluent theme and plain code-behind (no MVVM framework).
 - Most keys (function keys, Tab, `+`/`-`/`*`, Ctrl+L, Ctrl+P/Alt+Enter, the volume provider keys, Ctrl+1-9) are handled at window level with tunnelling `KeyDown` handlers. Enter, Backspace, Ctrl+PageDown and Ctrl+\ are handled with a tunnelling handler on the list.
-- The volume provider list handles Enter with a tunnelling handler on the list, because the focused list item takes Enter before the default OK button sees it.
+- The volume provider and create volume lists handle Enter with a tunnelling handler on the list, because the focused list item takes Enter before the default OK button sees it.
 - `+`, `-` and `*` are matched by `KeySymbol` (plus `Key.Add`/`Subtract`/`Multiply`) and shown in the menu headers, because key gestures would display as `OemPlus`. Ctrl+\ matches the `\` symbol, `Key.OemPipe` or `Key.OemBackslash`.
 - Dialogs are shown with `ShowDialog(owner)`. Progress dialogs (copy/move, delete) start the operation with `Task.Run` when opened and report through a `Progress<T>` created on the UI thread; questions such as overwriting are shown over them with `Dispatcher.UIThread.InvokeAsync`. Closing the window cancels, and the dialog closes when the operation has stopped and exposes its `Exception`.
 - Errors are raised as `PaneView.NavigationFailed` and shown by `MainWindow` with `ErrorDialog`. `PaneView.CreateVolumeAsync` throws instead, so the error is shown before asking again.

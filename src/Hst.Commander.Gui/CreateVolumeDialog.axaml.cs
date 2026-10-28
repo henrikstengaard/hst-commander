@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Hst.Commander.Abstractions;
 
 namespace Hst.Commander.Gui;
@@ -20,6 +21,17 @@ public partial class CreateVolumeDialog : Window
         CreatorsList.ItemsSource = creators;
         CreatorsList.SelectedItem = creators.FirstOrDefault();
         CreatorsList.DoubleTapped += (_, _) => CloseWithSelected();
+        // tunnelling, as the focused list item takes Enter before the default OK button sees it
+        CreatorsList.AddHandler(KeyDownEvent, (_, e) =>
+        {
+            if (e.Key != Key.Enter)
+            {
+                return;
+            }
+
+            e.Handled = true;
+            CloseWithSelected();
+        }, RoutingStrategies.Tunnel);
         OkButton.Click += (_, _) => CloseWithSelected();
         CancelButton.Click += (_, _) => Close(null);
         Opened += (_, _) => FocusSelected();
