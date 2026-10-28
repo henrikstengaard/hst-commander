@@ -221,6 +221,10 @@ The details for each front-end are in [`docs/tui.md`](../docs/tui.md) and [`docs
 - **GUI:** Avalonia 12 with the Fluent theme and plain code-behind (no MVVM). `PaneView` holds a `NavigationContext`; most keys are handled at window level with tunnelling `KeyDown` handlers. Dialogs are shown with `ShowDialog(owner)`; background work reports through a `Progress<T>` created on the UI thread. Theme brushes live in `App.axaml` `ThemeDictionaries` and are referenced with `DynamicResource`.
 - Both front-ends have the same File menu, function key bar (F3-F10), themes (Midnight Commander, Light, Dark) and settings (stored separately in `~/.hst-commander/tui-settings.json` and `gui-settings.json`).
 
+## Git Workflow
+
+- Always create a new branch from `main` before making changes (e.g. `feature/<name>`, `fix/<name>`, `docs/<name>`); never commit directly to `main`. Changes reach `main` through a pull request.
+
 ## Build and Test Commands
 
 ```shell
