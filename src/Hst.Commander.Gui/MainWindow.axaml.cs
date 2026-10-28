@@ -21,7 +21,11 @@ public partial class MainWindow : Window
     public MainWindow(string initialPath)
     {
         InitializeComponent();
-        Title = AppInfo.Current.NameAndVersion;
+        Title = Elevation.IsElevated
+            ? $"{AppInfo.Current.NameAndVersion} ({Elevation.AdministratorName})"
+            : AppInfo.Current.NameAndVersion;
+        AdministratorIndicator.IsVisible = Elevation.IsElevated;
+        AdministratorText.Text = Elevation.AdministratorName;
 
         _activePane = LeftPane;
         LeftPane.IsActive = true;
@@ -74,15 +78,22 @@ public partial class MainWindow : Window
         AddHandler(KeyDownEvent, OnWindowKeyDown, RoutingStrategies.Tunnel);
         Opened += async (_, _) =>
         {
-            // setting the navigation modes lists the entries
-            await LeftPane.SetNavigationModeAsync(PaneNavigationMode.Find(settings.LeftNavigationMode));
-            await RightPane.SetNavigationModeAsync(PaneNavigationMode.Find(settings.RightNavigationMode));
-            LeftPane.FocusEntries();
+            // e.g. where the panes were before restarting as administrator
+            await StartupOptions.Left.ApplyAsync(LeftPane.NavigationContext);
+            await StartupOptions.Right.ApplyAsync(RightPane.NavigationContext);
+            var startPane = StartupOptions.IsRightActive ? RightPane : LeftPane;
+
+            // setting the navigation modes lists the entries, at the same time so a pane listing slowly, e.g. a
+            // sleeping physical disk waking up, doesn't keep the other empty
+            await Task.WhenAll(
+                LeftPane.SetNavigationModeAsync(PaneNavigationMode.Find(settings.LeftNavigationMode)),
+                RightPane.SetNavigationModeAsync(PaneNavigationMode.Find(settings.RightNavigationMode)));
+            startPane.FocusEntries();
             if (StartupError is { } startupError)
             {
                 StartupError = null;
                 await new ErrorDialog(startupError).ShowDialog(this);
-                LeftPane.FocusEntries();
+                startPane.FocusEntries();
             }
         };
         Closing += OnClosing;
@@ -95,6 +106,9 @@ public partial class MainWindow : Window
 
     /// <summary>Error shown when the window is opened, e.g. plugins that failed to load.</summary>
     public string? StartupError { get; set; }
+
+    /// <summary>Where the panes start when the window is opened, e.g. given on the command line.</summary>
+    public StartupOptions StartupOptions { get; init; } = new();
 
     /// <summary>
     ///     Adds the navigation modes to the View menu, acting on the active pane: the built-in list and thumbnail modes
@@ -309,10 +323,66 @@ public partial class MainWindow : Window
         var volumeProvider = await ChooseVolumeProviderAsync(this, pane);
         if (volumeProvider != null)
         {
-            await pane.ChangeVolumeProviderAsync(volumeProvider);
+            await ChangeVolumeProviderAsync(pane, volumeProvider);
         }
 
         pane.FocusEntries();
+    }
+
+    /// <summary>
+    ///     Shows the root of a new volume from a volume provider in a pane. A volume provider needing administrator
+    ///     rights offers to restart Hst Commander as administrator first, with the pane showing the volume provider;
+    ///     declined or cancelled, the volume provider is shown without them.
+    /// </summary>
+    private async Task ChangeVolumeProviderAsync(PaneView pane, IVolumeProvider volumeProvider)
+    {
+        if (Elevation.NeedsRestart(volumeProvider) && await RestartAsAdministratorAsync(pane, volumeProvider))
+        {
+            return;
+        }
+
+        await pane.ChangeVolumeProviderAsync(volumeProvider);
+    }
+
+    /// <summary>
+    ///     Asks to start Hst Commander as administrator (UAC on Windows) with the panes where they are and the pane
+    ///     showing the volume provider, and closes the window when started. Returns false when it isn't started, e.g.
+    ///     declined, UAC cancelled, or on Linux and macOS, where the GUI can't restart itself as root and says so.
+    /// </summary>
+    private async Task<bool> RestartAsAdministratorAsync(PaneView pane, IVolumeProvider volumeProvider)
+    {
+        if (!Elevation.CanRestartWithoutTerminal)
+        {
+            await new ConfirmDialog(Elevation.AdministratorName, Elevation.GetRestartManuallyMessage(volumeProvider),
+                "_OK", null).ShowDialog<bool?>(this);
+            return false;
+        }
+
+        if (await new ConfirmDialog(Elevation.AdministratorName, Elevation.GetRestartQuestion(volumeProvider),
+                "_Restart", "_Continue").ShowDialog<bool?>(this) != true)
+        {
+            return false;
+        }
+
+        var isRight = pane == RightPane;
+        var options = StartupOptions.FromPanes(LeftPane.NavigationContext, RightPane.NavigationContext, isRight,
+            isRight, volumeProvider);
+        try
+        {
+            if (!Elevation.StartAsAdministrator(options))
+            {
+                return false;
+            }
+        }
+        catch (IOException exception)
+        {
+            await ShowErrorAsync(exception);
+            return false;
+        }
+
+        _quitConfirmed = true;
+        Close();
+        return true;
     }
 
     /// <summary>Shows the volume provider list over a pane, owned by a window, returning the chosen one or null.</summary>
@@ -330,7 +400,7 @@ public partial class MainWindow : Window
             owner => ChooseVolumeProviderAsync(owner, pane)).ShowDialog<LocationDialogResult?>(this);
         if (result?.VolumeProvider is { } volumeProvider)
         {
-            await pane.ChangeVolumeProviderAsync(volumeProvider);
+            await ChangeVolumeProviderAsync(pane, volumeProvider);
         }
         else if (result?.IsHome == true)
         {

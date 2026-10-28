@@ -7,14 +7,14 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 ## Files
 
 - `MainWindow.axaml(.cs)`: the dual-pane window, menus, function key bar, window-level keys and error display.
-- `PaneView.axaml(.cs)`: one pane: path panel, column header, entry `ListBox` (list or thumbnails), `IconLayoutView` for plugin navigation modes and the icon positions bar.
+- `PaneView.axaml(.cs)`: one pane: path panel, column header, entry `ListBox` (list or thumbnails), `IconLayoutView` for plugin navigation modes, the icon positions bar and the listing progress (an indeterminate progress bar with "Reading ..." shown when listing takes longer than `ListingProgress.Delay`, 2 seconds).
 - `PaneNavigationMode.cs`, `IconLayoutView.cs`: navigation modes, see [Navigation modes](icons-and-navigation-modes.md#navigation-modes).
 - `EntryItem.cs`: a display row for an `IEntry`.
 - `Icons/`: `FileIcons` (loading and caching entry icons), `IFileIconProvider` with Windows, freedesktop and macOS implementations, and `ViewerIcon` for the icon viewer.
 - `ViewerDialog` with `ViewerControl` and `ViewerSearchDialog`: the viewer.
 - `ThemeManager.cs`, `GuiTheme.cs`, `MidnightCommanderStyles.axaml`, `GuiSettings.cs`: themes and settings.
 - `BackgroundPicker`: the background chooser shared by the icon viewer and the image view.
-- Dialogs, one `.axaml` each: `ErrorDialog`, `SettingsDialog`, `CopyDialog`, `CopyProgressDialog`, `OverwriteDialog`, `DeleteDialog`, `DeleteProgressDialog`, `QuitDialog`, `MakeDirectoryDialog`, `CreateVolumeDialog`, `CreateVolumeFieldsDialog`, `SelectGroupDialog`, `PropertiesDialog`, `IconViewerDialog`, `VolumeProviderDialog`, `LocationDialog`, `AboutDialog`.
+- Dialogs, one `.axaml` each: `ErrorDialog`, `SettingsDialog`, `CopyDialog`, `CopyProgressDialog`, `OverwriteDialog`, `DeleteDialog`, `DeleteProgressDialog`, `QuitDialog`, `ConfirmDialog` (a question with two buttons or a message, e.g. restarting as administrator), `MakeDirectoryDialog`, `CreateVolumeDialog`, `CreateVolumeFieldsDialog`, `SelectGroupDialog`, `PropertiesDialog`, `IconViewerDialog`, `VolumeProviderDialog`, `LocationDialog`, `AboutDialog`.
 
 ## Avalonia
 

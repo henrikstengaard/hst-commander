@@ -4,44 +4,50 @@ using Hst.Commander.Abstractions;
 namespace Hst.Commander.Core;
 
 /// <summary>
-///     Writable images (local files opened as volumes by a file volume provider that can write, e.g. Amiga disk files)
-///     opened once per file and shared by both panes and file operations. Two volumes writing the same file would each
-///     keep their own state of the file system, e.g. the free blocks, and damage it, so all use the same volume of the
-///     file through views of their own (<see cref="SharedImageVolume" />) with their own current directory. The file is
-///     closed when the last view is disposed.
+///     Writable images (items opened as volumes by a file volume provider that can write, e.g. local Amiga disk files
+///     or physical disks, see <see cref="IVolume.GetWritableImageId" />) opened once per id and shared by both panes
+///     and file operations. Two volumes writing the same file would each keep their own state of the file system, e.g.
+///     the free blocks, and damage it, so all use the same volume of the file through views of their own
+///     (<see cref="SharedImageVolume" />) with their own current directory. The file is closed when the last view is
+///     disposed.
 /// </summary>
 internal static class SharedImages
 {
     private static readonly Lock OpenLock = new();
-    private static readonly Dictionary<string, SharedImage> Images = new(PathComparer);
+    private static readonly Dictionary<string, SharedImage> Images = new(IdComparer);
 
-    private static StringComparer PathComparer =>
+    private static StringComparer IdComparer =>
         OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
             ? StringComparer.OrdinalIgnoreCase
             : StringComparer.Ordinal;
 
     /// <summary>
-    ///     Opens a view of the image of a local file at its root, opening the file the first time: for reading and
-    ///     writing when possible, otherwise only for reading (e.g. a read-only file), and then the volume is read-only.
+    ///     Opens a view of the image of an item at its root, opening the item the first time with the volume it's in:
+    ///     for reading and writing when possible (<see cref="IVolume.OpenReadWrite" />), otherwise only for reading
+    ///     (e.g. a read-only file), and then the volume is read-only.
     /// </summary>
-    public static async Task<SharedImageVolume> OpenAsync(string path, IFileVolumeProvider fileVolumeProvider,
-        CancellationToken cancellationToken)
+    /// <param name="id">Id of the item, <see cref="IVolume.GetWritableImageId" />.</param>
+    /// <param name="name">Name of the item in the current directory of <paramref name="volume" />.</param>
+    /// <param name="volume">Volume the item is in, only used when the image isn't open.</param>
+    /// <param name="fileVolumeProvider">File volume provider creating the volume of the image.</param>
+    /// <param name="cancellationToken"></param>
+    public static async Task<SharedImageVolume> OpenAsync(string id, string name, IVolume volume,
+        IFileVolumeProvider fileVolumeProvider, CancellationToken cancellationToken)
     {
-        path = Path.GetFullPath(path);
         lock (OpenLock)
         {
-            if (Images.TryGetValue(path, out var openImage))
+            if (Images.TryGetValue(id, out var openImage))
             {
                 return openImage.OpenView();
             }
         }
 
-        var stream = OpenFile(path);
+        var stream = await OpenStreamAsync(name, volume, cancellationToken);
         SharedImage image;
         try
         {
-            var volume = await fileVolumeProvider.CreateVolume(stream, cancellationToken);
-            image = new SharedImage(path, volume, stream);
+            var imageVolume = await fileVolumeProvider.CreateVolume(stream, cancellationToken);
+            image = new SharedImage(id, imageVolume, stream);
         }
         catch
         {
@@ -52,9 +58,9 @@ internal static class SharedImages
         lock (OpenLock)
         {
             // the image may have been opened at the same time, e.g. for a copy on a background thread
-            if (!Images.TryGetValue(path, out var openImage))
+            if (!Images.TryGetValue(id, out var openImage))
             {
-                Images[path] = image;
+                Images[id] = image;
                 return image.OpenView();
             }
 
@@ -72,19 +78,17 @@ internal static class SharedImages
         }
     }
 
-    /// <summary>
-    ///     Opens a file for reading and writing, shared with other readers and writers, e.g. a pane copying the file.
-    ///     It's unbuffered, so changes are written to the file right away and seen by others reading it.
-    /// </summary>
-    private static FileStream OpenFile(string path)
+    /// <summary>Opens an item for reading and writing, or only for reading when it can't be written.</summary>
+    private static async Task<Stream> OpenStreamAsync(string name, IVolume volume,
+        CancellationToken cancellationToken)
     {
         try
         {
-            return new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite, 0);
+            return await volume.OpenReadWrite(name, cancellationToken);
         }
         catch (Exception exception) when (exception is UnauthorizedAccessException or IOException)
         {
-            return new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 0);
+            return await volume.OpenRead(name, cancellationToken);
         }
     }
 
@@ -97,16 +101,16 @@ internal static class SharedImages
                 return;
             }
 
-            Images.Remove(image.Path);
+            Images.Remove(image.Id);
         }
 
         image.Close();
     }
 
     /// <summary>An image shared by views. Operations are serialized with a lock, as volumes are not thread safe.</summary>
-    internal sealed class SharedImage(string path, IVolume volume, Stream stream)
+    internal sealed class SharedImage(string id, IVolume volume, Stream stream)
     {
-        public string Path { get; } = path;
+        public string Id { get; } = id;
 
         public IVolume Volume { get; } = volume;
 

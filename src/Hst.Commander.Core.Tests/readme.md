@@ -1,6 +1,6 @@
 # Hst.Commander.Core.Tests
 
-xUnit unit tests for `Hst.Commander.Core` and the default plugins (Zip, LhaLzx, Disk and Amiga).
+xUnit unit tests for `Hst.Commander.Core` and the default plugins (Zip, LhaLzx, Disk, Amiga and PhysicalDisk).
 
 ## Running
 
@@ -12,7 +12,7 @@ The tests run on Windows, macOS and Linux for every push (`build-and-test.yml`).
 
 ## Coverage
 
-- **Volumes**: local, ISO 9660, zip, lha, lzx and nested volumes, disk images (MBR, GPT, PiStorm and hybrid disks) and Amiga images (adf and RDB, Fast File System and PFS3).
+- **Volumes**: local, ISO 9660, zip, lha, lzx and nested volumes, disk images (MBR, GPT, PiStorm and hybrid disks), Amiga images (adf and RDB, Fast File System and PFS3) and physical disks (test disks and the sector-aligned disk stream).
 - **Navigation** (`NavigationContext`): opening images, changing location, making directories, moving, creating volumes, selecting groups, properties, icon files and writable Amiga and disk images.
 - **File operations**: copying, moving and deleting between volumes, filters and UAE metadata.
 - **Viewer**: the viewer document and session, and viewing images.

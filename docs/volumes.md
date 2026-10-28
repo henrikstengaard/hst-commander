@@ -28,6 +28,7 @@ Plugin volumes:
 | `VolumeListVolume`, `PartitionTableVolume` (Disk) | MBR and GPT disk images. See below |
 | `HybridDiskVolume` (Disk) | A disk with both an MBR and another volume on the whole disk (e.g. a rigid disk block in blocks 1-15): the root lists both partition tables, e.g. `hybrid.img\rdb\1` |
 | `DiscFileSystemVolume` (Disk) | FAT (long names) and NTFS via DiscUtils, writable when the file system is; dates are UTC; attributes can be changed |
+| `PhysicalDiskVolume` (PhysicalDisk) | The physical disks of the computer, listed as items opened like images. See below |
 
 ISO images and zip, lha and lzx archives are read-only. `LocalVolume.CreateContainer` throws `NotSupportedException` in the drive list.
 
@@ -47,6 +48,15 @@ ISO images and zip, lha and lzx archives are read-only. `LocalVolume.CreateConta
 - Sector sizes of 512 and 4096 bytes are supported. GPT tells by the header offset. MBR doesn't store it, so 4096 is used only when the partitions only fit with 4096-byte sectors, or also fit and more of them start with a recognizable volume there.
 - `DiskFileVolumeProvider` doesn't match the boot sector of an unpartitioned FAT/exFAT/NTFS volume, which also ends with `0x55 0xAA`.
 
+### Physical disks
+
+- The `Physical disks` volume provider of the PhysicalDisk plugin lists the disks with media as items named by the device (`PhysicalDrive2` on Windows, `sdb` on Linux, `disk4` on macOS) with the model in `DisplayName`, e.g. `PhysicalDrive2 - SanDisk Ultra`, and the bus, sector size and size in `Details`. The list is read again each time it's listed, so attached disks show up when refreshing. Disks are queried at the same time (Windows and macOS), as a sleeping disk, e.g. a USB drive, only answers after waking up, which can take more than ten seconds; both front-ends show a progress indicator in the pane when listing takes longer than 2 seconds (`ListingProgress`).
+- System disks (`PhysicalDisk.IsSystem`) aren't accessible, so the operating system can't be damaged: `OpenRead` and `OpenReadWrite` throw `UnauthorizedAccessException` ("... is a system disk and not accessible"), shown as an error when opening, viewing or copying one. They are the disks with the Windows volume (Windows), with `/`, `/boot` or `/boot/efi` through partitions, device mapper and RAID devices (Linux), and with the root volume and its APFS physical stores (macOS). The properties show `System disk`.
+- A disk is an item, so Enter opens it as an image with the file volume providers (MBR/GPT with the Disk plugin, RDB with the Amiga plugin), and paths start with the disk, e.g. `PhysicalDrive2\mbr\1`. F3 and F5 read the whole disk.
+- Each disk has a writable image id (its device path), so it is shared like a local writable image (see below). `OpenReadWrite` fails, making the disk read-only, when the OS uses a volume on it: Windows locks and dismounts the disk's volumes and fails when one can't be locked (e.g. the system drive); Linux and macOS fail when a partition is mounted.
+- Reading needs administrator rights (Windows) or root (Linux: or the `disk` group). The provider has `RequiresAdministrator`, so choosing it when not elevated offers to restart as administrator, see [Running as administrator](application.md#running-as-administrator). Read errors of files that aren't local are thrown when opening them, so the error is shown instead of nothing happening.
+- `DiskStream` reads and writes whole sectors through a buffer aligned in memory, as Windows physical drives and macOS raw disks require, and flushes writes when closed.
+
 ## Navigation Model
 
 Each pane's `NavigationContext` owns a `NestedVolume` over a root volume from a volume provider (initially `Local` at the startup directory). `ChangeVolumeProviderAsync` creates a new root volume, closes opened images and the previous root volume, and clears the marks. `CurrentPath` at the root is `Computer` for the local drive list and the provider's `Name` otherwise. Local-only features (disk space, starting files, executables) need a `LocalVolume` root.
@@ -55,7 +65,7 @@ Each pane's `NavigationContext` owns a `NestedVolume` over a root volume from a 
 
 Opening a file (Enter or double-click, `OpenEntryAsync`) first checks whether it is an image by asking every file volume provider, regardless of extension, so e.g. a `.nupkg`, `.jar` or `.docx` opens as a zip archive. A file no provider detects is started. `OpenAsVolumeAsync` (Ctrl+PageDown, File > Open as volume) does the same detection but throws `IOException` when nothing matches. Images are detected in any location, including inside other images.
 
-1. Providers are asked in order with `IsMatch`, reading through the current volume's `OpenRead`. A seekable stream is reset for the next provider, otherwise the file is opened again. Files that can't be read (`IOException`, `UnauthorizedAccessException`, `NotSupportedException`) aren't images.
+1. Providers are asked in order with `IsMatch`, reading through the current volume's `OpenRead`. A seekable stream is reset for the next provider, otherwise the file is opened again. Local files that can't be read (`IOException`, `UnauthorizedAccessException`, `NotSupportedException`) aren't images, so they are started; for other files (and with `OpenAsVolumeAsync`) the error is thrown, e.g. a physical disk without access.
 2. The first match gets the file opened again as a seekable stream; a stream that isn't seekable (e.g. inside a zip) is copied to a temporary file deleted on close.
 3. The volume is pushed on the `NestedVolume` (wrapped in `EntryVolumeProvider`) and the image (provider, file name, the directory inside its parent image, volume and stream) on the context's image stack, which `OpenLocationAsync` uses to open the images again.
 
@@ -63,8 +73,8 @@ Going up from an image's root pops and disposes its volume and stream. Changing 
 
 ### Writable Images
 
-- A provider with `CanWrite` (the Amiga adf and RDB providers) gets a writable stream for a local file opened directly from a local directory.
-- `SharedImages` opens such a file once per full path (case-insensitive on Windows and macOS) with read/write sharing and no buffering, falling back to read-only. The volume is shared by both panes and the volumes of file operations, because two volumes writing one file would each keep their own file system state (e.g. free blocks) and damage it.
+- A provider with `CanWrite` (the Amiga adf and RDB providers and the Disk provider) gets a writable stream for a file of the root volume with an id from `IVolume.GetWritableImageId`: a local file (its full path, `LocalVolume`) or a physical disk (its device path, `PhysicalDiskVolume`).
+- `SharedImages` opens such a file once per id (case-insensitive on Windows and macOS) with `IVolume.OpenReadWrite` (read/write sharing, no buffering), falling back to `OpenRead` (read-only) when it throws `UnauthorizedAccessException` or `IOException`. The volume is shared by both panes and the volumes of file operations, because two volumes writing one file would each keep their own file system state (e.g. free blocks) and damage it.
 - Each user gets a `SharedImageVolume` view with its own current directory. Every operation, and each read/write of its streams (`LockedStream`), holds the image's semaphore and first changes the shared volume to the view's directory. Operations run on the thread pool while holding the lock, so the lock is never held by work waiting for a blocked UI thread. The file is closed when the last view is disposed.
 - Images inside other images get a `ReadOnlyStream`, since changes would be lost.
 - `OpenedImage.IsWritable` decides whether making directories, moving and similar operations are supported inside an image.
@@ -86,7 +96,7 @@ The location dialog (Ctrl+L, double-clicking the path, File > Location) has the 
 - empty, or `Computer` in a local volume: the drive list;
 - a local directory (relative to the current local directory; `c:` means `c:\`), switching to the Local provider;
 - a local path into an image, e.g. `c:\images\disk.iso\archive.zip\dir1`: the closest existing file must be detected as an image and the rest are directories or images. It is opened in a `NavigationContext` of its own, so a failure leaves the location unchanged;
-- otherwise, with a non-local provider shown and an unrooted path, a path from the root of a new volume of that provider.
+- otherwise, with a non-local provider shown and an unrooted path, a path from the root of a new volume of that provider, where components are directories or images, e.g. `PhysicalDrive2\mbr\1`.
 
 ## Volume Provider Keys
 

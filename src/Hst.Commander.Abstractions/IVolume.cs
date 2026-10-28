@@ -125,4 +125,24 @@ public interface IVolume
     /// <param name="cancellationToken"></param>
     Task SetAttributes(string name, EntryAttributes attributes, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException("Changing attributes is not supported");
+
+    /// <summary>
+    /// Id of an item in current directory that <see cref="OpenReadWrite" /> can open for reading and writing as a
+    /// writable image, unique across volumes, e.g. the full path of a local file or "\\.\PhysicalDrive2" of a physical
+    /// disk. Hst Commander opens a writable image once per id and shares it with both panes and file operations, as
+    /// two volumes writing the same file system would damage it. Null (the default) when the item can only be read.
+    /// </summary>
+    /// <param name="name">Name of the item.</param>
+    string? GetWritableImageId(string name) => null;
+
+    /// <summary>
+    /// Open an item in current directory with an id (<see cref="GetWritableImageId" />) for reading and writing as a
+    /// seekable stream, shared with other readers and writers and unbuffered, so changes are seen by others reading
+    /// it. Throws <see cref="UnauthorizedAccessException"/> or <see cref="IOException"/> when it can't be written, e.g.
+    /// a read-only file, and then the image is opened with <see cref="OpenRead" /> and is read-only.
+    /// </summary>
+    /// <param name="name">Name of the item.</param>
+    /// <param name="cancellationToken"></param>
+    Task<Stream> OpenReadWrite(string name, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("Opening for reading and writing is not supported");
 }

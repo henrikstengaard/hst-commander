@@ -10,6 +10,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 
 - A volume has a current directory; `ListEntries`, `OpenEntry`, `OpenRead`, `OpenWrite`, `CreateContainer`, `Delete`, `Rename` and `SetModifiedDate` act on names in it. `ChangeDirectory` takes path components and handles `Paths.Root` and `Paths.Parent` case-insensitively.
 - Write members throw `NotSupportedException` when read-only. `OpenWrite` creates or overwrites; `CreateContainer` is a no-op when the container exists; `Delete` only deletes items and empty containers; `Rename` throws `IOException` when the new name exists (case-only changes are allowed); `SetModifiedDate` treats an unspecified `DateTimeKind` as UTC.
+- `GetWritableImageId(name)` and `OpenReadWrite(name)` (optional, default null and `NotSupportedException`): an item with an id unique across volumes (e.g. a local file's full path or a physical disk's device path) is opened once for reading and writing as a writable image shared by both panes, see [Writable images](volumes.md#writable-images). `OpenReadWrite` throws `UnauthorizedAccessException` or `IOException` when the item can only be read, and the image is then opened read-only with `OpenRead`.
 - Optional members with defaults: `SupportsAmigaMetadata` (the current directory stores Amiga names, protection bits and comments as they are, see [UAE metadata](file-operations.md#uae-metadata)), `CanSetAmigaMetadata`/`SetAmigaMetadata` and `GetChangeableAttributes`/`SetAttributes` (only the changeable attributes are changed). The properties dialog uses `CanSetAmigaMetadata` and `GetChangeableAttributes` to decide what can be changed.
 
 ### IEntry
@@ -24,6 +25,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 ### IVolumeProvider
 
 - What a pane can show (the volume provider list). Each `CreateVolume` call must return a volume of its own, because file operations open a second one on a background thread. Volumes implementing `IDisposable` are disposed when no longer used.
+- `RequiresAdministrator` (optional, default false): the volumes need administrator rights (root on Linux and macOS), e.g. physical disks; choosing the provider when not elevated offers to restart Hst Commander as administrator, see [Running as administrator](application.md#running-as-administrator).
 - `VolumeProviders.All` is the built-in `Local` provider followed by the plugins' providers.
 
 ### IFileVolumeProvider
@@ -69,7 +71,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 
 ## Loading Plugins
 
-- `Plugins.BuiltIn` lists the plugins included by default (Zip, LhaLzx, Disk, Amiga), referenced by Core. Disk comes before Amiga so hybrid disks (an MBR and a rigid disk block, which `RdbFileVolumeProvider` would also match) are opened by the Disk plugin. `Plugins.All` is the built-in plugins followed by the loaded ones; the `VolumeProviders` lists are rebuilt when it changes.
+- `Plugins.BuiltIn` lists the plugins included by default (Zip, LhaLzx, Disk, Amiga, PhysicalDisk), referenced by Core. Disk comes before Amiga so hybrid disks (an MBR and a rigid disk block, which `RdbFileVolumeProvider` would also match) are opened by the Disk plugin. `Plugins.All` is the built-in plugins followed by the loaded ones; the `VolumeProviders` lists are rebuilt when it changes.
 - Both front-ends call `Plugins.Load()` once at startup, before the panes are created, because each `NavigationContext` takes `VolumeProviders.Files` when it's created: the TUI in `Program.cs`, the GUI in `App.OnFrameworkInitializationCompleted`. In the GUI it must be written `Hst.Commander.Core.Plugins`, as `Plugins` there resolves to the `Hst.Commander.Plugins` namespace.
 - Load errors (including a failing `Initialize`) are joined by `Plugins.FormatErrors` and shown once the main window is loaded; the other plugins still load.
 - `PluginLoader.Directories` are `~/.hst-commander/plugins` and then `plugins` next to the executable; missing directories are skipped and a directory listed twice is scanned once.

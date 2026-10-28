@@ -1,0 +1,174 @@
+using Hst.Commander.Abstractions;
+using Hst.Commander.Plugins.PhysicalDisk;
+
+namespace Hst.Commander.Core.Tests;
+
+public class GivenNavigationContextWithPhysicalDisks : IDisposable
+{
+    private readonly string _rootPath =
+        Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), $"hst-commander-{Guid.NewGuid()}")).FullName;
+
+    private readonly TestPhysicalDisks _disks = new();
+    private readonly PhysicalDiskVolumeProvider _volumeProvider;
+
+    public GivenNavigationContextWithPhysicalDisks()
+    {
+        _volumeProvider = new PhysicalDiskVolumeProvider(_disks);
+    }
+
+    public void Dispose()
+    {
+        Directory.Delete(_rootPath, true);
+        GC.SuppressFinalize(this);
+    }
+
+    /// <summary>Adds a disk with an MBR and a FAT partition.</summary>
+    private async Task AddMbrDisk(string name, string? model = null)
+    {
+        var path = Path.Combine(_rootPath, $"{name}.img");
+        await using (var disk = DiskTestData.CreateMbrDisk())
+        {
+            await DiskTestData.WriteToFile(disk, path);
+        }
+
+        _disks.AddDisk(name, path, model);
+    }
+
+    private async Task<NavigationContext> CreateContextAsync()
+    {
+        var navigationContext = new NavigationContext(_rootPath);
+        await navigationContext.ChangeVolumeProviderAsync(_volumeProvider);
+        return navigationContext;
+    }
+
+    private static async Task OpenAsync(NavigationContext navigationContext, string name) =>
+        await navigationContext.OpenEntryAsync(
+            (await navigationContext.ListEntriesAsync()).First(entry => entry.Name == name));
+
+    private static async Task<IReadOnlyList<string>> ListNamesAsync(NavigationContext navigationContext) =>
+        (await navigationContext.ListEntriesAsync()).Select(entry => entry.Name).ToList();
+
+    [Fact]
+    public async Task When_ListingPhysicalDisks_Then_DisksAreListedWithTheirModel()
+    {
+        // arrange
+        await AddMbrDisk("PhysicalDrive1", "SanDisk Ultra");
+        await AddMbrDisk("PhysicalDrive2");
+        using var navigationContext = await CreateContextAsync();
+
+        // act
+        var entries = await navigationContext.ListEntriesAsync();
+
+        // assert
+        Assert.Equal(PhysicalDiskVolume.VolumeName, navigationContext.CurrentPath);
+        Assert.Equal(["PhysicalDrive1", "PhysicalDrive2"], entries.Select(entry => entry.Name));
+        Assert.Equal(["PhysicalDrive1 - SanDisk Ultra", "PhysicalDrive2"], entries.Select(entry => entry.DisplayName));
+        Assert.All(entries, entry => Assert.Equal(EntryType.Item, entry.Type));
+        Assert.Equal(new FileInfo(Path.Combine(_rootPath, "PhysicalDrive1.img")).Length, entries[0].Size);
+        var details = Assert.IsType<EntryDetails>(entries[0].Details);
+        Assert.Contains(details.Sections.SelectMany(section => section),
+            property => property is { Label: "Model", Value: "SanDisk Ultra" });
+    }
+
+    [Fact]
+    public async Task When_DiskIsOpened_Then_PathStartsWithTheDiskAndFilesAreWrittenToIt()
+    {
+        // arrange
+        await AddMbrDisk("PhysicalDrive1");
+        await File.WriteAllTextAsync(Path.Combine(_rootPath, "file1.txt"), "Disk");
+
+        using (var diskContext = await CreateContextAsync())
+        using (var otherDiskContext = await CreateContextAsync())
+        using (var localContext = new NavigationContext(_rootPath))
+        {
+            // act
+            await OpenAsync(diskContext, "PhysicalDrive1");
+            var tableNames = await ListNamesAsync(diskContext);
+            await OpenAsync(diskContext, "mbr");
+            await OpenAsync(diskContext, "1");
+            var path = diskContext.CurrentPath;
+            Assert.Null(diskContext.CreateDirectoryNotSupportedMessage);
+            await diskContext.CreateDirectoryAsync("dir1");
+            var localEntries = await localContext.ListEntriesAsync();
+            await localContext.CopyAsync([localEntries.First(entry => entry.Name == "file1.txt")], diskContext,
+                diskContext.CurrentPath, "*");
+
+            // the other pane shares the opened disk, so it sees the changes
+            await otherDiskContext.ChangeLocationAsync(Path.Combine("PhysicalDrive1", "mbr", "1"));
+            var otherNames = await ListNamesAsync(otherDiskContext);
+
+            // assert
+            Assert.True(diskContext.IsInImage);
+            Assert.Equal([Paths.Parent, "mbr"], tableNames);
+            Assert.Equal(Path.Combine("PhysicalDrive1", "mbr", "1"), path);
+            Assert.Equal([Paths.Parent, "dir1", "file1.txt"], otherNames);
+        }
+
+        // opened again, the changes are on the disk
+        using var reopenedContext = await CreateContextAsync();
+        await reopenedContext.ChangeLocationAsync(Path.Combine("PhysicalDrive1", "mbr", "1"));
+        Assert.Equal([Paths.Parent, "dir1", "file1.txt"], await ListNamesAsync(reopenedContext));
+    }
+
+    [Fact]
+    public async Task When_DiskCantBeWritten_Then_ItIsOpenedReadOnly()
+    {
+        // arrange
+        await AddMbrDisk("PhysicalDrive1");
+        _disks.ReadOnlyDisks.Add("PhysicalDrive1");
+        using var navigationContext = await CreateContextAsync();
+
+        // act
+        await navigationContext.ChangeLocationAsync(Path.Combine("PhysicalDrive1", "mbr", "1"));
+
+        // assert
+        Assert.NotNull(navigationContext.CreateDirectoryNotSupportedMessage);
+        await Assert.ThrowsAnyAsync<Exception>(() => navigationContext.CreateDirectoryAsync("dir1"));
+    }
+
+    [Fact]
+    public async Task When_DiskCantBeRead_Then_OpeningItThrowsTheError()
+    {
+        // arrange
+        await AddMbrDisk("PhysicalDrive1");
+        _disks.DeniedDisks.Add("PhysicalDrive1");
+        using var navigationContext = await CreateContextAsync();
+
+        // act and assert
+        var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            OpenAsync(navigationContext, "PhysicalDrive1"));
+        Assert.Contains("denied", exception.Message);
+        Assert.False(navigationContext.IsInImage);
+    }
+
+    [Fact]
+    public async Task When_SystemDiskIsOpened_Then_ItIsNotAccessible()
+    {
+        // arrange
+        await AddMbrDisk("PhysicalDrive0");
+        _disks.SystemDisks.Add("PhysicalDrive0");
+        using var navigationContext = await CreateContextAsync();
+        var volume = new PhysicalDiskVolume(_disks);
+
+        // act and assert
+        var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            OpenAsync(navigationContext, "PhysicalDrive0"));
+        Assert.Contains("system disk", exception.Message);
+        Assert.False(navigationContext.IsInImage);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => volume.OpenRead("PhysicalDrive0"));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => volume.OpenReadWrite("PhysicalDrive0"));
+    }
+
+    [Fact]
+    public async Task When_PhysicalDiskListIsChanged_Then_NotSupportedExceptionIsThrown()
+    {
+        // arrange
+        await AddMbrDisk("PhysicalDrive1");
+        var volume = await _volumeProvider.CreateVolume();
+
+        // act and assert
+        await Assert.ThrowsAsync<NotSupportedException>(() => volume.Delete("PhysicalDrive1"));
+        await Assert.ThrowsAsync<NotSupportedException>(() => volume.CreateContainer("dir1"));
+        await Assert.ThrowsAsync<DirectoryNotFoundException>(() => volume.ChangeDirectory(["PhysicalDrive1"]));
+    }
+}

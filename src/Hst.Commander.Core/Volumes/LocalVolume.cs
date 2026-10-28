@@ -155,6 +155,18 @@ public class LocalVolume(string path) : IVolume
         Task.FromResult<Stream>(new FileStream(GetItemPath(name), FileMode.Create, FileAccess.Write, FileShare.None,
             BufferSize, true));
 
+    /// <summary>Full path of an item, the id of a writable image of a local file; null in the drive list.</summary>
+    public string? GetWritableImageId(string name) =>
+        _currentPath == null ? null : Path.GetFullPath(Path.Combine(_currentPath, name));
+
+    /// <summary>
+    /// Opens an item for reading and writing, shared with other readers and writers, e.g. a pane copying the file.
+    /// It's unbuffered, so changes are written to the file right away and seen by others reading it.
+    /// </summary>
+    public Task<Stream> OpenReadWrite(string name, CancellationToken cancellationToken = default) =>
+        Task.FromResult<Stream>(new FileStream(GetItemPath(name), FileMode.Open, FileAccess.ReadWrite,
+            FileShare.ReadWrite, 0));
+
     public Task CreateContainer(string name, CancellationToken cancellationToken = default)
     {
         if (_currentPath == null)

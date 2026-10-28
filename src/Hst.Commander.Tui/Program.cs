@@ -5,6 +5,8 @@ using Terminal.Gui;
 // plugins are loaded before the panes are created, so their volume providers are used
 var pluginErrors = Plugins.FormatErrors(Plugins.Load());
 var mainWindow = new MainWindow(Environment.CurrentDirectory, TuiSettings.Load());
+// waited for here, so the TUI runs on the main thread (there's no synchronization context yet to deadlock)
+mainWindow.ApplyStartupOptionsAsync(StartupOptions.Parse(args)).GetAwaiter().GetResult();
 if (pluginErrors != null)
 {
     mainWindow.ShowErrorWhenLoaded(pluginErrors);
@@ -16,7 +18,6 @@ try
     {
         TerminalScreen.EnterTui();
         Application.Init();
-        await mainWindow.InitializeAsync();
         Application.Run(mainWindow);
         Application.Shutdown();
         TerminalScreen.LeaveTui();
@@ -34,6 +35,15 @@ try
                 break;
             case TerminalAction.ShowOutput:
                 TerminalScreen.ShowOutput();
+                break;
+            case TerminalAction.RestartAsRoot restartAsRoot:
+                // quits after Hst Commander ran as root, or shows why sudo failed
+                if (Elevation.RunAsRootInTerminal(restartAsRoot.Options) is not { } restartError)
+                {
+                    return;
+                }
+
+                mainWindow.ShowErrorWhenLoaded(restartError);
                 break;
             default:
                 return;

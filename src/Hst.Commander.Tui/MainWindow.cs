@@ -14,6 +14,7 @@ public sealed class MainWindow : Window
     private const int ColumnCount = 3;
 
     private readonly MenuBar _menuBar;
+    private readonly Label? _administratorLabel;
     private readonly FunctionKeyBarView _functionKeyBar;
     private readonly Pane _leftPane;
     private readonly Pane _rightPane;
@@ -24,6 +25,7 @@ public sealed class MainWindow : Window
     private Pane _activePane;
     private TerminalAction? _pendingTerminalAction;
     private string? _pendingError;
+    private bool _restarting;
     private string _selectGroupFilter = SelectGroupOptions.Default.Filter;
 
     public MainWindow(string initialPath, TuiSettings settings)
@@ -96,17 +98,30 @@ public sealed class MainWindow : Window
         _activePane = _leftPane;
 
         Add(_menuBar, _leftPane.View, _rightPane.View, _functionKeyBar);
+
+        // running as administrator or root is shown at the right of the menu bar
+        if (Elevation.IsElevated)
+        {
+            var text = $" {Elevation.AdministratorName} ";
+            _menuBar.Width = Dim.Fill(text.Length);
+            _administratorLabel = new Label { X = Pos.AnchorEnd(text.Length), Y = 0, Text = text };
+            Add(_administratorLabel);
+        }
+
         ApplyTheme(theme);
         ApplyVolumeProviderKeys(settings.EffectiveVolumeProviderKeys);
         ApplyEnterFileAction(settings.EnterFileAction);
         ApplyUaeMetadata(settings.UaeMetadata);
         ConfigurePaneKeys(_leftPane, _rightPane);
         ConfigurePaneKeys(_rightPane, _leftPane);
-        // also when run again after a program has run in the terminal
-        Loaded += (_, _) =>
+        // also when run again after a program has run in the terminal. The panes are listed once the window runs:
+        // Application.Init installs Terminal.Gui's synchronization context, so awaiting a listing that isn't done at
+        // once (e.g. the physical disks) before Application.Run would wait for a main loop that isn't running yet
+        Loaded += async (_, _) =>
         {
             _activePane.TableView.SetFocus();
             ShowPendingError();
+            await InitializeAsync();
         };
     }
 
@@ -142,7 +157,7 @@ public sealed class MainWindow : Window
     ///     Confirms quitting when the window is stopped by F10, File > Quit or Esc (<see cref="Application.QuitKey" />);
     ///     stopping it for a terminal action isn't quitting. Esc in the confirm dialog answers no.
     /// </summary>
-    private bool ConfirmClosing() => _pendingTerminalAction != null ||
+    private bool ConfirmClosing() => _pendingTerminalAction != null || _restarting ||
                                      MessageBox.Query("Quit", AppInfo.Current.QuitQuestion, "_Yes", "_No") == 0;
 
     /// <summary>Stops the window, so the action is done in the terminal while the TUI is shut down.</summary>
@@ -167,10 +182,30 @@ public sealed class MainWindow : Window
         RequestTerminalAction(new TerminalAction.RunProgram(path));
     }
 
-    public async Task InitializeAsync()
+    /// <summary>
+    ///     Starts the panes where the startup options say, e.g. where they were before restarting as administrator, and
+    ///     makes the pane active. Called once before the window is first run.
+    /// </summary>
+    public async Task ApplyStartupOptionsAsync(StartupOptions options)
     {
-        await InitializePaneAsync(_leftPane);
-        await InitializePaneAsync(_rightPane);
+        await options.Left.ApplyAsync(_leftPane.NavigationContext);
+        await options.Right.ApplyAsync(_rightPane.NavigationContext);
+        _activePane = options.IsRightActive ? _rightPane : _leftPane;
+    }
+
+    /// <summary>
+    ///     Lists both panes at the same time and draws each when listed, so a pane listing slowly, e.g. a sleeping
+    ///     physical disk waking up, doesn't keep the other blank.
+    /// </summary>
+    private Task InitializeAsync() =>
+        Task.WhenAll(InitializeAndDrawPaneAsync(_leftPane), InitializeAndDrawPaneAsync(_rightPane));
+
+    private static async Task InitializeAndDrawPaneAsync(Pane pane)
+    {
+        await InitializePaneAsync(pane);
+
+        // the window was drawn before the pane was listed and isn't drawn again by itself
+        Application.LayoutAndDraw(true);
     }
 
     public void DisposeNavigationContexts()
@@ -185,6 +220,11 @@ public sealed class MainWindow : Window
         _palette = TuiPalette.For(theme);
         _menuBar.ColorScheme = _palette.MenuColorScheme;
         _menuBar.NeedsDraw = true;
+        if (_administratorLabel != null)
+        {
+            _administratorLabel.ColorScheme = _palette.AdministratorColorScheme;
+        }
+
         _functionKeyBar.KeyAttribute = _palette.FunctionKey;
         _functionKeyBar.TitleAttribute = _palette.Menu;
         _functionKeyBar.NeedsDraw = true;
@@ -309,7 +349,8 @@ public sealed class MainWindow : Window
             Width = Dim.Fill()
         };
 
-        var pane = new Pane(navigationContext, view, pathPanel, tableView, bottomLine);
+        var progress = new ListingProgressView();
+        var pane = new Pane(navigationContext, view, pathPanel, tableView, bottomLine, progress);
         tableView.Style = new TableStyle
         {
             ShowVerticalCellLines = true,
@@ -320,7 +361,7 @@ public sealed class MainWindow : Window
         };
         tableView.FrameChanged += (_, _) => UpdatePaneColumns(pane);
 
-        view.Add(pathPanel, tableView, bottomLine);
+        view.Add(pathPanel, tableView, bottomLine, progress);
 
         return pane;
     }
@@ -664,7 +705,7 @@ public sealed class MainWindow : Window
         pane.TableView.SetFocus();
         if (result?.VolumeProvider is { } volumeProvider)
         {
-            await RunNavigationAsync(pane, () => pane.NavigationContext.ChangeVolumeProviderAsync(volumeProvider));
+            await ChangeVolumeProviderAsync(pane, volumeProvider);
         }
         else if (result?.IsHome == true)
         {
@@ -686,8 +727,60 @@ public sealed class MainWindow : Window
         pane.TableView.SetFocus();
         if (volumeProvider != null)
         {
-            await RunNavigationAsync(pane, () => pane.NavigationContext.ChangeVolumeProviderAsync(volumeProvider));
+            await ChangeVolumeProviderAsync(pane, volumeProvider);
         }
+    }
+
+    /// <summary>
+    ///     Shows the root of a new volume from a volume provider in a pane. A volume provider needing administrator
+    ///     rights offers to restart Hst Commander as administrator first, with the pane showing the volume provider;
+    ///     declined or cancelled, the volume provider is shown without them.
+    /// </summary>
+    private async Task ChangeVolumeProviderAsync(Pane pane, IVolumeProvider volumeProvider)
+    {
+        if (Elevation.NeedsRestart(volumeProvider) &&
+            MessageBox.Query(Elevation.AdministratorName, Elevation.GetRestartQuestion(volumeProvider), "_Restart",
+                "_Continue") == 0 &&
+            RestartAsAdministrator(pane, volumeProvider))
+        {
+            return;
+        }
+
+        await RunNavigationAsync(pane, () => pane.NavigationContext.ChangeVolumeProviderAsync(volumeProvider));
+    }
+
+    /// <summary>
+    ///     Starts Hst Commander as administrator with the panes where they are and the pane showing the volume provider,
+    ///     and quits: on Windows with UAC, elsewhere with sudo in the terminal while the TUI is shut down. Returns false
+    ///     when it isn't started, e.g. UAC is cancelled.
+    /// </summary>
+    private bool RestartAsAdministrator(Pane pane, IVolumeProvider volumeProvider)
+    {
+        var isRight = pane == _rightPane;
+        var options = StartupOptions.FromPanes(_leftPane.NavigationContext, _rightPane.NavigationContext, isRight,
+            isRight, volumeProvider);
+        if (!Elevation.CanRestartWithoutTerminal)
+        {
+            RequestTerminalAction(new TerminalAction.RestartAsRoot(options));
+            return true;
+        }
+
+        try
+        {
+            if (!Elevation.StartAsAdministrator(options))
+            {
+                return false;
+            }
+        }
+        catch (IOException exception)
+        {
+            MessageBox.ErrorQuery("Error", exception.Message, "OK");
+            return false;
+        }
+
+        _restarting = true;
+        Application.RequestStop(this);
+        return true;
     }
 
     /// <summary>Shows the volume provider list centered over a pane, returning the chosen one or null.</summary>
@@ -1015,7 +1108,8 @@ public sealed class MainWindow : Window
     private static async Task RefreshPaneAsync(Pane pane)
     {
         var previousPath = pane.PathPanel.Path;
-        pane.Entries = await pane.NavigationContext.ListEntriesAsync();
+        pane.Entries = await ListingProgress.ListEntriesAsync(pane.NavigationContext, pane.Progress.Show,
+            pane.Progress.Hide);
         pane.PathPanel.Path = pane.NavigationContext.CurrentPath;
         pane.PathPanel.DiskSpace = pane.NavigationContext.DiskSpace;
         pane.PathPanel.Summary = pane.NavigationContext.MarkedSummary;
@@ -1254,13 +1348,15 @@ public sealed class MainWindow : Window
         View view,
         PathPanelView pathPanel,
         EntryTableView tableView,
-        Label bottomLine)
+        Label bottomLine,
+        ListingProgressView progress)
     {
         public NavigationContext NavigationContext { get; } = navigationContext;
         public View View { get; } = view;
         public PathPanelView PathPanel { get; } = pathPanel;
         public EntryTableView TableView { get; } = tableView;
         public Label BottomLine { get; } = bottomLine;
+        public ListingProgressView Progress { get; } = progress;
         public IReadOnlyList<IEntry> Entries { get; set; } = [];
         public DataTable? DataTable { get; set; }
     }
