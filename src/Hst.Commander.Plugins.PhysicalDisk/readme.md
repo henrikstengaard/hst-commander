@@ -10,6 +10,12 @@ The PhysicalDisk plugin adds the physical disks of the computer, internal and ex
 - A disk is opened for reading and writing once and shared by both panes and file operations, like writable images. It is opened read-only when it can't be written, e.g. when a volume on it is in use.
 - F3 views and F5 copies a disk like a file, e.g. to make an image of it.
 
+## Disk cache
+
+Disks are read and written through a cache of 64 KiB blocks, so the many small reads and writes of file systems (e.g. of allocation tables and directories) read and write the disk in large blocks. Changes are written when the file system is consistent: between file operations, about a second after the last operation, or right away when half the cache holds changes. They are only written in the middle of an operation when the whole cache holds changes, e.g. when writing a file larger than the cache, and always when the disk is closed.
+
+The cache is 32 MB for each disk opened by default. Change it with `CacheSize` in megabytes in `~/.hst-commander/plugins/physicaldisk/settings.json`, e.g. `{ "CacheSize": 64 }`, or turn it off with `0`; it is read when Hst Commander starts.
+
 ## Access
 
 Choosing Physical disks when Hst Commander isn't running as administrator (root on Linux and macOS) offers to restart it as administrator with the panes where they were: with UAC on Windows, with sudo in the terminal in the TUI on Linux and macOS. The GUI on Linux and macOS says to start it as root. Both front-ends show `Administrator` or `root` in the menu bar while running with these rights.
@@ -24,3 +30,5 @@ Choosing Physical disks when Hst Commander isn't running as administrator (root 
 - `PhysicalDiskVolume` lists the disks as items with an id (`IVolume.GetWritableImageId`, the device path) and opens them with `OpenRead` and `OpenReadWrite`.
 - `IPhysicalDisks` lists and opens disks, implemented by `WindowsPhysicalDisks`, `LinuxPhysicalDisks` and `MacPhysicalDisks`.
 - `DiskStream` reads and writes a device through a buffer aligned to the sectors, as devices only read and write whole sectors.
+- `CachedDiskStream` caches blocks of a `DiskStream` and implements `IWriteCache`, so Hst Commander commits it when the file system is consistent; `Flush` doesn't write the cache, as file systems such as PFS3 flush after each change.
+- `PhysicalDiskSettings` reads the cache size from the plugin's settings file.

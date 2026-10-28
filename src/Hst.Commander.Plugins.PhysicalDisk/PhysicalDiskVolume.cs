@@ -9,9 +9,13 @@ namespace Hst.Commander.Plugins.PhysicalDisk;
 /// "PhysicalDrive2 - SanDisk Ultra". A disk is opened as a disk image by the file volume providers of Hst Commander,
 /// so paths start with the disk, e.g. "PhysicalDrive2\mbr\1". Disks have an id
 /// (<see cref="IVolume.GetWritableImageId" />), so a disk is opened once for reading and writing and shared by both
-/// panes. The list itself is read-only.
+/// panes. Disks are read and written through a cache of blocks (<see cref="CachedDiskStream" />). The list itself is
+/// read-only.
 /// </summary>
-public sealed class PhysicalDiskVolume(IPhysicalDisks disks) : IVolume
+/// <param name="disks">Physical disks of the operating system.</param>
+/// <param name="cacheSize">Most bytes cached for each disk opened, 0 to not cache.</param>
+public sealed class PhysicalDiskVolume(IPhysicalDisks disks, long cacheSize = PhysicalDiskSettings.DefaultCacheSize)
+    : IVolume
 {
     /// <summary>Name of the volume, shown as the path of the disk list.</summary>
     public const string VolumeName = "Physical disks";
@@ -56,7 +60,7 @@ public sealed class PhysicalDiskVolume(IPhysicalDisks disks) : IVolume
     public Task<Stream> OpenRead(string name, CancellationToken cancellationToken = default)
     {
         var disk = GetAccessibleDisk(name);
-        return Task.Run(() => disks.OpenRead(disk), cancellationToken);
+        return Task.Run(() => Cached(disks.OpenRead(disk)), cancellationToken);
     }
 
     /// <summary>Path of the device of a disk, e.g. "\.\PhysicalDrive2"; null when there's no such disk.</summary>
@@ -65,8 +69,11 @@ public sealed class PhysicalDiskVolume(IPhysicalDisks disks) : IVolume
     public Task<Stream> OpenReadWrite(string name, CancellationToken cancellationToken = default)
     {
         var disk = GetAccessibleDisk(name);
-        return Task.Run(() => disks.OpenReadWrite(disk), cancellationToken);
+        return Task.Run(() => Cached(disks.OpenReadWrite(disk)), cancellationToken);
     }
+
+    private Stream Cached(Stream stream) =>
+        cacheSize >= CachedDiskStream.BlockSize ? new CachedDiskStream(stream, cacheSize) : stream;
 
     public Task<Stream> OpenWrite(string name, CancellationToken cancellationToken = default) => throw ReadOnly();
 

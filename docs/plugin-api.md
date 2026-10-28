@@ -62,6 +62,10 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - Returns the plugin's volume providers, file volume providers, volume creators (with `CanCreateVolumes`), icon providers, navigation modes and image providers. `Initialize(host)` is called once before the plugin is used.
 - A plugin references only Abstractions. Plugins can't use each other's types, because each loads in its own load context, so they work together through `IPluginHost`.
 
+### IWriteCache
+
+- A stream returned by `IVolume.OpenReadWrite` can implement it when it caches writes, e.g. `CachedDiskStream` of the PhysicalDisk plugin. `HasCachedWrites` tells whether writes are waiting and `ShouldFlush` asks to be committed soon. Hst Commander calls `Commit` on a shared writable image's stream when its file system is consistent, see [Writable images](volumes.md#writable-images). `Stream.Flush` shouldn't write the cached writes, as file systems flush their stream after each change (e.g. PFS3); the stream writes by itself only when its cache is full and when it's disposed.
+
 ### IPluginHost
 
 - `OpenVolume(name, stream, exclude)` opens a seekable stream as a volume with the first file volume provider that detects it (skipping `exclude`), null when none does. The stream is passed on as it is (writable when it is) and stays owned by the caller. E.g. the Disk plugin opens PiStorm partitions with the Amiga plugin's `RdbFileVolumeProvider` this way.

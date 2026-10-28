@@ -1,4 +1,4 @@
-using Hst.Commander.Abstractions;
+﻿using Hst.Commander.Abstractions;
 using Hst.Commander.Plugins.PhysicalDisk;
 
 namespace Hst.Commander.Core.Tests;
@@ -108,6 +108,38 @@ public class GivenNavigationContextWithPhysicalDisks : IDisposable
         using var reopenedContext = await CreateContextAsync();
         await reopenedContext.ChangeLocationAsync(Path.Combine("PhysicalDrive1", "mbr", "1"));
         Assert.Equal([Paths.Parent, "dir1", "file1.txt"], await ListNamesAsync(reopenedContext));
+    }
+
+    [Fact]
+    public async Task When_DiskIsChanged_Then_CachedWritesAreWrittenWhenIdleWhileTheDiskIsOpen()
+    {
+        // arrange
+        await AddMbrDisk("PhysicalDrive1");
+        var diskPath = Path.Combine(_rootPath, "PhysicalDrive1.img");
+        var original = ReadDisk(diskPath);
+        using var diskContext = await CreateContextAsync();
+        await diskContext.ChangeLocationAsync(Path.Combine("PhysicalDrive1", "mbr", "1"));
+
+        // act
+        await diskContext.CreateDirectoryAsync("dir1");
+
+        // assert
+        var timeout = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+        while (ReadDisk(diskPath).SequenceEqual(original) && DateTime.UtcNow < timeout)
+        {
+            await Task.Delay(50);
+        }
+
+        Assert.False(ReadDisk(diskPath).SequenceEqual(original));
+    }
+
+    /// <summary>Bytes of a disk image file, read while the disk is open.</summary>
+    private static byte[] ReadDisk(string path)
+    {
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        var bytes = new byte[stream.Length];
+        stream.ReadExactly(bytes);
+        return bytes;
     }
 
     [Fact]

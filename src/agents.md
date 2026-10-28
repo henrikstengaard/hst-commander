@@ -42,7 +42,7 @@ src/
   Directory.Build.targets       Replaces the last version part with the git commit count
   packaging/                    Release packaging scripts (Linux AppImage/.deb, macOS .dmg, Windows Inno Setup)
   icon/                         App icon sources, rendered sizes and make scripts
-  Hst.Commander.Abstractions/   Plugin API: IVolume, IEntry, IVolumeProvider, IFileVolumeProvider, IPlugin, IPluginHost, ... and Paths (no external deps)
+  Hst.Commander.Abstractions/   Plugin API: IVolume, IEntry, IVolumeProvider, IFileVolumeProvider, IPlugin, IPluginHost, IWriteCache, ... and Paths (no external deps)
   Hst.Commander.Plugins.Zip/    Zip archives (default plugin)
   Hst.Commander.Plugins.LhaLzx/ Lha and lzx archives (default plugin)
   Hst.Commander.Plugins.Disk/   MBR/GPT disk images with FAT/NTFS partitions, hybrid MBR/RDB disks (default plugin)
@@ -72,7 +72,8 @@ src/
         |                          [AmigaPlugin, Adf/RdbFileVolumeProvider,
         |                           AmigaFileSystemVolume, RdbVolume]  <- Hst.Commander.Plugins.Amiga
         |                          [PhysicalDiskPlugin, PhysicalDiskVolumeProvider,
-        |                           PhysicalDiskVolume, DiskStream]  <- Hst.Commander.Plugins.PhysicalDisk
+        |                           PhysicalDiskVolume, DiskStream,
+        |                           CachedDiskStream]  <- Hst.Commander.Plugins.PhysicalDisk
         |                                    /    (default plugins, Plugins.All)
 [Volume Implementations]  <- Hst.Commander.Core
   LocalVolumeProvider (VolumeProviders.All),
@@ -105,6 +106,7 @@ All are in `Hst.Commander.Abstractions`; see [`docs/plugin-api.md`](../docs/plug
 | `IImageProvider` | Reads the images of a file for the viewer (F3) |
 | `IPlugin` | Returns a plugin's providers, creators and modes; `Initialize(IPluginHost)` |
 | `IPluginHost` | Lets plugins work together without sharing types (e.g. the Disk plugin opens a PiStorm partition with the Amiga plugin) |
+| `IWriteCache` | A writable image stream caching writes (e.g. physical disks), committed by Hst Commander when the file system is consistent (`Flush` doesn't write it) |
 
 ### Core Rules
 
@@ -113,7 +115,7 @@ These apply across features and aren't obvious from a single file:
 - **Plugins reference only `Hst.Commander.Abstractions`.** Each loads in its own `AssemblyLoadContext` sharing Abstractions with the host, so plugins can't use each other's types and work together through `IPluginHost`. Built-in plugins are listed in `Plugins.BuiltIn`, and the order matters (Disk before Amiga, so hybrid disks open as hybrid disks).
 - **Each `NavigationContext` owns a `NestedVolume`.** Opening an image pushes a volume (wrapped in `EntryVolumeProvider`); going up from its root pops and disposes it.
 - **Background work never uses the pane's volume.** Copy, move, delete, viewing, counting contents and reading icons inside volume entries open an independent volume with `NavigationContext.OpenLocationAsync`, because volumes aren't thread safe.
-- **Writable images are shared.** A file of the root volume with an id (`IVolume.GetWritableImageId`, e.g. a local file or a physical disk) opened by a provider with `CanWrite` is opened once (`SharedImages`) and shared by both panes and file operations through `SharedImageVolume` views serialized by a semaphore; two volumes writing one file would damage its file system. The lock is only held on the thread pool, never by work waiting for a UI thread. Images inside other images are read-only.
+- **Writable images are shared.** A file of the root volume with an id (`IVolume.GetWritableImageId`, e.g. a local file or a physical disk) opened by a provider with `CanWrite` is opened once (`SharedImages`) and shared by both panes and file operations through `SharedImageVolume` views serialized by a semaphore; two volumes writing one file would damage its file system. The lock is only held on the thread pool, never by work waiting for a UI thread. A stream caching writes (`IWriteCache`, e.g. `CachedDiskStream` of physical disks) is committed (`IWriteCache.Commit`, not `Flush`) only between operations, when the file system is consistent. Images inside other images are read-only.
 - **File operations only use `IVolume`.** `VolumeCopy`, `VolumeMove` and `VolumeDelete` work between any two volumes, so a new volume type gets copy, move and delete for free.
 - **Amiga metadata handling depends on `SupportsAmigaMetadata` of both sides** (copied as is, written as UAE metadata, read from UAE metadata, or both); see [`docs/file-operations.md`](../docs/file-operations.md#uae-metadata).
 - **Marked vs. selected:** in code, "marked" means entries picked with Insert/Space and "selected" means the row under the cursor.
