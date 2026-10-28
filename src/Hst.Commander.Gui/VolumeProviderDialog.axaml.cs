@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Hst.Commander.Abstractions;
 
 namespace Hst.Commander.Gui;
@@ -32,6 +33,17 @@ public partial class VolumeProviderDialog : Window
                 ? currentVolumeProvider
                 : volumeProviders.FirstOrDefault();
         VolumeProvidersList.DoubleTapped += (_, _) => CloseWithSelected();
+        // tunnelling, as the focused list item takes Enter before the default OK button sees it
+        VolumeProvidersList.AddHandler(KeyDownEvent, (_, e) =>
+        {
+            if (e.Key != Key.Enter)
+            {
+                return;
+            }
+
+            e.Handled = true;
+            CloseWithSelected();
+        }, RoutingStrategies.Tunnel);
         OkButton.Click += (_, _) => CloseWithSelected();
         CancelButton.Click += (_, _) => Close(null);
         Opened += (_, _) =>

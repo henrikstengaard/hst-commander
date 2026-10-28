@@ -32,7 +32,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - PageUp/PageDown move by a visible page; Ctrl+PageDown is checked before PageDown.
 - Ctrl+\ arrives as the control character `0x1C`, which is also sent for Ctrl+4, so both match. The Windows driver decodes Ctrl with the key's character in the current layout, so Ctrl+`<` matches too: the key left of Z is `<` on e.g. Danish and German layouts.
 - Ctrl+P is the main properties key (shown in the menu), because Windows Terminal and the classic console use Alt+Enter for full screen; Alt+Enter still works where the terminal passes it on.
-- The volume provider list is centered over its pane.
+- The volume provider list is centered over its pane. It and the create volume list (F9) have OK and Cancel buttons like the GUI. Enter in the list is handled in the list's `KeyDown` and chooses the selected item, as do OK and double-click.
 
 ## Viewer
 
