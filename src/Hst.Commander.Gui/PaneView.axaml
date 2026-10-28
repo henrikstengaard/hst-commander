@@ -126,6 +126,18 @@
 
                 <!-- navigation modes of plugins: icons at positions, e.g. the Amiga Workbench -->
                 <local:IconLayoutView x:Name="IconLayout" Grid.Row="0" Grid.RowSpan="2" IsVisible="False" />
+
+                <!-- shown while listing takes long, e.g. the physical disks while a sleeping disk wakes up -->
+                <Border x:Name="ListingProgress" Grid.Row="0" Grid.RowSpan="2" IsVisible="False"
+                        HorizontalAlignment="Center" VerticalAlignment="Center" Padding="16,10"
+                        Background="{DynamicResource PaneBackground}" BorderBrush="{DynamicResource PaneBorder}"
+                        BorderThickness="1" CornerRadius="4">
+                    <StackPanel Spacing="8">
+                        <TextBlock x:Name="ListingProgressText" Foreground="{DynamicResource PathForeground}"
+                                   HorizontalAlignment="Center" />
+                        <ProgressBar IsIndeterminate="True" MinWidth="200" />
+                    </StackPanel>
+                </Border>
             </Grid>
         </Border>
 

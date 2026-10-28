@@ -137,6 +137,11 @@ public class NestedVolume(IVolume volume) : IVolume
     public Task SetAttributes(string name, EntryAttributes attributes, CancellationToken cancellationToken = default) =>
         _currentVolume.SetAttributes(name, attributes, cancellationToken);
 
+    public string? GetWritableImageId(string name) => _currentVolume.GetWritableImageId(name);
+
+    public Task<Stream> OpenReadWrite(string name, CancellationToken cancellationToken = default) =>
+        _currentVolume.OpenReadWrite(name, cancellationToken);
+
     /// <summary>
     /// Name of the nested volume.
     /// </summary>

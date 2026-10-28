@@ -1,4 +1,5 @@
 using Hst.Commander.Abstractions;
+using Hst.Commander.Core.Volumes;
 
 namespace Hst.Commander.Core;
 
@@ -14,6 +15,24 @@ public sealed class VolumeLocation(IVolume volume, string path, IDisposable? res
     public IVolume Volume { get; } = volume;
 
     public string Path { get; } = path;
+
+    /// <summary>View of the shared image the location is in, e.g. of a physical disk; null when there's none.</summary>
+    internal SharedImageVolume? SharedImage { get; init; }
+
+    /// <summary>Reports the progress of committing the cached writes of the shared image while it's used.</summary>
+    internal IProgress<DiskWriteProgress>? DiskWriteProgress
+    {
+        set
+        {
+            if (SharedImage != null)
+            {
+                SharedImage.DiskWriteProgress = value;
+            }
+        }
+    }
+
+    /// <summary>Commits the cached writes of the shared image (see <see cref="SharedImageVolume.CommitAsync" />).</summary>
+    internal Task CommitAsync() => SharedImage?.CommitAsync() ?? Task.CompletedTask;
 
     public void Dispose() => resource?.Dispose();
 }

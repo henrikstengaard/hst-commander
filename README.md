@@ -26,6 +26,7 @@ Hst Commander comes with two front-ends that have the same functionality:
   - MBR and GPT disk images (raw or vhd) with FAT and NTFS partitions, PiStorm disks and hybrid MBR/RDB disks.
   - Amiga disk files (adf) and hard disk images with a rigid disk block (RDB), with Fast File System and PFS3 partitions.
 - Writing to Amiga adf and RDB images and FAT and NTFS partitions of disk images, shared safely by both panes.
+- Reading and writing physical disks, internal and external (e.g. USB), opened like MBR, GPT and RDB disk images and shown with their model (as administrator or root).
 - Copying, moving, renaming, making directories and deleting between any locations, with progress dialogs, speed and ETA, filters and overwrite confirmation.
 - Keeping Amiga names, protection bits and comments when copying between Amiga volumes, and storing them as UAE metadata (UAEFSDB or FS-UAE metafiles) on other volumes.
 - Creating volumes provided by plugins with F9, e.g. empty Amiga disk files (adf), formatted and bootable.
@@ -103,6 +104,7 @@ dotnet test src/Hst.Commander.Core.Tests/Hst.Commander.Core.Tests.csproj
 | [`Hst.Commander.Plugins.LhaLzx`](src/Hst.Commander.Plugins.LhaLzx/readme.md) | Lha and lzx archives (default plugin) |
 | [`Hst.Commander.Plugins.Disk`](src/Hst.Commander.Plugins.Disk/readme.md) | MBR/GPT disk images with FAT and NTFS partitions, PiStorm and hybrid disks (default plugin) |
 | [`Hst.Commander.Plugins.Amiga`](src/Hst.Commander.Plugins.Amiga/readme.md) | Amiga adf and RDB images, `.info` icons, Workbench navigation mode and Amiga pictures (default plugin) |
+| [`Hst.Commander.Plugins.PhysicalDisk`](src/Hst.Commander.Plugins.PhysicalDisk/readme.md) | Internal and external physical disks, opened like MBR, GPT and RDB disk images (default plugin) |
 | [`Hst.Commander.Core.Tests`](src/Hst.Commander.Core.Tests/readme.md) | Unit tests |
 
 See [src/agents.md](src/agents.md) for the architecture and coding conventions and [docs](docs) for how each feature works.

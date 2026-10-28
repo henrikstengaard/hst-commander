@@ -503,7 +503,13 @@ public partial class PaneView : UserControl
     {
         var hadFocus = EntriesList.IsKeyboardFocusWithin || IconLayout.IsKeyboardFocusWithin;
         var selectedIndex = EntriesList.SelectedIndex;
-        var navigationEntries = await NavigationContext.ListEntriesAsync();
+        var navigationEntries = await Core.ListingProgress.ListEntriesAsync(NavigationContext,
+            message =>
+            {
+                ListingProgressText.Text = message;
+                ListingProgress.IsVisible = true;
+            },
+            () => ListingProgress.IsVisible = false);
         var entries = navigationEntries
             .Select(entry => new EntryItem(entry, NavigationContext.IsMarked(entry), NavigationContext.IsExecutable(entry)))
             .ToList();

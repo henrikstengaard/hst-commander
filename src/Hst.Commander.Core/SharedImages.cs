@@ -1,47 +1,60 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using Hst.Commander.Abstractions;
+using Hst.Commander.Core.Volumes;
 
 namespace Hst.Commander.Core;
 
 /// <summary>
-///     Writable images (local files opened as volumes by a file volume provider that can write, e.g. Amiga disk files)
-///     opened once per file and shared by both panes and file operations. Two volumes writing the same file would each
-///     keep their own state of the file system, e.g. the free blocks, and damage it, so all use the same volume of the
-///     file through views of their own (<see cref="SharedImageVolume" />) with their own current directory. The file is
-///     closed when the last view is disposed.
+///     Writable images (items opened as volumes by a file volume provider that can write, e.g. local Amiga disk files
+///     or physical disks, see <see cref="IVolume.GetWritableImageId" />) opened once per id and shared by both panes
+///     and file operations. Two volumes writing the same file would each keep their own state of the file system, e.g.
+///     the free blocks, and damage it, so all use the same volume of the file through views of their own
+///     (<see cref="SharedImageVolume" />) with their own current directory. The file is closed when the last view is
+///     disposed. A stream caching writes (<see cref="IWriteCache" />, e.g. a physical disk) is committed when the file
+///     system is consistent: after an operation with no file open for writing, when the cache asks for it, or when
+///     nothing has been done for <see cref="IdleFlushDelay" />.
 /// </summary>
 internal static class SharedImages
 {
-    private static readonly Lock OpenLock = new();
-    private static readonly Dictionary<string, SharedImage> Images = new(PathComparer);
+    /// <summary>Time without operations after which the cached writes of an image are written.</summary>
+    public static readonly TimeSpan IdleFlushDelay = TimeSpan.FromSeconds(1);
 
-    private static StringComparer PathComparer =>
+    private static readonly Lock OpenLock = new();
+    private static readonly Dictionary<string, SharedImage> Images = new(IdComparer);
+
+    private static StringComparer IdComparer =>
         OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
             ? StringComparer.OrdinalIgnoreCase
             : StringComparer.Ordinal;
 
     /// <summary>
-    ///     Opens a view of the image of a local file at its root, opening the file the first time: for reading and
-    ///     writing when possible, otherwise only for reading (e.g. a read-only file), and then the volume is read-only.
+    ///     Opens a view of the image of an item at its root, opening the item the first time with the volume it's in:
+    ///     for reading and writing when possible (<see cref="IVolume.OpenReadWrite" />), otherwise only for reading
+    ///     (e.g. a read-only file), and then the volume is read-only.
     /// </summary>
-    public static async Task<SharedImageVolume> OpenAsync(string path, IFileVolumeProvider fileVolumeProvider,
-        CancellationToken cancellationToken)
+    /// <param name="id">Id of the item, <see cref="IVolume.GetWritableImageId" />.</param>
+    /// <param name="name">Name of the item in the current directory of <paramref name="volume" />.</param>
+    /// <param name="volume">Volume the item is in, only used when the image isn't open.</param>
+    /// <param name="fileVolumeProvider">File volume provider creating the volume of the image.</param>
+    /// <param name="cancellationToken"></param>
+    public static async Task<SharedImageVolume> OpenAsync(string id, string name, IVolume volume,
+        IFileVolumeProvider fileVolumeProvider, CancellationToken cancellationToken)
     {
-        path = Path.GetFullPath(path);
         lock (OpenLock)
         {
-            if (Images.TryGetValue(path, out var openImage))
+            if (Images.TryGetValue(id, out var openImage))
             {
                 return openImage.OpenView();
             }
         }
 
-        var stream = OpenFile(path);
+        var stream = await OpenStreamAsync(name, volume, cancellationToken);
         SharedImage image;
         try
         {
-            var volume = await fileVolumeProvider.CreateVolume(stream, cancellationToken);
-            image = new SharedImage(path, volume, stream);
+            var imageVolume = await fileVolumeProvider.CreateVolume(stream, cancellationToken);
+            image = new SharedImage(id, imageVolume, stream);
         }
         catch
         {
@@ -52,9 +65,9 @@ internal static class SharedImages
         lock (OpenLock)
         {
             // the image may have been opened at the same time, e.g. for a copy on a background thread
-            if (!Images.TryGetValue(path, out var openImage))
+            if (!Images.TryGetValue(id, out var openImage))
             {
-                Images[path] = image;
+                Images[id] = image;
                 return image.OpenView();
             }
 
@@ -72,19 +85,17 @@ internal static class SharedImages
         }
     }
 
-    /// <summary>
-    ///     Opens a file for reading and writing, shared with other readers and writers, e.g. a pane copying the file.
-    ///     It's unbuffered, so changes are written to the file right away and seen by others reading it.
-    /// </summary>
-    private static FileStream OpenFile(string path)
+    /// <summary>Opens an item for reading and writing, or only for reading when it can't be written.</summary>
+    private static async Task<Stream> OpenStreamAsync(string name, IVolume volume,
+        CancellationToken cancellationToken)
     {
         try
         {
-            return new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite, 0);
+            return await volume.OpenReadWrite(name, cancellationToken);
         }
         catch (Exception exception) when (exception is UnauthorizedAccessException or IOException)
         {
-            return new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 0);
+            return await volume.OpenRead(name, cancellationToken);
         }
     }
 
@@ -97,16 +108,25 @@ internal static class SharedImages
                 return;
             }
 
-            Images.Remove(image.Path);
+            Images.Remove(image.Id);
         }
 
         image.Close();
     }
 
     /// <summary>An image shared by views. Operations are serialized with a lock, as volumes are not thread safe.</summary>
-    internal sealed class SharedImage(string path, IVolume volume, Stream stream)
+    /// <summary>Progress calling a handler on the thread reporting it.</summary>
+    private sealed class ActionProgress<T>(Action<T> handler) : IProgress<T>
     {
-        public string Path { get; } = path;
+        public void Report(T value) => handler(value);
+    }
+
+    internal sealed class SharedImage(string id, IVolume volume, Stream stream)
+    {
+        private Timer? _idleFlushTimer;
+        private bool _closed;
+
+        public string Id { get; } = id;
 
         public IVolume Volume { get; } = volume;
 
@@ -117,6 +137,9 @@ internal static class SharedImages
         /// <summary>Number of open views, changed while holding the open lock.</summary>
         public int ViewCount { get; set; }
 
+        /// <summary>Number of files open for writing, changed while holding <see cref="Lock" />.</summary>
+        public int OpenWriteStreams { get; set; }
+
         public SharedImageVolume OpenView()
         {
             ViewCount++;
@@ -125,11 +148,99 @@ internal static class SharedImages
 
         public void Release() => SharedImages.Release(this);
 
+        /// <summary>
+        ///     Called holding <see cref="Lock" /> after an operation, when the file system is consistent unless a file is
+        ///     open for writing: commits cached writes when the cache asks for it, otherwise they are committed when
+        ///     nothing has been done for <see cref="IdleFlushDelay" />.
+        /// </summary>
+        /// <param name="progress">Reports the progress of a commit, e.g. to the progress dialog of a copy.</param>
+        public void OperationCompleted(IProgress<DiskWriteProgress>? progress)
+        {
+            if (_closed || stream is not IWriteCache { HasCachedWrites: true } cache)
+            {
+                return;
+            }
+
+            if (cache.ShouldFlush && OpenWriteStreams == 0)
+            {
+                Commit(cache, progress);
+                return;
+            }
+
+            _idleFlushTimer ??= new Timer(_ => _ = FlushWhenIdleAsync());
+            _idleFlushTimer.Change(IdleFlushDelay, Timeout.InfiniteTimeSpan);
+        }
+
+        /// <summary>
+        ///     Commits the cached writes when no file is open for writing, e.g. at the end of a copy, so they aren't
+        ///     written after the progress dialog is closed. Runs on the thread pool, like the operations.
+        /// </summary>
+        public Task CommitAsync(IProgress<DiskWriteProgress>? progress) => Task.Run(async () =>
+        {
+            await Lock.WaitAsync();
+            try
+            {
+                if (!_closed && OpenWriteStreams == 0 && stream is IWriteCache { HasCachedWrites: true } cache)
+                {
+                    Commit(cache, progress);
+                }
+            }
+            finally
+            {
+                Lock.Release();
+            }
+        });
+
+        private static void Commit(IWriteCache cache, IProgress<DiskWriteProgress>? progress)
+        {
+            if (progress == null)
+            {
+                cache.Commit();
+                return;
+            }
+
+            var totalBytes = cache.CachedWriteBytes;
+            var stopwatch = Stopwatch.StartNew();
+            progress.Report(new DiskWriteProgress(0, totalBytes));
+            cache.Commit(new ActionProgress<long>(writtenBytes =>
+            {
+                var seconds = stopwatch.Elapsed.TotalSeconds;
+                var bytesPerSecond = seconds > 0 ? writtenBytes / seconds : 0;
+                TimeSpan? eta = bytesPerSecond > 0
+                    ? TimeSpan.FromSeconds(Math.Ceiling(Math.Max(0, totalBytes - writtenBytes) / bytesPerSecond))
+                    : null;
+                progress.Report(new DiskWriteProgress(writtenBytes, totalBytes, bytesPerSecond, eta));
+            }));
+        }
+
+        private async Task FlushWhenIdleAsync()
+        {
+            await Lock.WaitAsync();
+            try
+            {
+                // a file open for writing flushes when it's closed
+                if (!_closed && OpenWriteStreams == 0 && stream is IWriteCache { HasCachedWrites: true } cache)
+                {
+                    cache.Commit();
+                }
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                // the writes stay cached and are written again by the next flush, which throws the error
+            }
+            finally
+            {
+                Lock.Release();
+            }
+        }
+
         public void Close()
         {
             Lock.Wait();
             try
             {
+                _closed = true;
+                _idleFlushTimer?.Dispose();
                 (Volume as IDisposable)?.Dispose();
                 stream.Dispose();
             }
@@ -163,6 +274,19 @@ internal sealed class SharedImageVolume : IVolume, IDisposable
     public string Name => _image.Volume.Name;
 
     public IEnumerable<string> CurrentPathComponents => _currentPathComponents.ToList();
+
+    /// <summary>
+    ///     Reports the progress of committing cached writes after the operations of this view, e.g. to the progress
+    ///     dialog of a copy; null when not shown.
+    /// </summary>
+    public IProgress<DiskWriteProgress>? DiskWriteProgress { get; set; }
+
+    /// <summary>Commits the cached writes of the image (see <see cref="SharedImages.SharedImage.CommitAsync" />).</summary>
+    public Task CommitAsync()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return _image.CommitAsync(DiskWriteProgress);
+    }
 
     public async IAsyncEnumerable<IEntry> ListEntries(
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -207,11 +331,16 @@ internal sealed class SharedImageVolume : IVolume, IDisposable
 
     public Task<Stream> OpenRead(string name, CancellationToken cancellationToken = default) =>
         RunAsync(async volume =>
-            (Stream)new LockedStream(await volume.OpenRead(name, cancellationToken), _image.Lock), cancellationToken);
+            (Stream)new LockedStream(await volume.OpenRead(name, cancellationToken), _image, false), cancellationToken);
 
     public Task<Stream> OpenWrite(string name, CancellationToken cancellationToken = default) =>
         RunAsync(async volume =>
-            (Stream)new LockedStream(await volume.OpenWrite(name, cancellationToken), _image.Lock), cancellationToken);
+        {
+            var stream = new LockedStream(await volume.OpenWrite(name, cancellationToken), _image, true,
+                DiskWriteProgress);
+            _image.OpenWriteStreams++;
+            return (Stream)stream;
+        }, cancellationToken);
 
     public Task CreateContainer(string name, CancellationToken cancellationToken = default) =>
         RunAsync(async volume =>
@@ -267,7 +396,8 @@ internal sealed class SharedImageVolume : IVolume, IDisposable
     /// <summary>
     ///     Runs an operation on the shared volume in the view's current directory, holding the image's lock. It runs on
     ///     the thread pool, so the lock is never held by work waiting for a UI thread, which may be blocked waiting for
-    ///     the lock (<see cref="SharedImages.SharedImage.Close" /> and the synchronous members of the streams).
+    ///     the lock (<see cref="SharedImages.SharedImage.Close" /> and the synchronous members of the streams). Cached
+    ///     writes may be flushed after the operation (<see cref="SharedImages.SharedImage.OperationCompleted" />).
     /// </summary>
     private Task<T> RunAsync<T>(Func<IVolume, Task<T>> operation, CancellationToken cancellationToken)
     {
@@ -284,7 +414,9 @@ internal sealed class SharedImageVolume : IVolume, IDisposable
                     await volume.ChangeDirectory([Paths.Root, .._currentPathComponents], cancellationToken);
                 }
 
-                return await operation(volume);
+                var result = await operation(volume);
+                _image.OperationCompleted(DiskWriteProgress);
+                return result;
             }
             finally
             {
@@ -304,9 +436,18 @@ internal sealed class SharedImageVolume : IVolume, IDisposable
         _image.Release();
     }
 
-    /// <summary>Stream of an entry in a shared image, holding the image's lock while reading and writing.</summary>
-    private sealed class LockedStream(Stream stream, SemaphoreSlim imageLock) : Stream
+    /// <summary>
+    ///     Stream of an entry in a shared image, holding the image's lock while reading and writing. A file written is
+    ///     counted as open for writing until disposed (<see cref="SharedImages.SharedImage.OpenWriteStreams" />).
+    /// </summary>
+    /// <param name="stream">Stream of the entry.</param>
+    /// <param name="image">Image the entry is in.</param>
+    /// <param name="isWrite">True for a file opened for writing.</param>
+    /// <param name="diskWriteProgress">Progress of committing cached writes when a file written is closed.</param>
+    private sealed class LockedStream(Stream stream, SharedImages.SharedImage image, bool isWrite,
+        IProgress<DiskWriteProgress>? diskWriteProgress = null) : Stream
     {
+        private readonly SemaphoreSlim _imageLock = image.Lock;
         private bool _disposed;
 
         public override bool CanRead => stream.CanRead;
@@ -369,14 +510,14 @@ internal sealed class SharedImageVolume : IVolume, IDisposable
 
         private T Run<T>(Func<T> operation)
         {
-            imageLock.Wait();
+            _imageLock.Wait();
             try
             {
                 return operation();
             }
             finally
             {
-                imageLock.Release();
+                _imageLock.Release();
             }
         }
 
@@ -384,16 +525,26 @@ internal sealed class SharedImageVolume : IVolume, IDisposable
         private Task<T> RunAsync<T>(Func<Task<T>> operation, CancellationToken cancellationToken) =>
             Task.Run(async () =>
             {
-                await imageLock.WaitAsync(cancellationToken);
+                await _imageLock.WaitAsync(cancellationToken);
                 try
                 {
                     return await operation();
                 }
                 finally
                 {
-                    imageLock.Release();
+                    _imageLock.Release();
                 }
             }, cancellationToken);
+
+        /// <summary>Called holding the lock when disposed: the file system is consistent again after a file is written.</summary>
+        private void Closed()
+        {
+            if (isWrite)
+            {
+                image.OpenWriteStreams--;
+                image.OperationCompleted(diskWriteProgress);
+            }
+        }
 
         protected override void Dispose(bool disposing)
         {
@@ -402,7 +553,15 @@ internal sealed class SharedImageVolume : IVolume, IDisposable
                 _disposed = true;
                 Run(() =>
                 {
-                    stream.Dispose();
+                    try
+                    {
+                        stream.Dispose();
+                    }
+                    finally
+                    {
+                        Closed();
+                    }
+
                     return true;
                 });
             }
@@ -417,7 +576,15 @@ internal sealed class SharedImageVolume : IVolume, IDisposable
                 _disposed = true;
                 await RunAsync(async () =>
                 {
-                    await stream.DisposeAsync();
+                    try
+                    {
+                        await stream.DisposeAsync();
+                    }
+                    finally
+                    {
+                        Closed();
+                    }
+
                     return true;
                 }, CancellationToken.None);
             }

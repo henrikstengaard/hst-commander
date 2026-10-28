@@ -65,4 +65,9 @@ public class EntryVolumeProvider(IEntry entry, IVolume volumeProvider) : IVolume
 
     public Task SetAttributes(string name, EntryAttributes attributes, CancellationToken cancellationToken = default) =>
         volumeProvider.SetAttributes(name, attributes, cancellationToken);
+
+    public string? GetWritableImageId(string name) => volumeProvider.GetWritableImageId(name);
+
+    public Task<Stream> OpenReadWrite(string name, CancellationToken cancellationToken = default) =>
+        volumeProvider.OpenReadWrite(name, cancellationToken);
 }

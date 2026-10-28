@@ -13,6 +13,7 @@
       <ProjectReference Include="..\Hst.Commander.Plugins.LhaLzx\Hst.Commander.Plugins.LhaLzx.csproj" />
       <ProjectReference Include="..\Hst.Commander.Plugins.Disk\Hst.Commander.Plugins.Disk.csproj" />
       <ProjectReference Include="..\Hst.Commander.Plugins.Amiga\Hst.Commander.Plugins.Amiga.csproj" />
+      <ProjectReference Include="..\Hst.Commander.Plugins.PhysicalDisk\Hst.Commander.Plugins.PhysicalDisk.csproj" />
     </ItemGroup>
 
     <ItemGroup>

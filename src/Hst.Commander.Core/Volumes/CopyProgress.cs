@@ -25,6 +25,12 @@ public record CopyProgress(
     double BytesPerSecond,
     TimeSpan? Eta)
 {
+    /// <summary>
+    /// Progress of writing the cached writes of a disk while copying is waiting for it, null otherwise (see
+    /// <see cref="DiskWriteProgress" />).
+    /// </summary>
+    public DiskWriteProgress? DiskWrite { get; init; }
+
     /// <summary>Fraction of the current item copied, between 0 and 1.</summary>
     public double CurrentFraction => GetFraction(CurrentBytes, CurrentSize);
 
@@ -40,10 +46,13 @@ public record CopyProgress(
     public string SpeedText => SizeFormatter.FormatSpeed(BytesPerSecond);
 
     /// <summary>Estimated time left as "h:mm:ss" or "--:--:--" when unknown.</summary>
-    public string EtaText => Eta == null
+    public string EtaText => FormatEta(Eta);
+
+    /// <summary>Formats an estimated time left as "h:mm:ss" or "--:--:--" when unknown.</summary>
+    internal static string FormatEta(TimeSpan? eta) => eta == null
         ? "--:--:--"
         : string.Create(CultureInfo.InvariantCulture,
-            $"{(int)Eta.Value.TotalHours}:{Eta.Value.Minutes:00}:{Eta.Value.Seconds:00}");
+            $"{(int)eta.Value.TotalHours}:{eta.Value.Minutes:00}:{eta.Value.Seconds:00}");
 
     private static double GetFraction(long bytes, long size) =>
         size <= 0 ? 1 : Math.Clamp((double)bytes / size, 0, 1);

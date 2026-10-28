@@ -73,7 +73,8 @@ public sealed class NavigationContext : IDisposable
     ///         </item>
     ///         <item>
     ///             otherwise, when another volume provider is shown, a path in its volume from the root, e.g. "dir1"
-    ///             or the provider name for the root.
+    ///             or the provider name for the root, also going into images, e.g. "PhysicalDrive2\mbr" of a
+    ///             physical disk.
     ///         </item>
     ///     </list>
     /// </summary>
@@ -116,24 +117,19 @@ public sealed class NavigationContext : IDisposable
             cancellationToken);
     }
 
-    /// <summary>Changes to a path from the root of a new volume of the current (non-local) volume provider.</summary>
+    /// <summary>
+    ///     Changes to a path from the root of a new volume of the current (non-local) volume provider, where path
+    ///     components are directories or images.
+    /// </summary>
     private async Task ChangeVolumeLocationAsync(string path, CancellationToken cancellationToken)
     {
         var pathComponents = path.Equals(_volumeProvider.Name, StringComparison.OrdinalIgnoreCase)
             ? []
             : SplitPath(path);
         var volume = await _volumeProvider.CreateVolume(cancellationToken);
-        try
-        {
-            await volume.ChangeDirectory([Paths.Root, ..pathComponents], cancellationToken);
-        }
-        catch
-        {
-            (volume as IDisposable)?.Dispose();
-            throw;
-        }
-
-        SetRootVolume(_volumeProvider, volume);
+        var context = new NavigationContext(string.Empty, _startFile, _fileVolumeProviders, _iconProviders);
+        context.SetRootVolume(_volumeProvider, volume);
+        await ChangeToPathAsync(context, pathComponents, path, cancellationToken);
     }
 
     /// <summary>Changes to a local directory or a directory inside a local image.</summary>
@@ -166,7 +162,17 @@ public sealed class NavigationContext : IDisposable
             Path.GetFileName(imagePath),
             ..SplitPath(Path.GetRelativePath(imagePath, fullPath)).Where(pathComponent => pathComponent != ".")
         ];
-        var context = new NavigationContext(imageDirectory, _startFile, _fileVolumeProviders);
+        var context = new NavigationContext(imageDirectory, _startFile, _fileVolumeProviders, _iconProviders);
+        await ChangeToPathAsync(context, pathComponents, fullPath, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Changes a new context to path components that are directories or images and then shows its location. The
+    ///     context is disposed when a path component isn't found, leaving this location unchanged.
+    /// </summary>
+    private async Task ChangeToPathAsync(NavigationContext context, IEnumerable<string> pathComponents,
+        string location, CancellationToken cancellationToken)
+    {
         try
         {
             foreach (var pathComponent in pathComponents)
@@ -177,9 +183,9 @@ public sealed class NavigationContext : IDisposable
                     await context._nestedVolume.ChangeDirectory([entry.Name], cancellationToken);
                 }
                 else if (entry == null ||
-                         !await context.OpenImageAsync(entry, _fileVolumeProviders, cancellationToken))
+                         !await context.OpenImageAsync(entry, _fileVolumeProviders, true, cancellationToken))
                 {
-                    throw new IOException($"Location '{fullPath}' not found");
+                    throw new IOException($"Location '{location}' not found");
                 }
             }
         }
@@ -841,8 +847,9 @@ public sealed class NavigationContext : IDisposable
         }
 
         // files detected by any file volume provider, e.g. ISO images or zip archives (also with other extensions like
-        // .nupkg), are browsed as images
-        if (await OpenImageAsync(entry, _fileVolumeProviders, cancellationToken))
+        // .nupkg), are browsed as images; local files that can't be read are started, errors reading other files,
+        // e.g. a physical disk without access, are thrown
+        if (await OpenImageAsync(entry, _fileVolumeProviders, localFilePath != null, cancellationToken))
         {
             return;
         }
@@ -883,7 +890,7 @@ public sealed class NavigationContext : IDisposable
             return;
         }
 
-        if (!await OpenImageAsync(entry, _fileVolumeProviders, cancellationToken))
+        if (!await OpenImageAsync(entry, _fileVolumeProviders, false, cancellationToken))
         {
             throw new IOException($"'{entry.Name}' can't be opened as a volume");
         }
@@ -891,27 +898,26 @@ public sealed class NavigationContext : IDisposable
 
     /// <summary>
     ///     Opens an item in the current location as an image when one of the file volume providers detects it, e.g.
-    ///     by its magic signature, and pushes its volume. Returns false when none detects it.
+    ///     by its magic signature, and pushes its volume. Returns false when none detects it, or when the file can't
+    ///     be read and <paramref name="ignoreReadErrors" /> is true.
     /// </summary>
     private async Task<bool> OpenImageAsync(IEntry entry, IEnumerable<IFileVolumeProvider> fileVolumeProviders,
-        CancellationToken cancellationToken)
+        bool ignoreReadErrors, CancellationToken cancellationToken)
     {
         var volume = _nestedVolume;
         var fileVolumeProvider = await DetectFileVolumeProviderAsync(entry.Name, fileVolumeProviders.ToList(),
-            token => volume.OpenRead(entry.Name, token), cancellationToken);
+            token => volume.OpenRead(entry.Name, token), ignoreReadErrors, cancellationToken);
         if (fileVolumeProvider == null)
         {
             return false;
         }
 
-        // a local file is shared when it can be written, otherwise an image inside another image is opened again
-        // from the directory it's in, e.g. for copying
+        // a file of the root volume with an id, e.g. a local file or a physical disk, is shared when it can be
+        // written, otherwise an image inside another image is opened again from the directory it's in, e.g. for copying
         var parentPathComponents = IsInImage ? _images.Peek().Volume.CurrentPathComponents.ToList() : [];
-        var sharedPath = fileVolumeProvider.CanWrite && !IsInImage && LocalPath is { } localPath
-            ? Path.Combine(localPath, entry.Name)
-            : null;
-        var image = await OpenImageAsync(fileVolumeProvider, entry.Name, parentPathComponents, sharedPath,
-            token => volume.OpenRead(entry.Name, token), cancellationToken);
+        var sharedId = fileVolumeProvider.CanWrite && !IsInImage ? volume.GetWritableImageId(entry.Name) : null;
+        var image = await OpenImageAsync(fileVolumeProvider, entry.Name, parentPathComponents, sharedId, volume,
+            cancellationToken);
         _nestedVolume.PushVolume(new EntryVolumeProvider(entry, image.Volume));
         _images.Push(image);
         PreviousEntryName = null;
@@ -921,11 +927,12 @@ public sealed class NavigationContext : IDisposable
 
     /// <summary>
     ///     The first file volume provider detecting a file, null when none does. Files that can't be read, e.g. locked
-    ///     by another process, are not detected, so they are started as usual.
+    ///     by another process, are not detected when <paramref name="ignoreReadErrors" /> is true, so local files are
+    ///     started as usual.
     /// </summary>
     private static async Task<IFileVolumeProvider?> DetectFileVolumeProviderAsync(string name,
         IReadOnlyList<IFileVolumeProvider> fileVolumeProviders, Func<CancellationToken, Task<Stream>> openRead,
-        CancellationToken cancellationToken)
+        bool ignoreReadErrors, CancellationToken cancellationToken)
     {
         if (fileVolumeProviders.Count == 0)
         {
@@ -958,7 +965,7 @@ public sealed class NavigationContext : IDisposable
                 }
             }
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException
+        catch (Exception exception) when (ignoreReadErrors && exception is IOException or UnauthorizedAccessException
                                               or NotSupportedException)
         {
             return null;
@@ -975,22 +982,24 @@ public sealed class NavigationContext : IDisposable
     }
 
     /// <summary>
-    ///     Opens a file as an image with a file volume provider. A local file opened by a file volume provider that can
-    ///     write (<paramref name="sharedPath" />) is shared with the other pane and file operations (see
-    ///     <see cref="SharedImages" />), other files are opened for reading.
+    ///     Opens a file in the current directory of a volume as an image with a file volume provider. A file with an id
+    ///     opened by a file volume provider that can write (<paramref name="sharedId" />), e.g. a local file or a
+    ///     physical disk, is shared with the other pane and file operations (see <see cref="SharedImages" />), other
+    ///     files are opened for reading.
     /// </summary>
     private static async Task<OpenedImage> OpenImageAsync(IFileVolumeProvider fileVolumeProvider, string name,
-        IReadOnlyList<string> parentPathComponents, string? sharedPath, Func<CancellationToken, Task<Stream>> openRead,
+        IReadOnlyList<string> parentPathComponents, string? sharedId, IVolume parentVolume,
         CancellationToken cancellationToken)
     {
-        if (sharedPath != null)
+        if (sharedId != null)
         {
-            var sharedVolume = await SharedImages.OpenAsync(sharedPath, fileVolumeProvider, cancellationToken);
-            return new OpenedImage(fileVolumeProvider, name, parentPathComponents, sharedVolume, null, sharedPath,
+            var sharedVolume = await SharedImages.OpenAsync(sharedId, name, parentVolume, fileVolumeProvider,
+                cancellationToken);
+            return new OpenedImage(fileVolumeProvider, name, parentPathComponents, sharedVolume, null, sharedId,
                 sharedVolume.IsWritable);
         }
 
-        var stream = await OpenSeekableAsync(openRead, cancellationToken);
+        var stream = await OpenSeekableAsync(token => parentVolume.OpenRead(name, token), cancellationToken);
         try
         {
             // a file volume provider that can write gets a read-only stream, e.g. of a temporary copy of the file
@@ -1199,6 +1208,7 @@ public sealed class NavigationContext : IDisposable
         try
         {
             var volume = rootLocation.Volume;
+            SharedImageVolume? sharedImage = null;
             foreach (var image in _images.Reverse())
             {
                 // the first image is in the root location, the others in a directory of the image before
@@ -1207,17 +1217,16 @@ public sealed class NavigationContext : IDisposable
                     await volume.ChangeDirectory([Paths.Root, ..image.ParentPathComponents], cancellationToken);
                 }
 
-                var parentVolume = volume;
                 var openedImage = await OpenImageAsync(image.FileVolumeProvider, image.Name,
-                    image.ParentPathComponents, image.SharedPath, token => parentVolume.OpenRead(image.Name, token),
-                    cancellationToken);
+                    image.ParentPathComponents, image.SharedId, volume, cancellationToken);
                 resources.Push(openedImage);
                 volume = openedImage.Volume;
+                sharedImage ??= volume as SharedImageVolume;
             }
 
             await volume.ChangeDirectory([Paths.Root, .._images.Peek().Volume.CurrentPathComponents],
                 cancellationToken);
-            return new VolumeLocation(volume, CurrentPath, new Resources(resources));
+            return new VolumeLocation(volume, CurrentPath, new Resources(resources)) { SharedImage = sharedImage };
         }
         catch
         {
@@ -1273,8 +1282,11 @@ public sealed class NavigationContext : IDisposable
         using (destination)
         {
             ThrowIfCopyingOntoItself(source.Path, entries, destination.Path, targetName, "copy");
-            await source.Volume.CopyToAsync(entries, destination.Volume,
-                new CopyOptions(filter, targetName, confirmOverwrite, UaeMetadata), progress, cancellationToken);
+            var operationProgress = CreateOperationProgress(progress);
+            await RunCommittingAsync([destination], operationProgress?.DiskWrite, () =>
+                source.Volume.CopyToAsync(entries, destination.Volume,
+                    new CopyOptions(filter, targetName, confirmOverwrite, UaeMetadata), operationProgress,
+                    cancellationToken));
         }
     }
 
@@ -1290,21 +1302,75 @@ public sealed class NavigationContext : IDisposable
         ArgumentNullException.ThrowIfNull(entries);
 
         using var location = await OpenLocationAsync(cancellationToken);
-        var metadata = await UaeMetadataUpdater.ReadAsync(location.Volume, UaeMetadata, false, null,
-            cancellationToken);
+        var operationProgress = progress == null
+            ? null
+            : new OperationProgress<DeleteProgress>(progress, new DeleteProgress(string.Empty, 0, 0),
+                (value, diskWrite) => value with { DiskWrite = diskWrite });
+        await RunCommittingAsync([location], operationProgress?.DiskWrite, async () =>
+        {
+            var metadata = await UaeMetadataUpdater.ReadAsync(location.Volume, UaeMetadata, false, null,
+                cancellationToken);
+            try
+            {
+                await location.Volume.DeleteAsync(entries, operationProgress, cancellationToken);
+            }
+            catch
+            {
+                // the metadata of the entries deleted so far is removed, also when deleting fails
+                await UaeMetadataUpdater.TryRemoveMissingAsync(location.Volume, metadata);
+                throw;
+            }
+
+            await UaeMetadataReader.RemoveMissingAsync(location.Volume, metadata, cancellationToken);
+        });
+    }
+
+    /// <summary>
+    ///     Runs a file operation, committing the cached writes of the shared images of its locations when it has
+    ///     stopped (see <see cref="SharedImages" />), also when it fails or is cancelled, so they are written while the
+    ///     progress dialog is shown instead of after it's closed. Commits while the operation runs (when the cache is
+    ///     filling up) and at the end report their progress to <paramref name="progress" />.
+    /// </summary>
+    private static async Task RunCommittingAsync(IReadOnlyList<VolumeLocation> locations,
+        IProgress<DiskWriteProgress>? progress, Func<Task> operation)
+    {
+        foreach (var location in locations)
+        {
+            location.DiskWriteProgress = progress;
+        }
+
         try
         {
-            await location.Volume.DeleteAsync(entries, progress, cancellationToken);
+            await operation();
         }
         catch
         {
-            // the metadata of the entries deleted so far is removed, also when deleting fails
-            await UaeMetadataUpdater.TryRemoveMissingAsync(location.Volume, metadata);
+            foreach (var location in locations)
+            {
+                try
+                {
+                    await location.CommitAsync();
+                }
+                catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+                {
+                    // the error of the operation is shown; the writes stay cached for the next commit
+                }
+            }
+
             throw;
         }
 
-        await UaeMetadataReader.RemoveMissingAsync(location.Volume, metadata, cancellationToken);
+        foreach (var location in locations)
+        {
+            await location.CommitAsync();
+        }
     }
+
+    private static OperationProgress<CopyProgress>? CreateOperationProgress(IProgress<CopyProgress>? progress) =>
+        progress == null
+            ? null
+            : new OperationProgress<CopyProgress>(progress, new CopyProgress(string.Empty, 0, 0, 0, 0, 0, 0, 0, null),
+                (value, diskWrite) => value with { DiskWrite = diskWrite });
 
     /// <summary>
     ///     Properties of entries in the current location shown in the properties dialog (Alt+Enter), e.g. of
@@ -1811,13 +1877,18 @@ public sealed class NavigationContext : IDisposable
         using (destination)
         {
             ThrowIfCopyingOntoItself(source.Path, entries, destination.Path, targetName, "move");
-            var remainingEntries = await MoveOnSameDriveAsync(source, entries, destination, filter, targetName,
-                progress, cancellationToken);
-            if (remainingEntries.Count > 0)
+            var operationProgress = CreateOperationProgress(progress);
+            await RunCommittingAsync([destination, source], operationProgress?.DiskWrite, async () =>
             {
-                await source.Volume.MoveToAsync(remainingEntries, destination.Volume,
-                    new CopyOptions(filter, targetName, confirmOverwrite, UaeMetadata), progress, cancellationToken);
-            }
+                var remainingEntries = await MoveOnSameDriveAsync(source, entries, destination, filter, targetName,
+                    operationProgress, cancellationToken);
+                if (remainingEntries.Count > 0)
+                {
+                    await source.Volume.MoveToAsync(remainingEntries, destination.Volume,
+                        new CopyOptions(filter, targetName, confirmOverwrite, UaeMetadata), operationProgress,
+                        cancellationToken);
+                }
+            });
         }
     }
 
@@ -2042,6 +2113,38 @@ public sealed class NavigationContext : IDisposable
     }
 
     /// <summary>
+    ///     Progress of a file operation that also reports the progress of committing cached writes, as the last
+    ///     progress of the operation with the disk write (e.g. <see cref="CopyProgress.DiskWrite" />), so the progress
+    ///     dialog shows it.
+    /// </summary>
+    private sealed class OperationProgress<T> : IProgress<T>
+    {
+        private readonly IProgress<T> _progress;
+        private T _last;
+
+        public OperationProgress(IProgress<T> progress, T initial, Func<T, DiskWriteProgress, T> withDiskWrite)
+        {
+            _progress = progress;
+            _last = initial;
+            DiskWrite = new ActionProgress<DiskWriteProgress>(value => _progress.Report(withDiskWrite(_last, value)));
+        }
+
+        /// <summary>Reports the progress of committing cached writes.</summary>
+        public IProgress<DiskWriteProgress> DiskWrite { get; }
+
+        public void Report(T value)
+        {
+            _last = value;
+            _progress.Report(value);
+        }
+
+        private sealed class ActionProgress<TValue>(Action<TValue> handler) : IProgress<TValue>
+        {
+            public void Report(TValue value) => handler(value);
+        }
+    }
+
+    /// <summary>
     ///     A file opened as a volume (an image) by a file volume provider.
     /// </summary>
     /// <param name="fileVolumeProvider">File volume provider that detected the file and created the volume.</param>
@@ -2051,10 +2154,10 @@ public sealed class NavigationContext : IDisposable
     /// </param>
     /// <param name="volume">Volume of the image, a view of a shared image when shared.</param>
     /// <param name="stream">Stream of the file, closed after the volume. Null when shared.</param>
-    /// <param name="sharedPath">Path of the local file of a shared image (see <see cref="SharedImages" />).</param>
+    /// <param name="sharedId">Id of the file of a shared image (see <see cref="SharedImages" />).</param>
     /// <param name="isWritable">True when the image can be changed.</param>
     private sealed class OpenedImage(IFileVolumeProvider fileVolumeProvider, string name,
-        IReadOnlyList<string> parentPathComponents, IVolume volume, Stream? stream, string? sharedPath,
+        IReadOnlyList<string> parentPathComponents, IVolume volume, Stream? stream, string? sharedId,
         bool isWritable) : IDisposable
     {
         public IFileVolumeProvider FileVolumeProvider { get; } = fileVolumeProvider;
@@ -2065,7 +2168,7 @@ public sealed class NavigationContext : IDisposable
 
         public IVolume Volume { get; } = volume;
 
-        public string? SharedPath { get; } = sharedPath;
+        public string? SharedId { get; } = sharedId;
 
         public bool IsWritable { get; } = isWritable;
 

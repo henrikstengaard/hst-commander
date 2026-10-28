@@ -17,6 +17,13 @@ public interface IVolumeProvider
     string Description { get; }
 
     /// <summary>
+    /// True when the volumes need administrator rights (root on Linux and macOS) to be opened, e.g. physical disks.
+    /// Choosing the volume provider when Hst Commander isn't running as administrator offers to restart it as
+    /// administrator. Defaults to false.
+    /// </summary>
+    bool RequiresAdministrator => false;
+
+    /// <summary>
     /// Create a new volume at its root. Each call returns a volume of its own, so e.g. a copy can use one on a
     /// background thread without changing the volume shown in a pane. A volume implementing <see cref="IDisposable"/>
     /// is disposed when it is no longer used.

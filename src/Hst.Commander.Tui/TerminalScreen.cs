@@ -1,6 +1,8 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Text;
+using Hst.Commander.Core;
 
 namespace Hst.Commander.Tui;
 
@@ -12,6 +14,9 @@ public abstract record TerminalAction
 
     /// <summary>Shows the output screen (Ctrl+O) until a key is pressed.</summary>
     public sealed record ShowOutput : TerminalAction;
+
+    /// <summary>Runs Hst Commander again as root with sudo in the terminal (Linux and macOS), then quits.</summary>
+    public sealed record RestartAsRoot(StartupOptions Options) : TerminalAction;
 }
 
 /// <summary>
@@ -118,13 +123,41 @@ public static class TerminalScreen
     /// <summary>Shows the output screen until a key is pressed (Ctrl+O), like Midnight Commander.</summary>
     public static void ShowOutput() => Console.ReadKey(true);
 
+    /// <summary>
+    ///     True in Windows Terminal, Visual Studio's and VS Code's terminals, which show the console through a pseudo
+    ///     console and not its screen buffers. The environment variables aren't enough: a program started as
+    ///     administrator doesn't get them, but is still shown in Windows Terminal when it's the default terminal.
+    /// </summary>
     private static bool IsWindowsTerminal => Environment.GetEnvironmentVariable("WT_SESSION") != null ||
-                                             Environment.GetEnvironmentVariable("VSAPPIDNAME") != null;
+                                             Environment.GetEnvironmentVariable("VSAPPIDNAME") != null ||
+                                             IsPseudoConsole;
+
+    private static bool IsPseudoConsole
+    {
+        get
+        {
+            var window = GetConsoleWindow();
+            if (window == IntPtr.Zero)
+            {
+                return false;
+            }
+
+            var className = new StringBuilder(256);
+            return GetClassName(window, className, className.Capacity) > 0 &&
+                   className.ToString() == "PseudoConsoleWindow";
+        }
+    }
 
     private static bool IsValid(IntPtr handle) => handle != IntPtr.Zero && handle != new IntPtr(-1);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern IntPtr GetStdHandle(int stdHandle);
+
+    [DllImport("kernel32.dll")]
+    private static extern IntPtr GetConsoleWindow();
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetClassName(IntPtr window, StringBuilder className, int maxCount);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

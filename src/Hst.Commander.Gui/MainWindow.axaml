@@ -7,36 +7,45 @@
         Width="1200" Height="750"
         WindowStartupLocation="CenterScreen">
     <DockPanel>
-        <Menu DockPanel.Dock="Top">
-            <MenuItem Header="_File">
-                <MenuItem x:Name="ViewMenuItem" Header="Vie_w..." InputGesture="F3" />
-                <MenuItem x:Name="CopyMenuItem" Header="_Copy..." InputGesture="F5" />
-                <MenuItem x:Name="MoveMenuItem" Header="Mo_ve/rename..." InputGesture="F6" />
-                <MenuItem x:Name="MakeDirectoryMenuItem" Header="_Make directory..." InputGesture="F7" />
-                <MenuItem x:Name="DeleteMenuItem" Header="_Delete..." InputGesture="F8" />
-                <MenuItem x:Name="CreateVolumeMenuItem" Header="Cr_eate volume..." InputGesture="F9" />
-                <MenuItem x:Name="PropertiesMenuItem" Header="_Properties..." InputGesture="Alt+Enter" />
-                <MenuItem x:Name="OpenAsVolumeMenuItem" Header="Ope_n as volume" InputGesture="Ctrl+PageDown" />
-                <Separator />
-                <!-- +, - and * are matched by their symbol in MainWindow, key gestures would be shown as "OemPlus" etc. -->
-                <MenuItem x:Name="SelectGroupMenuItem" Header="Select _group... (+)" />
-                <MenuItem x:Name="UnselectGroupMenuItem" Header="_Unselect group... (-)" />
-                <MenuItem x:Name="InvertSelectionMenuItem" Header="_Invert selection (*)" />
-                <Separator />
-                <MenuItem x:Name="LeftVolumeMenuItem" Header="_Left volume..." />
-                <MenuItem x:Name="RightVolumeMenuItem" Header="_Right volume..." />
-                <MenuItem x:Name="LocationMenuItem" Header="L_ocation..." InputGesture="Ctrl+L" />
-                <Separator />
-                <MenuItem x:Name="SettingsMenuItem" Header="_Settings..." />
-                <Separator />
-                <MenuItem x:Name="QuitMenuItem" Header="_Quit" InputGesture="F10" />
-            </MenuItem>
-            <!-- the navigation modes of the active pane, added by the code-behind -->
-            <MenuItem x:Name="ViewMenu" Header="_View" />
-            <MenuItem Header="_Help">
-                <MenuItem x:Name="AboutMenuItem" Header="_About..." />
-            </MenuItem>
-        </Menu>
+        <DockPanel DockPanel.Dock="Top">
+            <!-- shown at the right of the menu bar when running as administrator or root -->
+            <Border x:Name="AdministratorIndicator" DockPanel.Dock="Right" IsVisible="False"
+                    Background="{DynamicResource AdministratorBackground}" CornerRadius="3" Margin="4,2"
+                    VerticalAlignment="Center" Padding="8,2">
+                <TextBlock x:Name="AdministratorText" Foreground="{DynamicResource AdministratorForeground}"
+                           FontWeight="Bold" />
+            </Border>
+            <Menu>
+                <MenuItem Header="_File">
+                    <MenuItem x:Name="ViewMenuItem" Header="Vie_w..." InputGesture="F3" />
+                    <MenuItem x:Name="CopyMenuItem" Header="_Copy..." InputGesture="F5" />
+                    <MenuItem x:Name="MoveMenuItem" Header="Mo_ve/rename..." InputGesture="F6" />
+                    <MenuItem x:Name="MakeDirectoryMenuItem" Header="_Make directory..." InputGesture="F7" />
+                    <MenuItem x:Name="DeleteMenuItem" Header="_Delete..." InputGesture="F8" />
+                    <MenuItem x:Name="CreateVolumeMenuItem" Header="Cr_eate volume..." InputGesture="F9" />
+                    <MenuItem x:Name="PropertiesMenuItem" Header="_Properties..." InputGesture="Alt+Enter" />
+                    <MenuItem x:Name="OpenAsVolumeMenuItem" Header="Ope_n as volume" InputGesture="Ctrl+PageDown" />
+                    <Separator />
+                    <!-- +, - and * are matched by their symbol in MainWindow, key gestures would be shown as "OemPlus" etc. -->
+                    <MenuItem x:Name="SelectGroupMenuItem" Header="Select _group... (+)" />
+                    <MenuItem x:Name="UnselectGroupMenuItem" Header="_Unselect group... (-)" />
+                    <MenuItem x:Name="InvertSelectionMenuItem" Header="_Invert selection (*)" />
+                    <Separator />
+                    <MenuItem x:Name="LeftVolumeMenuItem" Header="_Left volume..." />
+                    <MenuItem x:Name="RightVolumeMenuItem" Header="_Right volume..." />
+                    <MenuItem x:Name="LocationMenuItem" Header="L_ocation..." InputGesture="Ctrl+L" />
+                    <Separator />
+                    <MenuItem x:Name="SettingsMenuItem" Header="_Settings..." />
+                    <Separator />
+                    <MenuItem x:Name="QuitMenuItem" Header="_Quit" InputGesture="F10" />
+                </MenuItem>
+                <!-- the navigation modes of the active pane, added by the code-behind -->
+                <MenuItem x:Name="ViewMenu" Header="_View" />
+                <MenuItem Header="_Help">
+                    <MenuItem x:Name="AboutMenuItem" Header="_About..." />
+                </MenuItem>
+            </Menu>
+        </DockPanel>
         <!-- function key bar; the buttons aren't focusable so the active pane keeps the focus -->
         <UniformGrid DockPanel.Dock="Bottom" Rows="1">
             <UniformGrid.Styles>
