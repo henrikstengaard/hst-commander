@@ -10,7 +10,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - Long operations run on a background thread with volumes of their own from `OpenLocationAsync`, never the pane's volume. For local paths that's a new `LocalVolume`; images are opened again from their files (images inside images from the reopened image they're in); other providers get a new volume changed to the current path.
 - `GetOperationEntries` returns the marked entries, or the entry under the cursor when none are marked (never `..`). Marks are cleared after a successful copy or delete.
 - Progress is reported at most every 100 ms and at item boundaries.
-- While cached writes of a disk are written, e.g. of a physical disk when its cache fills up and at the end of a copy, move or delete, the progress has `DiskWrite` (`DiskWriteProgress`) and the progress dialogs of both front-ends show "Writing to disk 12M/16M" instead of the current file, with the current file's bar following the write (the delete dialog shows the percentage); see [Writable images](volumes.md#writable-images).
+- While cached writes of a disk are written, e.g. of a physical disk when its cache fills up and at the end of a copy, move or delete, the progress has `DiskWrite` (`DiskWriteProgress`) and the progress dialogs of both front-ends show "Writing to disk 12M/16M" instead of the current file, with the current file's bar following the write and the speed and ETA of the write (the delete dialog shows the percentage, and the speed and ETA of the write in place of its ETA); see [Writable images](volumes.md#writable-images).
 - Operations that can't run in a location (the drive list, a read-only image) have a `...NotSupportedMessage` property, which the front-ends show as an error instead of opening the dialog; the method itself then throws `NotSupportedException`.
 - Created and renamed entries are selected once by `GetSelectedIndex` when the entries are listed again.
 
@@ -55,7 +55,7 @@ Amiga names can contain characters other file systems can't (e.g. `*`, `?`, `#`)
 
 ## Deleting
 
-- `VolumeDelete.DeleteAsync` scans first (entries inside a container before the container), then deletes in that order, using only `Delete` of items and empty containers. The volume is changed back to its starting directory, also when cancelled or failed.
+- `VolumeDelete.DeleteAsync` scans first (entries inside a container before the container), then deletes in that order, using only `Delete` of items and empty containers. The volume is changed back to its starting directory, also when cancelled or failed. The progress has an estimated time left (`DeleteProgress.Eta`) from the average entries deleted per second, shown below the total bar.
 - `NavigationContext.DeleteAsync` runs it on a volume of its own and removes the UAE metadata of deleted entries.
 
 ## Making Directories

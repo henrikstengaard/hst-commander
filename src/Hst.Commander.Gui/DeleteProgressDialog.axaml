@@ -11,6 +11,7 @@
         <TextBlock x:Name="CurrentText" Text="Preparing..." TextTrimming="CharacterEllipsis" />
         <TextBlock x:Name="TotalText" Text="Total" />
         <ProgressBar x:Name="TotalProgressBar" Minimum="0" Maximum="1" ShowProgressText="True" />
+        <TextBlock x:Name="EtaText" Text="" />
         <Button x:Name="CancelButton" Content="Cancel" MinWidth="80" HorizontalAlignment="Right"
                 HorizontalContentAlignment="Center" IsCancel="True" Margin="0,8,0,0" />
     </StackPanel>

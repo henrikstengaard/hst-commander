@@ -345,20 +345,21 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    ///     Asks to start Hst Commander as administrator (UAC on Windows) with the panes where they are and the pane
-    ///     showing the volume provider, and closes the window when started. Returns false when it isn't started, e.g.
-    ///     declined, UAC cancelled, or on Linux and macOS, where the GUI can't restart itself as root and says so.
+    ///     Asks to start Hst Commander as administrator (UAC on Windows, pkexec on Linux) with the panes where they are
+    ///     and the pane showing the volume provider, and closes the window when started. Returns false when it isn't
+    ///     started, e.g. declined, the password dialog cancelled, or on macOS and Linux without pkexec, where the GUI
+    ///     can't restart itself as root and says so.
     /// </summary>
     private async Task<bool> RestartAsAdministratorAsync(PaneView pane, IVolumeProvider volumeProvider)
     {
-        if (!Elevation.CanRestartWithoutTerminal)
+        if (!Elevation.CanStartAsAdministrator)
         {
             await new ConfirmDialog(Elevation.AdministratorName, Elevation.GetRestartManuallyMessage(volumeProvider),
                 "_OK", null).ShowDialog<bool?>(this);
             return false;
         }
 
-        if (await new ConfirmDialog(Elevation.AdministratorName, Elevation.GetRestartQuestion(volumeProvider),
+        if (await new ConfirmDialog(Elevation.AdministratorName, Elevation.GetRestartQuestion(volumeProvider, false),
                 "_Restart", "_Continue").ShowDialog<bool?>(this) != true)
         {
             return false;
@@ -369,7 +370,7 @@ public partial class MainWindow : Window
             isRight, volumeProvider);
         try
         {
-            if (!Elevation.StartAsAdministrator(options))
+            if (!await Elevation.StartAsAdministratorAsync(options))
             {
                 return false;
             }

@@ -158,6 +158,8 @@ public class GivenNavigationContextWithPhysicalDisks : IDisposable
         Assert.Equal(0, diskWrites[0].WrittenBytes);
         Assert.True(diskWrites[0].TotalBytes > 0);
         Assert.Equal(1, diskWrites[^1].Fraction);
+        Assert.True(diskWrites[^1].BytesPerSecond > 0);
+        Assert.Equal(TimeSpan.Zero, diskWrites[^1].Eta);
         Assert.Equal("file1.txt", progress[^1].CurrentName);
     }
 
@@ -185,7 +187,7 @@ public class GivenNavigationContextWithPhysicalDisks : IDisposable
 
         // assert
         Assert.False(ReadDisk(diskPath).SequenceEqual(original));
-        Assert.Contains(progress, value => value.DiskWrite is { Fraction: 1 });
+        Assert.Contains(progress, value => value.DiskWrite is { Fraction: 1, Eta: not null });
     }
 
     private sealed class SynchronousProgress<T>(Action<T> handler) : IProgress<T>

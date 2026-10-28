@@ -69,6 +69,7 @@ public sealed class CopyProgressDialog : Dialog
         {
             _currentLabel.Text = diskWrite.Text;
             _currentProgressBar.Fraction = (float)diskWrite.Fraction;
+            _speedLabel.Text = $"{diskWrite.SpeedText}, ETA {diskWrite.EtaText}";
             return;
         }
 

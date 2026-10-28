@@ -18,7 +18,9 @@ public static class VolumeDelete
     /// </summary>
     /// <param name="volume">Volume to delete entries from.</param>
     /// <param name="entries">Entries in the current directory of the volume to delete.</param>
-    /// <param name="progress">Receives the delete progress, at most every 100 ms and when the delete is done.</param>
+    /// <param name="progress">
+    /// Receives the delete progress with the estimated time left, at most every 100 ms and when the delete is done.
+    /// </param>
     /// <param name="cancellationToken"></param>
     public static async Task DeleteAsync(this IVolume volume, IEnumerable<IEntry> entries,
         IProgress<DeleteProgress>? progress = null, CancellationToken cancellationToken = default)
@@ -46,7 +48,11 @@ public static class VolumeDelete
             }
 
             lastReport = elapsed;
-            progress.Report(new DeleteProgress(currentName, deletedEntries, items.Count));
+            var entriesPerSecond = elapsed.TotalSeconds > 0 ? deletedEntries / elapsed.TotalSeconds : 0;
+            TimeSpan? eta = entriesPerSecond > 0
+                ? TimeSpan.FromSeconds(Math.Ceiling((items.Count - deletedEntries) / entriesPerSecond))
+                : null;
+            progress.Report(new DeleteProgress(currentName, deletedEntries, items.Count, eta));
         }
 
         try

@@ -4,9 +4,9 @@ using Terminal.Gui;
 namespace Hst.Commander.Tui;
 
 /// <summary>
-///     Modal dialog showing the progress of a delete with the entry being deleted and a total progress bar. Cancel (or
-///     Esc) cancels the delete through <see cref="CancellationToken" />; the dialog stays open until the delete has
-///     stopped and <see cref="Complete" /> is called.
+///     Modal dialog showing the progress of a delete with the entry being deleted, a total progress bar and the
+///     estimated time left. Cancel (or Esc) cancels the delete through <see cref="CancellationToken" />; the dialog
+///     stays open until the delete has stopped and <see cref="Complete" /> is called.
 /// </summary>
 public sealed class DeleteProgressDialog : Dialog
 {
@@ -14,6 +14,7 @@ public sealed class DeleteProgressDialog : Dialog
     private readonly Label _currentLabel;
     private readonly Label _totalLabel;
     private readonly ProgressBar _totalProgressBar;
+    private readonly Label _etaLabel;
     private readonly Button _cancelButton;
     private bool _completed;
 
@@ -21,7 +22,7 @@ public sealed class DeleteProgressDialog : Dialog
     {
         Title = "Delete";
         Width = Dim.Percent(70);
-        Height = 9;
+        Height = 10;
         ColorScheme = palette.DialogColorScheme;
 
         _currentLabel = new Label { X = 1, Y = 1, Width = Dim.Fill(1), Text = "Preparing..." };
@@ -35,6 +36,7 @@ public sealed class DeleteProgressDialog : Dialog
             ProgressBarStyle = ProgressBarStyle.Continuous,
             ProgressBarFormat = ProgressBarFormat.SimplePlusPercentage
         };
+        _etaLabel = new Label { X = 1, Y = 4, Width = Dim.Fill(1), Text = string.Empty };
 
         _cancelButton = new Button { Text = "Cancel", IsDefault = true };
         _cancelButton.Accepting += (_, e) =>
@@ -53,7 +55,7 @@ public sealed class DeleteProgressDialog : Dialog
             Cancel();
         };
 
-        Add(_currentLabel, _totalLabel, _totalProgressBar);
+        Add(_currentLabel, _totalLabel, _totalProgressBar, _etaLabel);
         AddButton(_cancelButton);
         Initialized += (_, _) => _cancelButton.SetFocus();
     }
@@ -72,6 +74,7 @@ public sealed class DeleteProgressDialog : Dialog
         if (progress.DiskWrite is { } diskWrite)
         {
             _currentLabel.Text = $"{diskWrite.Text} ({diskWrite.Fraction:P0})";
+            _etaLabel.Text = $"{diskWrite.SpeedText}, ETA {diskWrite.EtaText}";
             return;
         }
 
@@ -82,6 +85,7 @@ public sealed class DeleteProgressDialog : Dialog
 
         _totalLabel.Text = $"Total {progress.TotalText}";
         _totalProgressBar.Fraction = (float)progress.TotalFraction;
+        _etaLabel.Text = $"ETA {progress.EtaText}";
     }
 
     /// <summary>Closes the dialog when the delete has stopped. Must be called on the UI thread.</summary>

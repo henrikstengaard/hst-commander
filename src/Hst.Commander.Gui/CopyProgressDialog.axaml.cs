@@ -81,6 +81,7 @@ public partial class CopyProgressDialog : Window
         {
             CurrentText.Text = diskWrite.Text;
             CurrentProgressBar.Value = diskWrite.Fraction;
+            SpeedText.Text = $"{diskWrite.SpeedText}, ETA {diskWrite.EtaText}";
             return;
         }
 

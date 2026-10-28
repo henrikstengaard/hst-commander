@@ -4,8 +4,8 @@ using Hst.Commander.Core.Volumes;
 namespace Hst.Commander.Gui;
 
 /// <summary>
-///     Modal dialog running a delete in the background and showing its progress with the entry being deleted and a
-///     total progress bar. Cancel (or closing the window) cancels the delete; the dialog closes when the delete has
+///     Modal dialog running a delete in the background and showing its progress with the entry being deleted, a
+///     total progress bar and the estimated time left. Cancel (or closing the window) cancels the delete; the dialog closes when the delete has
 ///     stopped and <see cref="Exception" /> holds the error, if any.
 /// </summary>
 public partial class DeleteProgressDialog : Window
@@ -67,6 +67,7 @@ public partial class DeleteProgressDialog : Window
         if (progress.DiskWrite is { } diskWrite)
         {
             CurrentText.Text = $"{diskWrite.Text} ({diskWrite.Fraction:P0})";
+            EtaText.Text = $"{diskWrite.SpeedText}, ETA {diskWrite.EtaText}";
             return;
         }
 
@@ -77,6 +78,7 @@ public partial class DeleteProgressDialog : Window
 
         TotalText.Text = $"Total {progress.TotalText}";
         TotalProgressBar.Value = progress.TotalFraction;
+        EtaText.Text = $"ETA {progress.EtaText}";
     }
 
     private void Cancel()

@@ -19,7 +19,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - Quitting with F10 or File > Quit (and Esc in the TUI) after a confirm dialog in both front-ends.
 - Changing location with Ctrl+L or by double-clicking the path (location dialog), including paths into images.
 - Build versioning from the git commit count and a Help > About menu item in both front-ends.
-- Running as administrator or root shown in the menu bar of both front-ends; choosing the physical disks when not elevated offers to restart as administrator (UAC on Windows, sudo in the TUI's terminal on Linux and macOS) with the panes where they were.
+- Running as administrator or root shown in the menu bar of both front-ends; choosing the physical disks when not elevated offers to restart as administrator (UAC on Windows, sudo in the TUI's terminal on Linux and macOS, pkexec in the GUI on Linux) with the panes where they were.
 - Choosing the volume provider of the left/right pane with Alt+F1/Alt+F2 or Shift+F1/Shift+F2 (configurable, see [Volume provider keys](volumes.md#volume-provider-keys)) or File > Left/Right volume from `VolumeProviders.All`: the built-in Local volume provider and the PhysicalDisk plugin's `Physical disks`.
 - Copying (F5) between panes and volumes, with a confirm dialog (destination, filter) and a progress dialog.
 - Keeping Amiga names, protection bits and comments when copying or moving between Amiga volumes (and from lha/lzx archives), and storing/reading them as UAE metadata (UAEFSDB or FS-UAE metafiles, chosen in the settings) when copying between Amiga volumes and other volumes, shown in the properties dialog.

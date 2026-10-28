@@ -1,4 +1,5 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using Hst.Commander.Abstractions;
 using Hst.Commander.Core.Volumes;
 
@@ -199,9 +200,17 @@ internal static class SharedImages
             }
 
             var totalBytes = cache.CachedWriteBytes;
+            var stopwatch = Stopwatch.StartNew();
             progress.Report(new DiskWriteProgress(0, totalBytes));
             cache.Commit(new ActionProgress<long>(writtenBytes =>
-                progress.Report(new DiskWriteProgress(writtenBytes, totalBytes))));
+            {
+                var seconds = stopwatch.Elapsed.TotalSeconds;
+                var bytesPerSecond = seconds > 0 ? writtenBytes / seconds : 0;
+                TimeSpan? eta = bytesPerSecond > 0
+                    ? TimeSpan.FromSeconds(Math.Ceiling(Math.Max(0, totalBytes - writtenBytes) / bytesPerSecond))
+                    : null;
+                progress.Report(new DiskWriteProgress(writtenBytes, totalBytes, bytesPerSecond, eta));
+            }));
         }
 
         private async Task FlushWhenIdleAsync()
