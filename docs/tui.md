@@ -11,9 +11,9 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - `PathPanelView.cs`: the panel above each pane (path, marked summary, disk space) and the pane's top border.
 - `ListingProgressView.cs`: a framed spinner with "Reading ..." shown in the middle of a pane when listing it takes longer than `ListingProgress.Delay` (2 seconds), e.g. the physical disks while a sleeping disk wakes up.
 - `FunctionKeyBarView.cs`: the clickable function key bar.
-- `TerminalScreen.cs`: the terminal output screen while the TUI is shut down.
+- `TerminalScreen.cs`: the terminal output screen while the TUI is shut down, also running external editors (F4).
 - `TuiSettings.cs`, `TuiTheme.cs`, `TuiPalette.cs`: settings and the 16-color palette per theme.
-- Dialogs, one file each: `ViewerDialog` (+ `ViewerView`, `ViewerSearchDialog`), `SettingsDialog`, `CopyDialog`, `CopyProgressDialog`, `DeleteProgressDialog`, `MakeDirectoryDialog`, `CreateVolumeDialog`, `CreateVolumeFieldsDialog`, `SelectGroupDialog`, `PropertiesDialog`, `VolumeProviderDialog`, `LocationDialog`.
+- Dialogs, one file each: `ViewerDialog` (+ `ViewerView`, `ViewerSearchDialog`), `EditorDialog` (+ `EditorTextView`, `EditorSearchDialog`, `GoToLineDialog`), `SettingsDialog`, `CopyDialog`, `CopyProgressDialog`, `DeleteProgressDialog`, `MakeDirectoryDialog`, `CreateVolumeDialog`, `CreateVolumeFieldsDialog`, `SelectGroupDialog`, `PropertiesDialog`, `VolumeProviderDialog`, `LocationDialog`.
 
 ## Terminal.Gui
 
@@ -41,6 +41,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 ## Themes and Settings
 
 - Themes: Midnight Commander (default), Light and Dark, from `TuiPalette`. `MainWindow.ApplyTheme` reapplies them. The settings dialog previews theme changes live and reverts them on Cancel.
+- The settings dialog groups the settings in a `TabView`: Appearance (theme), Panes (volume keys, Enter on file), Copying (UAE metadata) and Editor (see [Editor settings](editor.md#settings)). Its radio groups have `HighlightStyle.None`: Terminal.Gui saves a view's color scheme when it's pressed and sets it as the view's own when released, so a clicked radio group would keep the previous theme's colors instead of inheriting the dialog's previewed theme.
 - Settings are stored in `~/.hst-commander/tui-settings.json`; a missing or invalid file gives defaults.
 
 ## Terminal Programs

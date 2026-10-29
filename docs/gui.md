@@ -14,7 +14,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - `ViewerDialog` with `ViewerControl` and `ViewerSearchDialog`: the viewer.
 - `ThemeManager.cs`, `GuiTheme.cs`, `MidnightCommanderStyles.axaml`, `GuiSettings.cs`: themes and settings.
 - `BackgroundPicker`: the background chooser shared by the icon viewer and the image view.
-- Dialogs, one `.axaml` each: `ErrorDialog`, `SettingsDialog`, `CopyDialog`, `CopyProgressDialog`, `OverwriteDialog`, `DeleteDialog`, `DeleteProgressDialog`, `QuitDialog`, `ConfirmDialog` (a question with two buttons or a message, e.g. restarting as administrator), `MakeDirectoryDialog`, `CreateVolumeDialog`, `CreateVolumeFieldsDialog`, `SelectGroupDialog`, `PropertiesDialog`, `IconViewerDialog`, `VolumeProviderDialog`, `LocationDialog`, `AboutDialog`.
+- Dialogs, one `.axaml` each: `ErrorDialog`, `SettingsDialog`, `EditorDialog` (+ `EditorSearchDialog`, `GoToLineDialog`, `SaveChangesDialog`), `ExternalEditDialog`, `CopyDialog`, `CopyProgressDialog`, `OverwriteDialog`, `DeleteDialog`, `DeleteProgressDialog`, `QuitDialog`, `ConfirmDialog` (a question with two buttons or a message, e.g. restarting as administrator), `MakeDirectoryDialog`, `CreateVolumeDialog`, `CreateVolumeFieldsDialog`, `SelectGroupDialog`, `PropertiesDialog`, `IconViewerDialog`, `VolumeProviderDialog`, `LocationDialog`, `AboutDialog`.
 
 ## Avalonia
 
@@ -50,5 +50,6 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 
 - Themes: Midnight Commander (default), Light and Dark. Midnight Commander is a custom `ThemeVariant` inheriting Dark plus `MidnightCommanderStyles` (the current row colors only), which `ThemeManager` adds to `Application.Styles` only for that theme. Only the panes are colored; menus, the function key bar and dialogs use the normal Fluent dark styling.
 - Pane colors are per-theme brushes in `App.axaml` `ThemeDictionaries`, referenced with `DynamicResource` so theme changes apply live.
+- The settings dialog groups the settings in a `TabControl`: Appearance (theme), Panes (volume keys, Enter on file), Copying (UAE metadata) and Editor (see [Editor settings](editor.md#settings)). Its tabs use the `SettingsTabItem` control theme instead of the Fluent theme's text headers, so they look like tabs (like the TUI's): bordered, the selected one with an accent line and joined to the bordered panel of its settings (drawn over the panel's border); the selected tab and the panel have the dialog's background, so only the borders mark them.
 - Settings are stored in `~/.hst-commander/gui-settings.json`; a missing or invalid file gives defaults. The settings dialog previews theme changes live and reverts them on Cancel.
 - The application icon is `src/icon/hst-commander.ico`, linked as `avares://Hst.Commander.Gui/Assets/hst-commander.ico`.

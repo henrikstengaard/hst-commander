@@ -1,0 +1,29 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Hst.Commander.Gui.EditorSearchDialog"
+        Title="Search"
+        Width="480"
+        SizeToContent="Height"
+        CanResize="False"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner">
+    <StackPanel Margin="16" Spacing="8">
+        <TextBlock Text="Search for:" />
+        <TextBox x:Name="SearchTextBox" />
+        <TextBlock x:Name="ReplacementLabel" Text="Replace with:" />
+        <TextBox x:Name="ReplacementTextBox" />
+        <Grid ColumnDefinitions="Auto,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="16" RowSpacing="4">
+            <CheckBox x:Name="RegexCheckBox" Grid.Row="0" Grid.Column="0" Content="_Regular expression" />
+            <CheckBox x:Name="CaseSensitiveCheckBox" Grid.Row="0" Grid.Column="1" Content="C_ase sensitive" />
+            <CheckBox x:Name="WholeWordsCheckBox" Grid.Row="1" Grid.Column="0" Content="_Whole words" />
+            <CheckBox x:Name="BackwardsCheckBox" Grid.Row="1" Grid.Column="1" Content="_Backwards" />
+        </Grid>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,8,0,0">
+            <Button x:Name="OkButton" Content="OK" MinWidth="80" HorizontalContentAlignment="Center"
+                    IsDefault="True" />
+            <Button x:Name="AllButton" Content="Replace _all" MinWidth="80" HorizontalContentAlignment="Center" />
+            <Button x:Name="CancelButton" Content="Cancel" MinWidth="80" HorizontalContentAlignment="Center"
+                    IsCancel="True" />
+        </StackPanel>
+    </StackPanel>
+</Window>

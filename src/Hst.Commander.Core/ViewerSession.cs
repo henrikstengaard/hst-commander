@@ -10,7 +10,9 @@ namespace Hst.Commander.Core;
 ///     and selecting take the number of rows and columns the front-end shows. Images start in the image view, other
 ///     binary files in the hex view. In the image view scrolling (lines, pages, columns, start and end) changes the
 ///     image shown; the image is fitted to the view or zoomed (<see cref="ImageZoom" />) and moved when it is larger
-///     than the view (<see cref="PanImage" />). Must be used on one thread, searching reads on a background thread.
+///     than the view (<see cref="PanImage" />). With word wrap (<see cref="ToggleWordWrap" />) the text view shows lines
+///     wrapped at the width of the view (<see cref="SetColumns" />), scrolled by rows. Must be used on one thread,
+///     searching reads on a background thread.
 /// </summary>
 public sealed class ViewerSession(ViewerDocument document, IReadOnlyList<EntryImage>? images = null) : IDisposable
 {
@@ -62,6 +64,54 @@ public sealed class ViewerSession(ViewerDocument document, IReadOnlyList<EntryIm
     /// <summary>Selected bytes, highlighted and copied; null when nothing is selected.</summary>
     public ViewerSelection? Selection { get; private set; }
 
+    /// <summary>True when the text view wraps long lines at the width of the view instead of scrolling horizontally.</summary>
+    public bool IsWordWrap { get; private set; }
+
+    /// <summary>Columns of the view, set by the front-end, which lines are wrapped at.</summary>
+    public int Columns { get; private set; } = 80;
+
+    /// <summary>Columns lines are wrapped at in the text view, 0 when not wrapping.</summary>
+    private int WrapColumns => IsWordWrap && !IsHex && !IsImage ? Math.Max(1, Columns) : 0;
+
+    /// <summary>
+    ///     Turns word wrap of the text view on or off (F2), keeping the position: the top is the row or line containing
+    ///     the top shown before.
+    /// </summary>
+    public void ToggleWordWrap()
+    {
+        IsWordWrap = !IsWordWrap;
+        LeftColumn = 0;
+        AlignTop();
+    }
+
+    /// <summary>
+    ///     Sets the columns of the view, e.g. when it's resized; with word wrap the lines are wrapped again, keeping the
+    ///     top row.
+    /// </summary>
+    public void SetColumns(int columns)
+    {
+        columns = Math.Max(1, columns);
+        if (columns == Columns)
+        {
+            return;
+        }
+
+        Columns = columns;
+        if (IsWordWrap)
+        {
+            AlignTop();
+        }
+    }
+
+    /// <summary>Moves the top of the text view to the start of the line or wrapped row containing it.</summary>
+    private void AlignTop()
+    {
+        if (!IsHex && !IsImage)
+        {
+            TopOffset = Document.GetLineOffset(TopOffset, WrapColumns);
+        }
+    }
+
     public void Dispose() => Document.Dispose();
 
     /// <summary>
@@ -73,7 +123,7 @@ public sealed class ViewerSession(ViewerDocument document, IReadOnlyList<EntryIm
         {
             IsHex = false;
             IsImage = Images.Count > 0;
-            TopOffset = Document.GetLineOffset(TopOffset);
+            TopOffset = Document.GetLineOffset(TopOffset, WrapColumns);
             return;
         }
 
@@ -169,7 +219,7 @@ public sealed class ViewerSession(ViewerDocument document, IReadOnlyList<EntryIm
         $"{Images[index].Name}, {ImagePixels.FormatSize(Images[index].Image)}";
 
     /// <summary>Lines shown in the text view.</summary>
-    public IReadOnlyList<ViewerLine> GetLines(int rows) => Document.ReadLines(TopOffset, rows);
+    public IReadOnlyList<ViewerLine> GetLines(int rows) => Document.ReadLines(TopOffset, rows, WrapColumns);
 
     /// <summary>Rows shown in the hex view.</summary>
     public IReadOnlyList<ViewerHexRow> GetHexRows(int rows)
@@ -191,9 +241,22 @@ public sealed class ViewerSession(ViewerDocument document, IReadOnlyList<EntryIm
     public bool IsMatchByte(long offset) =>
         Match is { } match && offset >= match.ByteOffset && offset < match.ByteOffset + match.ByteLength;
 
-    /// <summary>Columns of the text found in a line of the text view, null when not in the line.</summary>
-    public (int Column, int Length)? GetMatchColumns(ViewerLine line) =>
-        Match is { } match && match.LineOffset == line.Offset ? (match.Column, match.Length) : null;
+    /// <summary>
+    ///     Columns of the text found in a line of the text view, null when not in the line. Found by its bytes, so a
+    ///     match continuing on the next wrapped row is highlighted in both.
+    /// </summary>
+    public (int Column, int Length)? GetMatchColumns(ViewerLine line)
+    {
+        if (Match is not { } match || match.ByteOffset >= line.Offset + line.ContentLength ||
+            match.ByteOffset + match.ByteLength <= line.Offset)
+        {
+            return null;
+        }
+
+        var start = Document.GetColumn(line, match.ByteOffset);
+        var end = Document.GetColumn(line, match.ByteOffset + match.ByteLength);
+        return end > start ? (start, end - start) : null;
+    }
 
     /// <summary>Scrolls a number of lines or rows down (positive) or up (negative), e.g. a page.</summary>
     public void Scroll(int lines, int rows)
@@ -210,8 +273,10 @@ public sealed class ViewerSession(ViewerDocument document, IReadOnlyList<EntryIm
             return;
         }
 
-        var offset = Document.MoveLines(TopOffset, lines);
-        TopOffset = lines > 0 ? Math.Min(offset, Math.Max(TopOffset, Document.GetLastPageOffset(rows))) : offset;
+        var offset = Document.MoveLines(TopOffset, lines, WrapColumns);
+        TopOffset = lines > 0
+            ? Math.Min(offset, Math.Max(TopOffset, Document.GetLastPageOffset(rows, WrapColumns)))
+            : offset;
     }
 
     /// <summary>Scrolls to the start of the file.</summary>
@@ -235,7 +300,7 @@ public sealed class ViewerSession(ViewerDocument document, IReadOnlyList<EntryIm
             return;
         }
 
-        TopOffset = IsHex ? GetLastHexTop(rows) : Document.GetLastPageOffset(rows);
+        TopOffset = IsHex ? GetLastHexTop(rows) : Document.GetLastPageOffset(rows, WrapColumns);
     }
 
     /// <summary>Scrolls to a part of the file, from 0 (start) to 1 (end), e.g. with a scroll bar.</summary>
@@ -250,12 +315,12 @@ public sealed class ViewerSession(ViewerDocument document, IReadOnlyList<EntryIm
         var position = (long)(Math.Clamp(fraction, 0, 1) * Document.Length);
         TopOffset = IsHex
             ? Math.Min(AlignRow(position), GetLastHexTop(rows))
-            : Math.Min(Document.GetLineOffset(position), Document.GetLastPageOffset(rows));
+            : Math.Min(Document.GetLineOffset(position, WrapColumns), Document.GetLastPageOffset(rows, WrapColumns));
     }
 
     /// <summary>
     ///     Scrolls the text view a number of columns right (positive) or left (negative), at most until the end of the
-    ///     longest line shown is in view.
+    ///     longest line shown is in view. Wrapped lines fit the view, so they aren't scrolled.
     /// </summary>
     public void ScrollColumns(int delta, int rows, int columns)
     {
@@ -265,11 +330,16 @@ public sealed class ViewerSession(ViewerDocument document, IReadOnlyList<EntryIm
             return;
         }
 
+        if (WrapColumns > 0)
+        {
+            return;
+        }
+
         LeftColumn = Math.Clamp(LeftColumn + delta, 0, Math.Max(LeftColumn, GetMaxLineWidth(rows) - columns));
     }
 
     /// <summary>Scrolls the text view to a first column, e.g. with a scroll bar.</summary>
-    public void ScrollToColumn(int column) => LeftColumn = Math.Max(0, column);
+    public void ScrollToColumn(int column) => LeftColumn = WrapColumns > 0 ? 0 : Math.Max(0, column);
 
     /// <summary>Width of the longest line shown in the text view, e.g. for a scroll bar.</summary>
     public int GetMaxLineWidth(int rows) =>
@@ -297,6 +367,7 @@ public sealed class ViewerSession(ViewerDocument document, IReadOnlyList<EntryIm
         var percent = Document.Length == 0 ? 100 : (int)(end * 100 / Document.Length);
         var status = $"Offset {TopOffset:N0} of {Document.Length:N0} bytes, {percent}%";
         status = IsHex ? $"{status}, Hex" : $"{status}, {Document.EncodingName}";
+        status = WrapColumns > 0 ? $"{status}, Wrap" : status;
         return Selection is { } selection ? $"{status}, {selection.End - selection.Start:N0} bytes selected" : status;
     }
 
@@ -444,8 +515,8 @@ public sealed class ViewerSession(ViewerDocument document, IReadOnlyList<EntryIm
         LastSearch = options;
         Match = null;
         ShowHexForSearch();
-        var lineOffset = IsHex ? Document.GetLineOffset(TopOffset) : TopOffset;
-        return FindAsync(options, lineOffset, 0, rows, columns, progress, cancellationToken);
+        var (lineOffset, column) = GetSearchStart();
+        return FindAsync(options, lineOffset, column, rows, columns, progress, cancellationToken);
     }
 
     /// <summary>
@@ -464,12 +535,27 @@ public sealed class ViewerSession(ViewerDocument document, IReadOnlyList<EntryIm
         var options = search with { Backwards = backwards };
         if (Match is not { } match)
         {
-            var lineOffset = IsHex ? Document.GetLineOffset(TopOffset) : TopOffset;
-            return FindAsync(options, lineOffset, 0, rows, columns, progress, cancellationToken);
+            var (lineOffset, column) = GetSearchStart();
+            return FindAsync(options, lineOffset, column, rows, columns, progress, cancellationToken);
         }
 
         return FindAsync(options, match.LineOffset, backwards ? match.Column : match.Column + 1, rows, columns,
             progress, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Where searching from the top of the view starts: searching uses lines that aren't wrapped, so a wrapped row at
+    ///     the top starts at its column in its line.
+    /// </summary>
+    private (long LineOffset, int Column) GetSearchStart()
+    {
+        var lineOffset = Document.GetLineOffset(TopOffset);
+        if (IsHex || lineOffset == TopOffset || Document.ReadLines(lineOffset, 1) is not [var line])
+        {
+            return (lineOffset, 0);
+        }
+
+        return (lineOffset, Document.GetColumn(line, TopOffset));
     }
 
     private async Task<bool> FindAsync(ViewerSearchOptions options, long lineOffset, int column, int rows,
@@ -500,10 +586,18 @@ public sealed class ViewerSession(ViewerDocument document, IReadOnlyList<EntryIm
             return;
         }
 
-        if (GetLines(rows).All(line => line.Offset != match.LineOffset))
+        var wrapColumns = WrapColumns;
+        if (GetLines(rows).All(line =>
+                match.ByteOffset < line.Offset || match.ByteOffset >= line.Offset + Math.Max(1, line.Length)))
         {
-            TopOffset = Math.Min(Document.MoveLines(match.LineOffset, -(Math.Max(1, rows) / 3)),
-                Math.Max(match.LineOffset, Document.GetLastPageOffset(rows)));
+            var matchRow = Document.GetLineOffset(match.ByteOffset, wrapColumns);
+            TopOffset = Math.Min(Document.MoveLines(matchRow, -(Math.Max(1, rows) / 3), wrapColumns),
+                Math.Max(matchRow, Document.GetLastPageOffset(rows, wrapColumns)));
+        }
+
+        if (wrapColumns > 0)
+        {
+            return;
         }
 
         columns = Math.Max(1, columns);

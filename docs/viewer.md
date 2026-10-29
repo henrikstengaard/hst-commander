@@ -17,6 +17,13 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - A file with zero bytes at its start is `IsBinary` and opens in the hex view.
 - The hex view shows 16 bytes per row: offset (8 hex digits, 16 above 4 GB), hex values with an extra space after 8, and printable ASCII as text.
 
+## Word wrap
+
+- F2 (or the `F2 Wrap` button) wraps long lines of the text view at the width of the view, off when the viewer opens. `ViewerSession.ToggleWordWrap` keeps the top in its line; the front-ends set the width with `SetColumns` when drawing and before handling keys, and the lines are wrapped again (keeping the top row) when the view is resized.
+- Wrapping is done by `ViewerDocument`: the line methods (`ReadLines`, `MoveLines`, `GetLineOffset`, ...) take `wrapColumns`, and `FindLineEnd` ends a row after the last space (or tab) that fits, or where a word doesn't fit. Rows only depend on where their line starts, so scrolling up, the last page and going to an offset work on rows like on lines, and the selection (byte offsets) needs nothing else.
+- Wrapped lines aren't scrolled horizontally (the GUI hides its horizontal scroll bar). The status line shows `Wrap`.
+- Searching uses lines that aren't wrapped, so a match across a wrap point is found; matches are highlighted by their bytes, so such a match is highlighted on both rows.
+
 ## Searching
 
 - `FindAsync(ViewerSearchOptions)` runs on the thread pool line by line in the *shown* text (so a tab in the search text doesn't match an expanded tab), case-insensitive unless case sensitive. Regular expressions match within a line, with a timeout per line; empty matches are ignored. Empty text or an invalid regex throws `IOException`.
@@ -48,4 +55,4 @@ GUI only. The TUI passes no image providers, as a terminal can't show images wel
 
 ## Keys
 
-Both viewers: arrows, PageUp/PageDown (Space), Home/End, mouse wheel, F4 hex/text, F7, Ctrl+F or `/` search, F5 next, F6 previous, Ctrl+C or Ctrl+Insert copy, Ctrl+A select all, Esc or F10 close (Esc cancels a running search instead). Dragging selects (dragging outside the view scrolls), Shift+click extends and a click clears. In the image view `+`/`-` zoom, `0` fits and `1` shows 100%.
+Both viewers: arrows, PageUp/PageDown (Space), Home/End, mouse wheel, F2 word wrap, F4 hex/text, F7, Ctrl+F or `/` search, F5 next, F6 previous, Ctrl+C or Ctrl+Insert copy, Ctrl+A select all, Esc or F10 close (Esc cancels a running search instead). Dragging selects (dragging outside the view scrolls), Shift+click extends and a click clears. In the image view `+`/`-` zoom, `0` fits and `1` shows 100%.

@@ -7,7 +7,7 @@ namespace Hst.Commander.Tui;
 /// <summary>
 ///     Modal full screen viewer (F3) of a file in the text or hex view (F4), reading only the part of the file shown, so
 ///     files of any size can be viewed. Images aren't shown in a terminal, they are viewed as binary files in the hex
-///     view. F7, Ctrl+F or / searches for text or a regular expression, F5 finds the
+///     view. F2 wraps long lines at the width of the window. F7, Ctrl+F or / searches for text or a regular expression, F5 finds the
 ///     next match and F6 the previous one; searching runs in the background and Esc cancels it. A match is
 ///     highlighted, "not found" is shown in the status line. Text is selected by dragging with the mouse (Shift+click
 ///     extends, Ctrl+A selects all, a click clears it) and copied to the clipboard with Ctrl+C or Ctrl+Insert. Esc or F10
@@ -122,8 +122,12 @@ public sealed class ViewerDialog : Dialog
         }
 
         var rows = _view.Rows;
+        _session.SetColumns(_view.Columns);
         switch (key.KeyCode)
         {
+            case KeyCode.F2:
+                ToggleWordWrap();
+                return true;
             case KeyCode.F4:
                 ToggleHex();
                 return true;
@@ -191,6 +195,14 @@ public sealed class ViewerDialog : Dialog
     private void ToggleHex()
     {
         _session.ToggleHex();
+        UpdateKeyBar();
+        UpdateView();
+    }
+
+    private void ToggleWordWrap()
+    {
+        _session.SetColumns(_view.Columns);
+        _session.ToggleWordWrap();
         UpdateKeyBar();
         UpdateView();
     }
@@ -299,6 +311,7 @@ public sealed class ViewerDialog : Dialog
     {
         _keyBar.Items =
         [
+            new FunctionKeyItem("F2", _session.IsWordWrap ? "Unwrap" : "Wrap", ToggleWordWrap),
             new FunctionKeyItem("F4", _session.IsHex ? "Text" : "Hex", ToggleHex),
             new FunctionKeyItem("F5", "Next", () => FindNext(false)),
             new FunctionKeyItem("F6", "Prev", () => FindNext(true)),

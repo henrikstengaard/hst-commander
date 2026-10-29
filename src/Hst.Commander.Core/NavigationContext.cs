@@ -1192,6 +1192,132 @@ public sealed class NavigationContext : IDisposable
     }
 
     /// <summary>
+    ///     Opens a listed file in the built-in editor (F4). Local files are read and written directly, files inside
+    ///     images and other volumes through a volume of their own (<see cref="OpenLocationAsync" />), owned by the
+    ///     session, and the cached writes of a shared image are committed after saving. A file in a read-only image opens
+    ///     read-only. Directories, binary files and files larger than <see cref="EditorDocument.MaxLength" /> throw
+    ///     <see cref="IOException" />.
+    /// </summary>
+    public async Task<EditorSession> OpenEditorAsync(IEntry entry, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        ThrowIfNotEditable(entry);
+
+        if (GetLocalPath(entry) is { } localPath)
+        {
+            var localDocument = await Task.Run(async () =>
+            {
+                await using var stream = new FileStream(localPath, FileMode.Open, FileAccess.Read,
+                    FileShare.ReadWrite | FileShare.Delete);
+                return await EditorDocument.ReadAsync(stream, cancellationToken);
+            }, cancellationToken);
+            return new EditorSession(entry.Name, localDocument,
+                (bytes, token) => Task.Run(() => WriteLocalFileAsync(localPath, bytes, token), token), null, null);
+        }
+
+        var location = await OpenLocationAsync(cancellationToken);
+        try
+        {
+            var document = await Task.Run(async () =>
+            {
+                await using var stream = await location.Volume.OpenRead(entry.Name, cancellationToken);
+                return await EditorDocument.ReadAsync(stream, cancellationToken);
+            }, cancellationToken);
+            var readOnlyReason = SaveNotSupportedMessage;
+            Func<byte[], CancellationToken, Task>? write = readOnlyReason == null
+                ? (bytes, token) => WriteVolumeFileAsync(location, entry.Name,
+                    (destination, writeToken) => destination.WriteAsync(bytes, writeToken).AsTask(), token)
+                : null;
+            return new EditorSession(entry.Name, document, write, readOnlyReason, location);
+        }
+        catch
+        {
+            location.Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>
+    ///     Opens a listed file for an external editor (see <see cref="ExternalEditor" />): local files are edited in
+    ///     place, files inside images and other volumes are copied to a temporary file, written back by
+    ///     <see cref="ExternalEditFile.SaveChangesAsync" /> through a volume of its own. Directories throw
+    ///     <see cref="IOException" /> and files in read-only images <see cref="NotSupportedException" />, as the
+    ///     changes would be lost.
+    /// </summary>
+    public async Task<ExternalEditFile> OpenExternalEditAsync(IEntry entry,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        ThrowIfNotEditable(entry);
+
+        if (GetLocalPath(entry) is { } localPath)
+        {
+            return ExternalEditFile.ForLocalFile(localPath);
+        }
+
+        if (SaveNotSupportedMessage is { } message)
+        {
+            throw new NotSupportedException($"'{entry.Name}' can't be edited with an external editor: {message}");
+        }
+
+        using var location = await OpenLocationAsync(cancellationToken);
+        return await Task.Run(async () =>
+        {
+            await using var stream = await location.Volume.OpenRead(entry.Name, cancellationToken);
+            return await ExternalEditFile.CreateTemporaryAsync(entry.Name, stream,
+                (path, token) => WriteBackAsync(entry.Name, path, token), cancellationToken);
+        }, cancellationToken);
+    }
+
+    /// <summary>Why files in the current location can't be saved, e.g. in a read-only image; null when they can.</summary>
+    private string? SaveNotSupportedMessage =>
+        IsInImage && !_images.Peek().IsWritable ? "The file is in a read-only image" : null;
+
+    private static void ThrowIfNotEditable(IEntry entry)
+    {
+        if (entry.Type == EntryType.Container || entry.Name.Equals(Paths.Parent, StringComparison.Ordinal))
+        {
+            throw new IOException($"'{entry.Name}' is a directory and can't be edited");
+        }
+    }
+
+    /// <summary>
+    ///     Writes a local file in place, so its attributes (e.g. hidden, which can't be overwritten by creating the file)
+    ///     and permissions are kept.
+    /// </summary>
+    private static async Task WriteLocalFileAsync(string path, byte[] bytes, CancellationToken cancellationToken)
+    {
+        await using var stream = new FileStream(path, FileMode.OpenOrCreate, FileAccess.Write, FileShare.Read);
+        await stream.WriteAsync(bytes, cancellationToken);
+        stream.SetLength(bytes.Length);
+    }
+
+    /// <summary>Writes the temporary copy of a file edited with an external editor back to the current location.</summary>
+    private async Task WriteBackAsync(string name, string path, CancellationToken cancellationToken)
+    {
+        using var location = await OpenLocationAsync(cancellationToken);
+        await WriteVolumeFileAsync(location, name, async (destination, token) =>
+        {
+            // shared with the editor, which may still have the file open
+            await using var source = new FileStream(path, FileMode.Open, FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete);
+            await source.CopyToAsync(destination, token);
+        }, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Writes a file in a location on the thread pool (the lock of a shared image is only held there), committing the
+    ///     cached writes of its shared image afterwards.
+    /// </summary>
+    private static Task WriteVolumeFileAsync(VolumeLocation location, string name,
+        Func<Stream, CancellationToken, Task> write, CancellationToken cancellationToken) =>
+        Task.Run(() => RunCommittingAsync([location], null, async () =>
+        {
+            await using var stream = await location.Volume.OpenWrite(name, cancellationToken);
+            await write(stream, cancellationToken);
+        }), cancellationToken);
+
+    /// <summary>
     ///     Opens a volume of its own at the current location, so it can be used, e.g. for copying, without changing the
     ///     current directory of this context. Images are opened again from their files, images inside images from the
     ///     image they are in.

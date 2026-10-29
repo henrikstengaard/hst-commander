@@ -295,8 +295,9 @@ public sealed class ViewerControl : Control
             return;
         }
 
-        // a row more, partly shown at the bottom
+        // a row more, partly shown at the bottom; lines are wrapped at the whole columns shown
         var rows = Rows + 1;
+        _session.SetColumns(Columns);
         if (_session.IsHex)
         {
             RenderHexRows(context, _session, rows);

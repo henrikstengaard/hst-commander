@@ -31,6 +31,12 @@ public sealed record GuiSettings
     /// <summary>How Amiga names, protection bits and comments are stored when copying from Amiga volumes to others.</summary>
     public UaeMetadataFormat UaeMetadata { get; init; } = UaeMetadataFormat.UaeFsDb;
 
+    /// <summary>Which editor F4 opens files in: the built-in editor, the host operating system's or a command.</summary>
+    public EditorKind Editor { get; init; } = EditorKind.BuiltIn;
+
+    /// <summary>Command of the custom editor (see <see cref="ExternalEditor.ParseCommand" />), e.g. <c>code --wait</c>.</summary>
+    public string? EditorCommand { get; init; }
+
     /// <summary>Name of the navigation mode of the left pane (see <see cref="PaneNavigationMode" />), null for list.</summary>
     public string? LeftNavigationMode { get; init; }
 
