@@ -138,8 +138,15 @@ public static class ExternalEditor
         }
 
         var fileName = parts[0];
-        return new ExternalEditorCommand(Path.GetFileNameWithoutExtension(fileName), fileName, parts.Skip(1).ToList());
+        return new ExternalEditorCommand(GetProgramName(fileName), fileName, parts.Skip(1).ToList());
     }
+
+    /// <summary>
+    ///     Name of a program shown to the user, without its directory and extension. Both / and \ separate directories,
+    ///     as <see cref="Path.GetFileNameWithoutExtension(string)" /> only splits at \ on Windows.
+    /// </summary>
+    private static string GetProgramName(string fileName) =>
+        Path.GetFileNameWithoutExtension(fileName[(fileName.LastIndexOfAny(['/', '\\']) + 1)..]);
 
     /// <summary>Starts the editor with a file, returning its process (null when started in a process already running).</summary>
     public static Process? Start(ExternalEditorCommand command, string path)

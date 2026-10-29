@@ -28,6 +28,16 @@ public class GivenExternalEditor
         Assert.Equal(["--wait", "file.txt"], command.CreateStartInfo("file.txt").ArgumentList);
     }
 
+    [Theory]
+    [InlineData("/usr/local/bin/nvim", "nvim")]
+    [InlineData("\"C:\\Tools\\Sublime Text\\subl.exe\" -w", "subl")]
+    [InlineData("code.cmd --wait", "code")]
+    public void When_ParsingCommandWithPath_Then_NameIsProgramWithoutDirectoryAndExtension(string command,
+        string name)
+    {
+        Assert.Equal(name, ExternalEditor.ParseCommand(command)?.Name);
+    }
+
     [Fact]
     public void When_ParsingEmptyCommand_Then_NullIsReturned()
     {
