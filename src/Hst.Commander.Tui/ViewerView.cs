@@ -125,6 +125,8 @@ public sealed class ViewerView : View
             return true;
         }
 
+        // lines are wrapped at the width shown
+        _session.SetColumns(width);
         if (_session.IsHex)
         {
             DrawHexRows(width, height);

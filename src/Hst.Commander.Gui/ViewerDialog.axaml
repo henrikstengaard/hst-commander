@@ -44,6 +44,9 @@
                     <Setter Property="Padding" Value="6,3,0,3" />
                 </Style>
             </UniformGrid.Styles>
+            <Button x:Name="WrapButton" Classes="functionKey">
+                <StackPanel Orientation="Horizontal"><TextBlock Classes="key" Text="F2" /><TextBlock x:Name="WrapButtonText" Text="Wrap" /></StackPanel>
+            </Button>
             <Button x:Name="HexButton" Classes="functionKey">
                 <StackPanel Orientation="Horizontal"><TextBlock Classes="key" Text="F4" /><TextBlock x:Name="HexButtonText" Text="Hex" /></StackPanel>
             </Button>

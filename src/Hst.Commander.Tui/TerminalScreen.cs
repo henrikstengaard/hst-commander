@@ -15,6 +15,9 @@ public abstract record TerminalAction
     /// <summary>Shows the output screen (Ctrl+O) until a key is pressed.</summary>
     public sealed record ShowOutput : TerminalAction;
 
+    /// <summary>Runs an external editor (F4) with a file, e.g. nano, until it exits.</summary>
+    public sealed record RunEditor(ExternalEditorCommand Command, string Path) : TerminalAction;
+
     /// <summary>Runs Hst Commander again as root with sudo in the terminal (Linux and macOS), then quits.</summary>
     public sealed record RestartAsRoot(StartupOptions Options) : TerminalAction;
 }
@@ -91,22 +94,47 @@ public static class TerminalScreen
     ///     like Midnight Commander. Ctrl+C stops the program, not Hst Commander.
     /// </summary>
     /// <returns>The error message when the program couldn't be started, otherwise null.</returns>
-    public static string? Run(string path)
+    public static string? Run(string path) => Run(new ProcessStartInfo(path)
+    {
+        UseShellExecute = false,
+        WorkingDirectory = Path.GetDirectoryName(path) ?? string.Empty
+    }, path);
+
+    /// <summary>
+    ///     Runs an external editor with a file and waits for it to exit, like <see cref="Run(string)" />. An editor
+    ///     exiting at once has likely handed the file to an instance already running (see
+    ///     <see cref="ExternalEditor.HandOffTime" />), so then it waits for a key, as the file may still be edited.
+    /// </summary>
+    /// <returns>The error message when the editor couldn't be started, otherwise null.</returns>
+    public static string? RunEditor(ExternalEditorCommand command, string path)
+    {
+        var started = DateTime.Now;
+        if (Run(command.CreateStartInfo(path), $"{command.Name} {path}") is { } error)
+        {
+            return $"The editor '{command.FileName}' couldn't be started: {error}";
+        }
+
+        if (DateTime.Now - started < ExternalEditor.HandOffTime)
+        {
+            Console.WriteLine($"Press a key when done editing in {command.Name}...");
+            Console.ReadKey(true);
+        }
+
+        return null;
+    }
+
+    private static string? Run(ProcessStartInfo startInfo, string description)
     {
         Console.ResetColor();
         Console.WriteLine();
-        Console.WriteLine(path);
+        Console.WriteLine(description);
 
         // Ctrl+C is also sent to this process, which must keep running
         ConsoleCancelEventHandler ignoreCancel = (_, e) => e.Cancel = true;
         Console.CancelKeyPress += ignoreCancel;
         try
         {
-            using var process = Process.Start(new ProcessStartInfo(path)
-            {
-                UseShellExecute = false,
-                WorkingDirectory = Path.GetDirectoryName(path) ?? string.Empty
-            });
+            using var process = Process.Start(startInfo);
             process?.WaitForExit();
             return null;
         }

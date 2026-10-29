@@ -33,6 +33,13 @@ try
                 }
 
                 break;
+            case TerminalAction.RunEditor runEditor:
+                if (TerminalScreen.RunEditor(runEditor.Command, runEditor.Path) is { } editorError)
+                {
+                    mainWindow.ShowErrorWhenLoaded(editorError);
+                }
+
+                break;
             case TerminalAction.ShowOutput:
                 TerminalScreen.ShowOutput();
                 break;

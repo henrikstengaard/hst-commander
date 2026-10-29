@@ -13,7 +13,8 @@ namespace Hst.Commander.Gui;
 ///     shown, so files of any size can be viewed. Images start in the image view (F4 switches to the hex view and back);
 ///     the image of a file with several (e.g. an icon file) is chosen in a list or with the keys that scroll. The image
 ///     is zoomed with the zoom buttons and list, + and - (or Ctrl+mouse wheel), 0 fits it to the view and 1 shows it in
-///     100%; the arrow keys and the scroll bars move an image larger than the view. F7, Ctrl+F or / searches for text or a regular
+///     100%; the arrow keys and the scroll bars move an image larger than the view. F2 wraps long lines at the width of
+///     the window. F7, Ctrl+F or / searches for text or a regular
 ///     expression, F5 finds the next match and F6 the previous one; searching runs in the background and Esc cancels
 ///     it. A match is highlighted, "not found" is shown in the status line. Text is selected by dragging with the mouse (Shift+click
 ///     extends, Ctrl+A or the context menu selects all) and copied to the clipboard with Ctrl+C, Ctrl+Insert or the
@@ -110,6 +111,7 @@ public partial class ViewerDialog : Window
         };
         CloseButton.Click += (_, _) => Close();
         HexButton.Click += (_, _) => ToggleHex();
+        WrapButton.Click += (_, _) => ToggleWordWrap();
         SearchButton.Click += async (_, _) => await SearchAsync();
         NextButton.Click += async (_, _) => await FindNextAsync(false);
         PreviousButton.Click += async (_, _) => await FindNextAsync(true);
@@ -192,8 +194,12 @@ public partial class ViewerDialog : Window
         }
 
         var rows = View.Rows;
+        _session.SetColumns(View.Columns);
         switch (e.Key)
         {
+            case Key.F2:
+                ToggleWordWrap();
+                break;
             case Key.F4:
                 ToggleHex();
                 break;
@@ -337,6 +343,18 @@ public partial class ViewerDialog : Window
         UpdateView();
     }
 
+    private void ToggleWordWrap()
+    {
+        if (_session == null)
+        {
+            return;
+        }
+
+        _session.SetColumns(View.Columns);
+        _session.ToggleWordWrap();
+        UpdateView();
+    }
+
     private async Task SearchAsync()
     {
         if (_session == null || _searchCancellation != null)
@@ -426,6 +444,7 @@ public partial class ViewerDialog : Window
 
         View.InvalidateVisual();
         UpdateHexButton();
+        WrapButtonText.Text = _session.IsWordWrap ? "Unwrap" : "Wrap";
         var rows = View.Rows;
         _updating = true;
         ImageComboBox.IsVisible = _session.IsImage && _session.Images.Count > 1;
@@ -452,7 +471,10 @@ public partial class ViewerDialog : Window
                 (long)rows * (_session.IsHex ? ViewerDocument.BytesPerRow : 80)) / length);
             VerticalScrollBar.Value = _session.TopFraction * VerticalScrollMaximum;
 
-            HorizontalScrollBar.Visibility = _session.IsHex ? ScrollBarVisibility.Disabled : ScrollBarVisibility.Visible;
+            // wrapped lines fit the view
+            HorizontalScrollBar.Visibility = _session.IsHex || _session.IsWordWrap
+                ? ScrollBarVisibility.Disabled
+                : ScrollBarVisibility.Visible;
             if (HorizontalScrollBar.IsVisible)
             {
                 var columns = View.Columns;

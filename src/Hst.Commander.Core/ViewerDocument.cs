@@ -109,8 +109,13 @@ public sealed class ViewerDocument : IDisposable
         _resource?.Dispose();
     }
 
-    /// <summary>Reads lines from a line offset, at most <paramref name="count" />; fewer at the end of the file.</summary>
-    public IReadOnlyList<ViewerLine> ReadLines(long offset, int count)
+    /// <summary>
+    ///     Reads lines from a line offset, at most <paramref name="count" />; fewer at the end of the file. With
+    ///     <paramref name="wrapColumns" /> (0 for none) lines are wrapped to rows of at most that many columns, the lines
+    ///     of the text view with word wrap (see <see cref="FindLineEnd" />); the other line methods take it too, so
+    ///     wrapped rows are scrolled like lines.
+    /// </summary>
+    public IReadOnlyList<ViewerLine> ReadLines(long offset, int count, int wrapColumns = 0)
     {
         var lines = new List<ViewerLine>(Math.Clamp(count, 0, 256));
         offset = Math.Max(offset, TextStart);
@@ -118,7 +123,7 @@ public sealed class ViewerDocument : IDisposable
         while (lines.Count < count && offset < Length)
         {
             var read = ReadAt(offset, buffer);
-            var (contentLength, lineLength) = FindLineEnd(buffer.AsSpan(0, read));
+            var (contentLength, lineLength) = FindLineEnd(buffer.AsSpan(0, read), wrapColumns);
             lines.Add(new ViewerLine(offset, lineLength, contentLength,
                 ToDisplayText(buffer.AsSpan(0, contentLength))));
             offset += lineLength;
@@ -128,24 +133,27 @@ public sealed class ViewerDocument : IDisposable
     }
 
     /// <summary>Offset of the line after the line at an offset, or the offset itself for the last line.</summary>
-    public long GetNextLineOffset(long offset)
+    public long GetNextLineOffset(long offset, int wrapColumns = 0)
     {
         offset = Math.Max(offset, TextStart);
         var buffer = new byte[MaxLineLength + 2];
         var read = ReadAt(offset, buffer);
-        var next = offset + FindLineEnd(buffer.AsSpan(0, read)).LineLength;
+        var next = offset + FindLineEnd(buffer.AsSpan(0, read), wrapColumns).LineLength;
         return next < Length ? next : offset;
     }
 
     /// <summary>Offset of the line before the line at an offset, or the first line.</summary>
-    public long GetPreviousLineOffset(long offset) => offset <= TextStart ? TextStart : GetLineOffset(offset - 1);
+    public long GetPreviousLineOffset(long offset, int wrapColumns = 0) =>
+        offset <= TextStart ? TextStart : GetLineOffset(offset - 1, wrapColumns);
 
     /// <summary>Moves a line offset a number of lines down (positive) or up (negative), stopping at the first or last line.</summary>
-    public long MoveLines(long offset, int lines)
+    public long MoveLines(long offset, int lines, int wrapColumns = 0)
     {
         for (var index = 0; index < Math.Abs(lines); index++)
         {
-            var next = lines > 0 ? GetNextLineOffset(offset) : GetPreviousLineOffset(offset);
+            var next = lines > 0
+                ? GetNextLineOffset(offset, wrapColumns)
+                : GetPreviousLineOffset(offset, wrapColumns);
             if (next == offset)
             {
                 break;
@@ -158,13 +166,14 @@ public sealed class ViewerDocument : IDisposable
     }
 
     /// <summary>Offset of the first line of the last page of lines, the last offset the top of the view can be at.</summary>
-    public long GetLastPageOffset(int lines) => MoveLines(GetLineOffset(Length), -(Math.Max(1, lines) - 1));
+    public long GetLastPageOffset(int lines, int wrapColumns = 0) =>
+        MoveLines(GetLineOffset(Length, wrapColumns), -(Math.Max(1, lines) - 1), wrapColumns);
 
     /// <summary>
     ///     Offset of the line containing a byte, e.g. to show the text at a row of the hex view. Its line start is
     ///     looked for at most 64 KB back, a longer line is split from there.
     /// </summary>
-    public long GetLineOffset(long position)
+    public long GetLineOffset(long position, int wrapColumns = 0)
     {
         if (Length <= TextStart)
         {
@@ -185,7 +194,7 @@ public sealed class ViewerDocument : IDisposable
         while (true)
         {
             var read = ReadAt(offset, buffer);
-            var lineLength = FindLineEnd(buffer.AsSpan(0, read)).LineLength;
+            var lineLength = FindLineEnd(buffer.AsSpan(0, read), wrapColumns).LineLength;
             if (lineLength == 0 || offset + lineLength > position)
             {
                 return offset;
@@ -464,8 +473,42 @@ public sealed class ViewerDocument : IDisposable
     /// <summary>
     ///     Finds the end of the line at the start of the bytes: the length of its content and of the line with its line
     ///     break. A line without a line break within <see cref="MaxLineLength" /> bytes is split there (before a UTF-8
-    ///     character continuing after it).
+    ///     character continuing after it). With <paramref name="wrapColumns" /> a line whose shown text is wider is
+    ///     wrapped after the last space that fits (kept at the end of the row), or where it doesn't fit when there's no
+    ///     space; the rows of a line only depend on where it starts, so they are found the same way from any row.
     /// </summary>
+    private (int ContentLength, int LineLength) FindLineEnd(ReadOnlySpan<byte> bytes, int wrapColumns = 0)
+    {
+        var line = FindLineEnd(bytes);
+        if (wrapColumns <= 0)
+        {
+            return line;
+        }
+
+        var content = bytes[..line.ContentLength];
+        var position = 0;
+        var width = 0;
+        var afterSpace = 0;
+        while (position < content.Length)
+        {
+            var consumed = DecodeRune(content[position..], out var rune);
+            width += GetWidth(rune, width);
+            if (width > wrapColumns && position > 0)
+            {
+                var split = afterSpace > 0 ? afterSpace : position;
+                return (split, split);
+            }
+
+            position += consumed;
+            if (rune.Value is ' ' or '\t')
+            {
+                afterSpace = position;
+            }
+        }
+
+        return line;
+    }
+
     private (int ContentLength, int LineLength) FindLineEnd(ReadOnlySpan<byte> bytes)
     {
         var index = bytes[..Math.Min(bytes.Length, MaxLineLength + 1)].IndexOfAny((byte)'\n', (byte)'\r');

@@ -1,6 +1,9 @@
-﻿using Avalonia.Controls;
+﻿using System.ComponentModel;
+using System.Diagnostics;
+using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
 using Hst.Commander.Core;
 using Hst.Commander.Abstractions;
 using Hst.Commander.Gui.Icons;
@@ -13,6 +16,7 @@ public partial class MainWindow : Window
     private VolumeProviderKeys _volumeProviderKeys;
     private string _selectGroupFilter = SelectGroupOptions.Default.Filter;
     private bool _quitConfirmed;
+    private GuiSettings _editorSettings = new();
 
     public MainWindow() : this(Environment.CurrentDirectory)
     {
@@ -38,6 +42,7 @@ public partial class MainWindow : Window
         RightPane.NavigationContext = new NavigationContext(initialPath);
         ApplyEnterFileAction(settings.EnterFileAction);
         ApplyUaeMetadata(settings.UaeMetadata);
+        _editorSettings = settings;
         LeftPane.NavigationFailed += async (_, exception) => await ShowErrorAsync(exception);
         RightPane.NavigationFailed += async (_, exception) => await ShowErrorAsync(exception);
         // e.g. icon files written when saving icon positions, which the other pane may show
@@ -45,6 +50,7 @@ public partial class MainWindow : Window
         RightPane.EntriesChanged += async (_, _) => await LeftPane.RefreshEntriesAsync();
         BuildViewMenu();
         ViewMenuItem.Click += async (_, _) => await ViewAsync(_activePane);
+        EditMenuItem.Click += async (_, _) => await EditAsync(_activePane);
         CopyMenuItem.Click += async (_, _) => await CopyAsync(_activePane);
         MoveMenuItem.Click += async (_, _) => await MoveAsync(_activePane);
         MakeDirectoryMenuItem.Click += async (_, _) => await MakeDirectoryAsync(_activePane);
@@ -60,6 +66,7 @@ public partial class MainWindow : Window
         UnselectGroupMenuItem.Click += async (_, _) => await SelectGroupAsync(_activePane, false);
         InvertSelectionMenuItem.Click += (_, _) => InvertSelection(_activePane);
         ViewButton.Click += async (_, _) => await ViewAsync(_activePane);
+        EditButton.Click += async (_, _) => await EditAsync(_activePane);
         CopyButton.Click += async (_, _) => await CopyAsync(_activePane);
         MoveButton.Click += async (_, _) => await MoveAsync(_activePane);
         MkdirButton.Click += async (_, _) => await MakeDirectoryAsync(_activePane);
@@ -232,6 +239,10 @@ public partial class MainWindow : Window
             case Key.F3:
                 e.Handled = true;
                 await ViewAsync(_activePane);
+                break;
+            case Key.F4:
+                e.Handled = true;
+                await EditAsync(_activePane);
                 break;
             case Key.F5:
                 e.Handled = true;
@@ -476,6 +487,118 @@ public partial class MainWindow : Window
         }
 
         pane.FocusEntries();
+    }
+
+    /// <summary>
+    ///     Edits the file under the cursor of a pane (F4) in the editor chosen in the settings: the built-in editor or
+    ///     an external editor. Local files are opened in the external editor directly; a file inside an image or another
+    ///     volume is edited as a temporary copy while <see cref="ExternalEditDialog" /> is shown and written back when
+    ///     the editor exits. Both panes are refreshed after saving, as the other pane may show the same location.
+    /// </summary>
+    private async Task EditAsync(PaneView pane)
+    {
+        if (pane.SelectedEntry is not { Type: EntryType.Item } entry)
+        {
+            return;
+        }
+
+        var otherPane = pane == LeftPane ? RightPane : LeftPane;
+        var settings = _editorSettings;
+        if (settings.Editor == EditorKind.BuiltIn)
+        {
+            await EditWithBuiltInEditorAsync(pane, otherPane, entry);
+            return;
+        }
+
+        if (ExternalEditor.Get(settings.Editor, settings.EditorCommand, false) is not { } command)
+        {
+            await ShowErrorAsync(new IOException(settings.Editor == EditorKind.Custom
+                ? "Enter the command of the custom editor in the settings"
+                : "No text editor was found, choose another editor in the settings"));
+            return;
+        }
+
+        try
+        {
+            using var file = await pane.NavigationContext.OpenExternalEditAsync(entry);
+            Process? process;
+            try
+            {
+                process = ExternalEditor.Start(command, file.Path);
+            }
+            catch (Exception exception) when (exception is Win32Exception or IOException)
+            {
+                throw new IOException($"The editor '{command.FileName}' couldn't be started: {exception.Message}",
+                    exception);
+            }
+
+            using (process)
+            {
+                if (!file.IsTemporary)
+                {
+                    // the panes show the new size and date when the editor exits
+                    _ = RefreshWhenExitedAsync(process, pane, otherPane);
+                    pane.FocusEntries();
+                    return;
+                }
+
+                if (await new ExternalEditDialog(entry.Name, command.Name, process).ShowDialog<bool?>(this) == true &&
+                    await file.SaveChangesAsync())
+                {
+                    await pane.RefreshEntriesAsync();
+                    await otherPane.RefreshEntriesAsync();
+                }
+            }
+        }
+        catch (Exception exception)
+        {
+            await ShowErrorAsync(exception);
+        }
+
+        pane.FocusEntries();
+    }
+
+    private async Task EditWithBuiltInEditorAsync(PaneView pane, PaneView otherPane, IEntry entry)
+    {
+        EditorSession session;
+        try
+        {
+            session = await pane.NavigationContext.OpenEditorAsync(entry);
+        }
+        catch (Exception exception)
+        {
+            await ShowErrorAsync(exception);
+            pane.FocusEntries();
+            return;
+        }
+
+        using (session)
+        {
+            await new EditorDialog(session).ShowDialog(this);
+        }
+
+        if (session.HasSaved)
+        {
+            await pane.RefreshEntriesAsync();
+            await otherPane.RefreshEntriesAsync();
+        }
+
+        pane.FocusEntries();
+    }
+
+    private static async Task RefreshWhenExitedAsync(Process? process, PaneView pane, PaneView otherPane)
+    {
+        if (process == null)
+        {
+            return;
+        }
+
+        await process.WaitForExitAsync();
+        await Dispatcher.UIThread.InvokeAsync(async () =>
+        {
+            await pane.RefreshEntriesAsync();
+            await otherPane.RefreshEntriesAsync();
+        });
     }
 
     /// <summary>
@@ -793,6 +916,7 @@ public partial class MainWindow : Window
         ApplyVolumeProviderKeys(settings.EffectiveVolumeProviderKeys);
         ApplyEnterFileAction(settings.EnterFileAction);
         ApplyUaeMetadata(settings.UaeMetadata);
+        _editorSettings = settings;
         try
         {
             settings.Save();

@@ -20,6 +20,7 @@ The behavior of each feature is described in `docs/` at the repository root. Rea
 | [`docs/volumes.md`](../docs/volumes.md) | Volume implementations, images, writable images, going to the root, changing location, volume provider keys, Enter on files |
 | [`docs/file-operations.md`](../docs/file-operations.md) | Copying, UAE metadata, moving/renaming, deleting, making directories, creating volumes, selecting groups, properties |
 | [`docs/viewer.md`](../docs/viewer.md) | F3 viewer: text/hex/image views, search, selection and copying |
+| [`docs/editor.md`](../docs/editor.md) | F4 editing: built-in editor, search and replace, external editors, editor settings |
 | [`docs/icons-and-navigation-modes.md`](../docs/icons-and-navigation-modes.md) | Icon providers, GUI entry icons, navigation modes (list, thumbnails, Workbench, def icons) |
 | [`docs/tui.md`](../docs/tui.md) | TUI files, key handling, dialogs, themes, terminal programs |
 | [`docs/gui.md`](../docs/gui.md) | GUI files, key handling, dialogs, themes, icons |
@@ -114,7 +115,7 @@ These apply across features and aren't obvious from a single file:
 
 - **Plugins reference only `Hst.Commander.Abstractions`.** Each loads in its own `AssemblyLoadContext` sharing Abstractions with the host, so plugins can't use each other's types and work together through `IPluginHost`. Built-in plugins are listed in `Plugins.BuiltIn`, and the order matters (Disk before Amiga, so hybrid disks open as hybrid disks).
 - **Each `NavigationContext` owns a `NestedVolume`.** Opening an image pushes a volume (wrapped in `EntryVolumeProvider`); going up from its root pops and disposes it.
-- **Background work never uses the pane's volume.** Copy, move, delete, viewing, counting contents and reading icons inside volume entries open an independent volume with `NavigationContext.OpenLocationAsync`, because volumes aren't thread safe.
+- **Background work never uses the pane's volume.** Copy, move, delete, viewing, editing, counting contents and reading icons inside volume entries open an independent volume with `NavigationContext.OpenLocationAsync`, because volumes aren't thread safe.
 - **Writable images are shared.** A file of the root volume with an id (`IVolume.GetWritableImageId`, e.g. a local file or a physical disk) opened by a provider with `CanWrite` is opened once (`SharedImages`) and shared by both panes and file operations through `SharedImageVolume` views serialized by a semaphore; two volumes writing one file would damage its file system. The lock is only held on the thread pool, never by work waiting for a UI thread. A stream caching writes (`IWriteCache`, e.g. `CachedDiskStream` of physical disks) is committed (`IWriteCache.Commit`, not `Flush`) only between operations, when the file system is consistent. Images inside other images are read-only.
 - **File operations only use `IVolume`.** `VolumeCopy`, `VolumeMove` and `VolumeDelete` work between any two volumes, so a new volume type gets copy, move and delete for free.
 - **Amiga metadata handling depends on `SupportsAmigaMetadata` of both sides** (copied as is, written as UAE metadata, read from UAE metadata, or both); see [`docs/file-operations.md`](../docs/file-operations.md#uae-metadata).
@@ -131,7 +132,7 @@ These apply across features and aren't obvious from a single file:
 
 ## Not Implemented
 
-- Edit (F4) and other file-management operations; changing the viewer's encoding, word wrapping and going to an offset.
+- Other file-management operations (e.g. creating a new file with Shift+F4); changing the viewer's encoding and going to an offset; changing the editor's encoding and line breaks.
 - Writing to images other than Amiga adf and RDB images; ISO images and zip, lha and lzx archives are read-only, as are Amiga images inside other images.
 - Changing RDB, MBR and GPT partitions, other Amiga file systems (e.g. SFS), other PC file systems (exFAT, ext, ...) and vhdx/vmdk images.
 - Unloading or reloading plugins while running, and a list of loaded plugins in the UI.
@@ -160,7 +161,7 @@ These apply across features and aren't obvious from a single file:
 - Disk plugin: `Hst.Commander.Plugins.Disk`
 - Amiga plugin: `Hst.Commander.Plugins.Amiga`
 - Physical disk plugin: `Hst.Commander.Plugins.PhysicalDisk`
-- Core: `Hst.Commander.Core` (`AppInfo`, `EmbeddedIconReader`, `EnterFileAction`, `Elevation`, `EntryProperties`, `FileSystemDetails`, `IconImage`, `ListingProgress`, `NavigationContext`, `NameFilter`, `PluginHost`, `PluginLoader`, `Plugins`, `SelectGroupOptions`, `FileStarter`, `ImagePixels`, `SettingsPaths`, `SizeFormatter`, `StandardImageProvider`, `StartupOptions`, `PaneStartup`, `UaeMetadataFormat`, `ViewerDocument`, `ViewerSession`, `WindowsIconImageProvider`, `VolumeCreation`, `VolumeCreatorInput`), `Hst.Commander.Core.Volumes` (volumes, copying, UAE metadata)
+- Core: `Hst.Commander.Core` (`AppInfo`, `EditorDocument`, `EditorKind`, `EditorSearch`, `EditorSession`, `EmbeddedIconReader`, `EnterFileAction`, `ExternalEditFile`, `ExternalEditor`, `Elevation`, `EntryProperties`, `FileSystemDetails`, `IconImage`, `ListingProgress`, `NavigationContext`, `NameFilter`, `PluginHost`, `PluginLoader`, `Plugins`, `SelectGroupOptions`, `FileStarter`, `ImagePixels`, `SettingsPaths`, `SizeFormatter`, `StandardImageProvider`, `StartupOptions`, `PaneStartup`, `UaeMetadataFormat`, `ViewerDocument`, `ViewerSession`, `WindowsIconImageProvider`, `VolumeCreation`, `VolumeCreatorInput`), `Hst.Commander.Core.Volumes` (volumes, copying, UAE metadata)
 - Tui: `Hst.Commander.Tui`
 - Gui: `Hst.Commander.Gui`, `Hst.Commander.Gui.Icons` (entry icons)
 - Tests: `Hst.Commander.Core.Tests`
@@ -219,7 +220,7 @@ The details for each front-end are in [`docs/tui.md`](../docs/tui.md) and [`docs
 
 - **TUI:** Terminal.Gui **v2 pre-alpha** (`2.0.0-prealpha.1895`). Its API differs from v1, so consult the installed package, not online v1 docs. Each pane is a private `Pane` class holding its `NavigationContext`; pane keys are handled in `tableView.KeyDown`, window keys in `this.KeyUp`. Dialogs are `new Dialog { Buttons = [...] }` run with `Application.Run(dialog)`; background work reports back with `Application.Invoke`.
 - **GUI:** Avalonia 12 with the Fluent theme and plain code-behind (no MVVM). `PaneView` holds a `NavigationContext`; most keys are handled at window level with tunnelling `KeyDown` handlers. Dialogs are shown with `ShowDialog(owner)`; background work reports through a `Progress<T>` created on the UI thread. Theme brushes live in `App.axaml` `ThemeDictionaries` and are referenced with `DynamicResource`.
-- Both front-ends have the same File menu, function key bar (F3-F10), themes (Midnight Commander, Light, Dark) and settings (stored separately in `~/.hst-commander/tui-settings.json` and `gui-settings.json`).
+- Both front-ends have the same File menu, function key bar (F3-F10), themes (Midnight Commander, Light, Dark) and settings dialog with tabs (Appearance, Panes, Copying, Editor; stored separately in `~/.hst-commander/tui-settings.json` and `gui-settings.json`).
 
 ## Git Workflow
 

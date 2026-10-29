@@ -2,10 +2,69 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="Hst.Commander.Gui.SettingsDialog"
         Title="Settings"
-        Width="440" Height="310"
+        Width="520" Height="380"
         CanResize="False"
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner">
+    <Window.Resources>
+        <!-- tabs drawn as tabs on a panel, like the TUI's: the selected tab is joined to the panel showing its settings -->
+        <ControlTheme x:Key="SettingsTabItem" TargetType="TabItem">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseMediumLowBrush}" />
+            <Setter Property="BorderThickness" Value="1,1,1,0" />
+            <Setter Property="Padding" Value="14,6" />
+            <Setter Property="Margin" Value="0,4,2,0" />
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="4,4,0,0">
+                        <DockPanel>
+                            <!-- accent line on top of the selected tab -->
+                            <Border Name="PART_Accent" DockPanel.Dock="Top" Height="2" CornerRadius="4,4,0,0"
+                                    Background="{DynamicResource SystemAccentColor}" IsVisible="False" />
+                            <ContentPresenter Name="PART_ContentPresenter"
+                                              Content="{TemplateBinding Header}"
+                                              ContentTemplate="{TemplateBinding HeaderTemplate}"
+                                              Padding="{TemplateBinding Padding}" />
+                        </DockPanel>
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+            <Style Selector="^:pointerover">
+                <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
+                <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+            </Style>
+            <!-- the selected tab and its panel have the dialog's background, so only the borders mark them -->
+            <Style Selector="^:selected">
+                <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundAltHighBrush}" />
+                <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <!-- covers the panel's top border below the tab -->
+                <Setter Property="Margin" Value="0,0,2,-1" />
+                <Setter Property="Padding" Value="14,8,14,7" />
+            </Style>
+            <Style Selector="^:selected /template/ Border#PART_Accent">
+                <Setter Property="IsVisible" Value="True" />
+            </Style>
+        </ControlTheme>
+    </Window.Resources>
+    <Window.Styles>
+        <Style Selector="TabControl#TabControl /template/ ContentPresenter#PART_SelectedContentHost">
+            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundAltHighBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseMediumLowBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="0,4,4,4" />
+            <Setter Property="Padding" Value="16" />
+        </Style>
+        <!-- the tabs are drawn over the panel, so the selected tab covers its border -->
+        <Style Selector="TabControl#TabControl /template/ ItemsPresenter">
+            <Setter Property="ZIndex" Value="1" />
+        </Style>
+    </Window.Styles>
     <DockPanel Margin="16">
         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
             <Button x:Name="OkButton" Content="OK" MinWidth="80" HorizontalContentAlignment="Center"
@@ -13,15 +72,37 @@
             <Button x:Name="CancelButton" Content="Cancel" MinWidth="80" HorizontalContentAlignment="Center"
                     IsCancel="True" />
         </StackPanel>
-        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="12" VerticalAlignment="Top">
-            <TextBlock Grid.Row="0" Grid.Column="0" Text="Theme:" VerticalAlignment="Center" Margin="0,0,12,0" />
-            <ComboBox x:Name="ThemeComboBox" Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch" />
-            <TextBlock Grid.Row="1" Grid.Column="0" Text="Volume keys:" VerticalAlignment="Center" Margin="0,0,12,0" />
-            <ComboBox x:Name="VolumeProviderKeysComboBox" Grid.Row="1" Grid.Column="1" HorizontalAlignment="Stretch" />
-            <TextBlock Grid.Row="2" Grid.Column="0" Text="Enter on file:" VerticalAlignment="Center" Margin="0,0,12,0" />
-            <ComboBox x:Name="EnterFileActionComboBox" Grid.Row="2" Grid.Column="1" HorizontalAlignment="Stretch" />
-            <TextBlock Grid.Row="3" Grid.Column="0" Text="UAE metadata:" VerticalAlignment="Center" Margin="0,0,12,0" />
-            <ComboBox x:Name="UaeMetadataComboBox" Grid.Row="3" Grid.Column="1" HorizontalAlignment="Stretch" />
-        </Grid>
+        <TabControl x:Name="TabControl" Margin="0,0,0,12" Padding="0"
+                    ItemContainerTheme="{StaticResource SettingsTabItem}">
+            <TabItem Header="Appearance">
+                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto" RowSpacing="12" VerticalAlignment="Top">
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Theme:" VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <ComboBox x:Name="ThemeComboBox" Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch" />
+                </Grid>
+            </TabItem>
+            <TabItem Header="Panes">
+                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" RowSpacing="12" VerticalAlignment="Top">
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Volume keys:" VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <ComboBox x:Name="VolumeProviderKeysComboBox" Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch" />
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Enter on file:" VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <ComboBox x:Name="EnterFileActionComboBox" Grid.Row="1" Grid.Column="1" HorizontalAlignment="Stretch" />
+                </Grid>
+            </TabItem>
+            <TabItem Header="Copying">
+                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto" RowSpacing="12" VerticalAlignment="Top">
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="UAE metadata:" VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <ComboBox x:Name="UaeMetadataComboBox" Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch" />
+                </Grid>
+            </TabItem>
+            <TabItem Header="Editor">
+                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="12" VerticalAlignment="Top">
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Editor (F4):" VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <ComboBox x:Name="EditorComboBox" Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch" />
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Command:" VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <TextBox x:Name="EditorCommandTextBox" Grid.Row="1" Grid.Column="1" />
+                    <TextBlock x:Name="EditorCommandHelpText" Grid.Row="2" Grid.Column="1" TextWrapping="Wrap" Opacity="0.7" />
+                </Grid>
+            </TabItem>
+        </TabControl>
     </DockPanel>
 </Window>

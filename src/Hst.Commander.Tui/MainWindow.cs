@@ -27,6 +27,8 @@ public sealed class MainWindow : Window
     private string? _pendingError;
     private bool _restarting;
     private string _selectGroupFilter = SelectGroupOptions.Default.Filter;
+    private TuiSettings _editorSettings;
+    private ExternalEditFile? _pendingExternalEdit;
 
     public MainWindow(string initialPath, TuiSettings settings)
     {
@@ -47,6 +49,7 @@ public sealed class MainWindow : Window
                 new MenuBarItem("_File", new MenuItem[]
                 {
                     new("Vie_w...", "F3", ViewInActivePane),
+                    new("_Edit...", "F4", EditInActivePane),
                     new("_Copy...", "F5", CopyFromActivePane),
                     new("Mo_ve/rename...", "F6", MoveFromActivePane),
                     new("_Make directory...", "F7", MakeDirectoryInActivePane),
@@ -82,7 +85,7 @@ public sealed class MainWindow : Window
             Items =
             [
                 new FunctionKeyItem("F3", "View", ViewInActivePane),
-                new FunctionKeyItem("F4", "Edit"),
+                new FunctionKeyItem("F4", "Edit", EditInActivePane),
                 new FunctionKeyItem("F5", "Copy", CopyFromActivePane),
                 new FunctionKeyItem("F6", "Move", MoveFromActivePane),
                 new FunctionKeyItem("F7", "Mkdir", MakeDirectoryInActivePane),
@@ -112,6 +115,7 @@ public sealed class MainWindow : Window
         ApplyVolumeProviderKeys(settings.EffectiveVolumeProviderKeys);
         ApplyEnterFileAction(settings.EnterFileAction);
         ApplyUaeMetadata(settings.UaeMetadata);
+        _editorSettings = settings;
         ConfigurePaneKeys(_leftPane, _rightPane);
         ConfigurePaneKeys(_rightPane, _leftPane);
         // also when run again after a program has run in the terminal. The panes are listed once the window runs:
@@ -121,6 +125,7 @@ public sealed class MainWindow : Window
         {
             _activePane.TableView.SetFocus();
             ShowPendingError();
+            await SavePendingExternalEditAsync();
             await InitializeAsync();
         };
     }
@@ -303,6 +308,7 @@ public sealed class MainWindow : Window
         ApplyVolumeProviderKeys(result.EffectiveVolumeProviderKeys);
         ApplyEnterFileAction(result.EnterFileAction);
         ApplyUaeMetadata(result.UaeMetadata);
+        _editorSettings = result;
         try
         {
             result.Save();
@@ -471,6 +477,11 @@ public sealed class MainWindow : Window
                 key.Handled = true;
                 _ = ViewAsync(pane);
             }
+            else if (key.KeyCode == KeyCode.F4)
+            {
+                key.Handled = true;
+                _ = EditAsync(pane, otherPane);
+            }
             else if (key.KeyCode == KeyCode.F5)
             {
                 key.Handled = true;
@@ -506,6 +517,8 @@ public sealed class MainWindow : Window
     }
 
     private void ViewInActivePane() => _ = ViewAsync(_activePane);
+
+    private void EditInActivePane() => _ = EditAsync(_activePane, _activePane == _leftPane ? _rightPane : _leftPane);
 
     private void CopyFromActivePane() => _ = CopyAsync(_activePane, _activePane == _leftPane ? _rightPane : _leftPane);
 
@@ -566,6 +579,105 @@ public sealed class MainWindow : Window
         }
 
         pane.TableView.SetFocus();
+    }
+
+    /// <summary>
+    ///     Edits the file under the cursor (F4) in the editor chosen in the settings: the built-in editor, or an
+    ///     external editor run in the terminal while the TUI is shut down, like Midnight Commander. A file inside an
+    ///     image or another volume is edited as a temporary copy, written back when the TUI runs again. Both panes are
+    ///     refreshed after saving, as the other pane may show the same location.
+    /// </summary>
+    private async Task EditAsync(Pane pane, Pane otherPane)
+    {
+        if (GetCurrentEntry(pane) is not { Type: EntryType.Item } entry)
+        {
+            return;
+        }
+
+        var settings = _editorSettings;
+        if (settings.Editor == EditorKind.BuiltIn)
+        {
+            await EditWithBuiltInEditorAsync(pane, otherPane, entry);
+            return;
+        }
+
+        if (ExternalEditor.Get(settings.Editor, settings.EditorCommand, true) is not { } command)
+        {
+            MessageBox.ErrorQuery("Error", settings.Editor == EditorKind.Custom
+                ? "Enter the command of the custom editor in the settings"
+                : "No text editor was found, choose another editor in the settings", "OK");
+            return;
+        }
+
+        ExternalEditFile file;
+        try
+        {
+            file = await pane.NavigationContext.OpenExternalEditAsync(entry);
+        }
+        catch (Exception exception)
+        {
+            MessageBox.ErrorQuery("Error", exception.Message, "OK");
+            return;
+        }
+
+        _pendingExternalEdit = file;
+        RequestTerminalAction(new TerminalAction.RunEditor(command, file.Path));
+    }
+
+    private async Task EditWithBuiltInEditorAsync(Pane pane, Pane otherPane, IEntry entry)
+    {
+        EditorSession session;
+        try
+        {
+            session = await pane.NavigationContext.OpenEditorAsync(entry);
+        }
+        catch (Exception exception)
+        {
+            MessageBox.ErrorQuery("Error", exception.Message, "OK");
+            pane.TableView.SetFocus();
+            return;
+        }
+
+        using (session)
+        {
+            var dialog = new EditorDialog(session, _palette);
+            Application.Run(dialog);
+            dialog.Dispose();
+        }
+
+        if (session.HasSaved)
+        {
+            await RefreshPaneAsync(pane);
+            await RefreshPaneAsync(otherPane);
+        }
+
+        pane.TableView.SetFocus();
+    }
+
+    /// <summary>
+    ///     Writes back the temporary copy of a file edited with an external editor when it changed, once the TUI runs
+    ///     again after the editor exited, and deletes the copy.
+    /// </summary>
+    private async Task SavePendingExternalEditAsync()
+    {
+        if (_pendingExternalEdit is not { } file)
+        {
+            return;
+        }
+
+        _pendingExternalEdit = null;
+        using (file)
+        {
+            try
+            {
+                await file.SaveChangesAsync();
+            }
+            catch (Exception exception)
+            {
+                MessageBox.ErrorQuery("Error", $"Failed to save the changes of '{file.Name}': {exception.Message}",
+                    "OK");
+            }
+        }
     }
 
     /// <summary>

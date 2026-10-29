@@ -32,11 +32,12 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - Selecting (marking) or unselecting a group of entries with + or - (File > Select group / Unselect group), using wildcards or a regular expression, and inverting the selection with * (File > Invert selection).
 - GUI navigation modes (View menu, Ctrl+1 to Ctrl+9): list, thumbnails and the plugins' modes, e.g. the Amiga Workbench with icons at their `.info` positions, which can be dragged, sorted by name and saved, and def icons (`.info` or image files in `~/.hst-commander/plugins/amiga`) for entries without an icon.
 
-- Viewing files of any size (F3) in a text view (UTF-8 or ISO-8859-1) or hex view, with text and regular expression search and selecting and copying text or hex values, in both front-ends.
+- Viewing files of any size (F3) in a text view (UTF-8 or ISO-8859-1, word wrapped with F2) or hex view, with text and regular expression search and selecting and copying text or hex values, in both front-ends.
+- Editing text files (F4) in the built-in editor (search and replace with text or regular expressions, word wrap, go to line, undo, keeping the encoding and line breaks), also inside writable Amiga images, or in the system's or a custom external editor (files inside volumes are edited as temporary copies and written back), in both front-ends.
 - Viewing images (F3) in the GUI (the TUI shows them in the hex view): PNG, JPEG, GIF (all frames), BMP, WebP and Windows icon files (all images) built in, Amiga icons (all images) and IFF ILBM/PBM pictures with the Amiga plugin's image provider; fitted or zoomed (10%-1600%, + and -) and moved when larger than the view.
 
 **Not implemented:**
-- Edit (F4) and other file-management operations; changing the viewer's encoding, word wrapping and going to an offset.
+- Other file-management operations (e.g. creating a new file with Shift+F4); changing the viewer's encoding and going to an offset; changing the editor's encoding and line breaks.
 - Writing to images other than Amiga adf and RDB images; ISO images and zip, lha and lzx archives are read-only, as are Amiga images inside other images.
 - Writing an image file to a physical disk (the physical disk list is read-only).
 - Changing RDB, MBR and GPT partitions, other Amiga file systems (e.g. SFS), other PC file systems (exFAT, ext, ...) and vhdx/vmdk images.

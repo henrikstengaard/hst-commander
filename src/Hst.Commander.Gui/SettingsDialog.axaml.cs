@@ -4,8 +4,9 @@ using Hst.Commander.Core;
 namespace Hst.Commander.Gui;
 
 /// <summary>
-///     Modal settings view. Theme changes are previewed immediately and reverted on cancel; the dialog returns the
-///     changed settings on OK or null on cancel.
+///     Modal settings view with the settings grouped in tabs: appearance, panes, copying and the editor. Theme changes
+///     are previewed immediately and reverted on cancel; the dialog returns the changed settings on OK or null on
+///     cancel.
 /// </summary>
 public partial class SettingsDialog : Window
 {
@@ -39,16 +40,36 @@ public partial class SettingsDialog : Window
             Math.Max(0, EnterFileActions.All.ToList().IndexOf(settings.EnterFileAction));
         UaeMetadataComboBox.ItemsSource = UaeMetadataFormats.All.Select(UaeMetadataFormats.GetName).ToList();
         UaeMetadataComboBox.SelectedIndex = Math.Max(0, UaeMetadataFormats.All.ToList().IndexOf(settings.UaeMetadata));
+        EditorComboBox.ItemsSource = EditorKinds.All.Select(kind => EditorKinds.GetName(kind, false)).ToList();
+        EditorComboBox.SelectedIndex = Math.Max(0, EditorKinds.All.ToList().IndexOf(settings.Editor));
+        EditorComboBox.SelectionChanged += (_, _) => UpdateEditorCommand();
+        EditorCommandTextBox.Text = settings.EditorCommand ?? string.Empty;
+        EditorCommandTextBox.PlaceholderText = OperatingSystem.IsWindows()
+            ? "\"C:\\Program Files\\Notepad++\\notepad++.exe\" -multiInst"
+            : "code --wait";
+        EditorCommandHelpText.Text =
+            $"The program and its arguments; {ExternalEditor.FilePlaceholder} is replaced with the file, otherwise it's added last. Files inside images are written back when the editor exits.";
+        UpdateEditorCommand();
 
         var accepted = false;
         OkButton.Click += (_, _) =>
         {
+            var command = EditorCommandTextBox.Text?.Trim();
+            if (SelectedEditor == EditorKind.Custom && (command == null || ExternalEditor.ParseCommand(command) == null))
+            {
+                TabControl.SelectedIndex = TabControl.ItemCount - 1;
+                EditorCommandTextBox.Focus();
+                return;
+            }
+
             accepted = true;
             Close((settings with
                 {
                     Theme = SelectedTheme,
                     EnterFileAction = SelectedEnterFileAction,
-                    UaeMetadata = SelectedUaeMetadata
+                    UaeMetadata = SelectedUaeMetadata,
+                    Editor = SelectedEditor,
+                    EditorCommand = string.IsNullOrEmpty(command) ? null : command
                 })
                 .WithVolumeProviderKeys(SelectedVolumeProviderKeys));
         };
@@ -73,4 +94,9 @@ public partial class SettingsDialog : Window
 
     private UaeMetadataFormat SelectedUaeMetadata =>
         UaeMetadataFormats.All[Math.Max(0, UaeMetadataComboBox.SelectedIndex)];
+
+    private EditorKind SelectedEditor => EditorKinds.All[Math.Max(0, EditorComboBox.SelectedIndex)];
+
+    /// <summary>The command can only be entered for the custom editor.</summary>
+    private void UpdateEditorCommand() => EditorCommandTextBox.IsEnabled = SelectedEditor == EditorKind.Custom;
 }
