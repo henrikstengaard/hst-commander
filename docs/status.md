@@ -42,6 +42,5 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - Writing an image file to a physical disk (the physical disk list is read-only).
 - Changing RDB, MBR and GPT partitions, other Amiga file systems (e.g. SFS), other PC file systems (exFAT, ext, ...) and vhdx/vmdk images.
 - Unloading or reloading plugins while running, and a list of loaded plugins in the UI.
-- `DiskImageVolume` remains an intentional stub.
 
 

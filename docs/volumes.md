@@ -15,7 +15,6 @@ Core volumes (`Hst.Commander.Core.Volumes`):
 | `NestedVolume` | Holds a stack of volumes; opening an image pushes one, going up from its root pops it. `CurrentPathComponents` spans all of them |
 | `EntryVolumeProvider` | Presents a child volume as if it starts at the path of the entry that opened it |
 | `NullVolume` | Empty fallback |
-| `DiskImageVolume` | Intentional stub |
 
 Plugin volumes:
 
