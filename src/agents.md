@@ -80,7 +80,7 @@ src/
   LocalVolumeProvider (VolumeProviders.All),
   Iso9660FileVolumeProvider (VolumeProviders.Files),
   LocalVolume, Iso9660Volume, NestedVolume,
-  EntryVolumeProvider, DiskImageVolume (stub), NullVolume
+  EntryVolumeProvider, NullVolume
         |
 [NavigationContext]  <- Hst.Commander.Core
   Wraps NestedVolume, owns pane-level state
@@ -136,7 +136,6 @@ These apply across features and aren't obvious from a single file:
 - Writing to images other than Amiga adf and RDB images; ISO images and zip, lha and lzx archives are read-only, as are Amiga images inside other images.
 - Changing RDB, MBR and GPT partitions, other Amiga file systems (e.g. SFS), other PC file systems (exFAT, ext, ...) and vhdx/vmdk images.
 - Unloading or reloading plugins while running, and a list of loaded plugins in the UI.
-- `DiskImageVolume` remains an intentional stub.
 
 ---
 
@@ -253,7 +252,6 @@ dotnet test src/Hst.Commander.Core.Tests/Hst.Commander.Core.Tests.csproj --logge
 
 | Package | Version | Used in |
 |---|---|---|
-| `LTRData.DiscUtils` | 1.0.54 | `Hst.Commander.Core` — raw disk image support |
 | `LTRData.DiscUtils.Iso9660` | 1.0.54 | `Hst.Commander.Core` — ISO 9660 reading |
 | `SkiaSharp`, `SkiaSharp.NativeAssets.Linux` | 3.119.4 | `Hst.Commander.Core` — decoding PNG, JPEG, GIF, BMP and WebP images viewed with F3 in the GUI (the version Avalonia uses; part of the TUI too, as it references Core) |
 | `System.Linq.Async` | 6.0.1 | `Hst.Commander.Core` — async LINQ |
