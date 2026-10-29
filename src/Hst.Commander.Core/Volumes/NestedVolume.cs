@@ -134,6 +134,9 @@ public class NestedVolume(IVolume volume) : IVolume
     public Task<EntryAttributes> GetChangeableAttributes(CancellationToken cancellationToken = default) =>
         _currentVolume.GetChangeableAttributes(cancellationToken);
 
+    public Task<VolumeSpace?> GetSpace(CancellationToken cancellationToken = default) =>
+        _currentVolume.GetSpace(cancellationToken);
+
     public Task SetAttributes(string name, EntryAttributes attributes, CancellationToken cancellationToken = default) =>
         _currentVolume.SetAttributes(name, attributes, cancellationToken);
 

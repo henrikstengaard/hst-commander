@@ -317,6 +317,48 @@ public class GivenNavigationContextWithAmigaImages : IDisposable
     }
 
     [Fact]
+    public async Task When_AdfIsListed_Then_FreeAndTotalSpaceAreReturned()
+    {
+        // arrange
+        await AmigaTestData.CreateAdf(Path.Combine(_rootPath, "disk.adf"));
+        using var navigationContext = new NavigationContext(_rootPath);
+
+        // act
+        await OpenAsync(navigationContext, "disk.adf");
+        await navigationContext.ListEntriesAsync();
+        var diskSpace = navigationContext.DiskSpace;
+
+        // assert
+        Assert.NotNull(diskSpace);
+        Assert.Matches(@"^\d+[BKMGTPE]/\d+[BKMGTPE]$", diskSpace);
+    }
+
+    [Theory]
+    [InlineData("1")]
+    [InlineData("2")]
+    public async Task When_RdbPartitionIsListed_Then_FreeAndTotalSpaceAreReturned(string partitionName)
+    {
+        // arrange
+        await AmigaTestData.CreateRdbImage(Path.Combine(_rootPath, "disk.hdf"), AmigaTestData.Dos3DosType,
+            AmigaTestData.Pfs3DosType);
+        using var navigationContext = new NavigationContext(_rootPath);
+        await OpenAsync(navigationContext, "disk.hdf");
+        await OpenAsync(navigationContext, "rdb");
+        await navigationContext.ListEntriesAsync();
+        var partitionListSpace = navigationContext.DiskSpace;
+
+        // act
+        await OpenAsync(navigationContext, partitionName);
+        await navigationContext.ListEntriesAsync();
+        var diskSpace = navigationContext.DiskSpace;
+
+        // assert
+        Assert.Null(partitionListSpace);
+        Assert.NotNull(diskSpace);
+        Assert.Matches(@"^\d+[BKMGTPE]/\d+[BKMGTPE]$", diskSpace);
+    }
+
+    [Fact]
     public async Task When_RdbPartitionCantBeMounted_Then_ItIsShownWithoutVolumeName()
     {
         // arrange

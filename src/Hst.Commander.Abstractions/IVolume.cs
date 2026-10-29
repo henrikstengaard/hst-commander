@@ -127,6 +127,14 @@ public interface IVolume
         throw new NotSupportedException("Changing attributes is not supported");
 
     /// <summary>
+    /// Free and total space of the file system of the current directory, e.g. a FAT or NTFS partition, shown as
+    /// "free/total" next to the path like local drives. Null (the default) when the current directory isn't in a file
+    /// system with space, e.g. a list of partitions or an archive.
+    /// </summary>
+    Task<VolumeSpace?> GetSpace(CancellationToken cancellationToken = default) =>
+        Task.FromResult<VolumeSpace?>(null);
+
+    /// <summary>
     /// Id of an item in current directory that <see cref="OpenReadWrite" /> can open for reading and writing as a
     /// writable image, unique across volumes, e.g. the full path of a local file or "\\.\PhysicalDrive2" of a physical
     /// disk. Hst Commander opens a writable image once per id and shares it with both panes and file operations, as

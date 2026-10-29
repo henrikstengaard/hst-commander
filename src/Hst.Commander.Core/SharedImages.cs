@@ -386,6 +386,9 @@ internal sealed class SharedImageVolume : IVolume, IDisposable
     public Task<EntryAttributes> GetChangeableAttributes(CancellationToken cancellationToken = default) =>
         RunAsync(volume => volume.GetChangeableAttributes(cancellationToken), cancellationToken);
 
+    public Task<VolumeSpace?> GetSpace(CancellationToken cancellationToken = default) =>
+        RunAsync(volume => volume.GetSpace(cancellationToken), cancellationToken);
+
     public Task SetAttributes(string name, EntryAttributes attributes, CancellationToken cancellationToken = default) =>
         RunAsync(async volume =>
         {

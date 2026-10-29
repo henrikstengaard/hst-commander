@@ -26,7 +26,7 @@ Plugin volumes:
 | `RdbVolume` (Amiga) | Hard disk images with a rigid disk block (raw, fixed or dynamic vhd). See below |
 | `VolumeListVolume`, `PartitionTableVolume` (Disk) | MBR and GPT disk images. See below |
 | `HybridDiskVolume` (Disk) | A disk with both an MBR and another volume on the whole disk (e.g. a rigid disk block in blocks 1-15): the root lists both partition tables, e.g. `hybrid.img\rdb\1` |
-| `DiscFileSystemVolume` (Disk) | FAT (long names) and NTFS via DiscUtils, writable when the file system is; dates are UTC; attributes can be changed |
+| `DiscFileSystemVolume` (Disk) | FAT (long names) and NTFS via DiscUtils, writable when the file system is; dates are UTC; attributes can be changed; free/total space shown in the path panel (`GetSpace`) |
 | `PhysicalDiskVolume` (PhysicalDisk) | The physical disks of the computer, listed as items opened like images. See below |
 
 ISO images and zip, lha and lzx archives are read-only. `LocalVolume.CreateContainer` throws `NotSupportedException` in the drive list. The drive list shows the size of each drive in the size column, like the physical disk list; a drive without media (e.g. an empty card reader) has no size. Local directories have no size (`<DIR>`).
@@ -37,6 +37,7 @@ ISO images and zip, lha and lzx archives are read-only. `LocalVolume.CreateConta
 - Names are case-insensitive and can't contain `/` or `:`. Names longer than the file system allows throw `IOException`, because Hst.Amiga would silently truncate them. Case-only renames go through a temporary name.
 - Amiga dates are local time; dates before 1978 become 1978-01-01. Delete and overwrite ignore protection bits. Comments are cut to 79 characters.
 - `OpenRead` returns Hst.Amiga's seekable stream, so e.g. the viewer reads it directly.
+- Free/total space of an adf or an RDB partition is shown in the path panel (`GetSpace`, forwarded by `RdbVolume` inside a partition).
 - Disposing and closing a written stream wait on the thread pool, because Hst.Amiga waits for async writes there and would deadlock on a UI thread.
 
 ### Partition tables
@@ -61,7 +62,7 @@ ISO images and zip, lha and lzx archives are read-only. `LocalVolume.CreateConta
 
 ## Navigation Model
 
-Each pane's `NavigationContext` owns a `NestedVolume` over a root volume from a volume provider (initially `Local` at the startup directory). `ChangeVolumeProviderAsync` creates a new root volume, closes opened images and the previous root volume, and clears the marks. `CurrentPath` at the root is `Computer` for the local drive list and the provider's `Name` otherwise. Local-only features (disk space, starting files, executables) need a `LocalVolume` root.
+Each pane's `NavigationContext` owns a `NestedVolume` over a root volume from a volume provider (initially `Local` at the startup directory). `ChangeVolumeProviderAsync` creates a new root volume, closes opened images and the previous root volume, and clears the marks. `CurrentPath` at the root is `Computer` for the local drive list and the provider's `Name` otherwise. Local-only features (starting files, executables) need a `LocalVolume` root. The disk space (free/total) in the path panel is the local drive's, or inside an image or another root volume the space the current volume returns from `IVolume.GetSpace`, read when the pane is listed so the path panel doesn't read the volume (on FAT it scans the allocation table).
 
 ### Images
 

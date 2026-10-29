@@ -9,6 +9,7 @@ public sealed class NavigationContext : IDisposable
     private IVolume _rootVolume;
     private NestedVolume _nestedVolume;
     private readonly Stack<OpenedImage> _images = new();
+
     private readonly Dictionary<string, IEntry> _markedEntries = new(StringComparer.Ordinal);
     private readonly HashSet<string> _executableNames = new(StringComparer.Ordinal);
     private readonly Action<string> _startFile;
@@ -20,6 +21,9 @@ public sealed class NavigationContext : IDisposable
     private Task<VolumeLocation>? _iconLocation;
     private string? _newEntryName;
     private bool _selectFirstEntry;
+
+    /// <summary>Space of the current volume read when listing, shown by <see cref="DiskSpace" />.</summary>
+    private VolumeSpace? _volumeSpace;
 
     /// <param name="initialPath">Local directory to start in, empty for the drive list.</param>
     /// <param name="startFile">
@@ -395,14 +399,20 @@ public sealed class NavigationContext : IDisposable
         : null;
 
     /// <summary>
-    ///     Free and total space of the local drive at the current path formatted as "free/total", e.g. "87G/256G".
-    ///     Null when listing drives, inside an image or when the drive is unavailable.
+    ///     Free and total space at the current path formatted as "free/total", e.g. "87G/256G": of the local drive, or
+    ///     of the file system of a volume (<see cref="IVolume.GetSpace" />) read when listing, e.g. a FAT partition in
+    ///     an image. Null when listing drives, when the volume has no space or when the drive is unavailable.
     /// </summary>
     public string? DiskSpace
     {
         get
         {
-            if (IsInImage || LocalPath is not { } localPath)
+            if (IsInImage || _rootVolume is not LocalVolume)
+            {
+                return _volumeSpace is { } volumeSpace ? FormatSpace(volumeSpace.Free, volumeSpace.Total) : null;
+            }
+
+            if (LocalPath is not { } localPath)
             {
                 return null;
             }
@@ -412,13 +422,35 @@ public sealed class NavigationContext : IDisposable
                 var currentPath = Path.GetFullPath(localPath);
                 var driveInfo = FindDrive(currentPath);
                 return driveInfo is { IsReady: true }
-                    ? $"{SizeFormatter.FormatHumanized(driveInfo.AvailableFreeSpace)}/{SizeFormatter.FormatHumanized(driveInfo.TotalSize)}"
+                    ? FormatSpace(driveInfo.AvailableFreeSpace, driveInfo.TotalSize)
                     : null;
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
             {
                 return null;
             }
+        }
+    }
+
+    private static string FormatSpace(long free, long total) =>
+        $"{SizeFormatter.FormatHumanized(free)}/{SizeFormatter.FormatHumanized(total)}";
+
+    /// <summary>Reads the space of the current volume when it isn't a local directory, null when it has none.</summary>
+    private async Task<VolumeSpace?> GetVolumeSpaceAsync(CancellationToken cancellationToken)
+    {
+        if (!IsInImage && _rootVolume is LocalVolume)
+        {
+            return null;
+        }
+
+        try
+        {
+            return await _nestedVolume.GetSpace(cancellationToken);
+        }
+        catch (Exception exception) when (exception is IOException or NotSupportedException)
+        {
+            // the space is only shown, listing still works
+            return null;
         }
     }
 
@@ -476,6 +508,7 @@ public sealed class NavigationContext : IDisposable
             entries.Add(entry);
         }
 
+        _volumeSpace = await GetVolumeSpaceAsync(cancellationToken);
         UpdateExecutableNames(entries);
         UpdateIconFiles(entries);
 

@@ -63,6 +63,9 @@ public class EntryVolumeProvider(IEntry entry, IVolume volumeProvider) : IVolume
     public Task<EntryAttributes> GetChangeableAttributes(CancellationToken cancellationToken = default) =>
         volumeProvider.GetChangeableAttributes(cancellationToken);
 
+    public Task<VolumeSpace?> GetSpace(CancellationToken cancellationToken = default) =>
+        volumeProvider.GetSpace(cancellationToken);
+
     public Task SetAttributes(string name, EntryAttributes attributes, CancellationToken cancellationToken = default) =>
         volumeProvider.SetAttributes(name, attributes, cancellationToken);
 

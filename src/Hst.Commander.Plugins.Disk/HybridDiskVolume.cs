@@ -163,6 +163,9 @@ public sealed class HybridDiskVolume : IVolume, IDisposable
     public Task<EntryAttributes> GetChangeableAttributes(CancellationToken cancellationToken = default) =>
         _currentVolume?.GetChangeableAttributes(cancellationToken) ?? Task.FromResult(EntryAttributes.None);
 
+    public Task<VolumeSpace?> GetSpace(CancellationToken cancellationToken = default) =>
+        _currentVolume?.GetSpace(cancellationToken) ?? Task.FromResult<VolumeSpace?>(null);
+
     public Task SetAttributes(string name, EntryAttributes attributes, CancellationToken cancellationToken = default) =>
         _currentVolume?.SetAttributes(name, attributes, cancellationToken) ??
         throw ReadOnly();
