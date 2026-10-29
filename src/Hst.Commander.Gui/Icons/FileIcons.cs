@@ -20,6 +20,7 @@ internal static class FileIcons
     private static readonly IFileIconProvider? Provider = CreateProvider();
     private static readonly Dictionary<string, IImage> TypeIcons = new(StringComparer.OrdinalIgnoreCase);
     private static readonly Dictionary<string, IImage?> FileIconCache = new(StringComparer.Ordinal);
+    private static readonly SemaphoreSlim TypeIconLock = new(1, 1);
 
     /// <summary>Built-in folder icon, used until the OS icon is loaded or when the OS has none.</summary>
     public static IImage DefaultFolderIcon { get; } = CreateDrawing(
@@ -29,10 +30,50 @@ internal static class FileIcons
     public static IImage DefaultFileIcon { get; } = CreateDrawing(
         "M3,1 L10,1 L13,4 L13,15 L3,15 Z", "#F4F4F4", "#808080");
 
+    /// <summary>Folder icons with an arrow up for the parent entry (".."), by the folder icon they are made from.</summary>
+    private static readonly Dictionary<IImage, IImage> ParentIcons = new(ReferenceEqualityComparer.Instance);
+
     /// <summary>Icon shown right away for an entry, before <see cref="LoadAsync" /> has loaded the actual icon.</summary>
-    public static IImage GetInitialIcon(IEntry entry) => entry.Type == EntryType.Container
-        ? TypeIcons.GetValueOrDefault("folder") ?? DefaultFolderIcon
-        : TypeIcons.GetValueOrDefault($"file{Path.GetExtension(entry.Name)}") ?? DefaultFileIcon;
+    public static IImage GetInitialIcon(IEntry entry) => IsParent(entry)
+        ? GetParentIcon(TypeIcons.GetValueOrDefault("folder") ?? DefaultFolderIcon)
+        : entry.Type == EntryType.Container
+            ? TypeIcons.GetValueOrDefault("folder") ?? DefaultFolderIcon
+            : TypeIcons.GetValueOrDefault($"file{Path.GetExtension(entry.Name)}") ?? DefaultFileIcon;
+
+    private static bool IsParent(IEntry entry) => entry.Name == Paths.Parent;
+
+    /// <summary>
+    ///     Folder icon with a green arrow up drawn over its lower right part, showing the parent entry ("..") navigates
+    ///     a directory up. Cached per folder icon.
+    /// </summary>
+    private static IImage GetParentIcon(IImage folderIcon)
+    {
+        if (ParentIcons.TryGetValue(folderIcon, out var parentIcon))
+        {
+            return parentIcon;
+        }
+
+        // the arrow is drawn in a 16x16 box scaled to the folder icon's size
+        var size = folderIcon.Size;
+        var scale = Math.Min(size.Width, size.Height) / 16;
+        var arrow = Geometry.Parse("M11,5 L15,9.5 L12.75,9.5 L12.75,15 L9.25,15 L9.25,9.5 L7,9.5 Z");
+        arrow.Transform = new ScaleTransform(scale, scale);
+        parentIcon = new DrawingImage(new DrawingGroup
+        {
+            Children =
+            {
+                new ImageDrawing { ImageSource = folderIcon, Rect = new Rect(size) },
+                new GeometryDrawing
+                {
+                    Geometry = arrow,
+                    Brush = new SolidColorBrush(Color.Parse("#3CB043")),
+                    Pen = new Pen(new SolidColorBrush(Color.Parse("#1E6B23")), Math.Max(1, scale * 0.75))
+                }
+            }
+        });
+        ParentIcons[folderIcon] = parentIcon;
+        return parentIcon;
+    }
 
     /// <summary>
     ///     Loads the icons of the listed entries, first the type icons and then the icons contained in files, which
@@ -53,7 +94,8 @@ internal static class FileIcons
                 isLarge ? $"@{size}" : string.Empty);
         }
 
-        foreach (var item in items.Where(item => !item.IsContainer || navigationContext.HasIcon(item.Entry)))
+        foreach (var item in items.Where(item =>
+                     !IsParent(item.Entry) && (!item.IsContainer || navigationContext.HasIcon(item.Entry))))
         {
             if (cancellationToken.IsCancellationRequested)
             {
@@ -190,10 +232,19 @@ internal static class FileIcons
             .ToList()))
         .ToList();
 
-    /// <summary>Type icon of an entry: the drive icon in the drive list, the folder icon or the file type icon.</summary>
+    /// <summary>
+    ///     Type icon of an entry: the folder icon with an arrow up for the parent entry (".."), the drive icon in the
+    ///     drive list, the folder icon or the file type icon.
+    /// </summary>
     private static async Task<IImage> GetEntryTypeIconAsync(IEntry entry, NavigationContext navigationContext,
         int size, string keySuffix)
     {
+        if (IsParent(entry))
+        {
+            return GetParentIcon(await GetTypeIconAsync($"folder{keySuffix}", provider => provider.GetFolderIcon(size),
+                DefaultFolderIcon));
+        }
+
         var localPath = navigationContext.GetLocalPath(entry);
         if (entry.Type != EntryType.Container)
         {
@@ -216,9 +267,24 @@ internal static class FileIcons
             return icon;
         }
 
-        icon = CreateBitmap(await RunProviderAsync(getIcon)) ?? defaultIcon;
-        TypeIcons[key] = icon;
-        return icon;
+        // both panes load their icons at the same time (e.g. at startup), so type icons are loaded one at a time and
+        // a pane waiting for another pane's load gets the same icon instead of loading it again
+        await TypeIconLock.WaitAsync();
+        try
+        {
+            if (TypeIcons.TryGetValue(key, out icon))
+            {
+                return icon;
+            }
+
+            icon = CreateBitmap(await RunProviderAsync(getIcon)) ?? defaultIcon;
+            TypeIcons[key] = icon;
+            return icon;
+        }
+        finally
+        {
+            TypeIconLock.Release();
+        }
     }
 
     /// <summary>

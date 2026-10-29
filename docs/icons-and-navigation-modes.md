@@ -19,7 +19,9 @@ Each row shows a 16x16 icon. `PaneView.LoadIcons` runs `FileIcons.LoadAsync` aft
 
 1. Icons of plugin icon files and inside volume entries (cached by the icon file's location, size, date and pixel size; icons inside volume entries aren't cached). Scaled into the square keeping their aspect ratio.
 2. Icons contained in files (`EmbeddedIconReader`): local files on a background thread, files inside images on the UI thread, because the pane's volume isn't thread safe. When a local file has no icon of its own but the OS shows one (`IFileIconProvider.HasFileIcon`, e.g. Windows system programs and shortcuts, `.icns` on macOS), the OS icon of the file is used.
-3. Type icons from the host OS, cached per extension, folder and drive: Windows shell icons (`SHGetFileInfo` with attributes, so files don't need to exist), freedesktop icons on Linux (shared MIME database and PNG icon themes; SVG-only icons aren't supported), NSWorkspace on macOS (on the UI thread). Without one, the built-in icons stay.
+3. Type icons from the host OS, cached per extension, folder and drive and loaded one at a time, so both panes loading at startup get the same icon: Windows shell icons (`SHGetFileInfo` with attributes, so files don't need to exist), freedesktop icons on Linux (shared MIME database and PNG icon themes; SVG-only icons aren't supported), NSWorkspace on macOS (on the UI thread). Without one, the built-in icons stay.
+
+The parent entry (`..`) in the list and thumbnails shows the folder icon (the OS one once loaded, otherwise the built-in one) with a green arrow up drawn over its lower right part, so it's clear it goes a directory up. It never gets an icon of its own. Plugin navigation modes (e.g. Workbench) don't show `..`; they have the `..` toolbar button instead.
 
 ## Navigation Modes
 
