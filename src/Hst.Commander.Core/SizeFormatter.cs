@@ -11,18 +11,16 @@ public static class SizeFormatter
     private static readonly string[] Units = ["B", "K", "M", "G", "T", "P", "E"];
 
     /// <summary>
-    ///     Formats the size column of an entry: "&lt;DIR&gt;" for directories, otherwise the humanized size,
-    ///     e.g. "87G" (see <see cref="FormatHumanized" />). Empty when the size is unknown.
+    ///     Formats the size column of an entry: the humanized size, e.g. "87G" (see <see cref="FormatHumanized" />),
+    ///     also for containers with a size, e.g. drives, partition tables and partitions; "&lt;DIR&gt;" for other directories. Empty
+    ///     when the size of an item is unknown.
     /// </summary>
-    public static string FormatEntrySize(IEntry entry)
+    public static string FormatEntrySize(IEntry entry) => entry.Size switch
     {
-        if (entry.Type == EntryType.Container)
-        {
-            return DirectorySize;
-        }
-
-        return entry.Size == null ? string.Empty : FormatHumanized(entry.Size.Value);
-    }
+        { } size => FormatHumanized(size),
+        null when entry.Type == EntryType.Container => DirectorySize,
+        _ => string.Empty
+    };
 
     /// <summary>Formats a size as a rounded integer with a single letter unit, e.g. "87G".</summary>
     public static string FormatHumanized(long size)

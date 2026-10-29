@@ -26,7 +26,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 ## Panes
 
 - Each pane is a private `Pane` class holding its `NavigationContext`, views, entries and `DataTable`.
-- The name column takes the remaining width; size and date columns shrink on narrow panes so everything fits. Long names are shortened with `~`, keeping the end of the stem and the extension when they fit. Sizes are humanized (`SizeFormatter.FormatEntrySize`, `<DIR>` for directories).
+- The name column takes the remaining width; size and date columns shrink on narrow panes so everything fits. Long names are shortened with `~`, keeping the end of the stem and the extension when they fit. Sizes are humanized (`SizeFormatter.FormatEntrySize`): containers with a size, i.e. drives, partition tables and partitions, show it, other directories show `<DIR>`.
 - The path panel highlights the path of the focused pane and trims it from the left with `...`; the disk space is dropped when the panel is too narrow.
 - The cursor row is only drawn in the active pane (the pane last focused), so it stays visible while a dialog or the menu has the focus. Marked entries are yellow, also under the cursor.
 - PageUp/PageDown move by a visible page; Ctrl+PageDown is checked before PageDown.

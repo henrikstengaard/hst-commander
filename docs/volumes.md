@@ -30,7 +30,7 @@ Plugin volumes:
 | `DiscFileSystemVolume` (Disk) | FAT (long names) and NTFS via DiscUtils, writable when the file system is; dates are UTC; attributes can be changed |
 | `PhysicalDiskVolume` (PhysicalDisk) | The physical disks of the computer, listed as items opened like images. See below |
 
-ISO images and zip, lha and lzx archives are read-only. `LocalVolume.CreateContainer` throws `NotSupportedException` in the drive list.
+ISO images and zip, lha and lzx archives are read-only. `LocalVolume.CreateContainer` throws `NotSupportedException` in the drive list. The drive list shows the size of each drive in the size column, like the physical disk list; a drive without media (e.g. an empty card reader) has no size. Local directories have no size (`<DIR>`).
 
 ### Amiga file systems
 
@@ -42,7 +42,7 @@ ISO images and zip, lha and lzx archives are read-only. `LocalVolume.CreateConta
 
 ### Partition tables
 
-- The root of an RDB, MBR or GPT disk lists the partition table as a single directory (`rdb`, `mbr` or `gpt` in paths, shown in upper case), so paths always show it, e.g. `disk.hdf\rdb\1` or `pistorm.img\mbr\2\rdb\1`. It lists the partitions as directories `1`..`n` marked `IsVolume`, with a `DisplayName` (e.g. `1 - DH0 - Workbench`, `2 - PiStorm RDB`) and `Details` for the properties dialog.
+- The root of an RDB, MBR or GPT disk lists the partition table as a single directory (`rdb`, `mbr` or `gpt` in paths, shown in upper case), so paths always show it, e.g. `disk.hdf\rdb\1` or `pistorm.img\mbr\2\rdb\1`. It lists the partitions as directories `1`..`n` marked `IsVolume`, with a `DisplayName` (e.g. `1 - DH0 - Workbench`, `2 - PiStorm RDB`), the partition size as `Size` (shown in the size column instead of `<DIR>`) and `Details` for the properties dialog. The partition table directory has the disk size as `Size`, also shown in the size column and as `Disk size` in its properties: the disk's length for MBR and GPT (MBR doesn't store the disk size, and the partition table covers the whole disk), and cylinders * heads * sectors * block size of the rigid disk block for RDB.
 - A partition is mounted when listed or opened and stays mounted until disposed; one that can't be mounted is only tried once when listed and throws `IOException` when opened. Partition lists are read-only.
 - MBR/GPT partitions are mounted as FAT or NTFS, otherwise through `IPluginHost.OpenVolume` (e.g. a PiStorm partition, MBR type `0x76` or its GPT type, opens as an `RdbVolume`).
 - Sector sizes of 512 and 4096 bytes are supported. GPT tells by the header offset. MBR doesn't store it, so 4096 is used only when the partitions only fit with 4096-byte sectors, or also fit and more of them start with a recognizable volume there.

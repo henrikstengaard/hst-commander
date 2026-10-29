@@ -290,11 +290,13 @@ public class DiskFileVolumeProvider : IFileVolumeProvider
         var otherVolume = await FindOtherVolume(diskStream, cancellationToken);
         if (otherVolume == null)
         {
-            return new PartitionTableVolume(partitionTableName, partitions, Host, resource, sectorSize);
+            return new PartitionTableVolume(partitionTableName, partitions, Host, resource, sectorSize,
+                diskStream.Length);
         }
 
         return new HybridDiskVolume(
-            [new PartitionTableVolume(partitionTableName, partitions, Host, null, sectorSize), otherVolume], resource);
+            [new PartitionTableVolume(partitionTableName, partitions, Host, null, sectorSize, diskStream.Length), otherVolume],
+            resource);
     }
 
     /// <summary>
