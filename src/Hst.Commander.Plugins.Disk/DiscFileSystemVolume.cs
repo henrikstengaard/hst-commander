@@ -47,6 +47,9 @@ public sealed class DiscFileSystemVolume : IVolume, IDisposable
     /// <summary>Free space of the file system in bytes.</summary>
     public long Free => Run(() => _fileSystem.AvailableSpace);
 
+    public Task<VolumeSpace?> GetSpace(CancellationToken cancellationToken = default) =>
+        Task.FromResult<VolumeSpace?>(new VolumeSpace(Math.Clamp(Free, 0, Size), Size));
+
     public async IAsyncEnumerable<IEntry> ListEntries(
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {

@@ -238,6 +238,9 @@ public abstract class VolumeListVolume : IVolume, IDisposable
     public Task<EntryAttributes> GetChangeableAttributes(CancellationToken cancellationToken = default) =>
         CurrentVolume?.GetChangeableAttributes(cancellationToken) ?? Task.FromResult(EntryAttributes.None);
 
+    public Task<VolumeSpace?> GetSpace(CancellationToken cancellationToken = default) =>
+        CurrentVolume?.GetSpace(cancellationToken) ?? Task.FromResult<VolumeSpace?>(null);
+
     public Task SetAttributes(string name, EntryAttributes attributes, CancellationToken cancellationToken = default) =>
         CurrentVolume?.SetAttributes(name, attributes, cancellationToken) ??
         throw new NotSupportedException(ReadOnlyMessage);

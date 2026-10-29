@@ -97,6 +97,34 @@ public class GivenNavigationContextWithDiskImages : IDisposable
     }
 
     [Theory]
+    [InlineData("1")]
+    [InlineData("2")]
+    public async Task When_FatOrNtfsPartitionIsListed_Then_FreeAndTotalSpaceAreReturned(string partitionName)
+    {
+        // arrange
+        await using (var disk = DiskTestData.CreateGptDisk())
+        {
+            await DiskTestData.WriteToFile(disk, Path.Combine(_rootPath, "disk.img"));
+        }
+
+        using var navigationContext = new NavigationContext(_rootPath);
+        await OpenAsync(navigationContext, "disk.img");
+        await OpenAsync(navigationContext, "gpt");
+        await navigationContext.ListEntriesAsync();
+        var partitionTableSpace = navigationContext.DiskSpace;
+
+        // act
+        await OpenAsync(navigationContext, partitionName);
+        await navigationContext.ListEntriesAsync();
+        var diskSpace = navigationContext.DiskSpace;
+
+        // assert
+        Assert.Null(partitionTableSpace);
+        Assert.NotNull(diskSpace);
+        Assert.Matches(@"^\d+[BKMGTPE]/\d+[BKMGTPE]$", diskSpace);
+    }
+
+    [Theory]
     [InlineData(false, "mbr")]
     [InlineData(true, "gpt")]
     public async Task When_DiskIsOpened_Then_PartitionTableHasDiskSize(bool gpt, string partitionTableName)

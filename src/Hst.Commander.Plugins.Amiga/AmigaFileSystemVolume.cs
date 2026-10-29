@@ -244,6 +244,9 @@ public class AmigaFileSystemVolume : IVolume, IDisposable
     public Task<bool> CanSetAmigaMetadata(CancellationToken cancellationToken = default) =>
         Task.FromResult(_isWritable);
 
+    public Task<VolumeSpace?> GetSpace(CancellationToken cancellationToken = default) =>
+        Task.FromResult<VolumeSpace?>(new VolumeSpace(Math.Clamp(Free, 0, Size), Size));
+
     public async Task SetAmigaMetadata(string name, AmigaMetadata metadata,
         CancellationToken cancellationToken = default)
     {
