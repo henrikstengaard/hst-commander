@@ -40,7 +40,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 `EditorSession` holds the document, whether and why it's read-only, saving, the last search and the status text (`Line 12, Col 8   UTF-8, LF   Wrap   Modified`). The front-ends edit with their own text control:
 
 - TUI: `EditorDialog` with `EditorTextView`, a Terminal.Gui `TextView`. The text view keeps rows and columns of the wrapped lines when word wrapped and doesn't expose the mapping to lines of the text, so `EditorTextView` calls its private `SetWrapModel`, `UpdateWrapModel`, `GetUnwrappedPosition` and `InsertAllText` by reflection (the package version is pinned; without them positions are of the wrapped lines and replacing all can't be undone). Ctrl+V pastes and Ctrl+Y redoes instead of the text view's emacs keys; Ctrl+L (open a file) is ignored.
-- GUI: `EditorDialog` with an Avalonia `TextBox` (LF as new line, monospace font, theme colors). Replacing sets `SelectedText`, as setting `Text` clears the undo history.
+- GUI: `EditorDialog` with an Avalonia `TextBox` (LF as new line, monospace font, theme colors). Replacing sets `SelectedText`, as setting `Text` clears the undo history. Word wrap also disables horizontal scrolling, as the text box only wraps at its width when it can't scroll horizontally.
 - Closing with changes asks to save, discard or cancel (`SaveChangesDialog` in the GUI).
 - Word wrap is off when the editor opens and toggled with F8, like F2 in the viewer (F2 saves in the editor, like Midnight Commander).
 

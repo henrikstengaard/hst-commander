@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
@@ -300,6 +301,9 @@ public partial class EditorDialog : Window
     private void SetWordWrap(bool wordWrap)
     {
         TextBox.TextWrapping = wordWrap ? TextWrapping.Wrap : TextWrapping.NoWrap;
+        // the text box only wraps at its width when it can't scroll horizontally, which gives the text any width
+        ScrollViewer.SetHorizontalScrollBarVisibility(TextBox,
+            wordWrap ? ScrollBarVisibility.Disabled : ScrollBarVisibility.Auto);
         WrapButtonText.Text = wordWrap ? "Unwrap" : "Wrap";
         UpdateStatus();
     }
