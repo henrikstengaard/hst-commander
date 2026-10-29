@@ -65,7 +65,7 @@ public sealed class MainWindow : Window
                     null!,
                     new("_Settings...", string.Empty, ShowSettings),
                     null!,
-                    new("_Quit", "F10", Quit)
+                    new("_Quit", "F10/Ctrl+Q", Quit)
                 }),
                 new MenuBarItem("_Help", new MenuItem[]
                 {
@@ -150,11 +150,11 @@ public sealed class MainWindow : Window
         return action;
     }
 
-    /// <summary>Quits the application (F10, File > Quit), after confirming when the window is closing.</summary>
+    /// <summary>Quits the application (F10, Ctrl+Q, File > Quit), after confirming when the window is closing.</summary>
     private void Quit() => Application.RequestStop(this);
 
     /// <summary>
-    ///     Confirms quitting when the window is stopped by F10, File > Quit or Esc (<see cref="Application.QuitKey" />);
+    ///     Confirms quitting when the window is stopped by F10, Ctrl+Q, File > Quit or Esc (<see cref="Application.QuitKey" />);
     ///     stopping it for a terminal action isn't quitting. Esc in the confirm dialog answers no.
     /// </summary>
     private bool ConfirmClosing() => _pendingTerminalAction != null || _restarting ||
@@ -496,7 +496,8 @@ public sealed class MainWindow : Window
                 key.Handled = true;
                 _ = CreateVolumeAsync(pane, otherPane);
             }
-            else if (key.KeyCode == KeyCode.F10)
+            // terminals like gnome terminal use f10 for their menu, so ctrl+q too
+            else if (key.KeyCode == KeyCode.F10 || key == Key.Q.WithCtrl)
             {
                 key.Handled = true;
                 Quit();

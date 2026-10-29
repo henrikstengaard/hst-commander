@@ -255,6 +255,7 @@ public partial class MainWindow : Window
                 await CreateVolumeAsync(_activePane);
                 break;
             case Key.F10:
+            case Key.Q when e.KeyModifiers == KeyModifiers.Control:
                 e.Handled = true;
                 Close();
                 break;
@@ -262,7 +263,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    ///     Confirms quitting (F10, File > Quit, Alt+F4 or closing the window) with <see cref="QuitDialog" />: closing is
+    ///     Confirms quitting (F10, Ctrl+Q, File > Quit, Alt+F4 or closing the window) with <see cref="QuitDialog" />: closing is
     ///     cancelled while the dialog is shown and the window is closed again on yes.
     /// </summary>
     private async void OnClosing(object? sender, WindowClosingEventArgs e)

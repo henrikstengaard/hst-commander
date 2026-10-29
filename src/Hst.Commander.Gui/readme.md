@@ -51,7 +51,7 @@ The View menu (Ctrl+1 to Ctrl+9) chooses how each pane shows its entries:
 | F7 | Make directory |
 | F8 / Delete | Delete |
 | F9 | Create a volume |
-| F10 | Quit |
+| F10 / Ctrl+Q | Quit |
 | Ctrl+P / Alt+Enter | Properties |
 | Ctrl+L | Change location |
 | Ctrl+1 to Ctrl+9 | Choose the navigation mode |
