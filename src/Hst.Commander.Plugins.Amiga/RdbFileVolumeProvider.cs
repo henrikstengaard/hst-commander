@@ -71,6 +71,14 @@ public class RdbFileVolumeProvider : IFileVolumeProvider
         return false;
     }
 
+    /// <summary>Size of the disk in the rigid disk block: cylinders * heads * sectors * block size; null when unset.</summary>
+    internal static long? GetDiskSize(RigidDiskBlock rigidDiskBlock)
+    {
+        var size = (long)rigidDiskBlock.Cylinders * rigidDiskBlock.Heads * rigidDiskBlock.Sectors *
+                   rigidDiskBlock.BlockSize;
+        return size > 0 ? size : null;
+    }
+
     /// <summary>
     /// Creates a volume listing the partitions of the rigid disk block. Throws <see cref="IOException" /> when the
     /// rigid disk block can't be read or has no partitions.
@@ -110,7 +118,7 @@ public class RdbFileVolumeProvider : IFileVolumeProvider
                 throw new IOException("The rigid disk block has no partitions");
             }
 
-            return new RdbVolume(diskStream, partitionBlocks, disk);
+            return new RdbVolume(diskStream, partitionBlocks, disk, GetDiskSize(rigidDiskBlock));
         }
         catch
         {

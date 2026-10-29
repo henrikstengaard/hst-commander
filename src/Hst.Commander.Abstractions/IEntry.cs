@@ -4,6 +4,10 @@ public interface IEntry
 {
     string Name { get; }
     EntryType Type { get; }
+    /// <summary>
+    /// Size in bytes of an item, or of a container that is a volume or a disk, e.g. a drive, a partition table or a partition, shown in the size
+    /// column. Null for other containers (shown as "&lt;DIR&gt;") and items of unknown size.
+    /// </summary>
     long? Size { get; }
     DateTime? ModifiedDate { get; }
 

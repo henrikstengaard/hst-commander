@@ -290,11 +290,25 @@ public class LocalVolume(string path) : IVolume
         return Task.FromResult(entries);
     }
     
-    private static IEntry CreateEntry(DriveInfo driveInfo) => 
-        new Entry(driveInfo.Name, EntryType.Container, driveInfo.TotalSize);
+    /// <summary>Drive with its size shown in the size column; a drive without media has no size.</summary>
+    private static IEntry CreateEntry(DriveInfo driveInfo) =>
+        new Entry(driveInfo.Name, EntryType.Container, GetTotalSize(driveInfo));
 
-    private static IEntry CreateEntry(DirectoryInfo directoryInfo) => 
-        new Entry(directoryInfo.Name, EntryType.Container, 0, directoryInfo.LastWriteTimeUtc);
+    private static long? GetTotalSize(DriveInfo driveInfo)
+    {
+        try
+        {
+            return driveInfo.IsReady ? driveInfo.TotalSize : null;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Directory without a size, shown as "&lt;DIR&gt;".</summary>
+    private static IEntry CreateEntry(DirectoryInfo directoryInfo) =>
+        new Entry(directoryInfo.Name, EntryType.Container, null, directoryInfo.LastWriteTimeUtc);
 
     private static IEntry CreateEntry(FileInfo fileInfo) => 
         new Entry(fileInfo.Name, EntryType.Item, fileInfo.Length, fileInfo.LastWriteTimeUtc);

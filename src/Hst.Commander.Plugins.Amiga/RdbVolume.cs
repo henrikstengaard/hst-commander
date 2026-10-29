@@ -19,6 +19,7 @@ public class RdbVolume : IVolume, IDisposable
     private readonly Stream _stream;
     private readonly IReadOnlyList<PartitionBlock> _partitionBlocks;
     private readonly IDisposable? _resource;
+    private readonly long? _diskSize;
     private const string PartitionTypeName = "Amiga partition";
     private const string PartitionTableName = "rdb";
     private const string PartitionTableDisplayName = "RDB";
@@ -31,7 +32,12 @@ public class RdbVolume : IVolume, IDisposable
     /// <param name="stream">Stream of the disk, written to when writable.</param>
     /// <param name="partitionBlocks">Partitions of the rigid disk block, at least one.</param>
     /// <param name="resource">Resource disposed with the volume after the partitions, e.g. a virtual disk.</param>
-    public RdbVolume(Stream stream, IReadOnlyList<PartitionBlock> partitionBlocks, IDisposable? resource = null)
+    /// <param name="diskSize">
+    /// Size of the disk in the rigid disk block (cylinders * heads * sectors * block size), shown as the size of the
+    /// partition table, null when unknown.
+    /// </param>
+    public RdbVolume(Stream stream, IReadOnlyList<PartitionBlock> partitionBlocks, IDisposable? resource = null,
+        long? diskSize = null)
     {
         ArgumentNullException.ThrowIfNull(stream);
         ArgumentNullException.ThrowIfNull(partitionBlocks);
@@ -39,6 +45,7 @@ public class RdbVolume : IVolume, IDisposable
         _stream = stream;
         _partitionBlocks = partitionBlocks;
         _resource = resource;
+        _diskSize = diskSize;
     }
 
     public string Name => "Rdb";
@@ -56,15 +63,21 @@ public class RdbVolume : IVolume, IDisposable
     private static string GetPartitionName(int partitionIndex) =>
         (partitionIndex + 1).ToString(CultureInfo.InvariantCulture);
 
-    private PartitionTableEntry CreatePartitionTableEntry() => new(PartitionTableName, PartitionTableDisplayName,
-        new EntryDetails(
-        "Partition table",
-        [
-            [
-                new EntryProperty("Partition table", "Rigid disk block (RDB)"),
-                new EntryProperty("Partitions", _partitionBlocks.Count.ToString(CultureInfo.InvariantCulture))
-            ]
-        ]));
+    private PartitionTableEntry CreatePartitionTableEntry()
+    {
+        var section = new List<EntryProperty>
+        {
+            new("Partition table", "Rigid disk block (RDB)"),
+            new("Partitions", _partitionBlocks.Count.ToString(CultureInfo.InvariantCulture))
+        };
+        if (_diskSize is { } diskSize)
+        {
+            section.Add(EntryProperty.FromBytes("Disk size", diskSize));
+        }
+
+        return new PartitionTableEntry(PartitionTableName, PartitionTableDisplayName, _diskSize,
+            new EntryDetails("Partition table", [section]));
+    }
 
     public async IAsyncEnumerable<IEntry> ListEntries(
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -356,12 +369,14 @@ public class RdbVolume : IVolume, IDisposable
         public bool IsVolume => true;
     }
 
-    /// <summary>Partition table in the root, the directory "rdb" shown as "RDB" listing the partitions.</summary>
-    private sealed record PartitionTableEntry(string Name, string DisplayName, EntryDetails Details) : IEntry
+    /// <summary>
+    /// Partition table in the root, the directory "rdb" shown as "RDB" listing the partitions, with the size of the
+    /// disk.
+    /// </summary>
+    private sealed record PartitionTableEntry(string Name, string DisplayName, long? Size, EntryDetails Details)
+        : IEntry
     {
         public EntryType Type => EntryType.Container;
-
-        public long? Size => null;
 
         public DateTime? ModifiedDate => null;
     }

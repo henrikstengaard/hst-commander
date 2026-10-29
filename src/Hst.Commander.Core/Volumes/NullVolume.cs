@@ -18,7 +18,7 @@ public class NullVolume : IVolume
         Task.CompletedTask;
 
     public Task<IEntry> OpenEntry(string name, CancellationToken cancellationToken = default) =>
-        Task.FromResult<IEntry>(new Entry(".", EntryType.Container, 0, new DateTime()));
+        Task.FromResult<IEntry>(new Entry(".", EntryType.Container, null, new DateTime()));
 
     public Task<Stream> OpenRead(string name, CancellationToken cancellationToken = default) =>
         throw new IOException($"File not found '{name}'");

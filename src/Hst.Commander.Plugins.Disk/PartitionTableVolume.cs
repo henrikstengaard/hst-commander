@@ -31,6 +31,7 @@ public sealed class PartitionTableVolume : VolumeListVolume
     private readonly IPluginHost? _host;
     private readonly IDisposable? _resource;
     private readonly int _sectorSize;
+    private readonly long? _diskSize;
     private readonly Dictionary<int, Stream> _partitionStreams = new();
 
     /// <param name="name">Name of the partition table, "MBR" or "GPT".</param>
@@ -38,8 +39,12 @@ public sealed class PartitionTableVolume : VolumeListVolume
     /// <param name="host">Host opening partitions not mounted by DiscUtils, null to only mount FAT and NTFS.</param>
     /// <param name="resource">Resource disposed with the volume after the partitions, e.g. a virtual disk.</param>
     /// <param name="sectorSize">Sector size of the disk in bytes, 512 or 4096.</param>
+    /// <param name="diskSize">
+    /// Size of the disk in bytes, shown as the size of the partition table (MBR doesn't store it, and the partition table
+    /// covers the whole disk), null when unknown.
+    /// </param>
     public PartitionTableVolume(string name, IReadOnlyList<PartitionInfo> partitions, IPluginHost? host = null,
-        IDisposable? resource = null, int sectorSize = 512)
+        IDisposable? resource = null, int sectorSize = 512, long? diskSize = null)
     {
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(partitions);
@@ -49,6 +54,7 @@ public sealed class PartitionTableVolume : VolumeListVolume
         _host = host;
         _resource = resource;
         _sectorSize = sectorSize;
+        _diskSize = diskSize;
     }
 
     public override string Name { get; }
@@ -61,14 +67,21 @@ public sealed class PartitionTableVolume : VolumeListVolume
     /// <summary>Name of a partition: the partition number, e.g. "1".</summary>
     protected override string GetEntryName(int index) => (index + 1).ToString(CultureInfo.InvariantCulture);
 
-    protected override IEntry CreateListEntry() => new PartitionTableEntry(ListName, Name, new EntryDetails("Partition table",
-    [
-        [
-            new EntryProperty("Partition table", Name == "GPT" ? "GUID partition table (GPT)" : "Master boot record (MBR)"),
-            new EntryProperty("Partitions", _partitions.Count.ToString(CultureInfo.InvariantCulture)),
-            new EntryProperty("Sector size", FormatSectorSize())
-        ]
-    ]));
+    protected override IEntry CreateListEntry()
+    {
+        var section = new List<EntryProperty>
+        {
+            new("Partition table", Name == "GPT" ? "GUID partition table (GPT)" : "Master boot record (MBR)"),
+            new("Partitions", _partitions.Count.ToString(CultureInfo.InvariantCulture)),
+            new("Sector size", FormatSectorSize())
+        };
+        if (_diskSize is { } diskSize)
+        {
+            section.Add(EntryProperty.FromBytes("Disk size", diskSize));
+        }
+
+        return new PartitionTableEntry(ListName, Name, _diskSize, new EntryDetails("Partition table", [section]));
+    }
 
     private string FormatSectorSize() => string.Create(CultureInfo.InvariantCulture, $"{_sectorSize} bytes");
 

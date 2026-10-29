@@ -1,3 +1,4 @@
+using Hst.Amiga.RigidDiskBlocks;
 using Hst.Commander.Abstractions;
 
 namespace Hst.Commander.Core.Tests;
@@ -252,6 +253,37 @@ public class GivenNavigationContextWithAmigaImages : IDisposable
         Assert.Equal([Paths.Parent, "ffs"], await ListNamesAsync(reopenedContext));
         await reopenedContext.ChangeLocationAsync(Path.Combine(imagePath, "rdb", "2", "pfs3"));
         Assert.Equal(Path.Combine(imagePath, "rdb", "2", "pfs3"), reopenedContext.CurrentPath);
+    }
+
+    [Fact]
+    public async Task When_RdbImageIsOpened_Then_PartitionTableHasDiskSizeOfRigidDiskBlock()
+    {
+        // arrange
+        var imagePath = Path.Combine(_rootPath, "disk.hdf");
+        await AmigaTestData.CreateRdbImage(imagePath, AmigaTestData.Dos3DosType, AmigaTestData.Pfs3DosType);
+        long expectedSize;
+        await using (var stream = File.OpenRead(imagePath))
+        {
+            var rigidDiskBlock = await RigidDiskBlockReader.Read(stream);
+            Assert.NotNull(rigidDiskBlock);
+            expectedSize = (long)rigidDiskBlock.Cylinders * rigidDiskBlock.Heads * rigidDiskBlock.Sectors *
+                           rigidDiskBlock.BlockSize;
+        }
+
+        using var navigationContext = new NavigationContext(_rootPath);
+
+        // act
+        await OpenAsync(navigationContext, "disk.hdf");
+        var partitionTable = (await navigationContext.ListEntriesAsync()).Single(entry => entry.Name == "rdb");
+        await OpenAsync(navigationContext, "rdb");
+        var partitions = (await navigationContext.ListEntriesAsync()).Where(entry => entry.Name != Paths.Parent);
+
+        // assert
+        Assert.True(expectedSize > 0);
+        Assert.Equal(expectedSize, partitionTable.Size);
+        Assert.Equal(SizeFormatter.FormatHumanized(expectedSize), SizeFormatter.FormatEntrySize(partitionTable));
+        Assert.All(partitions, partition => Assert.Equal(SizeFormatter.FormatHumanized(partition.Size!.Value),
+            SizeFormatter.FormatEntrySize(partition)));
     }
 
     [Fact]

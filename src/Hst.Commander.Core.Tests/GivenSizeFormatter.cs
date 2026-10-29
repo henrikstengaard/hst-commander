@@ -45,10 +45,20 @@ public class GivenSizeFormatter
     public void When_FormatEntrySizeForDirectory_Then_DirIsReturned()
     {
         // act
-        var formatted = SizeFormatter.FormatEntrySize(new Entry("dir1", EntryType.Container, 0));
+        var formatted = SizeFormatter.FormatEntrySize(new Entry("dir1", EntryType.Container));
 
         // assert
         Assert.Equal("<DIR>", formatted);
+    }
+
+    [Fact]
+    public void When_FormatEntrySizeForContainerWithSize_Then_SizeWithUnitIsReturned()
+    {
+        // act
+        var formatted = SizeFormatter.FormatEntrySize(new Entry("1", EntryType.Container, 274877906944L));
+
+        // assert
+        Assert.Equal("256G", formatted);
     }
 
     [Theory]

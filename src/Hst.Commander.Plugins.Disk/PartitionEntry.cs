@@ -15,12 +15,12 @@ internal sealed record PartitionEntry(string Name, string DisplayName, long? Siz
     public bool IsVolume => true;
 }
 
-/// <summary>Partition table listed as a directory listing its partitions, e.g. "mbr" shown as "MBR".</summary>
-internal sealed record PartitionTableEntry(string Name, string DisplayName, EntryDetails Details) : IEntry
+/// <summary>
+/// Partition table listed as a directory listing its partitions, e.g. "mbr" shown as "MBR", with the size of the disk.
+/// </summary>
+internal sealed record PartitionTableEntry(string Name, string DisplayName, long? Size, EntryDetails Details) : IEntry
 {
     public EntryType Type => EntryType.Container;
-
-    public long? Size => null;
 
     public DateTime? ModifiedDate => null;
 }

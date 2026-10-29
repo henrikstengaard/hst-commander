@@ -96,6 +96,33 @@ public class GivenNavigationContextWithDiskImages : IDisposable
         Assert.Equal(EntryAttributes.ReadOnly | EntryAttributes.Hidden, changedEntry.Attributes);
     }
 
+    [Theory]
+    [InlineData(false, "mbr")]
+    [InlineData(true, "gpt")]
+    public async Task When_DiskIsOpened_Then_PartitionTableHasDiskSize(bool gpt, string partitionTableName)
+    {
+        // arrange
+        var imagePath = Path.Combine(_rootPath, "disk.img");
+        await using (var disk = gpt ? DiskTestData.CreateGptDisk() : DiskTestData.CreateMbrDisk())
+        {
+            await DiskTestData.WriteToFile(disk, imagePath);
+        }
+
+        using var navigationContext = new NavigationContext(_rootPath);
+
+        // act
+        await OpenAsync(navigationContext, "disk.img");
+        var partitionTable = (await navigationContext.ListEntriesAsync()).Single(entry => entry.Name == partitionTableName);
+        var lines = navigationContext.GetProperties([partitionTable]).GetSections().SelectMany(section => section)
+            .ToDictionary(line => line.Label, line => line.Value);
+
+        // assert
+        var diskSize = new FileInfo(imagePath).Length;
+        Assert.Equal(diskSize, partitionTable.Size);
+        Assert.Equal(SizeFormatter.FormatHumanized(diskSize), SizeFormatter.FormatEntrySize(partitionTable));
+        Assert.Equal(SizeFormatter.FormatWithBytes(diskSize), lines["Disk size"]);
+    }
+
     [Fact]
     public async Task When_HybridDiskIsOpened_Then_PartitionTablesAreListed()
     {
