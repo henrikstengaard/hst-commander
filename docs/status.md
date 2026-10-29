@@ -16,7 +16,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - All unit tests in `Hst.Commander.Core.Tests`.
 
 - Going to the root of the volume with Ctrl+\ in both front-ends.
-- Quitting with F10 or File > Quit (and Esc in the TUI) after a confirm dialog in both front-ends.
+- Quitting with F10, Ctrl+Q or File > Quit (and Esc in the TUI) after a confirm dialog in both front-ends.
 - Changing location with Ctrl+L or by double-clicking the path (location dialog), including paths into images.
 - Build versioning from the git commit count and a Help > About menu item in both front-ends.
 - Running as administrator or root shown in the menu bar of both front-ends; choosing the physical disks when not elevated offers to restart as administrator (UAC on Windows, sudo in the TUI's terminal on Linux and macOS, pkexec in the GUI on Linux) with the panes where they were.

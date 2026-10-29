@@ -38,6 +38,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 
 ## Quitting
 
-- F10, `F10 Quit` or File > Quit asks `AppInfo.QuitQuestion` (Yes/No; Esc or closing answers No). Esc and F10 in the viewer and dialogs close those, not the application.
+- F10, Ctrl+Q, `F10 Quit` or File > Quit asks `AppInfo.QuitQuestion` (Yes/No; Esc or closing answers No). Esc and F10 in the viewer and dialogs close those, not the application.
+- Ctrl+Q is there because some terminals use F10 themselves, e.g. GNOME Terminal (Ubuntu) opens its menu with it, so the TUI never gets it.
 - TUI: Esc in the panes (`Application.QuitKey`) asks too. `MainWindow.Closing` confirms every stop of the window except a terminal action (running a program, Ctrl+O, restarting as root) and restarting as administrator.
 - GUI: `MainWindow.Closing` asks for every user close (also Alt+F4 and the close button) by cancelling the close while `QuitDialog` is shown and closing again on Yes. Closes by the OS or application shutdown aren't confirmed, and closing while another dialog is open is cancelled.
