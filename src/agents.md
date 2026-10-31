@@ -160,7 +160,7 @@ These apply across features and aren't obvious from a single file:
 - Disk plugin: `Hst.Commander.Plugins.Disk`
 - Amiga plugin: `Hst.Commander.Plugins.Amiga`
 - Physical disk plugin: `Hst.Commander.Plugins.PhysicalDisk`
-- Core: `Hst.Commander.Core` (`AppInfo`, `EditorDocument`, `EditorKind`, `EditorSearch`, `EditorSession`, `EmbeddedIconReader`, `EnterFileAction`, `ExternalEditFile`, `ExternalEditor`, `Elevation`, `EntryProperties`, `FileSystemDetails`, `IconImage`, `ListingProgress`, `NavigationContext`, `NameFilter`, `PluginHost`, `PluginLoader`, `Plugins`, `SelectGroupOptions`, `FileStarter`, `ImagePixels`, `SettingsPaths`, `SizeFormatter`, `StandardImageProvider`, `StartupOptions`, `PaneStartup`, `UaeMetadataFormat`, `ViewerDocument`, `ViewerSession`, `WindowsIconImageProvider`, `VolumeCreation`, `VolumeCreatorInput`), `Hst.Commander.Core.Volumes` (volumes, copying, UAE metadata)
+- Core: `Hst.Commander.Core` (`AppInfo`, `EditorDocument`, `EditorKind`, `EditorSearch`, `EditorSession`, `EmbeddedIconReader`, `EnterFileAction`, `ExternalEditFile`, `ExternalEditor`, `Elevation`, `EntryProperties`, `FileSystemDetails`, `IconImage`, `ListingProgress`, `NavigationContext`, `NameFilter`, `PluginHost`, `PluginLoader`, `Plugins`, `ProgressIndicator`, `SelectGroupOptions`, `FileStarter`, `ImagePixels`, `SettingsPaths`, `SizeFormatter`, `StandardImageProvider`, `StartupOptions`, `PaneStartup`, `UaeMetadataFormat`, `ViewerDocument`, `ViewerSession`, `WindowsIconImageProvider`, `VolumeCreation`, `VolumeCreatorInput`), `Hst.Commander.Core.Volumes` (volumes, copying, UAE metadata)
 - Tui: `Hst.Commander.Tui`
 - Gui: `Hst.Commander.Gui`, `Hst.Commander.Gui.Icons` (entry icons)
 - Tests: `Hst.Commander.Core.Tests`

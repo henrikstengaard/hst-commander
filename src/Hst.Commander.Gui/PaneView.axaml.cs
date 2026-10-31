@@ -22,6 +22,7 @@ public partial class PaneView : UserControl
     private readonly ScrollBarVisibility _listHorizontalScrollBarVisibility;
     private NavigationContext? _navigationContext;
     private CancellationTokenSource? _iconsCancellation;
+    private CancellationTokenSource? _volumeFilesCancellation;
 
     /// <summary>Values of the options of the navigation modes changed by the user, by mode and option name.</summary>
     private readonly Dictionary<INavigationMode, Dictionary<string, bool>> _navigationModeOptions = [];
@@ -179,8 +180,20 @@ public partial class PaneView : UserControl
     public NavigationContext NavigationContext
     {
         get => _navigationContext ?? throw new InvalidOperationException("Navigation context is not set.");
-        set => _navigationContext = value;
+        set
+        {
+            _navigationContext = value;
+            value.ProgressIndicator = new ProgressIndicator(ShowProgress, HideProgress);
+        }
     }
+
+    private void ShowProgress(string message)
+    {
+        ListingProgressText.Text = message;
+        ListingProgress.IsVisible = true;
+    }
+
+    private void HideProgress() => ListingProgress.IsVisible = false;
 
     /// <summary>Entry under the cursor, null when the list is empty.</summary>
     /// <summary>Whether the pane is the active pane, the current entry is only shown in the active pane.</summary>
@@ -503,17 +516,14 @@ public partial class PaneView : UserControl
     {
         var hadFocus = EntriesList.IsKeyboardFocusWithin || IconLayout.IsKeyboardFocusWithin;
         var selectedIndex = EntriesList.SelectedIndex;
-        var navigationEntries = await Core.ListingProgress.ListEntriesAsync(NavigationContext,
-            message =>
-            {
-                ListingProgressText.Text = message;
-                ListingProgress.IsVisible = true;
-            },
-            () => ListingProgress.IsVisible = false);
+        _volumeFilesCancellation?.Cancel();
+        var navigationEntries = await Core.ListingProgress.ListEntriesAsync(NavigationContext, ShowProgress,
+            HideProgress);
         var entries = navigationEntries
             .Select(entry => new EntryItem(entry, NavigationContext.IsMarked(entry), NavigationContext.IsExecutable(entry)))
             .ToList();
         var previousPath = PathText.Text;
+        DetectVolumeFiles(entries);
 
         PathText.Text = NavigationContext.CurrentPath;
         DiskSpaceText.Text = NavigationContext.DiskSpace ?? string.Empty;
@@ -610,6 +620,23 @@ public partial class PaneView : UserControl
         }
 
         return options;
+    }
+
+    /// <summary>
+    ///     Detects the listed files that can be opened as volumes in the background, showing an arrow over their icons
+    ///     when detected.
+    /// </summary>
+    private async void DetectVolumeFiles(IReadOnlyList<EntryItem> entries)
+    {
+        var cancellation = _volumeFilesCancellation = new CancellationTokenSource();
+        var items = entries.ToDictionary<EntryItem, IEntry>(item => item.Entry, ReferenceEqualityComparer.Instance);
+        await NavigationContext.DetectVolumeFilesAsync(entries.Select(item => item.Entry).ToList(), entry =>
+        {
+            if (!cancellation.IsCancellationRequested && items.TryGetValue(entry, out var item))
+            {
+                item.IsVolumeFile = true;
+            }
+        }, cancellation.Token);
     }
 
     /// <summary>

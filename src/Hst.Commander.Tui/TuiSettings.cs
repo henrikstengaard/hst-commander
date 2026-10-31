@@ -31,6 +31,18 @@ public sealed record TuiSettings
     /// <summary>How Amiga names, protection bits and comments are stored when copying from Amiga volumes to others.</summary>
     public UaeMetadataFormat UaeMetadata { get; init; } = UaeMetadataFormat.UaeFsDb;
 
+    /// <summary>
+    ///     Largest file in megabytes copied to a temporary file to open it, e.g. a zip archive inside a zip archive (see
+    ///     <see cref="NavigationContext.TemporaryCopyLimit" />); 0 for no limit.
+    /// </summary>
+    public long TemporaryCopyLimit { get; init; } = NavigationContext.DefaultTemporaryCopyLimit / Megabyte;
+
+    /// <summary><see cref="TemporaryCopyLimit" /> in bytes.</summary>
+    [JsonIgnore]
+    public long TemporaryCopyLimitBytes => Math.Clamp(TemporaryCopyLimit, 0, long.MaxValue / Megabyte) * Megabyte;
+
+    private const long Megabyte = 1024 * 1024;
+
     /// <summary>Which editor F4 opens files in: the built-in editor, the host operating system's or a command.</summary>
     public EditorKind Editor { get; init; } = EditorKind.BuiltIn;
 

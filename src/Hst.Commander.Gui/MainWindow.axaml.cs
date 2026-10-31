@@ -42,6 +42,7 @@ public partial class MainWindow : Window
         RightPane.NavigationContext = new NavigationContext(initialPath);
         ApplyEnterFileAction(settings.EnterFileAction);
         ApplyUaeMetadata(settings.UaeMetadata);
+        ApplyTemporaryCopyLimit(settings.TemporaryCopyLimitBytes);
         _editorSettings = settings;
         LeftPane.NavigationFailed += async (_, exception) => await ShowErrorAsync(exception);
         RightPane.NavigationFailed += async (_, exception) => await ShowErrorAsync(exception);
@@ -317,6 +318,13 @@ public partial class MainWindow : Window
     {
         LeftPane.NavigationContext.EnterFileAction = action;
         RightPane.NavigationContext.EnterFileAction = action;
+    }
+
+    /// <summary>Sets the largest file both panes copy to a temporary file to open it.</summary>
+    private void ApplyTemporaryCopyLimit(long limit)
+    {
+        LeftPane.NavigationContext.TemporaryCopyLimit = limit;
+        RightPane.NavigationContext.TemporaryCopyLimit = limit;
     }
 
     /// <summary>Sets how both panes store Amiga names, protection bits and comments when copying from Amiga volumes.</summary>
@@ -916,6 +924,7 @@ public partial class MainWindow : Window
         ApplyVolumeProviderKeys(settings.EffectiveVolumeProviderKeys);
         ApplyEnterFileAction(settings.EnterFileAction);
         ApplyUaeMetadata(settings.UaeMetadata);
+        ApplyTemporaryCopyLimit(settings.TemporaryCopyLimitBytes);
         _editorSettings = settings;
         try
         {

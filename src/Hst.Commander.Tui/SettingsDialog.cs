@@ -20,6 +20,7 @@ public sealed class SettingsDialog : Dialog
     private readonly RadioGroup _themeRadioGroup;
     private readonly RadioGroup _volumeProviderKeysRadioGroup;
     private readonly RadioGroup _enterFileActionRadioGroup;
+    private readonly TextField _temporaryCopyLimitField;
     private readonly RadioGroup _uaeMetadataRadioGroup;
     private readonly RadioGroup _editorRadioGroup;
     private readonly TextField _editorCommandField;
@@ -67,6 +68,20 @@ public sealed class SettingsDialog : Dialog
             SelectedItem = Math.Max(0, EnterFileActions.All.ToList().IndexOf(settings.EnterFileAction))
         };
 
+        var temporaryCopyLimitLabel = new Label { X = 1, Y = 7, Text = "Copy limit:" };
+        _temporaryCopyLimitField = new TextField
+        {
+            X = 16, Y = 7, Width = 10, Text = settings.TemporaryCopyLimit.ToString()
+        };
+        var temporaryCopyLimitHelp = new Label
+        {
+            X = 16,
+            Y = 8,
+            Width = Dim.Fill(1),
+            Height = 2,
+            Text = "MB copied to open an image inside an image\n(e.g. zip in zip), 0 for no limit"
+        };
+
         // copying
         var uaeMetadataLabel = new Label { X = 1, Y = 1, Text = "UAE metadata:" };
         _uaeMetadataRadioGroup = new RadioGroup
@@ -104,7 +119,8 @@ public sealed class SettingsDialog : Dialog
         var tabView = new TabView { X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Fill(1) };
         tabView.AddTab(CreateTab("Appearance", themeLabel, _themeRadioGroup), true);
         tabView.AddTab(CreateTab("Panes", volumeProviderKeysLabel, _volumeProviderKeysRadioGroup,
-            enterFileActionLabel, _enterFileActionRadioGroup), false);
+            enterFileActionLabel, _enterFileActionRadioGroup, temporaryCopyLimitLabel, _temporaryCopyLimitField,
+            temporaryCopyLimitHelp), false);
         tabView.AddTab(CreateTab("Copying", uaeMetadataLabel, _uaeMetadataRadioGroup), false);
         tabView.AddTab(CreateTab("Editor", editorLabel, _editorRadioGroup, editorCommandLabel, _editorCommandField,
             editorCommandHelp), false);
@@ -119,11 +135,18 @@ public sealed class SettingsDialog : Dialog
                 return;
             }
 
+            if (!long.TryParse(_temporaryCopyLimitField.Text, out var temporaryCopyLimit) || temporaryCopyLimit < 0)
+            {
+                MessageBox.ErrorQuery("Error", "Enter the copy limit in MB, 0 for no limit", "OK");
+                return;
+            }
+
             Result = (_settings with
                 {
                     Theme = SelectedTheme,
                     EnterFileAction = SelectedEnterFileAction,
                     UaeMetadata = SelectedUaeMetadata,
+                    TemporaryCopyLimit = temporaryCopyLimit,
                     Editor = SelectedEditor,
                     EditorCommand = string.IsNullOrWhiteSpace(_editorCommandField.Text)
                         ? null

@@ -23,6 +23,8 @@ Each row shows a 16x16 icon. `PaneView.LoadIcons` runs `FileIcons.LoadAsync` aft
 
 The parent entry (`..`) in the list and thumbnails shows the folder icon (the OS one once loaded, otherwise the built-in one) with a green arrow up drawn over its lower right part, so it's clear it goes a directory up. It never gets an icon of its own. Plugin navigation modes (e.g. Workbench) don't show `..`; they have the `..` toolbar button instead.
 
+Files that can be opened as volumes (`NavigationContext.IsVolumeFile`, see [Detecting volume files](volumes.md#detecting-volume-files)) show their icon with a blue arrow right drawn over its lower right part (`FileIcons.GetVolumeIcon`), in the list, thumbnails and for icons without an image of their own in plugin navigation modes (a Workbench icon from a `.info` file is shown as is). `EntryItem.Icon` adds the arrow to whatever icon is loaded, so it stays when the type or file icon replaces the initial one.
+
 ## Navigation Modes
 
 - A GUI pane shows its entries in a `PaneNavigationMode`: the built-in `List` (the default) and `Thumbnail`, followed by `VolumeProviders.NavigationModes` from plugins. The View menu lists them; Ctrl+1 to Ctrl+9 choose the first nine. Each pane's mode is saved by name in `GuiSettings` (unknown names become the list).

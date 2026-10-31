@@ -38,6 +38,7 @@ public partial class SettingsDialog : Window
         EnterFileActionComboBox.ItemsSource = EnterFileActions.All.Select(EnterFileActions.GetName).ToList();
         EnterFileActionComboBox.SelectedIndex =
             Math.Max(0, EnterFileActions.All.ToList().IndexOf(settings.EnterFileAction));
+        TemporaryCopyLimitUpDown.Value = settings.TemporaryCopyLimit;
         UaeMetadataComboBox.ItemsSource = UaeMetadataFormats.All.Select(UaeMetadataFormats.GetName).ToList();
         UaeMetadataComboBox.SelectedIndex = Math.Max(0, UaeMetadataFormats.All.ToList().IndexOf(settings.UaeMetadata));
         EditorComboBox.ItemsSource = EditorKinds.All.Select(kind => EditorKinds.GetName(kind, false)).ToList();
@@ -68,6 +69,7 @@ public partial class SettingsDialog : Window
                     Theme = SelectedTheme,
                     EnterFileAction = SelectedEnterFileAction,
                     UaeMetadata = SelectedUaeMetadata,
+                    TemporaryCopyLimit = (long)Math.Max(0, TemporaryCopyLimitUpDown.Value ?? 0),
                     Editor = SelectedEditor,
                     EditorCommand = string.IsNullOrEmpty(command) ? null : command
                 })

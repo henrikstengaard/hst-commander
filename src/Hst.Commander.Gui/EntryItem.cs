@@ -12,6 +12,7 @@ namespace Hst.Commander.Gui;
 public sealed class EntryItem(IEntry entry, bool isMarked = false, bool isExecutable = false) : INotifyPropertyChanged
 {
     private bool _isMarked = isMarked;
+    private bool _isVolumeFile;
     private IImage _icon = FileIcons.GetInitialIcon(entry);
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -44,10 +45,32 @@ public sealed class EntryItem(IEntry entry, bool isMarked = false, bool isExecut
         }
     }
 
-    /// <summary>Icon shown left of the name, replaced when <see cref="FileIcons" /> has loaded the actual icon.</summary>
+    /// <summary>
+    ///     True when the entry is a file that can be opened as a volume (<see cref="NavigationContext.IsVolumeFile" />),
+    ///     shown with an arrow over its icon.
+    /// </summary>
+    public bool IsVolumeFile
+    {
+        get => _isVolumeFile;
+        set
+        {
+            if (_isVolumeFile == value)
+            {
+                return;
+            }
+
+            _isVolumeFile = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Icon)));
+        }
+    }
+
+    /// <summary>
+    ///     Icon shown left of the name, replaced when <see cref="FileIcons" /> has loaded the actual icon. Files that
+    ///     can be opened as volumes have an arrow over it (<see cref="FileIcons.GetVolumeIcon" />).
+    /// </summary>
     public IImage Icon
     {
-        get => _icon;
+        get => _isVolumeFile ? FileIcons.GetVolumeIcon(_icon) : _icon;
         set
         {
             if (ReferenceEquals(_icon, value))
