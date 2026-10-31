@@ -22,6 +22,7 @@ public partial class PaneView : UserControl
     private readonly ScrollBarVisibility _listHorizontalScrollBarVisibility;
     private NavigationContext? _navigationContext;
     private CancellationTokenSource? _iconsCancellation;
+    private CancellationTokenSource? _volumeFilesCancellation;
 
     /// <summary>Values of the options of the navigation modes changed by the user, by mode and option name.</summary>
     private readonly Dictionary<INavigationMode, Dictionary<string, bool>> _navigationModeOptions = [];
@@ -29,6 +30,7 @@ public partial class PaneView : UserControl
     public PaneView()
     {
         InitializeComponent();
+        ListingCancelButton.Click += (_, _) => CancelProgress();
 
         _listItemTemplate = EntriesList.ItemTemplate;
         _listItemsPanel = EntriesList.ItemsPanel;
@@ -179,7 +181,79 @@ public partial class PaneView : UserControl
     public NavigationContext NavigationContext
     {
         get => _navigationContext ?? throw new InvalidOperationException("Navigation context is not set.");
-        set => _navigationContext = value;
+        set
+        {
+            _navigationContext = value;
+            value.ProgressIndicator = new PaneProgressIndicator(this);
+        }
+    }
+
+    /// <summary>Shows the progress with an indeterminate progress bar, e.g. while listing.</summary>
+    private void ShowProgress(string message)
+    {
+        _progressCancel = null;
+        ListingProgressText.Text = message;
+        ListingProgressBar.IsIndeterminate = true;
+        ListingProgressBar.ShowProgressText = false;
+        ListingCancelButton.IsVisible = false;
+        ListingProgress.IsVisible = true;
+    }
+
+    private void HideProgress()
+    {
+        var hadCancel = _progressCancel != null;
+        var hadFocus = ListingCancelButton.IsKeyboardFocusWithin;
+        _progressCancel = null;
+        ListingProgress.IsVisible = false;
+        if (hadCancel && hadFocus)
+        {
+            FocusEntries();
+        }
+    }
+
+    /// <summary>Cancels the progress shown with a cancel button, see <see cref="PaneProgressIndicator" />.</summary>
+    private Action? _progressCancel;
+
+    private void CancelProgress()
+    {
+        if (_progressCancel is not { } cancel || !ListingCancelButton.IsEnabled)
+        {
+            return;
+        }
+
+        ListingCancelButton.IsEnabled = false;
+        ListingProgressText.Text = "Cancelling...";
+        cancel();
+    }
+
+    /// <summary>
+    ///     Progress of the pane's navigation context, e.g. making a temporary copy of an image inside another image,
+    ///     shown with a progress bar and a cancel button having the focus.
+    /// </summary>
+    private sealed class PaneProgressIndicator(PaneView pane) : IProgressIndicator
+    {
+        public void Show(string message, Action cancel)
+        {
+            pane._progressCancel = cancel;
+            pane.ListingProgressText.Text = message;
+            pane.ListingProgressBar.IsIndeterminate = false;
+            pane.ListingProgressBar.ShowProgressText = true;
+            pane.ListingProgressBar.Value = 0;
+            pane.ListingCancelButton.IsEnabled = true;
+            pane.ListingCancelButton.IsVisible = true;
+            pane.ListingProgress.IsVisible = true;
+            pane.ListingCancelButton.Focus();
+        }
+
+        public void Report(double fraction)
+        {
+            if (pane._progressCancel != null)
+            {
+                pane.ListingProgressBar.Value = Math.Clamp(fraction, 0, 1) * 100;
+            }
+        }
+
+        public void Hide() => pane.HideProgress();
     }
 
     /// <summary>Entry under the cursor, null when the list is empty.</summary>
@@ -493,6 +567,12 @@ public partial class PaneView : UserControl
             await action();
             await RefreshAsync();
         }
+        catch (OperationCanceledException)
+        {
+            // cancelled by the user, e.g. making a temporary copy of an image inside another image: the location is
+            // unchanged, listed again to load the icons stopped before navigating
+            await RunNavigationAsync(() => Task.CompletedTask);
+        }
         catch (Exception exception)
         {
             NavigationFailed?.Invoke(this, exception);
@@ -503,17 +583,14 @@ public partial class PaneView : UserControl
     {
         var hadFocus = EntriesList.IsKeyboardFocusWithin || IconLayout.IsKeyboardFocusWithin;
         var selectedIndex = EntriesList.SelectedIndex;
-        var navigationEntries = await Core.ListingProgress.ListEntriesAsync(NavigationContext,
-            message =>
-            {
-                ListingProgressText.Text = message;
-                ListingProgress.IsVisible = true;
-            },
-            () => ListingProgress.IsVisible = false);
+        _volumeFilesCancellation?.Cancel();
+        var navigationEntries = await Core.ListingProgress.ListEntriesAsync(NavigationContext, ShowProgress,
+            HideProgress);
         var entries = navigationEntries
             .Select(entry => new EntryItem(entry, NavigationContext.IsMarked(entry), NavigationContext.IsExecutable(entry)))
             .ToList();
         var previousPath = PathText.Text;
+        DetectVolumeFiles(entries);
 
         PathText.Text = NavigationContext.CurrentPath;
         DiskSpaceText.Text = NavigationContext.DiskSpace ?? string.Empty;
@@ -610,6 +687,23 @@ public partial class PaneView : UserControl
         }
 
         return options;
+    }
+
+    /// <summary>
+    ///     Detects the listed files that can be opened as volumes in the background, showing an arrow over their icons
+    ///     when detected.
+    /// </summary>
+    private async void DetectVolumeFiles(IReadOnlyList<EntryItem> entries)
+    {
+        var cancellation = _volumeFilesCancellation = new CancellationTokenSource();
+        var items = entries.ToDictionary<EntryItem, IEntry>(item => item.Entry, ReferenceEqualityComparer.Instance);
+        await NavigationContext.DetectVolumeFilesAsync(entries.Select(item => item.Entry).ToList(), entry =>
+        {
+            if (!cancellation.IsCancellationRequested && items.TryGetValue(entry, out var item))
+            {
+                item.IsVolumeFile = true;
+            }
+        }, cancellation.Token);
     }
 
     /// <summary>

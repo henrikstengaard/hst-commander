@@ -12,6 +12,7 @@ public sealed class NavigationContext : IDisposable
 
     private readonly Dictionary<string, IEntry> _markedEntries = new(StringComparer.Ordinal);
     private readonly HashSet<string> _executableNames = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _volumeFileNames = new(StringComparer.Ordinal);
     private readonly Action<string> _startFile;
     private readonly IReadOnlyList<IFileVolumeProvider> _fileVolumeProviders;
     private readonly IReadOnlyList<IIconProvider> _iconProviders;
@@ -177,6 +178,8 @@ public sealed class NavigationContext : IDisposable
     private async Task ChangeToPathAsync(NavigationContext context, IEnumerable<string> pathComponents,
         string location, CancellationToken cancellationToken)
     {
+        context.TemporaryCopyLimit = TemporaryCopyLimit;
+        context.ProgressIndicator = ProgressIndicator;
         try
         {
             foreach (var pathComponent in pathComponents)
@@ -509,6 +512,7 @@ public sealed class NavigationContext : IDisposable
         }
 
         _volumeSpace = await GetVolumeSpaceAsync(cancellationToken);
+        _volumeFileNames.Clear();
         UpdateExecutableNames(entries);
         UpdateIconFiles(entries);
 
@@ -930,6 +934,82 @@ public sealed class NavigationContext : IDisposable
     }
 
     /// <summary>
+    ///     True when <see cref="DetectVolumeFilesAsync" /> has detected the listed file as a volume, e.g. an ISO image
+    ///     or a zip archive.
+    /// </summary>
+    public bool IsVolumeFile(IEntry entry) => _volumeFileNames.Contains(entry.Name);
+
+    /// <summary>
+    ///     Detects which listed files can be opened as volumes by a file volume provider (by its magic signature, see
+    ///     <see cref="IFileVolumeProvider.IsMatch" />), calling <paramref name="detected" /> on the calling thread for
+    ///     each detected file. The files are read on the thread pool from a volume of their own
+    ///     (<see cref="OpenLocationAsync" />), so the pane's volume isn't used and navigating needn't wait. Files that
+    ///     can't be read or fail detection are not volumes. Stops when cancelled, e.g. when the entries are listed again.
+    /// </summary>
+    public async Task DetectVolumeFilesAsync(IReadOnlyList<IEntry> entries, Action<IEntry> detected,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+        ArgumentNullException.ThrowIfNull(detected);
+
+        var files = entries.Where(entry => entry.Type == EntryType.Item).ToList();
+        if (files.Count == 0 || _fileVolumeProviders.Count == 0 || IsDriveList)
+        {
+            return;
+        }
+
+        // local files are read directly, others from a volume of their own opened on the calling thread, as it reads
+        // the pane's state
+        var localPath = !IsInImage ? LocalPath : null;
+        VolumeLocation? location = null;
+        try
+        {
+            if (localPath == null)
+            {
+                location = await OpenLocationAsync(cancellationToken);
+            }
+
+            foreach (var entry in files)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                Func<CancellationToken, Task<Stream>> openRead = localPath != null
+                    ? _ => Task.FromResult<Stream>(new FileStream(Path.Combine(localPath, entry.Name), FileMode.Open,
+                        FileAccess.Read, FileShare.ReadWrite))
+                    : token => location!.Volume.OpenRead(entry.Name, token);
+                IFileVolumeProvider? fileVolumeProvider;
+                try
+                {
+                    fileVolumeProvider = await Task.Run(() => DetectFileVolumeProviderAsync(entry.Name,
+                        _fileVolumeProviders, openRead, true, cancellationToken), cancellationToken);
+                }
+                catch (Exception exception) when (exception is not OperationCanceledException)
+                {
+                    // e.g. a plugin failing to detect a file, which then just isn't a volume
+                    continue;
+                }
+
+                if (fileVolumeProvider != null && !cancellationToken.IsCancellationRequested)
+                {
+                    _volumeFileNames.Add(entry.Name);
+                    detected(entry);
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // listed again or closed
+        }
+        catch (Exception)
+        {
+            // e.g. the location can't be opened, the files are then not shown as volumes
+        }
+        finally
+        {
+            location?.Dispose();
+        }
+    }
+
+    /// <summary>
     ///     Opens an item in the current location as an image when one of the file volume providers detects it, e.g.
     ///     by its magic signature, and pushes its volume. Returns false when none detects it, or when the file can't
     ///     be read and <paramref name="ignoreReadErrors" /> is true.
@@ -950,7 +1030,7 @@ public sealed class NavigationContext : IDisposable
         var parentPathComponents = IsInImage ? _images.Peek().Volume.CurrentPathComponents.ToList() : [];
         var sharedId = fileVolumeProvider.CanWrite && !IsInImage ? volume.GetWritableImageId(entry.Name) : null;
         var image = await OpenImageAsync(fileVolumeProvider, entry.Name, parentPathComponents, sharedId, volume,
-            cancellationToken);
+            entry.Size, true, cancellationToken);
         _nestedVolume.PushVolume(new EntryVolumeProvider(entry, image.Volume));
         _images.Push(image);
         PreviousEntryName = null;
@@ -1018,11 +1098,11 @@ public sealed class NavigationContext : IDisposable
     ///     Opens a file in the current directory of a volume as an image with a file volume provider. A file with an id
     ///     opened by a file volume provider that can write (<paramref name="sharedId" />), e.g. a local file or a
     ///     physical disk, is shared with the other pane and file operations (see <see cref="SharedImages" />), other
-    ///     files are opened for reading.
+    ///     files are opened for reading, through a temporary copy when needed (see <see cref="OpenSeekableAsync" />).
     /// </summary>
-    private static async Task<OpenedImage> OpenImageAsync(IFileVolumeProvider fileVolumeProvider, string name,
-        IReadOnlyList<string> parentPathComponents, string? sharedId, IVolume parentVolume,
-        CancellationToken cancellationToken)
+    private async Task<OpenedImage> OpenImageAsync(IFileVolumeProvider fileVolumeProvider, string name,
+        IReadOnlyList<string> parentPathComponents, string? sharedId, IVolume parentVolume, long? size,
+        bool showProgress, CancellationToken cancellationToken)
     {
         if (sharedId != null)
         {
@@ -1032,7 +1112,8 @@ public sealed class NavigationContext : IDisposable
                 sharedVolume.IsWritable);
         }
 
-        var stream = await OpenSeekableAsync(token => parentVolume.OpenRead(name, token), cancellationToken);
+        var stream = await OpenSeekableAsync(name, size, token => parentVolume.OpenRead(name, token), showProgress,
+            cancellationToken);
         try
         {
             // a file volume provider that can write gets a read-only stream, e.g. of a temporary copy of the file
@@ -1047,12 +1128,32 @@ public sealed class NavigationContext : IDisposable
         }
     }
 
+    /// <summary>Default of <see cref="TemporaryCopyLimit" />, 1 GB.</summary>
+    public const long DefaultTemporaryCopyLimit = 1024L * 1024 * 1024;
+
     /// <summary>
-    ///     Opens a file as a seekable stream for a file volume provider. A stream that isn't seekable, e.g. of a file
-    ///     inside a zip archive, is copied to a temporary file deleted when the stream is closed.
+    ///     Largest file copied to a temporary file by <see cref="OpenSeekableAsync" />, e.g. a zip archive inside a zip
+    ///     archive opened as an image or viewed; opening a larger file fails. 0 for no limit.
     /// </summary>
-    private static async Task<Stream> OpenSeekableAsync(Func<CancellationToken, Task<Stream>> openRead,
-        CancellationToken cancellationToken)
+    public long TemporaryCopyLimit { get; set; } = DefaultTemporaryCopyLimit;
+
+    /// <summary>
+    ///     Progress shown in the pane while it opens a file that takes long to open, e.g. making a temporary copy of a
+    ///     large image inside another image; shown after <see cref="ListingProgress.Delay" /> like listing, with a
+    ///     cancel button.
+    /// </summary>
+    public IProgressIndicator? ProgressIndicator { get; set; }
+
+    /// <summary>
+    ///     Opens a file as a seekable stream for a file volume provider or the viewer. A stream that isn't seekable,
+    ///     e.g. of a file inside a zip archive, is copied on the thread pool to a temporary file deleted when the
+    ///     stream is closed. A file larger than <see cref="TemporaryCopyLimit" /> throws <see cref="IOException" />,
+    ///     before copying when its <paramref name="size" /> is known. With <paramref name="showProgress" />,
+    ///     <see cref="ProgressIndicator" /> shows the progress while copying takes long and can cancel it, throwing
+    ///     <see cref="OperationCanceledException" />.
+    /// </summary>
+    private async Task<Stream> OpenSeekableAsync(string name, long? size,
+        Func<CancellationToken, Task<Stream>> openRead, bool showProgress, CancellationToken cancellationToken)
     {
         var stream = await openRead(cancellationToken);
         if (stream.CanSeek)
@@ -1062,19 +1163,76 @@ public sealed class NavigationContext : IDisposable
 
         await using (stream)
         {
-            var temporaryStream = new FileStream(Path.GetTempFileName(), FileMode.Create, FileAccess.ReadWrite,
-                FileShare.None, 81920, FileOptions.DeleteOnClose | FileOptions.Asynchronous);
-            try
+            var limit = TemporaryCopyLimit;
+            if (limit > 0 && size > limit)
             {
-                await stream.CopyToAsync(temporaryStream, cancellationToken);
-                temporaryStream.Position = 0;
-                return temporaryStream;
+                throw new IOException(GetTemporaryCopyLimitMessage(name, limit));
             }
-            catch
+
+            if (!showProgress || ProgressIndicator is not { } progressIndicator)
             {
-                await temporaryStream.DisposeAsync();
-                throw;
+                return await Task.Run(() => CopyToTemporaryFileAsync(name, stream, limit, null, null,
+                    cancellationToken), cancellationToken);
             }
+
+            // reported on the calling (UI) thread
+            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            var progress = new Progress<double>(progressIndicator.Report);
+            var copyTask = Task.Run(() => CopyToTemporaryFileAsync(name, stream, limit, size, progress,
+                cancellation.Token), cancellation.Token);
+            return await ListingProgress.RunAsync(copyTask, GetTemporaryCopyMessage(name),
+                message => progressIndicator.Show(message, cancellation.Cancel), progressIndicator.Hide,
+                ListingProgress.Delay);
+        }
+    }
+
+    /// <summary>Text shown with the progress while a file is copied to a temporary file.</summary>
+    public static string GetTemporaryCopyMessage(string name) => $"Copying {name} to a temporary file...";
+
+    /// <summary>Error of a file larger than the temporary copy limit.</summary>
+    public static string GetTemporaryCopyLimitMessage(string name, long limit) =>
+        $"'{name}' is larger than the temporary copy limit of {SizeFormatter.FormatHumanized(limit)}, which can be changed in Settings";
+
+    /// <summary>Time between progress reports while copying to a temporary file.</summary>
+    private static readonly TimeSpan TemporaryCopyReportInterval = TimeSpan.FromMilliseconds(100);
+
+    /// <summary>
+    ///     Copies a stream to a temporary file, reporting the fraction copied of <paramref name="size" /> when known.
+    /// </summary>
+    private static async Task<Stream> CopyToTemporaryFileAsync(string name, Stream stream, long limit, long? size,
+        IProgress<double>? progress, CancellationToken cancellationToken)
+    {
+        var temporaryStream = new FileStream(Path.GetTempFileName(), FileMode.Create, FileAccess.ReadWrite,
+            FileShare.None, 81920, FileOptions.DeleteOnClose | FileOptions.Asynchronous);
+        try
+        {
+            var buffer = new byte[81920];
+            long length = 0;
+            var lastReport = System.Diagnostics.Stopwatch.StartNew();
+            int read;
+            while ((read = await stream.ReadAsync(buffer, cancellationToken)) > 0)
+            {
+                length += read;
+                if (limit > 0 && length > limit)
+                {
+                    throw new IOException(GetTemporaryCopyLimitMessage(name, limit));
+                }
+
+                await temporaryStream.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+                if (progress != null && size > 0 && lastReport.Elapsed >= TemporaryCopyReportInterval)
+                {
+                    progress.Report(Math.Min(1, (double)length / size.Value));
+                    lastReport.Restart();
+                }
+            }
+
+            temporaryStream.Position = 0;
+            return temporaryStream;
+        }
+        catch
+        {
+            await temporaryStream.DisposeAsync();
+            throw;
         }
     }
 
@@ -1211,8 +1369,8 @@ public sealed class NavigationContext : IDisposable
         Stream stream;
         try
         {
-            stream = await OpenSeekableAsync(token => location.Volume.OpenRead(entry.Name, token),
-                cancellationToken);
+            stream = await OpenSeekableAsync(entry.Name, entry.Size,
+                token => location.Volume.OpenRead(entry.Name, token), true, cancellationToken);
         }
         catch
         {
@@ -1377,7 +1535,7 @@ public sealed class NavigationContext : IDisposable
                 }
 
                 var openedImage = await OpenImageAsync(image.FileVolumeProvider, image.Name,
-                    image.ParentPathComponents, image.SharedId, volume, cancellationToken);
+                    image.ParentPathComponents, image.SharedId, volume, null, false, cancellationToken);
                 resources.Push(openedImage);
                 volume = openedImage.Volume;
                 sharedImage ??= volume as SharedImageVolume;

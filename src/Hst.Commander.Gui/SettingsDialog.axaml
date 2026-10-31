@@ -81,11 +81,16 @@
                 </Grid>
             </TabItem>
             <TabItem Header="Panes">
-                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" RowSpacing="12" VerticalAlignment="Top">
+                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="12" VerticalAlignment="Top">
                     <TextBlock Grid.Row="0" Grid.Column="0" Text="Volume keys:" VerticalAlignment="Center" Margin="0,0,12,0" />
                     <ComboBox x:Name="VolumeProviderKeysComboBox" Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch" />
                     <TextBlock Grid.Row="1" Grid.Column="0" Text="Enter on file:" VerticalAlignment="Center" Margin="0,0,12,0" />
                     <ComboBox x:Name="EnterFileActionComboBox" Grid.Row="1" Grid.Column="1" HorizontalAlignment="Stretch" />
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Copy limit (MB):" VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <NumericUpDown x:Name="TemporaryCopyLimitUpDown" Grid.Row="2" Grid.Column="1" HorizontalAlignment="Left"
+                                   MinWidth="160" Minimum="0" Increment="256" FormatString="0" ParsingNumberStyle="Integer" />
+                    <TextBlock Grid.Row="3" Grid.Column="1" TextWrapping="Wrap" Opacity="0.7"
+                               Text="Largest file copied to a temporary file to open an image inside an image (e.g. a zip archive inside a zip archive) or view a file inside it; 0 for no limit." />
                 </Grid>
             </TabItem>
             <TabItem Header="Copying">

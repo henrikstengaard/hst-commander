@@ -8,7 +8,18 @@
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner">
     <StackPanel Margin="16" Spacing="16">
-        <TextBlock x:Name="MessageText" TextWrapping="Wrap" />
+        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+            <!-- error icon: a white cross in a red circle, the same in all themes -->
+            <Viewbox Grid.Column="0" Width="32" Height="32" VerticalAlignment="Top">
+                <Canvas Width="16" Height="16">
+                    <Ellipse Width="15" Height="15" Canvas.Left="0.5" Canvas.Top="0.5"
+                             Fill="#D93025" Stroke="#A1241B" StrokeThickness="1" />
+                    <Path Data="M5,5 L11,11 M11,5 L5,11" Stroke="White" StrokeThickness="2"
+                          StrokeLineCap="Round" />
+                </Canvas>
+            </Viewbox>
+            <TextBlock Grid.Column="1" x:Name="MessageText" TextWrapping="Wrap" VerticalAlignment="Center" />
+        </Grid>
         <Button x:Name="OkButton" Content="OK" HorizontalAlignment="Center" MinWidth="80"
                 HorizontalContentAlignment="Center" IsDefault="True" IsCancel="True" />
     </StackPanel>

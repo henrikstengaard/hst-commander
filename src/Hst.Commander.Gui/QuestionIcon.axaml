@@ -1,0 +1,15 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Hst.Commander.Gui.QuestionIcon"
+             Width="32" Height="32" VerticalAlignment="Top">
+    <!-- question icon: a white question mark in a blue circle, the same in all themes -->
+    <Viewbox>
+        <Canvas Width="16" Height="16">
+            <Ellipse Width="15" Height="15" Canvas.Left="0.5" Canvas.Top="0.5"
+                     Fill="#2F7FE0" Stroke="#1A4E8F" StrokeThickness="1" />
+            <Path Data="M5.75,6 A2.25,2.25 0 1 1 9.5,7.7 C8.5,8.4 8,8.8 8,9.75" Stroke="White"
+                  StrokeThickness="2" StrokeLineCap="Round" />
+            <Ellipse Width="2.2" Height="2.2" Canvas.Left="6.9" Canvas.Top="11.1" Fill="White" />
+        </Canvas>
+    </Viewbox>
+</UserControl>

@@ -510,4 +510,54 @@ public class GivenNavigationContextOpeningImages
             return Task.FromResult<IVolume>(volume);
         }
     }
+
+    [Fact]
+    public async Task When_OpenZipInsideZipLargerThanTemporaryCopyLimit_Then_IOExceptionIsThrown()
+    {
+        // arrange - a file inside a zip archive isn't seekable, so it's copied to a temporary file to open it
+        var rootPath = CreateTempDirectory();
+        await File.WriteAllBytesAsync(Path.Combine(rootPath, "outer.zip"),
+            CreateZipWithBinaryEntry("inner.zip", ZipTestData.CreateZipWithDirectoriesAndFiles()));
+        try
+        {
+            using var navigationContext = new NavigationContext(rootPath) { TemporaryCopyLimit = 100 };
+            await OpenAsync(navigationContext, "outer.zip");
+            var entry = (await navigationContext.ListEntriesAsync()).First(entry => entry.Name == "inner.zip");
+
+            // act
+            var exception = await Assert.ThrowsAsync<IOException>(() => navigationContext.OpenEntryAsync(entry));
+
+            // assert
+            Assert.Equal(NavigationContext.GetTemporaryCopyLimitMessage("inner.zip", 100), exception.Message);
+            Assert.Equal(Path.Combine(rootPath, "outer.zip"), navigationContext.CurrentPath);
+        }
+        finally
+        {
+            Directory.Delete(rootPath, true);
+        }
+    }
+
+    [Fact]
+    public async Task When_OpenZipInsideZipWithoutTemporaryCopyLimit_Then_InnerZipIsBrowsed()
+    {
+        // arrange
+        var rootPath = CreateTempDirectory();
+        await File.WriteAllBytesAsync(Path.Combine(rootPath, "outer.zip"),
+            CreateZipWithBinaryEntry("inner.zip", ZipTestData.CreateZipWithDirectoriesAndFiles()));
+        try
+        {
+            using var navigationContext = new NavigationContext(rootPath) { TemporaryCopyLimit = 0 };
+            await OpenAsync(navigationContext, "outer.zip");
+
+            // act
+            await OpenAsync(navigationContext, "inner.zip");
+
+            // assert
+            Assert.Equal(Path.Combine(rootPath, "outer.zip", "inner.zip"), navigationContext.CurrentPath);
+        }
+        finally
+        {
+            Directory.Delete(rootPath, true);
+        }
+    }
 }

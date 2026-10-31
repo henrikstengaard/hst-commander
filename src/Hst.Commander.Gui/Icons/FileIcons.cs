@@ -1,4 +1,5 @@
-﻿using System.Runtime.InteropServices;
+﻿using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
@@ -33,6 +34,12 @@ internal static class FileIcons
     /// <summary>Folder icons with an arrow up for the parent entry (".."), by the folder icon they are made from.</summary>
     private static readonly Dictionary<IImage, IImage> ParentIcons = new(ReferenceEqualityComparer.Instance);
 
+    /// <summary>
+    ///     Icons with an arrow right for files that can be opened as volumes, by the icon they are made from. Weak, as
+    ///     icons contained in files are made for each file.
+    /// </summary>
+    private static readonly ConditionalWeakTable<IImage, IImage> VolumeIcons = new();
+
     /// <summary>Icon shown right away for an entry, before <see cref="LoadAsync" /> has loaded the actual icon.</summary>
     public static IImage GetInitialIcon(IEntry entry) => IsParent(entry)
         ? GetParentIcon(TypeIcons.GetValueOrDefault("folder") ?? DefaultFolderIcon)
@@ -53,26 +60,39 @@ internal static class FileIcons
             return parentIcon;
         }
 
-        // the arrow is drawn in a 16x16 box scaled to the folder icon's size
-        var size = folderIcon.Size;
+        parentIcon = CreateArrowIcon(folderIcon,
+            "M11,5 L15,9.5 L12.75,9.5 L12.75,15 L9.25,15 L9.25,9.5 L7,9.5 Z", "#3CB043", "#1E6B23");
+        ParentIcons[folderIcon] = parentIcon;
+        return parentIcon;
+    }
+
+    /// <summary>
+    ///     Icon with a blue arrow right drawn over its lower right part, showing the file can be opened as a volume
+    ///     (see <see cref="NavigationContext.IsVolumeFile" />), e.g. an ISO image or a zip archive. Cached per icon.
+    /// </summary>
+    public static IImage GetVolumeIcon(IImage icon) => VolumeIcons.GetValue(icon, _ => CreateArrowIcon(icon,
+        "M15,11 L10.5,7 L10.5,9.25 L5,9.25 L5,12.75 L10.5,12.75 L10.5,15 Z", "#2F7FE0", "#1A4E8F"));
+
+    /// <summary>Icon with an arrow drawn over it, the arrow's path in a 16x16 box scaled to the icon's size.</summary>
+    private static IImage CreateArrowIcon(IImage icon, string arrowPath, string fill, string stroke)
+    {
+        var size = icon.Size;
         var scale = Math.Min(size.Width, size.Height) / 16;
-        var arrow = Geometry.Parse("M11,5 L15,9.5 L12.75,9.5 L12.75,15 L9.25,15 L9.25,9.5 L7,9.5 Z");
+        var arrow = Geometry.Parse(arrowPath);
         arrow.Transform = new ScaleTransform(scale, scale);
-        parentIcon = new DrawingImage(new DrawingGroup
+        return new DrawingImage(new DrawingGroup
         {
             Children =
             {
-                new ImageDrawing { ImageSource = folderIcon, Rect = new Rect(size) },
+                new ImageDrawing { ImageSource = icon, Rect = new Rect(size) },
                 new GeometryDrawing
                 {
                     Geometry = arrow,
-                    Brush = new SolidColorBrush(Color.Parse("#3CB043")),
-                    Pen = new Pen(new SolidColorBrush(Color.Parse("#1E6B23")), Math.Max(1, scale * 0.75))
+                    Brush = new SolidColorBrush(Color.Parse(fill)),
+                    Pen = new Pen(new SolidColorBrush(Color.Parse(stroke)), Math.Max(1, scale * 0.75))
                 }
             }
         });
-        ParentIcons[folderIcon] = parentIcon;
-        return parentIcon;
     }
 
     /// <summary>

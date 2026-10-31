@@ -69,10 +69,20 @@ Each pane's `NavigationContext` owns a `NestedVolume` over a root volume from a 
 Opening a file (Enter or double-click, `OpenEntryAsync`) first checks whether it is an image by asking every file volume provider, regardless of extension, so e.g. a `.nupkg`, `.jar` or `.docx` opens as a zip archive. A file no provider detects is started. `OpenAsVolumeAsync` (Ctrl+PageDown, File > Open as volume) does the same detection but throws `IOException` when nothing matches. Images are detected in any location, including inside other images.
 
 1. Providers are asked in order with `IsMatch`, reading through the current volume's `OpenRead`. A seekable stream is reset for the next provider, otherwise the file is opened again. Local files that can't be read (`IOException`, `UnauthorizedAccessException`, `NotSupportedException`) aren't images, so they are started; for other files (and with `OpenAsVolumeAsync`) the error is thrown, e.g. a physical disk without access.
-2. The first match gets the file opened again as a seekable stream; a stream that isn't seekable (e.g. inside a zip) is copied to a temporary file deleted on close.
+2. The first match gets the file opened again as a seekable stream; a stream that isn't seekable (e.g. inside a zip) is copied to a temporary file deleted on close. See [Temporary copies](#temporary-copies).
 3. The volume is pushed on the `NestedVolume` (wrapped in `EntryVolumeProvider`) and the image (provider, file name, the directory inside its parent image, volume and stream) on the context's image stack, which `OpenLocationAsync` uses to open the images again.
 
 Going up from an image's root pops and disposes its volume and stream. Changing the volume provider or location closes all images.
+
+### Temporary Copies
+
+Files that can't be read seekably, e.g. a zip archive inside a zip archive, are copied to a temporary file to open them as images or view them (F3). `NavigationContext.TemporaryCopyLimit` (default 1 GB, `DefaultTemporaryCopyLimit`) caps the copy: a larger file fails with an `IOException` saying the limit can be changed in Settings, shown as an error by the front-ends. The entry's size is checked before copying when it's known; otherwise the size is counted while copying, as a stream inside an archive doesn't know its length. 0 means no limit. The copy runs on the thread pool: awaiting each read and write on the UI thread made it crawl in the TUI, where every continuation waits for a Terminal.Gui main loop iteration. Both front-ends have a `Copy limit` setting in megabytes on the Panes tab (`TemporaryCopyLimit` in the settings file) and set it on both panes at startup and when the settings are saved. The limit applies wherever a temporary copy is made, including file operations and volume file detection opening the images again (`OpenLocationAsync`).
+
+When the pane opens an image or views a file and the copy takes longer than `ListingProgress.Delay` (2 seconds), the pane's `ProgressIndicator` (`IProgressIndicator`) shows "Copying <name> to a temporary file..." in the same box as slow listings, with a progress bar (the fraction of the entry's size, reported at most every 100 ms) and a Cancel button, which has the focus until the box is hidden. Cancelling throws `OperationCanceledException`, which the front-ends ignore, leaving the pane where it was. Copies made by `OpenLocationAsync` for background work don't show it.
+
+### Detecting Volume Files
+
+After listing, both front-ends call `DetectVolumeFilesAsync` in the background to find the files that can be opened as volumes, using the same detection as opening images (every file volume provider's `IsMatch`, regardless of extension). The TUI shows them with a `>` marker before the name, the GUI with a blue arrow right over the icon. Local files are read directly; files in images or other root volumes are read from a volume of their own (`OpenLocationAsync`), so the pane's volume isn't used. Files are read on the thread pool one at a time and reported on the calling thread; `IsVolumeFile(entry)` returns the result until the entries are listed again. Files that can't be read or make a provider fail aren't volumes. The front-ends cancel detection before listing again. Directories and the drive list are skipped.
 
 ### Writable Images
 

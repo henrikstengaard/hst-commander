@@ -9,7 +9,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - `MainWindow.cs`: the dual-pane window, File and Help menus, columns, key bindings, theme colors and the handlers for every function key and dialog.
 - `EntryTableView.cs`: the pane's `TableView`, with column dividers below the last entry and a scroll thumb.
 - `PathPanelView.cs`: the panel above each pane (path, marked summary, disk space) and the pane's top border.
-- `ListingProgressView.cs`: a framed spinner with "Reading ..." shown in the middle of a pane when listing it takes longer than `ListingProgress.Delay` (2 seconds), e.g. the physical disks while a sleeping disk wakes up.
+- `ListingProgressView.cs`: a framed spinner with "Reading ..." shown in the middle of a pane when listing it takes longer than `ListingProgress.Delay` (2 seconds), e.g. the physical disks while a sleeping disk wakes up, and, with a progress bar and a Cancel button, when making a temporary copy takes as long (the view is the pane's `NavigationContext.ProgressIndicator`; the table gets the focus back when it's hidden).
 - `FunctionKeyBarView.cs`: the clickable function key bar.
 - `TerminalScreen.cs`: the terminal output screen while the TUI is shut down, also running external editors (F4).
 - `TuiSettings.cs`, `TuiTheme.cs`, `TuiPalette.cs`: settings and the 16-color palette per theme.
@@ -26,6 +26,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 ## Panes
 
 - Each pane is a private `Pane` class holding its `NavigationContext`, views, entries and `DataTable`.
+- Names start with a marker character: the OS directory separator (`\` on Windows, `/` elsewhere) for directories (and `..`), `>` for files that can be opened as volumes (see [Detecting volume files](volumes.md#detecting-volume-files)) and a space for other files. The marker is set when the file is detected after listing.
 - The name column takes the remaining width; size and date columns shrink on narrow panes so everything fits. Long names are shortened with `~`, keeping the end of the stem and the extension when they fit. Sizes are humanized (`SizeFormatter.FormatEntrySize`): containers with a size, i.e. drives, partition tables and partitions, show it, other directories show `<DIR>`.
 - The path panel highlights the path of the focused pane and trims it from the left with `...`; the disk space is dropped when the panel is too narrow.
 - The cursor row is only drawn in the active pane (the pane last focused), so it stays visible while a dialog or the menu has the focus. Marked entries are yellow, also under the cursor.
@@ -41,7 +42,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 ## Themes and Settings
 
 - Themes: Midnight Commander (default), Light and Dark, from `TuiPalette`. `MainWindow.ApplyTheme` reapplies them. The settings dialog previews theme changes live and reverts them on Cancel.
-- The settings dialog groups the settings in a `TabView`: Appearance (theme), Panes (volume keys, Enter on file), Copying (UAE metadata) and Editor (see [Editor settings](editor.md#settings)). Its radio groups have `HighlightStyle.None`: Terminal.Gui saves a view's color scheme when it's pressed and sets it as the view's own when released, so a clicked radio group would keep the previous theme's colors instead of inheriting the dialog's previewed theme.
+- The settings dialog groups the settings in a `TabView`: Appearance (theme), Panes (volume keys, Enter on file, copy limit, see [Temporary copies](volumes.md#temporary-copies)), Copying (UAE metadata) and Editor (see [Editor settings](editor.md#settings)). Its radio groups have `HighlightStyle.None`: Terminal.Gui saves a view's color scheme when it's pressed and sets it as the view's own when released, so a clicked radio group would keep the previous theme's colors instead of inheriting the dialog's previewed theme.
 - Settings are stored in `~/.hst-commander/tui-settings.json`; a missing or invalid file gives defaults.
 
 ## Terminal Programs

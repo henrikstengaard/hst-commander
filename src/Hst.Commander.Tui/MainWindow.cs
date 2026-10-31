@@ -115,6 +115,7 @@ public sealed class MainWindow : Window
         ApplyVolumeProviderKeys(settings.EffectiveVolumeProviderKeys);
         ApplyEnterFileAction(settings.EnterFileAction);
         ApplyUaeMetadata(settings.UaeMetadata);
+        ApplyTemporaryCopyLimit(settings.TemporaryCopyLimitBytes);
         _editorSettings = settings;
         ConfigurePaneKeys(_leftPane, _rightPane);
         ConfigurePaneKeys(_rightPane, _leftPane);
@@ -215,6 +216,8 @@ public sealed class MainWindow : Window
 
     public void DisposeNavigationContexts()
     {
+        _leftPane.VolumeDetection?.Cancel();
+        _rightPane.VolumeDetection?.Cancel();
         _leftPane.NavigationContext.Dispose();
         _rightPane.NavigationContext.Dispose();
     }
@@ -263,6 +266,13 @@ public sealed class MainWindow : Window
         _rightPane.NavigationContext.UaeMetadata = format;
     }
 
+    /// <summary>Sets the largest file both panes copy to a temporary file to open it.</summary>
+    private void ApplyTemporaryCopyLimit(long limit)
+    {
+        _leftPane.NavigationContext.TemporaryCopyLimit = limit;
+        _rightPane.NavigationContext.TemporaryCopyLimit = limit;
+    }
+
     private Key LeftVolumeProviderKey => WithVolumeProviderModifier(Key.F1);
 
     private Key RightVolumeProviderKey => WithVolumeProviderModifier(Key.F2);
@@ -308,6 +318,7 @@ public sealed class MainWindow : Window
         ApplyVolumeProviderKeys(result.EffectiveVolumeProviderKeys);
         ApplyEnterFileAction(result.EnterFileAction);
         ApplyUaeMetadata(result.UaeMetadata);
+        ApplyTemporaryCopyLimit(result.TemporaryCopyLimitBytes);
         _editorSettings = result;
         try
         {
@@ -357,6 +368,8 @@ public sealed class MainWindow : Window
 
         var progress = new ListingProgressView();
         var pane = new Pane(navigationContext, view, pathPanel, tableView, bottomLine, progress);
+        progress.FocusOnHide = tableView;
+        navigationContext.ProgressIndicator = progress;
         tableView.Style = new TableStyle
         {
             ShowVerticalCellLines = true,
@@ -563,6 +576,12 @@ public sealed class MainWindow : Window
         {
             // a terminal can't show images, so they are viewed as binary files in the hex view
             session = await pane.NavigationContext.OpenViewerAsync(entry, []);
+        }
+        catch (OperationCanceledException)
+        {
+            // cancelled by the user, e.g. making a temporary copy of a file inside an image
+            pane.TableView.SetFocus();
+            return;
         }
         catch (Exception exception)
         {
@@ -1200,6 +1219,10 @@ public sealed class MainWindow : Window
             await action();
             await RefreshPaneAsync(pane);
         }
+        catch (OperationCanceledException)
+        {
+            // cancelled by the user, e.g. making a temporary copy of an image inside another image
+        }
         catch (Exception exception)
         {
             MessageBox.ErrorQuery("Error", exception.Message, "OK");
@@ -1220,6 +1243,7 @@ public sealed class MainWindow : Window
 
     private static async Task RefreshPaneAsync(Pane pane)
     {
+        pane.VolumeDetection?.Cancel();
         var previousPath = pane.PathPanel.Path;
         pane.Entries = await ListingProgress.ListEntriesAsync(pane.NavigationContext, pane.Progress.Show,
             pane.Progress.Hide);
@@ -1237,7 +1261,7 @@ public sealed class MainWindow : Window
         {
             var size = SizeFormatter.FormatEntrySize(entry);
             var modifiedDate = entry.ModifiedDate?.ToString("yyyy-MM-dd HH:mm") ?? string.Empty;
-            table.Rows.Add(entry.DisplayName, size, modifiedDate);
+            table.Rows.Add(GetEntryMarker(pane, entry) + entry.DisplayName, size, modifiedDate);
         }
 
         pane.TableView.Table = new DataTableSource(table);
@@ -1250,7 +1274,55 @@ public sealed class MainWindow : Window
         }
 
         UpdatePaneColumns(pane);
+        DetectVolumeFiles(pane);
     }
+
+    /// <summary>
+    ///     Detects the files of the pane that can be opened as volumes in the background, showing their marker when
+    ///     detected (see <see cref="GetEntryMarker" />).
+    /// </summary>
+    private static async void DetectVolumeFiles(Pane pane)
+    {
+        var cancellation = pane.VolumeDetection = new CancellationTokenSource();
+        var entries = pane.Entries;
+        await pane.NavigationContext.DetectVolumeFilesAsync(entries, entry =>
+        {
+            var rowIndex = IndexOfEntry(entries, entry);
+            if (cancellation.IsCancellationRequested || pane.DataTable == null || rowIndex < 0)
+            {
+                return;
+            }
+
+            pane.DataTable.Rows[rowIndex][0] = FormatEntryName(pane, entry, GetColumnWidths(
+                pane.TableView.Viewport.Width).Name);
+            pane.TableView.NeedsDraw = true;
+        }, cancellation.Token);
+    }
+
+    private static int IndexOfEntry(IReadOnlyList<IEntry> entries, IEntry entry)
+    {
+        for (var index = 0; index < entries.Count; index++)
+        {
+            if (ReferenceEquals(entries[index], entry))
+            {
+                return index;
+            }
+        }
+
+        return -1;
+    }
+
+    /// <summary>
+    ///     First character of an entry's name in the panes: the directory separator of the OS for directories, '>'
+    ///     for files that can be opened as volumes (e.g. ISO images and zip archives) and a space for other files.
+    /// </summary>
+    private static char GetEntryMarker(Pane pane, IEntry entry) => entry.Type == EntryType.Container
+        ? Path.DirectorySeparatorChar
+        : pane.NavigationContext.IsVolumeFile(entry)
+            ? VolumeFileMarker
+            : ' ';
+
+    private const char VolumeFileMarker = '>';
 
     private static void UpdatePaneColumns(Pane pane)
     {
@@ -1275,10 +1347,7 @@ public sealed class MainWindow : Window
 
         for (var rowIndex = 0; rowIndex < pane.Entries.Count; rowIndex++)
         {
-            pane.DataTable.Rows[rowIndex][0] = FormatEntryName(
-                pane.Entries[rowIndex].DisplayName,
-                pane.Entries[rowIndex].Type,
-                widths.Name);
+            pane.DataTable.Rows[rowIndex][0] = FormatEntryName(pane, pane.Entries[rowIndex], widths.Name);
         }
         pane.TableView.NeedsDraw = true;
     }
@@ -1319,6 +1388,10 @@ public sealed class MainWindow : Window
 
         return (nameWidth, sizeWidth, modifiedWidth);
     }
+
+    /// <summary>Name of an entry shown in a pane column, its marker followed by its name shortened to fit.</summary>
+    private static string FormatEntryName(Pane pane, IEntry entry, int columnWidth) =>
+        GetEntryMarker(pane, entry) + FormatEntryName(entry.DisplayName, entry.Type, Math.Max(1, columnWidth - 1));
 
     private static string FormatEntryName(string name, EntryType type, int columnWidth)
     {
@@ -1472,5 +1545,8 @@ public sealed class MainWindow : Window
         public ListingProgressView Progress { get; } = progress;
         public IReadOnlyList<IEntry> Entries { get; set; } = [];
         public DataTable? DataTable { get; set; }
+
+        /// <summary>Cancels detecting the files that can be opened as volumes, e.g. when listed again.</summary>
+        public CancellationTokenSource? VolumeDetection { get; set; }
     }
 }

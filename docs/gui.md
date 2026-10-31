@@ -7,7 +7,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 ## Files
 
 - `MainWindow.axaml(.cs)`: the dual-pane window, menus, function key bar, window-level keys and error display.
-- `PaneView.axaml(.cs)`: one pane: path panel, column header, entry `ListBox` (list or thumbnails), `IconLayoutView` for plugin navigation modes, the icon positions bar and the listing progress (an indeterminate progress bar with "Reading ..." shown when listing takes longer than `ListingProgress.Delay`, 2 seconds).
+- `PaneView.axaml(.cs)`: one pane: path panel, column header, entry `ListBox` (list or thumbnails), `IconLayoutView` for plugin navigation modes, the icon positions bar and the listing progress (an indeterminate progress bar with "Reading ..." shown when listing takes longer than `ListingProgress.Delay`, 2 seconds, and, with a progress bar and a Cancel button, when making a temporary copy takes as long through `NavigationContext.ProgressIndicator`).
 - `PaneNavigationMode.cs`, `IconLayoutView.cs`: navigation modes, see [Navigation modes](icons-and-navigation-modes.md#navigation-modes).
 - `EntryItem.cs`: a display row for an `IEntry`.
 - `Icons/`: `FileIcons` (loading and caching entry icons), `IFileIconProvider` with Windows, freedesktop and macOS implementations, and `ViewerIcon` for the icon viewer.
@@ -24,6 +24,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - `+`, `-` and `*` are matched by `KeySymbol` (plus `Key.Add`/`Subtract`/`Multiply`) and shown in the menu headers, because key gestures would display as `OemPlus`. Ctrl+\ matches the `\` symbol, `Key.OemPipe` or `Key.OemBackslash`.
 - Dialogs are shown with `ShowDialog(owner)`. Progress dialogs (copy/move, delete) start the operation with `Task.Run` when opened and report through a `Progress<T>` created on the UI thread; questions such as overwriting are shown over them with `Dispatcher.UIThread.InvokeAsync`. Closing the window cancels, and the dialog closes when the operation has stopped and exposes its `Exception`.
 - Errors are raised as `PaneView.NavigationFailed` and shown by `MainWindow` with `ErrorDialog`. `PaneView.CreateVolumeAsync` throws instead, so the error is shown before asking again.
+- `ErrorDialog` shows a red error icon left of the message, and dialogs asking a question (`ConfirmDialog`, `QuitDialog`, `SaveChangesDialog`, `DeleteDialog`, `OverwriteDialog`) show a blue question mark icon (`QuestionIcon`) left of the question; both are vector drawings, the same in all themes. A `ConfirmDialog` without a no button only shows a message and hides the icon.
 - The function key bar buttons aren't focusable, so the active pane keeps the focus.
 
 ## Panes
@@ -50,6 +51,6 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 
 - Themes: Midnight Commander (default), Light and Dark. Midnight Commander is a custom `ThemeVariant` inheriting Dark plus `MidnightCommanderStyles` (the current row colors only), which `ThemeManager` adds to `Application.Styles` only for that theme. Only the panes are colored; menus, the function key bar and dialogs use the normal Fluent dark styling.
 - Pane colors are per-theme brushes in `App.axaml` `ThemeDictionaries`, referenced with `DynamicResource` so theme changes apply live.
-- The settings dialog groups the settings in a `TabControl`: Appearance (theme), Panes (volume keys, Enter on file), Copying (UAE metadata) and Editor (see [Editor settings](editor.md#settings)). Its tabs use the `SettingsTabItem` control theme instead of the Fluent theme's text headers, so they look like tabs (like the TUI's): bordered, the selected one with an accent line and joined to the bordered panel of its settings (drawn over the panel's border); the selected tab and the panel have the dialog's background, so only the borders mark them.
+- The settings dialog groups the settings in a `TabControl`: Appearance (theme), Panes (volume keys, Enter on file, copy limit, see [Temporary copies](volumes.md#temporary-copies)), Copying (UAE metadata) and Editor (see [Editor settings](editor.md#settings)). Its tabs use the `SettingsTabItem` control theme instead of the Fluent theme's text headers, so they look like tabs (like the TUI's): bordered, the selected one with an accent line and joined to the bordered panel of its settings (drawn over the panel's border); the selected tab and the panel have the dialog's background, so only the borders mark them.
 - Settings are stored in `~/.hst-commander/gui-settings.json`; a missing or invalid file gives defaults. The settings dialog previews theme changes live and reverts them on Cancel.
 - The application icon is `src/icon/hst-commander.ico`, linked as `avares://Hst.Commander.Gui/Assets/hst-commander.ico`.

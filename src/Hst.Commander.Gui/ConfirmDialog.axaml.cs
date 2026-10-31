@@ -5,7 +5,7 @@ namespace Hst.Commander.Gui;
 /// <summary>
 ///     Modal dialog asking a question, e.g. whether to restart as administrator. The dialog returns true on the yes
 ///     button, false on the no button or null when closed, which is treated as no. Without a no button it only shows a
-///     message.
+///     message, without the question icon.
 /// </summary>
 public partial class ConfirmDialog : Window
 {
@@ -25,6 +25,7 @@ public partial class ConfirmDialog : Window
         YesButton.Content = yesText;
         NoButton.Content = noText;
         NoButton.IsVisible = noText != null;
+        QuestionIcon.IsVisible = noText != null;
         YesButton.Click += (_, _) => Close(true);
         NoButton.Click += (_, _) => Close(false);
         Opened += (_, _) => YesButton.Focus();

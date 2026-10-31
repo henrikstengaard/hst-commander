@@ -1,5 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:gui="using:Hst.Commander.Gui"
         x:Class="Hst.Commander.Gui.QuitDialog"
         Title="Quit"
         SizeToContent="WidthAndHeight"
@@ -8,7 +9,10 @@
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner">
     <StackPanel Margin="16" Spacing="16">
-        <TextBlock x:Name="MessageText" TextWrapping="Wrap" />
+        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+            <gui:QuestionIcon Grid.Column="0" />
+            <TextBlock Grid.Column="1" x:Name="MessageText" TextWrapping="Wrap" VerticalAlignment="Center" />
+        </Grid>
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
             <Button x:Name="YesButton" Content="_Yes" MinWidth="80" HorizontalContentAlignment="Center"
                     IsDefault="True" />
