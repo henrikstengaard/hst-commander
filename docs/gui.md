@@ -7,7 +7,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 ## Files
 
 - `MainWindow.axaml(.cs)`: the dual-pane window, menus, function key bar, window-level keys and error display.
-- `PaneView.axaml(.cs)`: one pane: path panel, column header, entry `ListBox` (list or thumbnails), `IconLayoutView` for plugin navigation modes, the icon positions bar and the listing progress (an indeterminate progress bar with "Reading ..." shown when listing takes longer than `ListingProgress.Delay`, 2 seconds, and when making a temporary copy takes as long through `NavigationContext.ProgressIndicator`).
+- `PaneView.axaml(.cs)`: one pane: path panel, column header, entry `ListBox` (list or thumbnails), `IconLayoutView` for plugin navigation modes, the icon positions bar and the listing progress (an indeterminate progress bar with "Reading ..." shown when listing takes longer than `ListingProgress.Delay`, 2 seconds, and, with a progress bar and a Cancel button, when making a temporary copy takes as long through `NavigationContext.ProgressIndicator`).
 - `PaneNavigationMode.cs`, `IconLayoutView.cs`: navigation modes, see [Navigation modes](icons-and-navigation-modes.md#navigation-modes).
 - `EntryItem.cs`: a display row for an `IEntry`.
 - `Icons/`: `FileIcons` (loading and caching entry icons), `IFileIconProvider` with Windows, freedesktop and macOS implementations, and `ViewerIcon` for the icon viewer.

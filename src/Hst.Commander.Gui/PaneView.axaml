@@ -135,7 +135,10 @@
                     <StackPanel Spacing="8">
                         <TextBlock x:Name="ListingProgressText" Foreground="{DynamicResource PathForeground}"
                                    HorizontalAlignment="Center" />
-                        <ProgressBar IsIndeterminate="True" MinWidth="200" />
+                        <ProgressBar x:Name="ListingProgressBar" IsIndeterminate="True" MinWidth="240" />
+                        <!-- shown while making a temporary copy, e.g. of an image inside another image -->
+                        <Button x:Name="ListingCancelButton" Content="Cancel" IsVisible="False" MinWidth="80"
+                                HorizontalAlignment="Center" HorizontalContentAlignment="Center" />
                     </StackPanel>
                 </Border>
             </Grid>

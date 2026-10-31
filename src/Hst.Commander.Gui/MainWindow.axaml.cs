@@ -482,6 +482,12 @@ public partial class MainWindow : Window
         {
             session = await pane.NavigationContext.OpenViewerAsync(entry);
         }
+        catch (OperationCanceledException)
+        {
+            // cancelled by the user, e.g. making a temporary copy of a file inside an image
+            pane.FocusEntries();
+            return;
+        }
         catch (Exception exception)
         {
             await ShowErrorAsync(exception);

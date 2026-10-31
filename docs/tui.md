@@ -9,7 +9,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - `MainWindow.cs`: the dual-pane window, File and Help menus, columns, key bindings, theme colors and the handlers for every function key and dialog.
 - `EntryTableView.cs`: the pane's `TableView`, with column dividers below the last entry and a scroll thumb.
 - `PathPanelView.cs`: the panel above each pane (path, marked summary, disk space) and the pane's top border.
-- `ListingProgressView.cs`: a framed spinner with "Reading ..." shown in the middle of a pane when listing it takes longer than `ListingProgress.Delay` (2 seconds), e.g. the physical disks while a sleeping disk wakes up, and when making a temporary copy takes as long (the pane's `NavigationContext.ProgressIndicator`).
+- `ListingProgressView.cs`: a framed spinner with "Reading ..." shown in the middle of a pane when listing it takes longer than `ListingProgress.Delay` (2 seconds), e.g. the physical disks while a sleeping disk wakes up, and, with a progress bar and a Cancel button, when making a temporary copy takes as long (the view is the pane's `NavigationContext.ProgressIndicator`; the table gets the focus back when it's hidden).
 - `FunctionKeyBarView.cs`: the clickable function key bar.
 - `TerminalScreen.cs`: the terminal output screen while the TUI is shut down, also running external editors (F4).
 - `TuiSettings.cs`, `TuiTheme.cs`, `TuiPalette.cs`: settings and the 16-color palette per theme.

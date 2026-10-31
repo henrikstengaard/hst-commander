@@ -30,6 +30,7 @@ public partial class PaneView : UserControl
     public PaneView()
     {
         InitializeComponent();
+        ListingCancelButton.Click += (_, _) => CancelProgress();
 
         _listItemTemplate = EntriesList.ItemTemplate;
         _listItemsPanel = EntriesList.ItemsPanel;
@@ -183,17 +184,77 @@ public partial class PaneView : UserControl
         set
         {
             _navigationContext = value;
-            value.ProgressIndicator = new ProgressIndicator(ShowProgress, HideProgress);
+            value.ProgressIndicator = new PaneProgressIndicator(this);
         }
     }
 
+    /// <summary>Shows the progress with an indeterminate progress bar, e.g. while listing.</summary>
     private void ShowProgress(string message)
     {
+        _progressCancel = null;
         ListingProgressText.Text = message;
+        ListingProgressBar.IsIndeterminate = true;
+        ListingProgressBar.ShowProgressText = false;
+        ListingCancelButton.IsVisible = false;
         ListingProgress.IsVisible = true;
     }
 
-    private void HideProgress() => ListingProgress.IsVisible = false;
+    private void HideProgress()
+    {
+        var hadCancel = _progressCancel != null;
+        var hadFocus = ListingCancelButton.IsKeyboardFocusWithin;
+        _progressCancel = null;
+        ListingProgress.IsVisible = false;
+        if (hadCancel && hadFocus)
+        {
+            FocusEntries();
+        }
+    }
+
+    /// <summary>Cancels the progress shown with a cancel button, see <see cref="PaneProgressIndicator" />.</summary>
+    private Action? _progressCancel;
+
+    private void CancelProgress()
+    {
+        if (_progressCancel is not { } cancel || !ListingCancelButton.IsEnabled)
+        {
+            return;
+        }
+
+        ListingCancelButton.IsEnabled = false;
+        ListingProgressText.Text = "Cancelling...";
+        cancel();
+    }
+
+    /// <summary>
+    ///     Progress of the pane's navigation context, e.g. making a temporary copy of an image inside another image,
+    ///     shown with a progress bar and a cancel button having the focus.
+    /// </summary>
+    private sealed class PaneProgressIndicator(PaneView pane) : IProgressIndicator
+    {
+        public void Show(string message, Action cancel)
+        {
+            pane._progressCancel = cancel;
+            pane.ListingProgressText.Text = message;
+            pane.ListingProgressBar.IsIndeterminate = false;
+            pane.ListingProgressBar.ShowProgressText = true;
+            pane.ListingProgressBar.Value = 0;
+            pane.ListingCancelButton.IsEnabled = true;
+            pane.ListingCancelButton.IsVisible = true;
+            pane.ListingProgress.IsVisible = true;
+            pane.ListingCancelButton.Focus();
+        }
+
+        public void Report(double fraction)
+        {
+            if (pane._progressCancel != null)
+            {
+                pane.ListingProgressBar.Value = Math.Clamp(fraction, 0, 1) * 100;
+            }
+        }
+
+        public void Hide() => pane.HideProgress();
+    }
 
     /// <summary>Entry under the cursor, null when the list is empty.</summary>
     /// <summary>Whether the pane is the active pane, the current entry is only shown in the active pane.</summary>
@@ -505,6 +566,12 @@ public partial class PaneView : UserControl
         {
             await action();
             await RefreshAsync();
+        }
+        catch (OperationCanceledException)
+        {
+            // cancelled by the user, e.g. making a temporary copy of an image inside another image: the location is
+            // unchanged, listed again to load the icons stopped before navigating
+            await RunNavigationAsync(() => Task.CompletedTask);
         }
         catch (Exception exception)
         {

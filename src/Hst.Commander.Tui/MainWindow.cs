@@ -368,7 +368,8 @@ public sealed class MainWindow : Window
 
         var progress = new ListingProgressView();
         var pane = new Pane(navigationContext, view, pathPanel, tableView, bottomLine, progress);
-        navigationContext.ProgressIndicator = new ProgressIndicator(progress.Show, progress.Hide);
+        progress.FocusOnHide = tableView;
+        navigationContext.ProgressIndicator = progress;
         tableView.Style = new TableStyle
         {
             ShowVerticalCellLines = true,
@@ -575,6 +576,12 @@ public sealed class MainWindow : Window
         {
             // a terminal can't show images, so they are viewed as binary files in the hex view
             session = await pane.NavigationContext.OpenViewerAsync(entry, []);
+        }
+        catch (OperationCanceledException)
+        {
+            // cancelled by the user, e.g. making a temporary copy of a file inside an image
+            pane.TableView.SetFocus();
+            return;
         }
         catch (Exception exception)
         {
@@ -1211,6 +1218,10 @@ public sealed class MainWindow : Window
         {
             await action();
             await RefreshPaneAsync(pane);
+        }
+        catch (OperationCanceledException)
+        {
+            // cancelled by the user, e.g. making a temporary copy of an image inside another image
         }
         catch (Exception exception)
         {
