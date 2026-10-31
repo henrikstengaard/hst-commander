@@ -24,6 +24,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - `+`, `-` and `*` are matched by `KeySymbol` (plus `Key.Add`/`Subtract`/`Multiply`) and shown in the menu headers, because key gestures would display as `OemPlus`. Ctrl+\ matches the `\` symbol, `Key.OemPipe` or `Key.OemBackslash`.
 - Dialogs are shown with `ShowDialog(owner)`. Progress dialogs (copy/move, delete) start the operation with `Task.Run` when opened and report through a `Progress<T>` created on the UI thread; questions such as overwriting are shown over them with `Dispatcher.UIThread.InvokeAsync`. Closing the window cancels, and the dialog closes when the operation has stopped and exposes its `Exception`.
 - Errors are raised as `PaneView.NavigationFailed` and shown by `MainWindow` with `ErrorDialog`. `PaneView.CreateVolumeAsync` throws instead, so the error is shown before asking again.
+- `ErrorDialog` shows a red error icon left of the message, and dialogs asking a question (`ConfirmDialog`, `QuitDialog`, `SaveChangesDialog`, `DeleteDialog`, `OverwriteDialog`) show a blue question mark icon (`QuestionIcon`) left of the question; both are vector drawings, the same in all themes. A `ConfirmDialog` without a no button only shows a message and hides the icon.
 - The function key bar buttons aren't focusable, so the active pane keeps the focus.
 
 ## Panes
