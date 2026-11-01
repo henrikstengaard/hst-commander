@@ -180,7 +180,11 @@ public class GivenPluginLoader
             Assert.Contains("GNU GENERAL PUBLIC LICENSE", plugin.ThirdPartyNotices);
             var loadContext = AssemblyLoadContext.GetLoadContext(plugin.GetType().Assembly)!;
             var smbLibrary = loadContext.LoadFromAssemblyName(new AssemblyName("SMBLibrary"));
-            Assert.Equal(Path.Combine(pluginPath, "SMBLibrary.dll"), smbLibrary.Location);
+            // compared from the temp directory's unique name on, as the temp path can be a symlink
+            // (/var is /private/var on macOS)
+            Assert.EndsWith(
+                Path.Combine(Path.GetFileName(pluginsPath), "Hst.Commander.Plugins.Smb", "SMBLibrary.dll"),
+                smbLibrary.Location);
         }
         finally
         {
