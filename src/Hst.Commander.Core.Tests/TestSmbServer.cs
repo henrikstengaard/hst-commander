@@ -79,9 +79,25 @@ public sealed class DirectoryFileStore(string rootPath) : INTFileStore
         public bool DeletePending { get; set; }
     }
 
-    private string GetFullPath(string path) => path.Length == 0
-        ? rootPath
-        : Path.Combine(rootPath, path.Replace('\\', Path.DirectorySeparatorChar));
+    // SMB servers ignore case, so each part matches an existing entry regardless of case,
+    // also on case-sensitive file systems (Linux); parts not found are kept as given, and the
+    // last part too when it's a new name (renaming dir2 to DIR2)
+    private string GetFullPath(string path, bool isNewName = false)
+    {
+        var fullPath = rootPath;
+        var parts = path.Split('\\', StringSplitOptions.RemoveEmptyEntries);
+        for (var i = 0; i < parts.Length; i++)
+        {
+            var part = parts[i];
+            var match = Directory.Exists(fullPath) && !(isNewName && i == parts.Length - 1)
+                ? Directory.EnumerateFileSystemEntries(fullPath)
+                    .FirstOrDefault(entry => string.Equals(Path.GetFileName(entry), part, StringComparison.OrdinalIgnoreCase))
+                : null;
+            fullPath = match ?? Path.Combine(fullPath, part);
+        }
+
+        return fullPath;
+    }
 
     public NTStatus CreateFile(out object handle, out FileStatus fileStatus, string path, AccessMask desiredAccess,
         FileAttributes fileAttributes, ShareAccess shareAccess, CreateDisposition createDisposition,
@@ -263,7 +279,7 @@ public sealed class DirectoryFileStore(string rootPath) : INTFileStore
                 fileHandle.DeletePending = disposition.DeletePending;
                 return NTStatus.STATUS_SUCCESS;
             case FileRenameInformationType2 rename:
-                var newPath = GetFullPath(rename.FileName);
+                var newPath = GetFullPath(rename.FileName, isNewName: true);
                 if (Directory.Exists(fileHandle.Path))
                 {
                     Directory.Move(fileHandle.Path, newPath);
