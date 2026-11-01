@@ -17,4 +17,33 @@
     </PropertyGroup>
     <Message Importance="high" Text="$(MSBuildProjectName) version: $(Version)" />
   </Target>
+
+  <!--
+    Self-contained apps include the .NET runtime, so the third-party notices of the runtime pack used are embedded
+    in the app as the resource THIRD-PARTY-NOTICES-DOTNET.txt, shown in Help > About > Licenses (see Licenses in
+    Core), and published next to the app. Builds that aren't self-contained run on a .NET installed separately and
+    show a link to the runtime's notices instead.
+  -->
+  <Target Name="FindDotNetThirdPartyNotices" DependsOnTargets="ResolveFrameworkReferences"
+          Condition="'$(SelfContained)' == 'true' And ('$(OutputType)' == 'Exe' Or '$(OutputType)' == 'WinExe')">
+    <ItemGroup>
+      <_DotNetThirdPartyNotices Include="@(ResolvedRuntimePack->'%(PackageDirectory)\THIRD-PARTY-NOTICES.TXT')"
+                                Condition="'%(ResolvedRuntimePack.FrameworkName)' == 'Microsoft.NETCore.App'" />
+    </ItemGroup>
+    <Error Condition="'@(_DotNetThirdPartyNotices)' == '' Or !Exists('@(_DotNetThirdPartyNotices)')"
+           Text="The third-party notices of the .NET runtime pack weren't found" />
+  </Target>
+
+  <Target Name="EmbedDotNetThirdPartyNotices" BeforeTargets="AssignTargetPaths"
+          DependsOnTargets="FindDotNetThirdPartyNotices" Condition="'$(SelfContained)' == 'true'">
+    <ItemGroup Condition="'@(_DotNetThirdPartyNotices)' != ''">
+      <EmbeddedResource Include="@(_DotNetThirdPartyNotices)" LogicalName="THIRD-PARTY-NOTICES-DOTNET.txt" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="PublishDotNetThirdPartyNotices" AfterTargets="Publish"
+          DependsOnTargets="FindDotNetThirdPartyNotices" Condition="'$(SelfContained)' == 'true'">
+    <Copy Condition="'@(_DotNetThirdPartyNotices)' != ''" SourceFiles="@(_DotNetThirdPartyNotices)"
+          DestinationFiles="$(PublishDir)THIRD-PARTY-NOTICES-DOTNET.txt" />
+  </Target>
 </Project>

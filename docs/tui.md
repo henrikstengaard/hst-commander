@@ -13,7 +13,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - `FunctionKeyBarView.cs`: the clickable function key bar.
 - `TerminalScreen.cs`: the terminal output screen while the TUI is shut down, also running external editors (F4).
 - `TuiSettings.cs`, `TuiTheme.cs`, `TuiPalette.cs`: settings and the 16-color palette per theme.
-- Dialogs, one file each: `ViewerDialog` (+ `ViewerView`, `ViewerSearchDialog`), `EditorDialog` (+ `EditorTextView`, `EditorSearchDialog`, `GoToLineDialog`), `SettingsDialog`, `CopyDialog`, `CopyProgressDialog`, `DeleteProgressDialog`, `MakeDirectoryDialog`, `CreateVolumeDialog`, `CreateVolumeFieldsDialog`, `SelectGroupDialog`, `PropertiesDialog`, `VolumeProviderDialog`, `LocationDialog`.
+- Dialogs, one file each: `ViewerDialog` (+ `ViewerView`, `ViewerSearchDialog`), `EditorDialog` (+ `EditorTextView`, `EditorSearchDialog`, `GoToLineDialog`), `SettingsDialog`, `CopyDialog`, `CopyProgressDialog`, `DeleteProgressDialog`, `MakeDirectoryDialog`, `CreateVolumeDialog`, `CreateVolumeFieldsDialog`, `SelectGroupDialog`, `PropertiesDialog`, `VolumeProviderDialog`, `LocationDialog`, `VolumeLocationDialog` (the location of a volume provider asking for one, e.g. an SMB path), `CredentialsDialog` (user name and password, the password hidden with `TextField.Secret`), `AboutDialog` (+ `LicenseDialog`, a read-only `TextView` with a license notice).
 
 ## Terminal.Gui
 

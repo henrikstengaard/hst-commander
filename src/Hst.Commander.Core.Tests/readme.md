@@ -1,6 +1,6 @@
 # Hst.Commander.Core.Tests
 
-xUnit unit tests for `Hst.Commander.Core` and the default plugins (Zip, LhaLzx, Disk, Amiga and PhysicalDisk).
+xUnit unit tests for `Hst.Commander.Core` and the default plugins (Zip, LhaLzx, Disk, Amiga and PhysicalDisk) and the external Smb plugin.
 
 ## Running
 
