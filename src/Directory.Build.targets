@@ -17,4 +17,19 @@
     </PropertyGroup>
     <Message Importance="high" Text="$(MSBuildProjectName) version: $(Version)" />
   </Target>
+
+  <!--
+    Self-contained apps include the .NET runtime, so its third-party notices are published next to the app as
+    THIRD-PARTY-NOTICES-DOTNET.txt, copied from the runtime pack used (see THIRD-PARTY-NOTICES.txt). Shown in
+    Help > About > Licenses.
+  -->
+  <Target Name="PublishDotNetThirdPartyNotices" AfterTargets="Publish" Condition="'$(SelfContained)' == 'true'">
+    <ItemGroup>
+      <_DotNetThirdPartyNotices Include="@(ResolvedRuntimePack->'%(PackageDirectory)\THIRD-PARTY-NOTICES.TXT')"
+                                Condition="'%(ResolvedRuntimePack.FrameworkName)' == 'Microsoft.NETCore.App'" />
+    </ItemGroup>
+    <Error Condition="'@(_DotNetThirdPartyNotices)' == '' Or !Exists('@(_DotNetThirdPartyNotices)')"
+           Text="The third-party notices of the .NET runtime pack weren't found" />
+    <Copy SourceFiles="@(_DotNetThirdPartyNotices)" DestinationFiles="$(PublishDir)THIRD-PARTY-NOTICES-DOTNET.txt" />
+  </Target>
 </Project>

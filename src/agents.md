@@ -24,7 +24,7 @@ The behavior of each feature is described in `docs/` at the repository root. Rea
 | [`docs/icons-and-navigation-modes.md`](../docs/icons-and-navigation-modes.md) | Icon providers, GUI entry icons, navigation modes (list, thumbnails, Workbench, def icons) |
 | [`docs/tui.md`](../docs/tui.md) | TUI files, key handling, dialogs, themes, terminal programs |
 | [`docs/gui.md`](../docs/gui.md) | GUI files, key handling, dialogs, themes, icons |
-| [`docs/application.md`](../docs/application.md) | Versioning, release workflows, About, quitting |
+| [`docs/application.md`](../docs/application.md) | Versioning, release workflows, About, licenses and third-party notices, quitting |
 | [`docs/testing.md`](../docs/testing.md) | Test helpers |
 | [`docs/status.md`](../docs/status.md) | What works and what isn't implemented |
 
@@ -38,7 +38,7 @@ The code is the source of truth for constants, key lists and colors; the docs de
 .github/workflows/              build-and-test.yml (every push, Windows/macOS/Linux), build-and-release.yml (manual, packages and drafts a prerelease)
 docs/                           Feature docs (see above)
 src/
-  Hst.Commander.sln             Solution file (10 projects)
+  Hst.Commander.sln             Solution file (11 projects)
   Directory.Build.props         Shared product name, version, authors and copyright
   Directory.Build.targets       Replaces the last version part with the git commit count
   packaging/                    Release packaging scripts (Linux AppImage/.deb, macOS .dmg, Windows Inno Setup)
@@ -49,6 +49,7 @@ src/
   Hst.Commander.Plugins.Disk/   MBR/GPT disk images with FAT/NTFS partitions, hybrid MBR/RDB disks (default plugin)
   Hst.Commander.Plugins.Amiga/  Writable adf and RDB images, .info icons, Workbench navigation mode, Amiga images (default plugin)
   Hst.Commander.Plugins.PhysicalDisk/ Internal and external physical disks on Windows, Linux and macOS (default plugin)
+  Hst.Commander.Plugins.Smb/    Windows file shares and other SMB 2/3 servers (external plugin, released separately: SMBLibrary is LGPL)
   Hst.Commander.Core/           Volume implementations, NavigationContext, copy/move/delete, UAE metadata, viewer, plugin loading
   Hst.Commander.Tui/            Terminal.Gui TUI application
   Hst.Commander.Gui/            Avalonia 12 desktop GUI application
@@ -75,6 +76,9 @@ src/
         |                          [PhysicalDiskPlugin, PhysicalDiskVolumeProvider,
         |                           PhysicalDiskVolume, DiskStream,
         |                           CachedDiskStream]  <- Hst.Commander.Plugins.PhysicalDisk
+        |                          [SmbPlugin, SmbVolumeProvider,
+        |                           SmbServerVolumeProvider, SmbVolume,
+        |                           SmbFileStream]  <- Hst.Commander.Plugins.Smb (external)
         |                                    /    (default plugins, Plugins.All)
 [Volume Implementations]  <- Hst.Commander.Core
   LocalVolumeProvider (VolumeProviders.All),
@@ -99,13 +103,14 @@ All are in `Hst.Commander.Abstractions`; see [`docs/plugin-api.md`](../docs/plug
 |---|---|
 | `IVolume` | A browsable container with a current directory: list, change directory, open/read/write, create container, delete, rename, set dates, Amiga metadata and attributes. Write members throw `NotSupportedException` when read-only |
 | `IEntry` | An entry: `Name`, `Type` (container/item), `Size`, `ModifiedDate`, plus optional `DisplayName`, `Details`, `IsVolume`, `AmigaMetadata`, `Attributes` |
-| `IVolumeProvider` | What a pane can show (Alt+F1/Alt+F2); `CreateVolume` returns a new, independent volume on each call |
+| `IVolumeProvider` | What a pane can show (Alt+F1/Alt+F2); `CreateVolume` returns a new, independent volume on each call; optional `PathRoot` shows paths like `\\server\share\dir` |
+| `ILocationVolumeProvider` | A volume provider asking for a location when chosen (e.g. an SMB path); `Connect` returns a `VolumeConnection` or throws `CredentialsRequiredException` to ask for a user name and password |
 | `IFileVolumeProvider` | Opens files as volumes (images), detected by magic signature with `IsMatch`; `CanWrite` for writable images |
 | `IVolumeCreator` | Creates a new volume file (F9) from input fields |
 | `IIconProvider` | Reads icons from icon files next to entries (e.g. `.info`) |
 | `INavigationMode` | Lays out a directory as icons at positions in the GUI (e.g. Workbench) |
 | `IImageProvider` | Reads the images of a file for the viewer (F3) |
-| `IPlugin` | Returns a plugin's providers, creators and modes; `Initialize(IPluginHost)` |
+| `IPlugin` | Returns a plugin's providers, creators and modes and its `ThirdPartyNotices` (shown in About > Licenses); `Initialize(IPluginHost)` |
 | `IPluginHost` | Lets plugins work together without sharing types (e.g. the Disk plugin opens a PiStorm partition with the Amiga plugin) |
 | `IWriteCache` | A writable image stream caching writes (e.g. physical disks), committed by Hst Commander when the file system is consistent (`Flush` doesn't write it) |
 
@@ -117,6 +122,7 @@ These apply across features and aren't obvious from a single file:
 - **Each `NavigationContext` owns a `NestedVolume`.** Opening an image pushes a volume (wrapped in `EntryVolumeProvider`); going up from its root pops and disposes it.
 - **Background work never uses the pane's volume.** Copy, move, delete, viewing, editing, counting contents and reading icons inside volume entries open an independent volume with `NavigationContext.OpenLocationAsync`, because volumes aren't thread safe.
 - **Writable images are shared.** A file of the root volume with an id (`IVolume.GetWritableImageId`, e.g. a local file or a physical disk) opened by a provider with `CanWrite` is opened once (`SharedImages`) and shared by both panes and file operations through `SharedImageVolume` views serialized by a semaphore; two volumes writing one file would damage its file system. The lock is only held on the thread pool, never by work waiting for a UI thread. A stream caching writes (`IWriteCache`, e.g. `CachedDiskStream` of physical disks) is committed (`IWriteCache.Commit`, not `Flush`) only between operations, when the file system is consistent. Images inside other images are read-only.
+- **Every third-party component the apps include has a notice.** `THIRD-PARTY-NOTICES.txt` lists each package with its license text, made by `src/notices/make-notices.py` (add a section there for a new component, and rerun it after changing packages); `GivenLicenses` fails for a new package that isn't listed. LGPL/GPL libraries go in external plugins (e.g. SMB) with their notices in `IPlugin.ThirdPartyNotices`, never in the apps. See [Licenses](../docs/application.md#licenses).
 - **File operations only use `IVolume`.** `VolumeCopy`, `VolumeMove` and `VolumeDelete` work between any two volumes, so a new volume type gets copy, move and delete for free.
 - **Amiga metadata handling depends on `SupportsAmigaMetadata` of both sides** (copied as is, written as UAE metadata, read from UAE metadata, or both); see [`docs/file-operations.md`](../docs/file-operations.md#uae-metadata).
 - **Marked vs. selected:** in code, "marked" means entries picked with Insert/Space and "selected" means the row under the cursor.
@@ -133,6 +139,7 @@ These apply across features and aren't obvious from a single file:
 ## Not Implemented
 
 - Other file-management operations (e.g. creating a new file with Shift+F4); changing the viewer's encoding and going to an offset; changing the editor's encoding and line breaks.
+- SMB 1, SMB ports other than 445, browsing the network for servers and saving SMB credentials.
 - Writing to images other than Amiga adf and RDB images; ISO images and zip, lha and lzx archives are read-only, as are Amiga images inside other images.
 - Changing RDB, MBR and GPT partitions, other Amiga file systems (e.g. SFS), other PC file systems (exFAT, ext, ...) and vhdx/vmdk images.
 - Unloading or reloading plugins while running, and a list of loaded plugins in the UI.
@@ -160,7 +167,8 @@ These apply across features and aren't obvious from a single file:
 - Disk plugin: `Hst.Commander.Plugins.Disk`
 - Amiga plugin: `Hst.Commander.Plugins.Amiga`
 - Physical disk plugin: `Hst.Commander.Plugins.PhysicalDisk`
-- Core: `Hst.Commander.Core` (`AppInfo`, `EditorDocument`, `EditorKind`, `EditorSearch`, `EditorSession`, `EmbeddedIconReader`, `EnterFileAction`, `ExternalEditFile`, `ExternalEditor`, `Elevation`, `EntryProperties`, `FileSystemDetails`, `IconImage`, `ListingProgress`, `NavigationContext`, `NameFilter`, `PluginHost`, `PluginLoader`, `Plugins`, `IProgressIndicator`, `SelectGroupOptions`, `FileStarter`, `ImagePixels`, `SettingsPaths`, `SizeFormatter`, `StandardImageProvider`, `StartupOptions`, `PaneStartup`, `UaeMetadataFormat`, `ViewerDocument`, `ViewerSession`, `WindowsIconImageProvider`, `VolumeCreation`, `VolumeCreatorInput`), `Hst.Commander.Core.Volumes` (volumes, copying, UAE metadata)
+- SMB plugin: `Hst.Commander.Plugins.Smb`
+- Core: `Hst.Commander.Core` (`AppInfo`, `EditorDocument`, `EditorKind`, `EditorSearch`, `EditorSession`, `EmbeddedIconReader`, `EnterFileAction`, `ExternalEditFile`, `ExternalEditor`, `Elevation`, `EntryProperties`, `FileSystemDetails`, `IconImage`, `ListingProgress`, `NavigationContext`, `NameFilter`, `PluginHost`, `PluginLoader`, `Plugins`, `IProgressIndicator`, `SelectGroupOptions`, `FileStarter`, `ImagePixels`, `SettingsPaths`, `SizeFormatter`, `StandardImageProvider`, `StartupOptions`, `PaneStartup`, `UaeMetadataFormat`, `ViewerDocument`, `ViewerSession`, `WindowsIconImageProvider`, `VolumeConnector`, `CredentialsRequest`, `Licenses`, `LicenseNotice`, `VolumeCreation`, `VolumeCreatorInput`), `Hst.Commander.Core.Volumes` (volumes, copying, UAE metadata)
 - Tui: `Hst.Commander.Tui`
 - Gui: `Hst.Commander.Gui`, `Hst.Commander.Gui.Icons` (entry icons)
 - Tests: `Hst.Commander.Core.Tests`
@@ -178,7 +186,7 @@ These apply across features and aren't obvious from a single file:
 2. **Implement all members**: `Name`, `CurrentPathComponents`, `ListEntries`, `ChangeDirectory`, `OpenEntry`, `OpenRead`, `OpenWrite`, `CreateContainer`, `Delete`, `Rename`, `SetModifiedDate` (throw `NotSupportedException` from the write members when the volume is read-only). Copying and moving to and from the volume then works through `VolumeCopy.CopyToAsync` and `VolumeMove.MoveToAsync`.
 3. **Handle `Paths.Root` and `Paths.Parent`** in `ChangeDirectory` — both are case-insensitive string comparisons.
 4. **Add unit tests** in `Hst.Commander.Core.Tests/` using the `Given<YourVolume>` naming pattern.
-5. **To make it selectable with Alt+F1/Alt+F2**, implement `IVolumeProvider` (see `LocalVolumeProvider`) and add it to `VolumeProviders.All`.
+5. **To make it selectable with Alt+F1/Alt+F2**, implement `IVolumeProvider` (see `LocalVolumeProvider`) and add it to `VolumeProviders.All`. To ask for a location (e.g. a server path) and credentials when chosen, implement `ILocationVolumeProvider` instead (see `SmbVolumeProvider` and [`docs/plugin-api.md`](../docs/plugin-api.md#ilocationvolumeprovider)).
 6. **Or open files as the volume** (images): implement `IFileVolumeProvider` with `IsMatch` checking the file's magic signature (see `Iso9660FileVolumeProvider` and `ZipFileVolumeProvider`) and add it to `VolumeProviders.Files`, or return it from `IPlugin.FileVolumeProviders` of a plugin. `NavigationContext` then opens matching files as images (see [Images](../docs/volumes.md#images)). Return true from `CanWrite` when the volume can write to the file (see [Writable images](../docs/volumes.md#writable-images) and `AdfFileVolumeProvider`).
 
 7. **To create new volumes as files with F9**, implement `IVolumeCreator` (see `AdfVolumeCreator`) with its input fields and return it from `IPlugin.VolumeCreators` with `IPlugin.CanCreateVolumes` true (see [Creating volumes](../docs/file-operations.md#creating-volumes)).
@@ -259,6 +267,7 @@ dotnet test src/Hst.Commander.Core.Tests/Hst.Commander.Core.Tests.csproj --logge
 | `Hst.Amiga` | 0.6.245 | `Hst.Commander.Plugins.Amiga` — Amiga rigid disk block, Fast File System and PFS3 reading and writing, .info icons; `Hst.Commander.Core` — UAE metadata (UAEFSDB and metafiles) |
 | `LTRData.DiscUtils.Vhd` | 1.0.54 | `Hst.Commander.Plugins.Amiga`, `Hst.Commander.Plugins.Disk` — vhd images |
 | `LTRData.DiscUtils.Core`, `.Fat`, `.Ntfs` | 1.0.54 | `Hst.Commander.Plugins.Disk` — MBR/GPT partition tables, FAT and NTFS reading and writing |
+| `SMBLibrary` | 1.5.8.1 | `Hst.Commander.Plugins.Smb` (external plugin, not included with the apps) — SMB 2/3 client (LGPL-3.0-or-later); its version and source commit are also in the plugin's `THIRD-PARTY-NOTICES.txt` and `build-and-release.yml` |
 | `Terminal.Gui` | 2.0.0-prealpha.1895 | `Hst.Commander.Tui` — TUI framework |
 | `Microsoft.Build.Tasks.Git` | 10.0.402 | `Hst.Commander.Tui` — build only (`PrivateAssets="all"`), overrides the vulnerable 8.0.0 (GHSA-23fw-v26w-5fgq) pulled in by Terminal.Gui's `Microsoft.SourceLink.GitHub` 8.0.0 dependency |
 | `Avalonia`, `Avalonia.Desktop`, `Avalonia.Themes.Fluent` | 12.1.4 | `Hst.Commander.Gui` — desktop GUI framework |

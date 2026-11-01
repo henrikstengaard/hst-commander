@@ -28,6 +28,11 @@ jobs:
         shell: pwsh
         run: dotnet restore Hst.Commander.sln
 
+      # the notices are made from the restored packages, so one OS is enough
+      - name: Check third-party notices
+        if: matrix.os == 'ubuntu-latest'
+        run: python3 src/notices/make-notices.py --check
+
       - name: Build
         working-directory: ./src
         shell: pwsh

@@ -118,9 +118,23 @@ public sealed record StartupOptions
 /// <summary>Where a pane starts: a volume provider by name (null for Local) and a location in it (null for its start).</summary>
 public sealed record PaneStartup(string? VolumeProviderName, string? Path)
 {
-    /// <summary>Where a pane is: its volume provider, unless Local, and its current path.</summary>
-    public static PaneStartup From(NavigationContext context) => new(
-        context.VolumeProvider == VolumeProviders.Local ? null : context.VolumeProvider.Name, context.CurrentPath);
+    /// <summary>
+    ///     Where a pane is: its volume provider, unless Local, and its current path. A volume provider connected to a
+    ///     location (e.g. an SMB server) isn't listed and needs the credentials entered, so the pane starts locally.
+    /// </summary>
+    public static PaneStartup From(NavigationContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        if (context.VolumeProvider == VolumeProviders.Local)
+        {
+            return new PaneStartup(null, context.CurrentPath);
+        }
+
+        return VolumeProviders.All.Contains(context.VolumeProvider)
+            ? new PaneStartup(context.VolumeProvider.Name, context.CurrentPath)
+            : new PaneStartup(null, null);
+    }
 
     /// <summary>
     ///     Changes a pane's navigation context to the volume provider and location. A volume provider that doesn't

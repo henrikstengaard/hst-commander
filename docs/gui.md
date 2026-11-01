@@ -14,7 +14,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - `ViewerDialog` with `ViewerControl` and `ViewerSearchDialog`: the viewer.
 - `ThemeManager.cs`, `GuiTheme.cs`, `MidnightCommanderStyles.axaml`, `GuiSettings.cs`: themes and settings.
 - `BackgroundPicker`: the background chooser shared by the icon viewer and the image view.
-- Dialogs, one `.axaml` each: `ErrorDialog`, `SettingsDialog`, `EditorDialog` (+ `EditorSearchDialog`, `GoToLineDialog`, `SaveChangesDialog`), `ExternalEditDialog`, `CopyDialog`, `CopyProgressDialog`, `OverwriteDialog`, `DeleteDialog`, `DeleteProgressDialog`, `QuitDialog`, `ConfirmDialog` (a question with two buttons or a message, e.g. restarting as administrator), `MakeDirectoryDialog`, `CreateVolumeDialog`, `CreateVolumeFieldsDialog`, `SelectGroupDialog`, `PropertiesDialog`, `IconViewerDialog`, `VolumeProviderDialog`, `LocationDialog`, `AboutDialog`.
+- Dialogs, one `.axaml` each: `ErrorDialog`, `SettingsDialog`, `EditorDialog` (+ `EditorSearchDialog`, `GoToLineDialog`, `SaveChangesDialog`), `ExternalEditDialog`, `CopyDialog`, `CopyProgressDialog`, `OverwriteDialog`, `DeleteDialog`, `DeleteProgressDialog`, `QuitDialog`, `ConfirmDialog` (a question with two buttons or a message, e.g. restarting as administrator), `MakeDirectoryDialog`, `CreateVolumeDialog`, `CreateVolumeFieldsDialog`, `SelectGroupDialog`, `PropertiesDialog`, `IconViewerDialog`, `VolumeProviderDialog`, `LocationDialog`, `VolumeLocationDialog` (the location of a volume provider asking for one, e.g. an SMB path), `CredentialsDialog` (user name and password, the password hidden with `PasswordChar`), `AboutDialog` (+ `LicenseDialog`, a read-only text box with a license notice).
 
 ## Avalonia
 

@@ -361,7 +361,30 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (volumeProvider is ILocationVolumeProvider locationVolumeProvider)
+        {
+            await ConnectAsync(pane, locationVolumeProvider);
+            return;
+        }
+
         await pane.ChangeVolumeProviderAsync(volumeProvider);
+    }
+
+    /// <summary>
+    ///     Asks for the location of a volume provider needing one (e.g. an SMB path) and shows it in a pane, asking for
+    ///     a user name and password when the location needs them. The pane is unchanged when a dialog is cancelled.
+    /// </summary>
+    private async Task ConnectAsync(PaneView pane, ILocationVolumeProvider volumeProvider)
+    {
+        var location = await new VolumeLocationDialog(volumeProvider, VolumeConnector.GetLastLocation(volumeProvider))
+            .ShowDialog<string?>(this);
+        if (location == null)
+        {
+            return;
+        }
+
+        await pane.ConnectAsync(volumeProvider, location,
+            request => new CredentialsDialog(request).ShowDialog<VolumeCredentials?>(this));
     }
 
     /// <summary>

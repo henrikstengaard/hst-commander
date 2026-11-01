@@ -26,7 +26,13 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 
 - What a pane can show (the volume provider list). Each `CreateVolume` call must return a volume of its own, because file operations open a second one on a background thread. Volumes implementing `IDisposable` are disposed when no longer used.
 - `RequiresAdministrator` (optional, default false): the volumes need administrator rights (root on Linux and macOS), e.g. physical disks; choosing the provider when not elevated offers to restart Hst Commander as administrator, see [Running as administrator](application.md#running-as-administrator).
+- `PathRoot` (optional, default null): the root of the paths shown for the volumes, e.g. `\\server`, so `CurrentPath` is `\\server\share\dir` instead of `share\dir`, and a location entered starting with it is changed to in the volumes.
 - `VolumeProviders.All` is the built-in `Local` provider followed by the plugins' providers.
+
+### ILocationVolumeProvider
+
+- An `IVolumeProvider` asking for a location when chosen, e.g. an SMB path. The front-ends show a dialog with `LocationLabel` and `LocationExample`, then `VolumeConnector.ConnectAsync` calls `Connect(location, credentials)`, first with null credentials. Throwing `CredentialsRequiredException` (an `IOException`) asks the user for a user name and password (`VolumeCredentials`, whose `ToString` hides the password) and calls it again; other `IOException`s are shown as errors.
+- `Connect` returns a `VolumeConnection(VolumeProvider, PathComponents)`: a volume provider bound to the location and credentials (its `CreateVolume` gives a new volume with a connection of its own each time, like any provider) and the path components the pane starts in. `NavigationContext.ChangeVolumeProviderAsync(connection)` changes to them before showing the volume, so a failure leaves the pane unchanged. The `CreateVolume` of the location provider itself isn't used and may throw `IOException`.
 
 ### IFileVolumeProvider
 
@@ -61,6 +67,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 
 - Returns the plugin's volume providers, file volume providers, volume creators (with `CanCreateVolumes`), icon providers, navigation modes and image providers. `Initialize(host)` is called once before the plugin is used.
 - A plugin references only Abstractions. Plugins can't use each other's types, because each loads in its own load context, so they work together through `IPluginHost`.
+- `ThirdPartyNotices` (optional, default null): the copyright notices and licenses of the third-party components the plugin uses, shown in Help > About > Licenses while it's loaded, e.g. the SMB plugin returns SMBLibrary's notice with the LGPL and GPL texts (an embedded resource). A plugin throwing from it is left out of the list.
 
 ### IWriteCache
 
@@ -81,4 +88,4 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - `PluginLoader.Directories` are `~/.hst-commander/plugins` and then `plugins` next to the executable; missing directories are skipped and a directory listed twice is scanned once.
 - In each directory, `Name/Name.dll` (the recommended layout, with its dependencies) is loaded first, then single `*.dll` files, ordered by path. Public non-abstract `IPlugin` classes with a parameterless constructor are created. Assemblies without plugins are skipped (a `BadImageFormatException` is ignored for single assemblies but reported for `Name/Name.dll`), as are plugin types already loaded, e.g. a copy of a built-in plugin.
 - Each plugin assembly gets its own `PluginLoadContext`, sharing Abstractions with the default context (so `IPlugin` is the same type; a plugin's own copy is ignored) and resolving other dependencies with its `.deps.json` or from its directory. This works in the single-file published apps. Plugins can't be unloaded and their assemblies stay locked while Hst Commander runs.
-- To build an external plugin, reference Abstractions with `<Private>false</Private>` and `<ExcludeAssets>runtime</ExcludeAssets>` and copy the output to `~/.hst-commander/plugins/<Name>/`.
+- To build an external plugin, reference Abstractions with `<Private>false</Private>` and `<ExcludeAssets>runtime</ExcludeAssets>` and copy the output to `~/.hst-commander/plugins/<Name>/`. `Hst.Commander.Plugins.Smb` is an example: it sets `EnableDynamicLoading`, so `dotnet publish` puts its dependencies (`SMBLibrary.dll`) and deps file next to it.

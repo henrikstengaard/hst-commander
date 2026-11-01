@@ -10,6 +10,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - Reading and writing MBR and GPT disk images (raw or vhd) with FAT and NTFS partitions, PiStorm RDB partitions (MBR type `0x76`, GPT type `3F82EEBC-87C9-4097-8165-89D6540557C0`) and hybrid MBR/RDB disks with the default Disk plugin, working with the Amiga plugin through `IPluginHost`.
 - Reading and writing Amiga disk files (adf, Fast File System) and the partitions (Fast File System, PFS3) of Amiga hard disk images with a rigid disk block (raw or vhd) with the default Amiga plugin, shared between panes and file operations (see [Writable images](volumes.md#writable-images)).
 - Reading and writing physical disks (internal and external, e.g. USB) with the default PhysicalDisk plugin on Windows (as administrator), Linux and macOS (as root): listed with their model in the `Physical disks` volume provider and opened like MBR, GPT and RDB disk images, shared between panes and file operations; read-only while the OS uses a volume on the disk; system disks are listed but not accessible; read and written through a block cache (32 MB per disk by default, set in the plugin's settings file) whose writes are written between file operations.
+- Browsing, reading and writing Windows file shares and other SMB 2/3 servers with the external Smb plugin (installed separately from the release's `smb-plugin.zip`): the `SMB` volume provider asks for an SMB path (`\\server\share` or `smb://server/share`, `\` or `/`) and for a user name and password when the server or share needs them.
 - Starting/executing local files with Enter or double-click, with executables drawn in green.
 - GUI entry icons: Amiga .info icons (the default Amiga plugin's icon provider) for the .info file and the entry it belongs to, icons contained in programs and .ico files (also inside images), otherwise the host OS icons for file types, folders and drives.
 - The volume abstraction layer and implementations: `LocalVolume`, `Iso9660Volume`, `ZipVolume`, `LhaVolume`, `LzxVolume`, `NestedVolume`, `EntryVolumeProvider`, and `NullVolume`.
@@ -18,9 +19,9 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - Going to the root of the volume with Ctrl+\ in both front-ends.
 - Quitting with F10, Ctrl+Q or File > Quit (and Esc in the TUI) after a confirm dialog in both front-ends.
 - Changing location with Ctrl+L or by double-clicking the path (location dialog), including paths into images.
-- Build versioning from the git commit count and a Help > About menu item in both front-ends.
+- Build versioning from the git commit count and a Help > About menu item in both front-ends, with a Licenses section showing the notices of Hst Commander, its third-party components and the loaded plugins, also installed next to the apps.
 - Running as administrator or root shown in the menu bar of both front-ends; choosing the physical disks when not elevated offers to restart as administrator (UAC on Windows, sudo in the TUI's terminal on Linux and macOS, pkexec in the GUI on Linux) with the panes where they were.
-- Choosing the volume provider of the left/right pane with Alt+F1/Alt+F2 or Shift+F1/Shift+F2 (configurable, see [Volume provider keys](volumes.md#volume-provider-keys)) or File > Left/Right volume from `VolumeProviders.All`: the built-in Local volume provider and the PhysicalDisk plugin's `Physical disks`.
+- Choosing the volume provider of the left/right pane with Alt+F1/Alt+F2 or Shift+F1/Shift+F2 (configurable, see [Volume provider keys](volumes.md#volume-provider-keys)) or File > Left/Right volume from `VolumeProviders.All`: the built-in Local volume provider, the PhysicalDisk plugin's `Physical disks` and, when installed, the Smb plugin's `SMB`.
 - Copying (F5) between panes and volumes, with a confirm dialog (destination, filter) and a progress dialog.
 - Keeping Amiga names, protection bits and comments when copying or moving between Amiga volumes (and from lha/lzx archives), and storing/reading them as UAE metadata (UAEFSDB or FS-UAE metafiles, chosen in the settings) when copying between Amiga volumes and other volumes, shown in the properties dialog.
 - Moving (F6) between panes and volumes, with the same confirm and progress dialogs as copying; a single entry moved to a plain name is renamed.
@@ -42,5 +43,6 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - Writing an image file to a physical disk (the physical disk list is read-only).
 - Changing RDB, MBR and GPT partitions, other Amiga file systems (e.g. SFS), other PC file systems (exFAT, ext, ...) and vhdx/vmdk images.
 - Unloading or reloading plugins while running, and a list of loaded plugins in the UI.
+- SMB 1 servers, SMB ports other than 445, browsing the servers of the network, remembering SMB credentials, and writable images on SMB shares (they open read-only).
 
 

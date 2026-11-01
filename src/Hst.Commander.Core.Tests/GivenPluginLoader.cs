@@ -1,4 +1,7 @@
+﻿using System.Reflection;
+using System.Runtime.Loader;
 using Hst.Commander.Abstractions;
+using Hst.Commander.Plugins.Smb;
 using Hst.Commander.Plugins.Zip;
 
 namespace Hst.Commander.Core.Tests;
@@ -149,4 +152,43 @@ public class GivenPluginLoader
         ], PluginLoader.Directories);
         Assert.IsAssignableFrom<IPlugin>(Plugins.BuiltIn[0]);
     }
+    [Fact]
+    public void When_SmbPluginIsInstalledWithSmbLibrary_Then_ItIsLoadedWithItsNotices()
+    {
+        // arrange - installed like the release: the plugin and SMBLibrary.dll in a directory of their own
+        var pluginsPath = CreateTempDirectory();
+        var pluginPath = Path.Combine(pluginsPath, "Hst.Commander.Plugins.Smb");
+        Directory.CreateDirectory(pluginPath);
+        File.Copy(typeof(SmbPlugin).Assembly.Location, Path.Combine(pluginPath, "Hst.Commander.Plugins.Smb.dll"));
+        File.Copy(typeof(SMBLibrary.NTStatus).Assembly.Location, Path.Combine(pluginPath, "SMBLibrary.dll"));
+        try
+        {
+            // act
+            var result = PluginLoader.Load([pluginsPath], []);
+
+            // assert - SMBLibrary is resolved from the plugin's directory in its load context
+            Assert.Empty(result.Errors);
+            var plugin = Assert.Single(result.Plugins);
+            Assert.NotSame(typeof(SmbPlugin), plugin.GetType());
+            var volumeProvider = Assert.IsAssignableFrom<ILocationVolumeProvider>(Assert.Single(plugin.VolumeProviders));
+            Assert.Equal("SMB", volumeProvider.Name);
+            // the notices name the version of SMBLibrary included, updated with the package
+            var smbLibraryVersion = typeof(SMBLibrary.NTStatus).Assembly.GetName().Version!.ToString();
+            Assert.Contains($"SMBLibrary {smbLibraryVersion}", plugin.ThirdPartyNotices);
+            Assert.Contains($"SMBLibrary-source-{smbLibraryVersion}.zip", plugin.ThirdPartyNotices);
+            Assert.Contains("GNU LESSER GENERAL PUBLIC LICENSE", plugin.ThirdPartyNotices);
+            Assert.Contains("GNU GENERAL PUBLIC LICENSE", plugin.ThirdPartyNotices);
+            var loadContext = AssemblyLoadContext.GetLoadContext(plugin.GetType().Assembly)!;
+            var smbLibrary = loadContext.LoadFromAssemblyName(new AssemblyName("SMBLibrary"));
+            Assert.Equal(Path.Combine(pluginPath, "SMBLibrary.dll"), smbLibrary.Location);
+        }
+        finally
+        {
+            DeleteDirectory(pluginsPath);
+        }
+    }
+
+    [Fact]
+    public void When_ListingBuiltInPlugins_Then_SmbPluginIsNotIncluded() =>
+        Assert.DoesNotContain(Plugins.BuiltIn, plugin => plugin.Name == "Smb");
 }

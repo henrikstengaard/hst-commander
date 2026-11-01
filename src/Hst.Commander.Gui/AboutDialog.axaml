@@ -1,16 +1,29 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:core="using:Hst.Commander.Core"
         x:Class="Hst.Commander.Gui.AboutDialog"
         Title="About"
-        SizeToContent="WidthAndHeight"
-        MinWidth="300" MaxWidth="600"
+        Width="460"
+        SizeToContent="Height"
         CanResize="False"
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner">
     <StackPanel Margin="16" Spacing="8">
         <TextBlock x:Name="NameAndVersionText" FontWeight="Bold" FontSize="16" />
         <TextBlock x:Name="AuthorText" TextWrapping="Wrap" />
-        <Button x:Name="OkButton" Content="OK" HorizontalAlignment="Center" MinWidth="80" Margin="0,8,0,0"
-                HorizontalContentAlignment="Center" IsDefault="True" IsCancel="True" />
+        <TextBlock Text="Licenses" FontWeight="Bold" Margin="0,8,0,0" />
+        <TextBlock x:Name="LicensesSummaryText" TextWrapping="Wrap" />
+        <ListBox x:Name="LicensesList" Height="150">
+            <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="core:LicenseNotice">
+                    <TextBlock Text="{Binding Title}" />
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,8,0,0">
+            <Button x:Name="ViewLicenseButton" Content="_View license" MinWidth="80" HorizontalContentAlignment="Center" />
+            <Button x:Name="OkButton" Content="OK" MinWidth="80" HorizontalContentAlignment="Center"
+                    IsDefault="True" IsCancel="True" />
+        </StackPanel>
     </StackPanel>
 </Window>
