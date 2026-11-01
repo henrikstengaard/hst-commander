@@ -1,3 +1,4 @@
+using System.Reflection;
 using Hst.Commander.Abstractions;
 
 namespace Hst.Commander.Core;
@@ -36,15 +37,18 @@ public static class Licenses
     /// </summary>
     /// <param name="plugins">Loaded plugins, defaults to <see cref="Plugins.All" />.</param>
     /// <param name="appDirectory">Directory of the app with the .NET notices, defaults to the app's base directory.</param>
+    /// <param name="appAssembly">
+    ///     Assembly of the app with the .NET notices embedded (self-contained apps), defaults to the entry assembly.
+    /// </param>
     public static IReadOnlyList<LicenseNotice> GetNotices(IEnumerable<IPlugin>? plugins = null,
-        string? appDirectory = null)
+        string? appDirectory = null, Assembly? appAssembly = null)
     {
         List<LicenseNotice> notices =
         [
             new("Hst Commander (MIT license)", ReadResource("LICENSE.txt")),
             new("Third-party components", ReadResource("THIRD-PARTY-NOTICES.txt")),
             new("Skia and HarfBuzz native libraries", ReadResource("THIRD-PARTY-NOTICES-SKIASHARP.txt")),
-            new(".NET runtime", ReadDotNetNotices(appDirectory ?? AppContext.BaseDirectory))
+            new(".NET runtime", ReadDotNetNotices(appAssembly ?? Assembly.GetEntryAssembly(), appDirectory ?? AppContext.BaseDirectory))
         ];
         foreach (var plugin in plugins ?? Plugins.All)
         {
@@ -68,8 +72,14 @@ public static class Licenses
         return notices;
     }
 
-    private static string ReadDotNetNotices(string appDirectory)
+    private static string ReadDotNetNotices(Assembly? appAssembly, string appDirectory)
     {
+        // embedded in self-contained apps by Directory.Build.targets, so they're shown without the file
+        if (ReadResource(appAssembly, DotNetNoticesFileName) is { } embedded)
+        {
+            return embedded;
+        }
+
         var path = Path.Combine(appDirectory, DotNetNoticesFileName);
         try
         {
@@ -88,10 +98,18 @@ public static class Licenses
                "and in the installation of .NET.";
     }
 
-    private static string ReadResource(string name)
+    private static string ReadResource(string name) =>
+        ReadResource(typeof(Licenses).Assembly, name) ??
+        throw new InvalidOperationException($"Resource '{name}' not found");
+
+    private static string? ReadResource(Assembly? assembly, string name)
     {
-        using var stream = typeof(Licenses).Assembly.GetManifestResourceStream(name) ??
-                           throw new InvalidOperationException($"Resource '{name}' not found");
+        using var stream = assembly?.GetManifestResourceStream(name);
+        if (stream == null)
+        {
+            return null;
+        }
+
         using var reader = new StreamReader(stream);
         return reader.ReadToEnd();
     }

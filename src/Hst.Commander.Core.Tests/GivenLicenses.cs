@@ -81,6 +81,27 @@ public class GivenLicenses
     }
 
     [Fact]
+    public void When_DotNetNoticesAreEmbeddedInApp_Then_TheyAreReturnedInsteadOfTheFile()
+    {
+        // arrange - the test assembly embeds notices like a self-contained app
+        var appDirectory = CreateTempDirectory();
+        File.WriteAllText(Path.Combine(appDirectory, Licenses.DotNetNoticesFileName), ".NET runtime notices file");
+        try
+        {
+            // act
+            var notices = Licenses.GetNotices([], appDirectory, typeof(GivenLicenses).Assembly);
+
+            // assert
+            Assert.Equal("Embedded .NET runtime notices",
+                notices.Single(notice => notice.Title == ".NET runtime").Text.Trim());
+        }
+        finally
+        {
+            Directory.Delete(appDirectory, true);
+        }
+    }
+
+    [Fact]
     public void When_NoticesAreEmbedded_Then_TheyAreTheFilesOfTheRepository()
     {
         // act
