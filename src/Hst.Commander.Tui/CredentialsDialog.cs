@@ -17,14 +17,16 @@ public sealed class CredentialsDialog : Dialog
     {
         Title = "Enter credentials";
         Width = Dim.Percent(60);
-        Height = 13;
+        Height = 14;
         ColorScheme = palette.DialogColorScheme;
 
-        var messageLabel = new Label { X = 1, Y = 1, Width = Dim.Fill(1), Height = 2, Text = request.Message };
-        var userNameLabel = new Label { X = 1, Y = 3, Text = "User name:" };
-        _userNameField = new TextField { X = 1, Y = 4, Width = Dim.Fill(1), Text = request.UserName };
-        var passwordLabel = new Label { X = 1, Y = 6, Text = "Password:" };
-        _passwordField = new TextField { X = 1, Y = 7, Width = Dim.Fill(1), Secret = true };
+        // up to 3 lines, e.g. why a bookmark's stored password wasn't used
+        var messageLabel = new Label { X = 1, Y = 1, Width = Dim.Fill(1), Height = 3, Text = request.Message };
+        messageLabel.TextFormatter.WordWrap = true;
+        var userNameLabel = new Label { X = 1, Y = 4, Text = "User name:" };
+        _userNameField = new TextField { X = 1, Y = 5, Width = Dim.Fill(1), Text = request.UserName };
+        var passwordLabel = new Label { X = 1, Y = 7, Text = "Password:" };
+        _passwordField = new TextField { X = 1, Y = 8, Width = Dim.Fill(1), Secret = true };
 
         var okButton = new Button { Text = "OK", IsDefault = true };
         okButton.Accepting += (_, e) =>

@@ -231,6 +231,45 @@ public class GivenNavigationContextBookmarks : IDisposable
         Assert.Equal(bookmark.Path, context.CurrentPath);
     }
 
+    [Theory]
+    [InlineData(true, "couldn't be read from Test store")]
+    [InlineData(false, "wasn't found in Test store")]
+    public async Task When_StoredPasswordCantBeRead_Then_CredentialsDialogSaysWhy(bool failLoad, string reason)
+    {
+        // arrange
+        _server.Credentials = _credentials;
+        var bookmark = new Bookmark("1", "share", "SMB", @"\server\share", Join(SmbPath.GetPathRoot("server"),
+            "share", "dir1"), @"DOMAIN\user", false);
+        _store.Add(bookmark);
+        _store.StorePassword(bookmark, "secret");
+        bookmark = Assert.Single(_store.Load());
+        _credentialStore.FailLoad = failLoad;
+        if (!failLoad)
+        {
+            _credentialStore.Passwords.Clear();
+        }
+
+        using var context = CreateContext(_rootPath);
+        var requests = new List<CredentialsRequest>();
+
+        // act: a wrong password is asked for again with the server's reason
+        var opened = await OpenAsync(context, bookmark, request =>
+        {
+            requests.Add(request);
+            return Task.FromResult<VolumeCredentials?>(requests.Count == 1
+                ? new VolumeCredentials(@"DOMAIN\user", "wrong")
+                : _credentials);
+        });
+
+        // assert
+        Assert.True(opened);
+        Assert.Equal(2, requests.Count);
+        Assert.Contains(reason, requests[0].Message);
+        Assert.Equal(@"DOMAIN\user", requests[0].UserName);
+        Assert.DoesNotContain("Test store", requests[1].Message);
+        Assert.Equal(bookmark.Path, context.CurrentPath);
+    }
+
     [Fact]
     public async Task When_LeavingConnectedVolumeProvider_Then_ConnectedLocationIsCleared()
     {

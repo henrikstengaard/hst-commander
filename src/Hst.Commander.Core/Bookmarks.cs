@@ -136,8 +136,9 @@ public sealed class BookmarkStore(string filePath, ICredentialStore credentialSt
     }
 
     /// <summary>
-    ///     Credentials of a bookmark with a stored password, null when it has none or the credential store can't read
-    ///     it (the user is then asked for them).
+    ///     Credentials of a bookmark with a stored password, null when it has none or there is no credential store (the
+    ///     user is then asked for them). Throws <see cref="IOException" /> with a message for the credentials dialog
+    ///     when the stored password can't be read, e.g. from a locked keyring, or is missing from the store.
     /// </summary>
     public VolumeCredentials? GetCredentials(Bookmark bookmark)
     {
@@ -148,14 +149,23 @@ public sealed class BookmarkStore(string filePath, ICredentialStore credentialSt
             return null;
         }
 
+        string? password;
         try
         {
-            return credentialStore.Load(bookmark.Id) is { } password ? new VolumeCredentials(userName, password) : null;
+            password = credentialStore.Load(bookmark.Id);
         }
-        catch (IOException)
+        catch (IOException exception)
         {
-            return null;
+            // the store's own error (e.g. a traceback from secret-tool) means little to the user
+            throw new IOException(
+                $"The stored password couldn't be read from {credentialStore.Name}, which may be locked. " +
+                "Enter it to connect.", exception);
         }
+
+        return password != null
+            ? new VolumeCredentials(userName, password)
+            : throw new IOException(
+                $"The stored password wasn't found in {credentialStore.Name}. Enter it to connect.");
     }
 
     /// <summary>Question asked when bookmarking a location connected to with a user name and password.</summary>
@@ -237,7 +247,8 @@ public static class BookmarkOpener
 
     /// <summary>
     ///     Opens a bookmark in a pane's navigation context. The location is unchanged when it can't be opened, throwing
-    ///     <see cref="IOException" />, or when the credentials dialog is cancelled, returning false.
+    ///     <see cref="IOException" />, or when the credentials dialog is cancelled, returning false. When a stored
+    ///     password can't be read (see <see cref="BookmarkStore.GetCredentials" />), the credentials dialog says so.
     /// </summary>
     /// <param name="context">Navigation context of the pane.</param>
     /// <param name="bookmark">Bookmark to open.</param>
@@ -262,9 +273,32 @@ public static class BookmarkOpener
             return true;
         }
 
+        VolumeCredentials? credentials = null;
+        string? readFailure = null;
+        try
+        {
+            credentials = store.GetCredentials(bookmark);
+        }
+        catch (IOException exception)
+        {
+            readFailure = exception.Message;
+        }
+
+        // the first time credentials are asked for, the dialog says why the stored password wasn't used
+        var ask = askCredentials;
+        if (readFailure != null)
+        {
+            var explained = false;
+            ask = request =>
+            {
+                var first = !explained;
+                explained = true;
+                return askCredentials(first ? request with { Message = readFailure } : request);
+            };
+        }
+
         var connection = await VolumeConnector.ConnectAsync(locationVolumeProvider,
-            bookmark.Location ?? bookmark.Path, askCredentials, show, hide, store.GetCredentials(bookmark),
-            bookmark.UserName, cancellationToken);
+            bookmark.Location ?? bookmark.Path, ask, show, hide, credentials, bookmark.UserName, cancellationToken);
         if (connection == null)
         {
             return false;

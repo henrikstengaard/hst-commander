@@ -141,7 +141,7 @@ Ctrl+B or File > Add bookmark bookmarks the location of the active pane with a d
   - Windows: Windows Credential Manager (`CredWriteW`/`CredReadW`/`CredDeleteW`), generic credentials named `Hst Commander/bookmark/<id>`, encrypted by Windows for the user.
   - macOS: the user's Keychain (Security framework), generic passwords of the service `Hst Commander` with the bookmark id as account.
   - Linux: the Secret Service (e.g. GNOME Keyring, KWallet) through `secret-tool` with the attributes `application hst-commander bookmark <id>`; the password is passed on standard input, never on the command line. The store is available when `secret-tool` is installed and a Secret Service answers a lookup matching nothing (so it never asks to unlock a keyring) within 3 seconds, checked once when first needed; without a desktop (e.g. Raspberry Pi OS Lite) there is often no keyring or session bus, and `secret-tool` fails or waits (see [Headless Linux](#headless-linux-eg-raspberry-pi-os-lite)). Without a store Hst Commander says the password can't be stored securely, and the bookmark asks for it when opened.
-- Opening a bookmark connects with the stored password; when there is none or it's rejected, the credentials dialog asks with the user name filled in. Deleting a bookmark deletes its password. A store failing (e.g. a locked keyring) is shown as an error and the bookmark is kept without the password.
+- Opening a bookmark connects with the stored password; when there is none or it's rejected, the credentials dialog asks with the user name filled in. When the stored password can't be read (e.g. a locked keyring) or is missing from the store, the credentials dialog says so instead of the server's reason (`BookmarkStore.GetCredentials` throws a message for it, without the store's own error, which for `secret-tool` can be a Python traceback). Deleting a bookmark deletes its password. A store failing when storing the password (e.g. a locked keyring) is shown as an error and the bookmark is kept without the password.
 
 ### Headless Linux (e.g. Raspberry Pi OS Lite)
 
@@ -197,7 +197,7 @@ Without a desktop there is no keyring, so `secret-tool` fails and bookmarks can'
    pass show unlock > /dev/null
    ```
 
-   pass-secret-service is started by the session bus without a terminal, so gpg-agent can't ask for the passphrase when it decrypts a password. With a locked key, `secret-tool lookup` fails (`'NoneType' object has no attribute 'encode'`, as pass-secret-service gets no password from pass), and a bookmark asks for its password instead. Storing a password and checking whether the store is available work with a locked key, as they don't decrypt anything.
+   pass-secret-service is started by the session bus without a terminal, so gpg-agent can't ask for the passphrase when it decrypts a password. With a locked key, `secret-tool lookup` fails (`'NoneType' object has no attribute 'encode'`, as pass-secret-service gets no password from pass), and a bookmark's credentials dialog says the stored password couldn't be read from the Secret Service keyring and asks for it. Storing a password and checking whether the store is available work with a locked key, as they don't decrypt anything.
 
 6. Check that the Secret Service works:
 
