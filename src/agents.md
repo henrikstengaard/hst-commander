@@ -244,6 +244,7 @@ dotnet run --project src/Hst.Commander.Gui/Hst.Commander.Gui.csproj
 
 # Run the TUI app
 dotnet run --project src/Hst.Commander.Tui/Hst.Commander.Tui.csproj
+# (local builds of both apps include the external SMB plugin; publishing leaves it out)
 
 # Run unit tests
 dotnet test src/Hst.Commander.Core.Tests/Hst.Commander.Core.Tests.csproj

@@ -12,7 +12,9 @@ It is an **external plugin**, not included with Hst Commander: SMBLibrary is lic
 
 The zip also holds `SMBLibrary-source-<version>.zip`, the source code of the SMBLibrary version included.
 
-To build and install it from the source:
+Local builds of Hst Commander (`dotnet build` and `dotnet run` of the TUI or GUI) include the plugin: it's built and copied to `plugins/Hst.Commander.Plugins.Smb/` next to the app (`CopySmbPlugin` in `src/Directory.Build.targets`, turned on by `IncludeSmbPlugin` in the app projects). Publishing the apps (`dotnet publish`, as the release workflow does) leaves it out.
+
+To build and install it from the source for an installed Hst Commander:
 
 ```shell
 dotnet publish src/Hst.Commander.Plugins.Smb/Hst.Commander.Plugins.Smb.csproj -c Release -o ~/.hst-commander/plugins/Hst.Commander.Plugins.Smb
