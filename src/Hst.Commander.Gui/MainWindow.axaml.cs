@@ -77,6 +77,7 @@ public partial class MainWindow : Window
         LeftVolumeMenuItem.Click += async (_, _) => await ChooseVolumeProviderAsync(LeftPane);
         RightVolumeMenuItem.Click += async (_, _) => await ChooseVolumeProviderAsync(RightPane);
         LocationMenuItem.Click += async (_, _) => await ShowLocationAsync(_activePane);
+        AddBookmarkMenuItem.Click += async (_, _) => await AddBookmarkAsync(_activePane);
         LeftPane.PathDoubleClicked += async (_, _) => await ShowLocationAsync(LeftPane);
         RightPane.PathDoubleClicked += async (_, _) => await ShowLocationAsync(RightPane);
         SettingsMenuItem.Click += async (_, _) => await ShowSettingsAsync();
@@ -237,6 +238,10 @@ public partial class MainWindow : Window
                 e.Handled = true;
                 await ShowLocationAsync(_activePane);
                 break;
+            case Key.B when e.KeyModifiers == KeyModifiers.Control:
+                e.Handled = true;
+                await AddBookmarkAsync(_activePane);
+                break;
             case Key.F3:
                 e.Handled = true;
                 await ViewAsync(_activePane);
@@ -340,13 +345,107 @@ public partial class MainWindow : Window
     /// </summary>
     private async Task ChooseVolumeProviderAsync(PaneView pane)
     {
-        var volumeProvider = await ChooseVolumeProviderAsync(this, pane);
-        if (volumeProvider != null)
+        var volumeChoice = await ChooseVolumeProviderAsync(this, pane);
+        if (volumeChoice != null)
         {
-            await ChangeVolumeProviderAsync(pane, volumeProvider);
+            await ChangeVolumeProviderAsync(pane, volumeChoice);
         }
 
         pane.FocusEntries();
+    }
+
+    /// <summary>Shows a volume provider or opens a bookmark chosen in the volume provider list.</summary>
+    private Task ChangeVolumeProviderAsync(PaneView pane, VolumeChoice volumeChoice) =>
+        volumeChoice.Bookmark is { } bookmark
+            ? OpenBookmarkAsync(pane, bookmark)
+            : ChangeVolumeProviderAsync(pane, volumeChoice.VolumeProvider!);
+
+    /// <summary>
+    ///     Opens a bookmark in a pane, connecting with the stored credentials and asking for them when needed. A volume
+    ///     provider needing administrator rights offers to restart Hst Commander as administrator first, with the pane
+    ///     at the bookmark.
+    /// </summary>
+    private async Task OpenBookmarkAsync(PaneView pane, Bookmark bookmark)
+    {
+        IVolumeProvider volumeProvider;
+        try
+        {
+            volumeProvider = BookmarkOpener.GetVolumeProvider(bookmark);
+        }
+        catch (IOException exception)
+        {
+            await ShowErrorAsync(exception);
+            return;
+        }
+
+        if (Elevation.NeedsRestart(volumeProvider) &&
+            await RestartAsAdministratorAsync(pane, volumeProvider, bookmark.Path))
+        {
+            return;
+        }
+
+        await pane.OpenBookmarkAsync(bookmark,
+            request => new CredentialsDialog(request).ShowDialog<VolumeCredentials?>(this));
+    }
+
+    /// <summary>
+    ///     Bookmarks the location of a pane with the description entered (Ctrl+B). When the location was connected to
+    ///     with a user name and password (e.g. SMB), asks whether to store them in the credential store of the
+    ///     operating system, or says they can't be stored when there is none. The pane gets the focus.
+    /// </summary>
+    private async Task AddBookmarkAsync(PaneView pane)
+    {
+        var context = pane.NavigationContext;
+        var description = await new BookmarkDialog("Add bookmark", context.CurrentPath,
+            context.GetDefaultBookmarkDescription()).ShowDialog<string?>(this);
+        if (description != null)
+        {
+            await AddBookmarkAsync(context, description);
+        }
+
+        pane.FocusEntries();
+    }
+
+    private async Task AddBookmarkAsync(NavigationContext context, string description)
+    {
+        var store = BookmarkStore.Default;
+        var bookmark = context.CreateBookmark(description);
+        try
+        {
+            store.Add(bookmark);
+        }
+        catch (IOException exception)
+        {
+            await ShowErrorAsync(exception);
+            return;
+        }
+
+        if (bookmark.UserName == null || context.ConnectedLocation?.Credentials is not { } credentials)
+        {
+            return;
+        }
+
+        if (!store.CredentialStore.IsAvailable)
+        {
+            await new ConfirmDialog("Bookmark", BookmarkStore.GetUnavailableMessage(), "_OK", null)
+                .ShowDialog<bool?>(this);
+            return;
+        }
+
+        if (await new ConfirmDialog("Bookmark", store.GetStorePasswordQuestion(bookmark), "_Yes", "_No")
+                .ShowDialog<bool?>(this) != true)
+        {
+            return;
+        }
+
+        try
+        {
+            store.StorePassword(bookmark, credentials.Password);
+        }
+        catch (IOException exception)
+        {
+            await ShowErrorAsync(exception);
+        }
     }
 
     /// <summary>
@@ -393,7 +492,8 @@ public partial class MainWindow : Window
     ///     started, e.g. declined, the password dialog cancelled, or on macOS and Linux without pkexec, where the GUI
     ///     can't restart itself as root and says so.
     /// </summary>
-    private async Task<bool> RestartAsAdministratorAsync(PaneView pane, IVolumeProvider volumeProvider)
+    private async Task<bool> RestartAsAdministratorAsync(PaneView pane, IVolumeProvider volumeProvider,
+        string? path = null)
     {
         if (!Elevation.CanStartAsAdministrator)
         {
@@ -410,7 +510,7 @@ public partial class MainWindow : Window
 
         var isRight = pane == RightPane;
         var options = StartupOptions.FromPanes(LeftPane.NavigationContext, RightPane.NavigationContext, isRight,
-            isRight, volumeProvider);
+            isRight, volumeProvider, path);
         try
         {
             if (!await Elevation.StartAsAdministratorAsync(options))
@@ -429,10 +529,13 @@ public partial class MainWindow : Window
         return true;
     }
 
-    /// <summary>Shows the volume provider list over a pane, owned by a window, returning the chosen one or null.</summary>
-    private Task<IVolumeProvider?> ChooseVolumeProviderAsync(Window owner, PaneView pane) =>
-        new VolumeProviderDialog(pane == LeftPane ? "Left" : "Right", VolumeProviders.All,
-            pane.NavigationContext.VolumeProvider, pane).ShowDialog<IVolumeProvider?>(owner);
+    /// <summary>
+    ///     Shows the volume provider list with the bookmarks over a pane, owned by a window, returning the chosen volume
+    ///     provider or bookmark, or null.
+    /// </summary>
+    private Task<VolumeChoice?> ChooseVolumeProviderAsync(Window owner, PaneView pane) =>
+        new VolumeProviderDialog(pane == LeftPane ? "Left" : "Right", VolumeProviders.All, BookmarkStore.Default,
+            pane.NavigationContext.VolumeProvider, pane).ShowDialog<VolumeChoice?>(owner);
 
     /// <summary>
     ///     Shows the location dialog of a pane with its current path, changing to the entered path on OK, showing the
@@ -442,9 +545,9 @@ public partial class MainWindow : Window
     {
         var result = await new LocationDialog(pane.NavigationContext.CurrentPath,
             owner => ChooseVolumeProviderAsync(owner, pane)).ShowDialog<LocationDialogResult?>(this);
-        if (result?.VolumeProvider is { } volumeProvider)
+        if (result?.VolumeChoice is { } volumeChoice)
         {
-            await ChangeVolumeProviderAsync(pane, volumeProvider);
+            await ChangeVolumeProviderAsync(pane, volumeChoice);
         }
         else if (result?.IsHome == true)
         {

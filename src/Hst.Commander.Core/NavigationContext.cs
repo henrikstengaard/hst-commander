@@ -23,6 +23,9 @@ public sealed class NavigationContext : IDisposable
     private string? _newEntryName;
     private bool _selectFirstEntry;
 
+    /// <summary>Connection the volume provider was connected with, see <see cref="ConnectedLocation" />.</summary>
+    private LocationConnection? _connectedLocation;
+
     /// <summary>Space of the current volume read when listing, shown by <see cref="DiskSpace" />.</summary>
     private VolumeSpace? _volumeSpace;
 
@@ -95,6 +98,149 @@ public sealed class NavigationContext : IDisposable
     }
 
     /// <summary>
+    ///     Shows a new volume of a volume provider connected to a location by <see cref="VolumeConnector" /> (e.g. the
+    ///     share of an SMB server) like <see cref="ChangeVolumeProviderAsync(VolumeConnection, CancellationToken)" />,
+    ///     remembering the connection (see <see cref="ConnectedLocation" />), e.g. to bookmark the location. With a
+    ///     <paramref name="path" />, changes to it in the connected volumes like
+    ///     <see cref="ChangeLocationAsync(string, CancellationToken)" />, e.g. "\\server\share\disk.adf\dir" of a
+    ///     bookmark. The location is unchanged when the connection or the path can't be opened.
+    /// </summary>
+    public async Task ChangeVolumeProviderAsync(LocationConnection connection, string? path = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+
+        var context = CreateChildContext(string.Empty);
+        try
+        {
+            await context.ChangeVolumeProviderAsync(connection.Connection, cancellationToken);
+            context._connectedLocation = connection;
+            if (path != null)
+            {
+                await context.ChangeLocationAsync(path, cancellationToken);
+            }
+        }
+        catch
+        {
+            context.Dispose();
+            throw;
+        }
+
+        Adopt(context);
+    }
+
+    /// <summary>
+    ///     Connection the shown volume provider was connected with by <see cref="VolumeConnector" />, e.g. to an SMB
+    ///     server with the user name and password entered; null for other volume providers.
+    /// </summary>
+    public LocationConnection? ConnectedLocation =>
+        _connectedLocation is { } connection && connection.Connection.VolumeProvider == _volumeProvider
+            ? connection
+            : null;
+
+    /// <summary>
+    ///     Shows a new volume of a volume provider at a path in it, resolved like
+    ///     <see cref="ChangeLocationAsync(string, CancellationToken)" />, e.g. a bookmarked location: a local path for
+    ///     <see cref="VolumeProviders.Local" />, otherwise a path from the root of the provider's volumes, also going
+    ///     into images. The location is unchanged when the path can't be opened.
+    /// </summary>
+    public async Task ChangeLocationAsync(IVolumeProvider volumeProvider, string path,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(volumeProvider);
+        ArgumentNullException.ThrowIfNull(path);
+
+        var context = CreateChildContext(string.Empty);
+        try
+        {
+            if (volumeProvider != VolumeProviders.Local)
+            {
+                await context.ChangeVolumeProviderAsync(volumeProvider, cancellationToken);
+            }
+
+            await context.ChangeLocationAsync(path, cancellationToken);
+        }
+        catch
+        {
+            context.Dispose();
+            throw;
+        }
+
+        Adopt(context);
+    }
+
+    /// <summary>
+    ///     Bookmark of the current location with a description (see <see cref="BookmarkStore" />): the volume provider
+    ///     and the current path, and for a volume provider connected to a location (e.g. SMB) the location to connect to
+    ///     again, without images or credentials (e.g. "\\server\share\dir" of an image in it), and the user name.
+    /// </summary>
+    public Bookmark CreateBookmark(string description)
+    {
+        ArgumentNullException.ThrowIfNull(description);
+
+        var id = Guid.NewGuid().ToString("N");
+        description = description.Trim();
+        if (_rootVolume is LocalVolume)
+        {
+            return new Bookmark(id, description, null, null, CurrentPath, null, false);
+        }
+
+        if (ConnectedLocation is not { } connection)
+        {
+            return new Bookmark(id, description, _volumeProvider.Name, null, CurrentPath, null, false);
+        }
+
+        // the directory of the root volume, outside images, e.g. "\\server\share\dir"
+        var rootPathComponents = _rootVolume.CurrentPathComponents
+            .Where(pathComponent => !pathComponent.Equals(Paths.Root, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        var location = _volumeProvider.PathRoot is { Length: > 0 } pathRoot
+            ? string.Join(Path.DirectorySeparatorChar, [pathRoot, ..rootPathComponents])
+            : connection.Location;
+        var userName = connection.Credentials is { UserName.Length: > 0 } credentials ? credentials.UserName : null;
+        return new Bookmark(id, description, connection.LocationVolumeProvider.Name, location, CurrentPath, userName,
+            false);
+    }
+
+    /// <summary>
+    ///     Description suggested when bookmarking the current location: its last path component, e.g. "dir1" of
+    ///     "c:\temp\dir1", or the current path of a root, e.g. "c:\".
+    /// </summary>
+    public string GetDefaultBookmarkDescription()
+    {
+        var currentPath = CurrentPath;
+        var name = Path.GetFileName(Path.TrimEndingDirectorySeparator(currentPath));
+        return name.Length > 0 ? name : currentPath;
+    }
+
+    /// <summary>
+    ///     New context with the same file volume providers, icon providers and settings, e.g. to change to a path that
+    ///     is shown with <see cref="Adopt" /> only when it can be opened.
+    /// </summary>
+    private NavigationContext CreateChildContext(string initialPath) =>
+        new(initialPath, _startFile, _fileVolumeProviders, _iconProviders)
+        {
+            TemporaryCopyLimit = TemporaryCopyLimit,
+            ProgressIndicator = ProgressIndicator,
+            EnterFileAction = EnterFileAction,
+            UaeMetadata = UaeMetadata,
+            _connectedLocation = _connectedLocation
+        };
+
+    /// <summary>Shows the location of a context made by <see cref="CreateChildContext" />, taking its volumes.</summary>
+    private void Adopt(NavigationContext context)
+    {
+        SetRootVolume(context._volumeProvider, context._rootVolume);
+        _nestedVolume = context._nestedVolume;
+        foreach (var image in context._images.Reverse())
+        {
+            _images.Push(image);
+        }
+
+        _connectedLocation = context._connectedLocation;
+    }
+
+    /// <summary>
     ///     Changes to a location entered by the user, e.g. in the location dialog (Ctrl+L). The location is unchanged
     ///     when the path fails or equals <see cref="CurrentPath" />. A path is resolved as:
     ///     <list type="bullet">
@@ -161,7 +307,7 @@ public sealed class NavigationContext : IDisposable
             ? []
             : SplitPath(path);
         var volume = await _volumeProvider.CreateVolume(cancellationToken);
-        var context = new NavigationContext(string.Empty, _startFile, _fileVolumeProviders, _iconProviders);
+        var context = CreateChildContext(string.Empty);
         context.SetRootVolume(_volumeProvider, volume);
         await ChangeToPathAsync(context, pathComponents, path, cancellationToken);
     }
@@ -214,7 +360,7 @@ public sealed class NavigationContext : IDisposable
             Path.GetFileName(imagePath),
             ..SplitPath(Path.GetRelativePath(imagePath, fullPath)).Where(pathComponent => pathComponent != ".")
         ];
-        var context = new NavigationContext(imageDirectory, _startFile, _fileVolumeProviders, _iconProviders);
+        var context = CreateChildContext(imageDirectory);
         await ChangeToPathAsync(context, pathComponents, fullPath, cancellationToken);
     }
 
@@ -225,8 +371,6 @@ public sealed class NavigationContext : IDisposable
     private async Task ChangeToPathAsync(NavigationContext context, IEnumerable<string> pathComponents,
         string location, CancellationToken cancellationToken)
     {
-        context.TemporaryCopyLimit = TemporaryCopyLimit;
-        context.ProgressIndicator = ProgressIndicator;
         try
         {
             foreach (var pathComponent in pathComponents)
@@ -249,12 +393,7 @@ public sealed class NavigationContext : IDisposable
             throw;
         }
 
-        SetRootVolume(context._volumeProvider, context._rootVolume);
-        _nestedVolume = context._nestedVolume;
-        foreach (var image in context._images.Reverse())
-        {
-            _images.Push(image);
-        }
+        Adopt(context);
     }
 
     private static string[] SplitPath(string path) => path.Split(

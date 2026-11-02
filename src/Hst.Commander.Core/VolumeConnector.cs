@@ -34,8 +34,23 @@ public static class VolumeConnector
     ///     <paramref name="hide" /> when it's done. Returns null when the credentials dialog is cancelled. Throws
     ///     <see cref="IOException" /> when the location can't be reached.
     /// </summary>
-    public static async Task<VolumeConnection?> ConnectAsync(ILocationVolumeProvider volumeProvider, string location,
-        Func<CredentialsRequest, Task<VolumeCredentials?>> askCredentials, Action<string> show, Action hide,
+    /// <param name="volumeProvider">Volume provider connecting to the location.</param>
+    /// <param name="location">Location entered, e.g. "\server\share".</param>
+    /// <param name="askCredentials">Asks the user for credentials.</param>
+    /// <param name="show">Shows the progress.</param>
+    /// <param name="hide">Hides the progress.</param>
+    /// <param name="credentials">
+    ///     Credentials tried first, e.g. stored with a bookmark, null to connect without credentials first. Rejected
+    ///     ones are asked for again with their user name.
+    /// </param>
+    /// <param name="userName">
+    ///     User name shown the first time credentials are asked for when <paramref name="credentials" /> is null, e.g. the
+    ///     user name of a bookmark without a stored password.
+    /// </param>
+    /// <param name="cancellationToken"></param>
+    public static async Task<LocationConnection?> ConnectAsync(ILocationVolumeProvider volumeProvider,
+        string location, Func<CredentialsRequest, Task<VolumeCredentials?>> askCredentials, Action<string> show,
+        Action hide, VolumeCredentials? credentials = null, string? userName = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(volumeProvider);
@@ -48,18 +63,19 @@ public static class VolumeConnector
             LastLocations[volumeProvider.Name] = location;
         }
 
-        VolumeCredentials? credentials = null;
         while (true)
         {
             try
             {
-                return await ListingProgress.RunAsync(volumeProvider.Connect(location, credentials, cancellationToken),
-                    GetMessage(location), show, hide, ListingProgress.Delay);
+                var connection = await ListingProgress.RunAsync(
+                    volumeProvider.Connect(location, credentials, cancellationToken), GetMessage(location), show, hide,
+                    ListingProgress.Delay);
+                return new LocationConnection(volumeProvider, location, connection, credentials);
             }
             catch (CredentialsRequiredException exception)
             {
                 credentials = await askCredentials(new CredentialsRequest(volumeProvider.Name, location,
-                    exception.Message, credentials?.UserName ?? string.Empty));
+                    exception.Message, credentials?.UserName ?? userName ?? string.Empty));
                 if (credentials == null)
                 {
                     return null;
@@ -78,3 +94,15 @@ public static class VolumeConnector
 /// <param name="Message">Why credentials are needed, e.g. the user name or password was rejected.</param>
 /// <param name="UserName">User name shown initially, the last one entered.</param>
 public sealed record CredentialsRequest(string VolumeProviderName, string Location, string Message, string UserName);
+
+/// <summary>
+///     Connection to a location made by <see cref="VolumeConnector.ConnectAsync" />: the volume provider asking for the
+///     location (e.g. SMB), the location entered (which may hold credentials, e.g. an smb:// URL, so it isn't stored),
+///     the connection and the credentials it was connected with, null for none (e.g. a guest login), offered to be
+///     stored with a bookmark (see <see cref="BookmarkStore" />).
+/// </summary>
+public sealed record LocationConnection(
+    ILocationVolumeProvider LocationVolumeProvider,
+    string Location,
+    VolumeConnection Connection,
+    VolumeCredentials? Credentials);

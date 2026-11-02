@@ -19,6 +19,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - Going to the root of the volume with Ctrl+\ in both front-ends.
 - Quitting with F10, Ctrl+Q or File > Quit (and Esc in the TUI) after a confirm dialog in both front-ends.
 - Changing location with Ctrl+L or by double-clicking the path (location dialog), including paths into images.
+- Bookmarking locations with Ctrl+B (File > Add bookmark) in both front-ends, listed by the Bookmarks item of the volume provider list (Alt+F1/Alt+F2), renamed with F2 and deleted with Del; SMB passwords can be stored with a bookmark in Windows Credential Manager, the macOS Keychain or the Linux Secret Service (see [Bookmarks](volumes.md#bookmarks)).
 - Build versioning from the git commit count and a Help > About menu item in both front-ends, with a Licenses section showing the notices of Hst Commander, its third-party components and the loaded plugins, also installed next to the apps.
 - Running as administrator or root shown in the menu bar of both front-ends; choosing the physical disks when not elevated offers to restart as administrator (UAC on Windows, sudo in the TUI's terminal on Linux and macOS, pkexec in the GUI on Linux) with the panes where they were.
 - Choosing the volume provider of the left/right pane with Alt+F1/Alt+F2 or Shift+F1/Shift+F2 (configurable, see [Volume provider keys](volumes.md#volume-provider-keys)) or File > Left/Right volume from `VolumeProviders.All`: the built-in Local volume provider, the PhysicalDisk plugin's `Physical disks` and, when installed, the Smb plugin's `SMB`.
@@ -43,6 +44,6 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - Writing an image file to a physical disk (the physical disk list is read-only).
 - Changing RDB, MBR and GPT partitions, other Amiga file systems (e.g. SFS), other PC file systems (exFAT, ext, ...) and vhdx/vmdk images.
 - Unloading or reloading plugins while running, and a list of loaded plugins in the UI.
-- SMB 1 servers, SMB ports other than 445, browsing the servers of the network, and remembering SMB credentials.
+- SMB 1 servers, SMB ports other than 445 and browsing the servers of the network. SMB credentials are only remembered with bookmarks.
 
 

@@ -76,8 +76,9 @@ public sealed record StartupOptions
     /// <param name="isRightActive">True when the right pane is active.</param>
     /// <param name="changedPaneIsRight">The pane changing volume provider, true for the right pane.</param>
     /// <param name="volumeProvider">Volume provider the pane changes to, null when no pane changes.</param>
+    /// <param name="path">Location in the volume provider the pane changes to, e.g. of a bookmark, null for its start.</param>
     public static StartupOptions FromPanes(NavigationContext left, NavigationContext right, bool isRightActive,
-        bool changedPaneIsRight = false, IVolumeProvider? volumeProvider = null)
+        bool changedPaneIsRight = false, IVolumeProvider? volumeProvider = null, string? path = null)
     {
         ArgumentNullException.ThrowIfNull(left);
         ArgumentNullException.ThrowIfNull(right);
@@ -85,10 +86,10 @@ public sealed record StartupOptions
         return new StartupOptions
         {
             Left = volumeProvider != null && !changedPaneIsRight
-                ? new PaneStartup(volumeProvider.Name, null)
+                ? new PaneStartup(volumeProvider.Name, path)
                 : PaneStartup.From(left),
             Right = volumeProvider != null && changedPaneIsRight
-                ? new PaneStartup(volumeProvider.Name, null)
+                ? new PaneStartup(volumeProvider.Name, path)
                 : PaneStartup.From(right),
             IsRightActive = isRightActive
         };

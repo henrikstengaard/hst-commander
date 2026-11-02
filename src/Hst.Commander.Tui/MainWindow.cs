@@ -65,6 +65,7 @@ public sealed class MainWindow : Window
                     _leftVolumeMenuItem,
                     _rightVolumeMenuItem,
                     new("L_ocation...", "Ctrl+L", ShowLocationOfActivePane),
+                    new("Add _bookmark...", "Ctrl+B", AddBookmarkInActivePane),
                     null!,
                     new("_Settings...", string.Empty, ShowSettings),
                     null!,
@@ -481,6 +482,11 @@ public sealed class MainWindow : Window
                 key.Handled = true;
                 _ = ShowLocationAsync(pane);
             }
+            else if (key == Key.B.WithCtrl)
+            {
+                key.Handled = true;
+                AddBookmark(pane);
+            }
             else if (key == LeftVolumeProviderKey)
             {
                 key.Handled = true;
@@ -563,6 +569,68 @@ public sealed class MainWindow : Window
     private void ChooseRightVolumeProvider() => _ = ChooseVolumeProviderAsync(_rightPane);
 
     private void ShowLocationOfActivePane() => _ = ShowLocationAsync(_activePane);
+
+    private void AddBookmarkInActivePane() => AddBookmark(_activePane);
+
+    /// <summary>
+    ///     Bookmarks the location of a pane with the description entered (Ctrl+B). When the location was connected to
+    ///     with a user name and password (e.g. SMB), asks whether to store them in the credential store of the
+    ///     operating system, or says they can't be stored when there is none. The pane gets the focus.
+    /// </summary>
+    private void AddBookmark(Pane pane)
+    {
+        var context = pane.NavigationContext;
+        var dialog = new BookmarkDialog("Add bookmark", context.CurrentPath, context.GetDefaultBookmarkDescription(),
+            _palette);
+        Application.Run(dialog);
+        var description = dialog.Result;
+        dialog.Dispose();
+        pane.TableView.SetFocus();
+        if (description == null)
+        {
+            return;
+        }
+
+        var store = BookmarkStore.Default;
+        var bookmark = context.CreateBookmark(description);
+        try
+        {
+            store.Add(bookmark);
+        }
+        catch (IOException exception)
+        {
+            MessageBox.ErrorQuery("Error", exception.Message, "OK");
+            return;
+        }
+
+        if (bookmark.UserName == null || context.ConnectedLocation?.Credentials is not { } credentials)
+        {
+            return;
+        }
+
+        if (!store.CredentialStore.IsAvailable)
+        {
+            MessageBox.Query("Bookmark", BookmarkStore.GetUnavailableMessage(), "OK");
+            return;
+        }
+
+        if (MessageBox.Query("Bookmark", store.GetStorePasswordQuestion(bookmark), "_Yes",
+                "_No") != 0)
+        {
+            return;
+        }
+
+        try
+        {
+            store.StorePassword(bookmark, credentials.Password);
+        }
+        catch (IOException exception)
+        {
+            MessageBox.ErrorQuery("Error", exception.Message, "OK");
+        }
+
+        pane.TableView.SetFocus();
+    }
 
     private void ShowPropertiesOfActivePane() => _ = ShowPropertiesAsync(_activePane);
 
@@ -841,9 +909,9 @@ public sealed class MainWindow : Window
         dialog.Dispose();
 
         pane.TableView.SetFocus();
-        if (result?.VolumeProvider is { } volumeProvider)
+        if (result?.VolumeChoice is { } volumeChoice)
         {
-            await ChangeVolumeProviderAsync(pane, volumeProvider);
+            await ChangeVolumeProviderAsync(pane, volumeChoice);
         }
         else if (result?.IsHome == true)
         {
@@ -861,12 +929,49 @@ public sealed class MainWindow : Window
     /// </summary>
     private async Task ChooseVolumeProviderAsync(Pane pane)
     {
-        var volumeProvider = ChooseVolumeProvider(pane);
+        var volumeChoice = ChooseVolumeProvider(pane);
         pane.TableView.SetFocus();
-        if (volumeProvider != null)
+        if (volumeChoice != null)
         {
-            await ChangeVolumeProviderAsync(pane, volumeProvider);
+            await ChangeVolumeProviderAsync(pane, volumeChoice);
         }
+    }
+
+    /// <summary>Shows a volume provider or opens a bookmark chosen in the volume provider list.</summary>
+    private Task ChangeVolumeProviderAsync(Pane pane, VolumeChoice volumeChoice) =>
+        volumeChoice.Bookmark is { } bookmark
+            ? OpenBookmarkAsync(pane, bookmark)
+            : ChangeVolumeProviderAsync(pane, volumeChoice.VolumeProvider!);
+
+    /// <summary>
+    ///     Opens a bookmark in a pane, connecting with the stored credentials and asking for them when needed. A volume
+    ///     provider needing administrator rights offers to restart Hst Commander as administrator first, with the pane
+    ///     at the bookmark.
+    /// </summary>
+    private async Task OpenBookmarkAsync(Pane pane, Bookmark bookmark)
+    {
+        IVolumeProvider volumeProvider;
+        try
+        {
+            volumeProvider = BookmarkOpener.GetVolumeProvider(bookmark);
+        }
+        catch (IOException exception)
+        {
+            MessageBox.ErrorQuery("Error", exception.Message, "OK");
+            return;
+        }
+
+        if (Elevation.NeedsRestart(volumeProvider) &&
+            MessageBox.Query(Elevation.AdministratorName, Elevation.GetRestartQuestion(volumeProvider), "_Restart",
+                "_Continue") == 0 &&
+            RestartAsAdministrator(pane, volumeProvider, bookmark.Path))
+        {
+            return;
+        }
+
+        await RunNavigationAsync(pane, () => BookmarkOpener.OpenAsync(pane.NavigationContext, bookmark,
+            BookmarkStore.Default, AskCredentials, pane.Progress.Show, pane.Progress.Hide));
+        pane.TableView.SetFocus();
     }
 
     /// <summary>
@@ -938,11 +1043,11 @@ public sealed class MainWindow : Window
     ///     and quits: on Windows with UAC, elsewhere with sudo in the terminal while the TUI is shut down. Returns false
     ///     when it isn't started, e.g. UAC is cancelled.
     /// </summary>
-    private bool RestartAsAdministrator(Pane pane, IVolumeProvider volumeProvider)
+    private bool RestartAsAdministrator(Pane pane, IVolumeProvider volumeProvider, string? path = null)
     {
         var isRight = pane == _rightPane;
         var options = StartupOptions.FromPanes(_leftPane.NavigationContext, _rightPane.NavigationContext, isRight,
-            isRight, volumeProvider);
+            isRight, volumeProvider, path);
         if (!Elevation.CanRestartWithoutTerminal)
         {
             RequestTerminalAction(new TerminalAction.RestartAsRoot(options));
@@ -967,11 +1072,14 @@ public sealed class MainWindow : Window
         return true;
     }
 
-    /// <summary>Shows the volume provider list centered over a pane, returning the chosen one or null.</summary>
-    private IVolumeProvider? ChooseVolumeProvider(Pane pane)
+    /// <summary>
+    ///     Shows the volume provider list with the bookmarks centered over a pane, returning the chosen volume provider
+    ///     or bookmark, or null.
+    /// </summary>
+    private VolumeChoice? ChooseVolumeProvider(Pane pane)
     {
         var dialog = new VolumeProviderDialog(pane == _leftPane ? "Left" : "Right", VolumeProviders.All,
-            pane.NavigationContext.VolumeProvider, pane.View.Frame, _palette);
+            BookmarkStore.Default, pane.NavigationContext.VolumeProvider, pane.View.Frame, _palette);
         Application.Run(dialog);
         var volumeProvider = dialog.Result;
         dialog.Dispose();

@@ -35,6 +35,7 @@
                     <MenuItem x:Name="LeftVolumeMenuItem" Header="_Left volume..." />
                     <MenuItem x:Name="RightVolumeMenuItem" Header="_Right volume..." />
                     <MenuItem x:Name="LocationMenuItem" Header="L_ocation..." InputGesture="Ctrl+L" />
+                    <MenuItem x:Name="AddBookmarkMenuItem" Header="Add _bookmark..." InputGesture="Ctrl+B" />
                     <Separator />
                     <MenuItem x:Name="SettingsMenuItem" Header="_Settings..." />
                     <Separator />

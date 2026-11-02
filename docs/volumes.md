@@ -126,6 +126,23 @@ The location dialog (Ctrl+L, double-clicking the path, File > Location) has the 
 - otherwise, with a non-local provider shown and an unrooted path, a path from the root of a new volume of that provider, where components are directories or images, e.g. `PhysicalDrive2\mbr\1`;
 - with a non-local provider with a `PathRoot` shown, a path starting with it is a path in its volumes the same way, e.g. `\\server\share\dir` of an SMB server (`CurrentPath` shows paths with it too).
 
+## Bookmarks
+
+Ctrl+B or File > Add bookmark bookmarks the location of the active pane with a description (`BookmarkDialog`, the last path component by default). The volume provider list (Alt+F1/Alt+F2 and `Volumes...` of the location dialog) has a `Bookmarks` item after the volume providers (`VolumeChoice.Bookmarks`); choosing it opens the bookmark list (`BookmarksDialog`), or says there are no bookmarks when none have been added. Choosing a bookmark in the list opens it in the pane, and cancelling goes back to the volume provider list. Del or `Delete` deletes the selected bookmark after confirming and F2 or `Rename` changes its description; the list closes when the last bookmark is deleted.
+
+- `NavigationContext.CreateBookmark` makes a `Bookmark` of the current location: `VolumeProviderName` (null for local paths), `Path` (`CurrentPath`, which may go into images) and, for a volume provider asking for a location (e.g. SMB), `Location`, the directory of the root volume outside images with the provider's `PathRoot`, e.g. `\\server\share\dir`, so it never holds credentials of an `smb://user:password@` URL, and the `UserName` connected with.
+- `NavigationContext.ConnectedLocation` is the `LocationConnection` returned by `VolumeConnector.ConnectAsync` (the `ILocationVolumeProvider`, the location entered, the `VolumeConnection` and the credentials entered) while the pane shows its volume provider, so the bookmark knows which provider to connect with and the credentials to offer storing.
+- `BookmarkStore.Default` keeps the bookmarks in `~/.hst-commander/bookmarks.json`, shared by the TUI and the GUI and read again each time the list opens, so both can run at once. An unreadable file is no bookmarks.
+- `BookmarkOpener.OpenAsync` opens a bookmark: a local or volume provider path with `NavigationContext.ChangeLocationAsync(volumeProvider, path)`, which resolves the path in a context of its own like the location dialog, so a failure leaves the pane unchanged; a location provider's bookmark connects to `Location` with `VolumeConnector.ConnectAsync` and changes to `Path` (`ChangeVolumeProviderAsync(connection, path)`). A bookmark of a volume provider needing administrator rights offers to restart as administrator with the pane at the bookmark; one of a plugin that isn't loaded is an error.
+
+### Bookmark credentials
+
+- When the bookmarked location was connected to with a user name and password, Hst Commander asks whether to store the password. The user name is in `bookmarks.json`; the password only in the credential store of the operating system (`ICredentialStore`, `CredentialStores.Default`), never in a file of Hst Commander:
+  - Windows: Windows Credential Manager (`CredWriteW`/`CredReadW`/`CredDeleteW`), generic credentials named `Hst Commander/bookmark/<id>`, encrypted by Windows for the user.
+  - macOS: the user's Keychain (Security framework), generic passwords of the service `Hst Commander` with the bookmark id as account.
+  - Linux: the Secret Service (e.g. GNOME Keyring, KWallet) through `secret-tool` with the attributes `application hst-commander bookmark <id>`; the password is passed on standard input, never on the command line. Without `secret-tool` there is no store: Hst Commander says the password can't be stored securely, and the bookmark asks for it when opened.
+- Opening a bookmark connects with the stored password; when there is none or it's rejected, the credentials dialog asks with the user name filled in. Deleting a bookmark deletes its password. A store failing (e.g. a locked keyring) is shown as an error and the bookmark is kept without the password.
+
 ## Volume Provider Keys
 
 The volume provider list of the left/right pane opens with Alt+F1/Alt+F2 or Shift+F1/Shift+F2, chosen in the settings. Until chosen, the setting is null and `VolumeProviderKeyBindings.Default` applies: Alt on Windows, Shift elsewhere, because Linux desktops take Alt+F1/Alt+F2 and macOS terminals only send Alt with Option set as Meta. Choosing the keys already in effect keeps the setting unset.

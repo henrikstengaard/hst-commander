@@ -294,6 +294,15 @@ public partial class PaneView : UserControl
             }
         });
 
+    /// <summary>
+    ///     Opens a bookmark, connecting with its stored credentials and asking for them with
+    ///     <paramref name="askCredentials" /> when needed (see <see cref="BookmarkOpener" />). The pane is unchanged
+    ///     when the bookmark can't be opened or the credentials dialog is cancelled.
+    /// </summary>
+    public Task OpenBookmarkAsync(Bookmark bookmark, Func<CredentialsRequest, Task<VolumeCredentials?>> askCredentials) =>
+        RunNavigationAsync(() => BookmarkOpener.OpenAsync(NavigationContext, bookmark, BookmarkStore.Default,
+            askCredentials, ShowProgress, HideProgress));
+
     /// <summary>Changes to a location entered in the location dialog, see <see cref="NavigationContext.ChangeLocationAsync" />.</summary>
     public Task ChangeLocationAsync(string path) =>
         RunNavigationAsync(() => NavigationContext.ChangeLocationAsync(path));
