@@ -209,6 +209,15 @@ Without a desktop there is no keyring, so `secret-tool` fails and bookmarks can'
 
    `Cannot autolaunch D-Bus without X11 $DISPLAY` means there is no session bus: log in again after step 1 (a shell from `su` or an older `tmux` session doesn't have it either).
 
+7. To test a bookmark's password with a locked key, first bookmark a location connected to with a user name and password while the key is unlocked (step 5) and store its password; `secret-tool search --all application hst-commander` shows it, and `~/.hst-commander/bookmarks.json` has the user name but no password. Then lock the key by making gpg-agent forget the passphrase, from a second shell or after quitting Hst Commander:
+
+   ```sh
+   gpgconf --reload gpg-agent
+   secret-tool lookup application hst-commander bookmark <id>    # fails: 'NoneType' object has no attribute 'encode'
+   ```
+
+   Check with the lookup, not `pass show`, which asks for the passphrase and unlocks the key again (`<id>` is the bookmark's id in `bookmarks.json`). Opening the bookmark then shows the credentials dialog with the user name filled in and the message that the stored password couldn't be read from the Secret Service keyring, which may be locked, without a traceback or a passphrase prompt; Hst Commander doesn't need restarting, as the password is read each time. Storing the password of another bookmark and deleting that bookmark still work with the locked key. After `pass show unlock > /dev/null` the bookmark connects with the stored password again. After `secret-tool clear application hst-commander bookmark <id>` the dialog says the stored password wasn't found instead.
+
 ## Volume Provider Keys
 
 The volume provider list of the left/right pane opens with Alt+F1/Alt+F2 or Shift+F1/Shift+F2, chosen in the settings. Until chosen, the setting is null and `VolumeProviderKeyBindings.Default` applies: Alt on Windows, Shift elsewhere, because Linux desktops take Alt+F1/Alt+F2 and macOS terminals only send Alt with Option set as Meta. Choosing the keys already in effect keeps the setting unset.
