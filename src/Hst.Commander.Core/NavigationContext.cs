@@ -67,6 +67,34 @@ public sealed class NavigationContext : IDisposable
     }
 
     /// <summary>
+    ///     Shows a new volume of a volume provider connected to a location (see
+    ///     <see cref="ILocationVolumeProvider.Connect" /> and <see cref="VolumeConnector" />) at its path components,
+    ///     e.g. the share of an SMB server. The location is unchanged when the path can't be opened. Images opened in
+    ///     the current volume are closed and marks are cleared.
+    /// </summary>
+    public async Task ChangeVolumeProviderAsync(VolumeConnection connection,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+
+        var volume = await connection.VolumeProvider.CreateVolume(cancellationToken);
+        try
+        {
+            if (connection.PathComponents.Count > 0)
+            {
+                await volume.ChangeDirectory([Paths.Root, ..connection.PathComponents], cancellationToken);
+            }
+        }
+        catch
+        {
+            (volume as IDisposable)?.Dispose();
+            throw;
+        }
+
+        SetRootVolume(connection.VolumeProvider, volume);
+    }
+
+    /// <summary>
     ///     Changes to a location entered by the user, e.g. in the location dialog (Ctrl+L). The location is unchanged
     ///     when the path fails or equals <see cref="CurrentPath" />. A path is resolved as:
     ///     <list type="bullet">
@@ -79,7 +107,8 @@ public sealed class NavigationContext : IDisposable
     ///         <item>
     ///             otherwise, when another volume provider is shown, a path in its volume from the root, e.g. "dir1"
     ///             or the provider name for the root, also going into images, e.g. "PhysicalDrive2\mbr" of a
-    ///             physical disk.
+    ///             physical disk, or a path starting with its <see cref="IVolumeProvider.PathRoot" />, e.g.
+    ///             "\\server\share\dir" of an SMB server.
     ///         </item>
     ///     </list>
     /// </summary>
@@ -100,9 +129,9 @@ public sealed class NavigationContext : IDisposable
             return;
         }
 
-        if (!isLocal && !Path.IsPathRooted(path))
+        if (!isLocal && GetPathInVolume(path) is { } pathInVolume)
         {
-            await ChangeVolumeLocationAsync(path, cancellationToken);
+            await ChangeVolumeLocationAsync(pathInVolume, cancellationToken);
             return;
         }
 
@@ -135,6 +164,24 @@ public sealed class NavigationContext : IDisposable
         var context = new NavigationContext(string.Empty, _startFile, _fileVolumeProviders, _iconProviders);
         context.SetRootVolume(_volumeProvider, volume);
         await ChangeToPathAsync(context, pathComponents, path, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Path of a location in the volumes of the current (non-local) volume provider, null for a local path: a path
+    ///     starting with <see cref="IVolumeProvider.PathRoot" />, e.g. "\\server\share" of an SMB server, without it,
+    ///     or a path that isn't rooted.
+    /// </summary>
+    private string? GetPathInVolume(string path)
+    {
+        if (_volumeProvider.PathRoot is { Length: > 0 } pathRoot &&
+            path.StartsWith(pathRoot, StringComparison.OrdinalIgnoreCase) &&
+            (path.Length == pathRoot.Length || path[pathRoot.Length] is '\\' or '/'))
+        {
+            var rest = path[pathRoot.Length..].TrimStart('\\', '/');
+            return rest.Length == 0 ? _volumeProvider.Name : rest;
+        }
+
+        return Path.IsPathRooted(path) ? null : path;
     }
 
     /// <summary>Changes to a local directory or a directory inside a local image.</summary>
@@ -385,8 +432,14 @@ public sealed class NavigationContext : IDisposable
         get
         {
             var pathComponents = _nestedVolume.CurrentPathComponents.ToArray();
-            return pathComponents.Length == 0
-                ? _rootVolume is LocalVolume ? "Computer" : _volumeProvider.Name
+            if (pathComponents.Length == 0)
+            {
+                return _rootVolume is LocalVolume ? "Computer" : _volumeProvider.Name;
+            }
+
+            // e.g. "\\server\share\dir" of an SMB server
+            return _rootVolume is not LocalVolume && _volumeProvider.PathRoot is { Length: > 0 } pathRoot
+                ? string.Join(Path.DirectorySeparatorChar, [pathRoot, ..pathComponents])
                 : string.Join(Path.DirectorySeparatorChar, pathComponents);
         }
     }

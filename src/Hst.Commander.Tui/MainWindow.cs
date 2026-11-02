@@ -298,7 +298,13 @@ public sealed class MainWindow : Window
         pane.BottomLine.NeedsDraw = true;
     }
 
-    private static void ShowAbout() => MessageBox.Query("About", AppInfo.Current.AboutText, "OK");
+    /// <summary>Shows the About dialog with the version, author and the license notices.</summary>
+    private void ShowAbout()
+    {
+        var dialog = new AboutDialog(_palette);
+        Application.Run(dialog);
+        dialog.Dispose();
+    }
 
     private void ShowSettings()
     {
@@ -878,7 +884,53 @@ public sealed class MainWindow : Window
             return;
         }
 
+        if (volumeProvider is ILocationVolumeProvider locationVolumeProvider)
+        {
+            await ConnectAsync(pane, locationVolumeProvider);
+            return;
+        }
+
         await RunNavigationAsync(pane, () => pane.NavigationContext.ChangeVolumeProviderAsync(volumeProvider));
+    }
+
+    /// <summary>
+    ///     Asks for the location of a volume provider needing one (e.g. an SMB path) and shows it in a pane, asking for
+    ///     a user name and password when the location needs them. The pane is unchanged when a dialog is cancelled.
+    /// </summary>
+    private async Task ConnectAsync(Pane pane, ILocationVolumeProvider volumeProvider)
+    {
+        var dialog = new VolumeLocationDialog(volumeProvider, VolumeConnector.GetLastLocation(volumeProvider),
+            _palette);
+        Application.Run(dialog);
+        var location = dialog.Result;
+        dialog.Dispose();
+
+        pane.TableView.SetFocus();
+        if (location == null)
+        {
+            return;
+        }
+
+        await RunNavigationAsync(pane, async () =>
+        {
+            var connection = await VolumeConnector.ConnectAsync(volumeProvider, location, AskCredentials,
+                pane.Progress.Show, pane.Progress.Hide);
+            if (connection != null)
+            {
+                await pane.NavigationContext.ChangeVolumeProviderAsync(connection);
+            }
+        });
+        pane.TableView.SetFocus();
+    }
+
+    /// <summary>Shows the credentials dialog, returning the user name and password entered or null.</summary>
+    private Task<VolumeCredentials?> AskCredentials(CredentialsRequest request)
+    {
+        var dialog = new CredentialsDialog(request, _palette);
+        Application.Run(dialog);
+        var credentials = dialog.Result;
+        dialog.Dispose();
+        return Task.FromResult(credentials);
     }
 
     /// <summary>

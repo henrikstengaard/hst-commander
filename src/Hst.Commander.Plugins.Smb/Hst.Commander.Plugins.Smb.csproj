@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <!--
+        External plugin, not included with Hst Commander as it uses SMBLibrary (LGPL-3.0-or-later): published to its
+        own directory with SMBLibrary.dll as a separate file, so it can be replaced, and installed in
+        ~/.hst-commander/plugins/Hst.Commander.Plugins.Smb/ (see readme.md).
+    -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <EnableDynamicLoading>true</EnableDynamicLoading>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <!-- shared with Hst Commander, which loads its own copy -->
+      <ProjectReference Include="..\Hst.Commander.Abstractions\Hst.Commander.Abstractions.csproj">
+        <Private>false</Private>
+        <ExcludeAssets>runtime</ExcludeAssets>
+      </ProjectReference>
+    </ItemGroup>
+
+    <ItemGroup>
+      <!--
+          when changing the version, set SMBLIBRARY_VERSION and SMBLIBRARY_COMMIT (the commit of its source, included
+          with the release as the LGPL requires) in .github/workflows/build-and-release.yml and run
+          src/notices/make-notices.py to update THIRD-PARTY-NOTICES.txt
+      -->
+      <PackageReference Include="SMBLibrary" Version="1.5.8.1" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <!-- shown in Help > About > Licenses while the plugin is loaded, and installed next to the plugin -->
+      <EmbeddedResource Include="THIRD-PARTY-NOTICES.txt" LogicalName="THIRD-PARTY-NOTICES.txt" />
+      <None Include="THIRD-PARTY-NOTICES.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+      <None Include="readme.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    </ItemGroup>
+
+</Project>

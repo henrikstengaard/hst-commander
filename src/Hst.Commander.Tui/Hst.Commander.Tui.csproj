@@ -2,6 +2,8 @@
 
     <PropertyGroup>
         <OutputType>Exe</OutputType>
+        <!-- local builds include the external SMB plugin, publishing doesn't (see Directory.Build.targets) -->
+        <IncludeSmbPlugin>true</IncludeSmbPlugin>
         <TargetFramework>net10.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>

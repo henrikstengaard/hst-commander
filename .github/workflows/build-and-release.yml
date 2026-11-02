@@ -251,8 +251,57 @@ jobs:
           path: dist/*
           retention-days: 3
 
+  # smb plugin, an external plugin as it uses SMBLibrary (LGPL-3.0-or-later): managed only, so one zip for all
+  # platforms, with SMBLibrary.dll as a separate file in the plugin's directory and the source of SMBLibrary
+  build-smb-plugin:
+    needs: [version]
+    runs-on: ubuntu-latest
+    env:
+      # the SMBLibrary version referenced by the plugin and the commit of its source, also read by
+      # src/notices/make-notices.py for the plugin's THIRD-PARTY-NOTICES.txt
+      SMBLIBRARY_VERSION: 1.5.8.1
+      SMBLIBRARY_COMMIT: 582635541d2ec0c84eac5f66cbebd41e2d35c7ae
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            10.0.x
+
+      - name: Build smb plugin
+        shell: pwsh
+        run: |
+          dotnet publish src/Hst.Commander.Plugins.Smb/Hst.Commander.Plugins.Smb.csproj --configuration Release -p:Version=${{ needs.version.outputs.build_version }} -p:PublishDir=${{ github.workspace }}/plugin/Hst.Commander.Plugins.Smb
+          Remove-Item -Path plugin/Hst.Commander.Plugins.Smb/*.pdb
+          if (-not (Test-Path plugin/Hst.Commander.Plugins.Smb/SMBLibrary.dll)) { throw 'SMBLibrary.dll is missing' }
+          if (Test-Path plugin/Hst.Commander.Plugins.Smb/Hst.Commander.Abstractions.dll) { throw 'Hst.Commander.Abstractions.dll must not be included' }
+
+      - name: Download SMBLibrary source
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://github.com/TalAloni/SMBLibrary/archive/$env:SMBLIBRARY_COMMIT.zip" -OutFile "plugin/SMBLibrary-source-$env:SMBLIBRARY_VERSION.zip"
+          Get-ChildItem -recurse plugin
+
+      - name: Build plugin zip
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Compress-Archive -Path plugin/* -DestinationPath 'dist/hst-commander.smb-plugin.zip'
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: hst-commander.smb-plugin
+          path: dist/*
+          retention-days: 3
+
   publish:
-    needs: [version, build-windows, build-macos, build-linux]
+    needs: [version, build-windows, build-macos, build-linux, build-smb-plugin]
     runs-on: windows-latest
     env:
       RELEASE_TAG: ${{ needs.version.outputs.release_tag }}
@@ -261,7 +310,7 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: hst-commander.?ui.*
+          pattern: hst-commander.*
           merge-multiple: true
 
       - name: List artifacts
@@ -270,12 +319,17 @@ jobs:
           Get-ChildItem -Filter 'hst-commander.*' -name
 
       # e.g. hst-commander.tui.win-x64.setup.exe -> hst-commander_v0.1.29-98d7be8_tui_windows_x64_setup.exe,
-      # hst-commander.gui.linux-amd64.deb -> hst-commander_v0.1.29-98d7be8_gui_linux_amd64.deb
+      # hst-commander.gui.linux-amd64.deb -> hst-commander_v0.1.29-98d7be8_gui_linux_amd64.deb,
+      # hst-commander.smb-plugin.zip -> hst-commander_v0.1.29-98d7be8_smb-plugin.zip
       - name: Version artifacts
         shell: pwsh
         run: |
           $osNames = @{ win = 'windows'; osx = 'macos'; linux = 'linux' }
           Get-ChildItem -File -Filter 'hst-commander.*' | ForEach-Object {
+            if ($_.Name -match '^hst-commander\.([a-z]+-plugin)\.zip$') {
+              Rename-Item -Path $_.FullName -NewName ('{0}_{1}.zip' -f $env:RELEASE_VERSION, $Matches[1])
+              return
+            }
             if ($_.Name -notmatch '^hst-commander\.(tui|gui)\.(win|osx|linux)-([^.]+)\.(.+)$') { throw "Unexpected artifact '$($_.Name)'" }
             $app, $os, $arch, $kind = $Matches[1], $osNames[$Matches[2]], $Matches[3], $Matches[4]
             $suffix = if ($kind -match '^(setup|portable)\.(.+)$') { '_{0}.{1}' -f $Matches[1], $Matches[2] } else { '.' + $kind }

@@ -22,6 +22,25 @@
       <PackageReference Include="LTRData.DiscUtils.Iso9660" Version="1.0.54" />
       <!-- decoding standard image formats viewed with F3 (PNG, JPEG, GIF, BMP, WebP), the version Avalonia uses -->
       <PackageReference Include="SkiaSharp" Version="3.119.4" />
-      <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="3.119.4" />
+      <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="3.119.4" GeneratePathProperty="true" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <!--
+          License notices shown in Help > About > Licenses (see Licenses) and copied next to the apps, which reference
+          Core: Hst Commander's license, the notices of the third-party components and the notices of the native Skia
+          and HarfBuzz libraries (the same in the native asset packages of every platform). Text files aren't bundled
+          in single-file apps, so they stay next to the executable.
+      -->
+      <EmbeddedResource Include="..\..\LICENSE" LogicalName="LICENSE.txt" />
+      <EmbeddedResource Include="..\..\THIRD-PARTY-NOTICES.txt" LogicalName="THIRD-PARTY-NOTICES.txt" />
+      <EmbeddedResource Include="$(PkgSkiaSharp_NativeAssets_Linux)\THIRD-PARTY-NOTICES.txt"
+                        LogicalName="THIRD-PARTY-NOTICES-SKIASHARP.txt" />
+      <None Include="..\..\LICENSE" Link="LICENSE.txt" CopyToOutputDirectory="PreserveNewest"
+            CopyToPublishDirectory="PreserveNewest" />
+      <None Include="..\..\THIRD-PARTY-NOTICES.txt" Link="THIRD-PARTY-NOTICES.txt" CopyToOutputDirectory="PreserveNewest"
+            CopyToPublishDirectory="PreserveNewest" />
+      <None Include="$(PkgSkiaSharp_NativeAssets_Linux)\THIRD-PARTY-NOTICES.txt" Link="THIRD-PARTY-NOTICES-SKIASHARP.txt"
+            CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     </ItemGroup>
 </Project>

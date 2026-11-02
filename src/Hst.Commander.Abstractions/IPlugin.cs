@@ -53,6 +53,13 @@ public interface IPlugin
     IEnumerable<IImageProvider> ImageProviders => [];
 
     /// <summary>
+    /// Notices of the third-party components the plugin uses, e.g. their copyright notices and licenses, shown in the
+    /// Licenses section of the About dialog while the plugin is loaded, as some licenses require (e.g. the LGPL).
+    /// Defaults to null (none).
+    /// </summary>
+    string? ThirdPartyNotices => null;
+
+    /// <summary>
     /// Called once by Hst Commander when the plugin is loaded, before it is used, with the services of Hst Commander,
     /// e.g. to open partitions with the file volume providers of other plugins. Defaults to doing nothing.
     /// </summary>
