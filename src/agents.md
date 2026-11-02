@@ -24,7 +24,7 @@ The behavior of each feature is described in `docs/` at the repository root. Rea
 | [`docs/icons-and-navigation-modes.md`](../docs/icons-and-navigation-modes.md) | Icon providers, GUI entry icons, navigation modes (list, thumbnails, Workbench, def icons) |
 | [`docs/tui.md`](../docs/tui.md) | TUI files, key handling, dialogs, themes, terminal programs |
 | [`docs/gui.md`](../docs/gui.md) | GUI files, key handling, dialogs, themes, icons |
-| [`docs/application.md`](../docs/application.md) | Versioning, release workflows, About, licenses and third-party notices, quitting |
+| [`docs/application.md`](../docs/application.md) | Versioning, release workflows, local publishing, About, licenses and third-party notices, quitting |
 | [`docs/testing.md`](../docs/testing.md) | Test helpers |
 | [`docs/status.md`](../docs/status.md) | What works and what isn't implemented |
 
@@ -42,6 +42,7 @@ src/
   Directory.Build.props         Shared product name, version, authors and copyright
   Directory.Build.targets       Replaces the last version part with the git commit count
   packaging/                    Release packaging scripts (Linux AppImage/.deb, macOS .dmg, Windows Inno Setup)
+  publish/                      Local publish scripts for testing, PowerShell and bash per platform (output in publish/ at the root, ignored)
   icon/                         App icon sources, rendered sizes and make scripts
   Hst.Commander.Abstractions/   Plugin API: IVolume, IEntry, IVolumeProvider, IFileVolumeProvider, IPlugin, IPluginHost, IWriteCache, ... and Paths (no external deps)
   Hst.Commander.Plugins.Zip/    Zip archives (default plugin)
@@ -245,6 +246,9 @@ dotnet run --project src/Hst.Commander.Gui/Hst.Commander.Gui.csproj
 # Run the TUI app
 dotnet run --project src/Hst.Commander.Tui/Hst.Commander.Tui.csproj
 # (local builds of both apps include the external SMB plugin; publishing leaves it out)
+
+# Publish the TUI and GUI locally for testing (also .sh, and publish-windows/-macos; see docs/application.md)
+pwsh src/publish/publish-linux.ps1 -Runtime linux-arm64
 
 # Run unit tests
 dotnet test src/Hst.Commander.Core.Tests/Hst.Commander.Core.Tests.csproj
