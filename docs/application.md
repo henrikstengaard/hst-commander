@@ -1,6 +1,6 @@
 # Application
 
-Versioning, release workflows, the About dialog and quitting.
+Versioning, release workflows, local publishing, the About dialog and quitting.
 
 Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../src/agents.md).
 
@@ -30,6 +30,16 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - Local builds of the TUI and GUI (`dotnet build`, `dotnet run`) include the SMB plugin, so it can be used while developing: `CopySmbPlugin` in `Directory.Build.targets` (turned on by `IncludeSmbPlugin` in both app projects) builds the plugin after the app and copies its output to `plugins/Hst.Commander.Plugins.Smb/` next to the app. It isn't a project reference, which would make SMBLibrary a package of the apps (and of their notices), and it's skipped when publishing (`_IsPublishing`, set by `dotnet publish`), so the release packages don't include it.
 - It creates a draft prerelease tagged with the version.
 - Windows files are signed with Azure Artifact Signing only when the repository variable `AZURE_SIGNING_ENABLED` is `true`: the executable before packaging (so the zip and installer contain it signed) and the setup `.exe` after. The workflow lists the variables and secrets it needs.
+
+## Local Publishing
+
+`src/publish/` has a PowerShell and a bash script per platform to publish the TUI and GUI locally for testing, e.g. on a Raspberry Pi, without the release workflow: `publish-windows`, `publish-macos` and `publish-linux` (`.ps1` and `.sh`). They choose and check the runtime and call `publish.ps1` or `publish.sh`, which publish like `build-and-release.yml` (self-contained, single-file, ReadyToRun, executables renamed to `hst.commander` and `hst.commander.gui`) but without packages:
+
+- Output: `publish/<runtime>/tui/` and `publish/<runtime>/gui/` at the root of the repository (ignored by git, like every `publish/` directory but `src/publish/`), deleted before each publish. Debug symbols are kept for stack traces.
+- The SMB plugin, which releases leave out, is published once to `publish/smb-plugin/` and copied to `plugins/Hst.Commander.Plugins.Smb/` next to each app, so it loads like in local builds; `-NoSmbPlugin`/`--no-smb-plugin` leaves it out.
+- `-Runtime`/`--runtime` takes the release's runtimes of the platform (`win-x64`, `win-x86`, `win-arm64`; `osx-x64`, `osx-arm64`; `linux-x64`, `linux-arm64`, `linux-arm`). Without it, the script for the system it runs on uses its architecture: on Linux that of the user space, as a 32-bit Raspberry Pi OS runs a 64-bit kernel (`uname -m` says `aarch64`, `getconf LONG_BIT` 32), and on macOS that of the Mac, also from a shell running with Rosetta. The script for another system uses x64 (arm64 for macOS). `-App`/`--app` publishes only `tui` or `gui`.
+- Any script runs on any system with the .NET SDK, so e.g. `publish-linux.ps1 -Runtime linux-arm64` on Windows publishes for a 64-bit Raspberry Pi OS. Published on Windows, the executables need `chmod +x` on the target machine. On a Mac, the macOS scripts sign the executables ad hoc (arm64 runs only signed executables), as `src/packaging/macos/package.sh` does; published on another system, they have to be signed on the Mac with `codesign --force --sign -`.
+- The PowerShell scripts also run in Windows PowerShell 5.1. The bash scripts work with bash 3.2 of macOS and with Git Bash on Windows, where paths are passed to `dotnet` converted with `cygpath -m`.
 
 ## Running as Administrator
 

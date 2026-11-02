@@ -159,6 +159,8 @@ DocProject/Help/html
 
 # Click-Once directory
 publish/
+# local publishes for testing go to publish/ at the root, but the scripts making them aren't ignored
+!/src/publish/
 
 # Publish Web Output
 *.[Pp]ublish.xml
