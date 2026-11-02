@@ -33,6 +33,79 @@ public class GivenSmbVolume : IDisposable
         (await volume.ListEntries().ToListAsync()).Select(entry => entry.Name).ToList();
 
     [Fact]
+    public async Task When_GettingWritableImageIds_Then_TheyAreLowerCaseUncPathsOfFilesInShares()
+    {
+        // arrange
+        using var volume = OpenVolume();
+
+        // act
+        var shareListId = volume.GetWritableImageId("share");
+        await volume.ChangeDirectory(["share", "DIR1"]);
+        var fileId = volume.GetWritableImageId("Disk.ADF");
+
+        // assert - SMB paths ignore case, so differently cased paths are one image
+        Assert.Null(shareListId);
+        Assert.Equal(@"\\server\share\dir1\disk.adf", fileId);
+    }
+
+    [Fact]
+    public async Task When_OpeningForReadingAndWriting_Then_FileIsChangedInPlaceOnAConnectionOfItsOwn()
+    {
+        // arrange
+        var volume = OpenVolume();
+        await volume.ChangeDirectory(["share"]);
+
+        // act - the stream outlives the volume, as writable images are shared by both panes
+        var stream = await volume.OpenReadWrite("file1.txt");
+        var streamConnection = _server.Connections.Last();
+        volume.Dispose();
+        stream.Position = 6;
+        stream.Write("smb"u8);
+        stream.Position = 0;
+        var buffer = new byte[stream.Length];
+        stream.ReadExactly(buffer);
+        await stream.DisposeAsync();
+
+        // assert
+        Assert.Equal(2, _server.Connections.Count);
+        Assert.Equal("Hello smb world", System.Text.Encoding.ASCII.GetString(buffer));
+        Assert.Equal("Hello smb world", await File.ReadAllTextAsync(Path.Combine(_sharePath, "file1.txt")));
+        Assert.True(streamConnection.IsDisposed);
+    }
+
+    [Fact]
+    public async Task When_ServerClosedConnectionOfReadWriteStream_Then_ItConnectsAgainAndReopensTheFile()
+    {
+        // arrange
+        using var volume = OpenVolume();
+        await volume.ChangeDirectory(["share"]);
+        await using var stream = await volume.OpenReadWrite("file1.txt");
+        var closedConnection = _server.Connections.Last();
+        closedConnection.IsConnected = false;
+
+        // act
+        stream.Write("HELLO"u8);
+
+        // assert
+        Assert.Equal(3, _server.Connections.Count);
+        Assert.True(closedConnection.IsDisposed);
+        Assert.Equal("HELLO SMB world", await File.ReadAllTextAsync(Path.Combine(_sharePath, "file1.txt")));
+    }
+
+    [Fact]
+    public async Task When_OpeningReadOnlyFileForReadingAndWriting_Then_UnauthorizedAccessExceptionIsThrown()
+    {
+        // arrange
+        using var volume = OpenVolume();
+        await volume.ChangeDirectory(["share"]);
+        await volume.SetAttributes("file1.txt", EntryAttributes.ReadOnly);
+
+        // act & assert - the image is then opened read-only, and the connection isn't left open
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => volume.OpenReadWrite("file1.txt"));
+        Assert.True(_server.Connections.Last().IsDisposed);
+    }
+
+    [Fact]
     public async Task When_ListingRoot_Then_SharesExceptHiddenSharesAreListed()
     {
         // arrange
@@ -136,23 +209,26 @@ public class GivenSmbVolume : IDisposable
     }
 
     [Fact]
-    public async Task When_ReadingFile_Then_ContentIsReadInRequestsOfMaxReadSize()
+    public async Task When_ReadingFile_Then_ReadsFillTheBufferWithRequestsOfMaxReadSize()
     {
-        // arrange
+        // arrange - the test server reads at most 7 bytes per request
         using var volume = OpenVolume();
         await volume.ChangeDirectory(["share"]);
 
-        // act
+        // act - images read blocks with one read, so a read fills the buffer up to the end of the file
         await using var stream = await volume.OpenRead("file1.txt");
-        var buffer = new byte[100];
-        var firstRead = await stream.ReadAsync(buffer);
+        var block = new byte[10];
+        var firstRead = await stream.ReadAsync(block);
+        var lastRead = await stream.ReadAsync(new byte[100]);
         stream.Position = 0;
         using var reader = new StreamReader(stream);
         var text = await reader.ReadToEndAsync();
 
         // assert
         Assert.True(stream.CanSeek);
-        Assert.Equal(7, firstRead);
+        Assert.Equal(10, firstRead);
+        Assert.Equal("Hello SMB "u8.ToArray(), block);
+        Assert.Equal(5, lastRead);
         Assert.Equal("Hello SMB world", text);
     }
 

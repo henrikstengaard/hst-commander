@@ -58,7 +58,7 @@ public sealed class TestSmbServer : ISmbConnector
 
             return isGuest && server.GuestDeniedShares.Contains(share)
                 ? throw new UnauthorizedAccessException($"Access to share '{share}' denied")
-                : fileStore;
+                : fileStore.ForConnection(() => IsConnected);
         }
 
         public void Dispose() => IsDisposed = true;
@@ -71,7 +71,18 @@ public sealed class TestSmbServer : ISmbConnector
 /// </summary>
 public sealed class DirectoryFileStore(string rootPath) : INTFileStore
 {
-    private readonly Dictionary<string, FileAttributes> _attributes = new(StringComparer.Ordinal);
+    private Dictionary<string, FileAttributes> _attributes = new(StringComparer.Ordinal);
+    private Func<bool> _isConnected = () => true;
+
+    /// <summary>
+    /// The store as used by a connection, sharing the files and attributes: reading, writing and file information
+    /// fail like on a closed connection when <paramref name="isConnected" /> is false.
+    /// </summary>
+    public DirectoryFileStore ForConnection(Func<bool> isConnected) =>
+        new(rootPath) { _attributes = _attributes, _isConnected = isConnected };
+
+    /// <summary>Status of a request on a closed connection, which SMBLibrary returns when it gets no response.</summary>
+    private const NTStatus DisconnectedStatus = NTStatus.STATUS_INVALID_SMB;
 
     private sealed class Handle(string path)
     {
@@ -122,6 +133,13 @@ public sealed class DirectoryFileStore(string rootPath) : INTFileStore
         if (exists && createOptions.HasFlag(CreateOptions.FILE_NON_DIRECTORY_FILE) && isDirectory)
         {
             return NTStatus.STATUS_FILE_IS_A_DIRECTORY;
+        }
+
+        // like Windows, read-only files can't be opened for writing
+        if (exists && !isDirectory && desiredAccess.HasFlag(AccessMask.GENERIC_WRITE) &&
+            GetAttributes(fullPath).HasFlag(FileAttributes.ReadOnly))
+        {
+            return NTStatus.STATUS_ACCESS_DENIED;
         }
 
         switch (createDisposition)
@@ -181,6 +199,12 @@ public sealed class DirectoryFileStore(string rootPath) : INTFileStore
 
     public NTStatus ReadFile(out byte[] data, object handle, long offset, int maxCount)
     {
+        if (!_isConnected())
+        {
+            data = [];
+            return DisconnectedStatus;
+        }
+
         using var stream = File.OpenRead(((Handle)handle).Path);
         if (offset >= stream.Length)
         {
@@ -197,6 +221,12 @@ public sealed class DirectoryFileStore(string rootPath) : INTFileStore
 
     public NTStatus WriteFile(out int numberOfBytesWritten, object handle, long offset, byte[] data)
     {
+        if (!_isConnected())
+        {
+            numberOfBytesWritten = 0;
+            return DisconnectedStatus;
+        }
+
         using var stream = new FileStream(((Handle)handle).Path, FileMode.Open, FileAccess.Write);
         stream.Position = offset;
         stream.Write(data);
@@ -267,6 +297,11 @@ public sealed class DirectoryFileStore(string rootPath) : INTFileStore
 
     public NTStatus SetFileInformation(object handle, FileInformation information)
     {
+        if (!_isConnected())
+        {
+            return DisconnectedStatus;
+        }
+
         var fileHandle = (Handle)handle;
         switch (information)
         {

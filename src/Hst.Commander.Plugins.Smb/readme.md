@@ -27,7 +27,8 @@ dotnet publish src/Hst.Commander.Plugins.Smb/Hst.Commander.Plugins.Smb.csproj -c
 - Paths are shown as UNC paths, e.g. `\\server\share\dir` (`//server/share/dir` on Linux and macOS), and can be entered in the location dialog (Ctrl+L) while the server is shown.
 - Files and directories can be viewed, edited, copied, moved, renamed and deleted, and their read-only, hidden, system and archive attributes changed, as the user's rights allow. The free and total space of the share is shown next to the path.
 - Each file operation uses a connection of its own. A connection closed by the server, e.g. after being idle, is connected again.
-- Only port 445 and SMB 2 and 3 are supported. Images on shares (e.g. adf files) open read-only.
+- Images on shares (adf, RDB and disk images) can be written like local ones and are shared by both panes. Each open image has a connection of its own, connected again when the server closed it. Writes go over the network uncached, so large hard disk images are slower than local ones. Read-only files open read-only.
+- Only port 445 and SMB 2 and 3 are supported.
 
 ## Licenses
 
@@ -40,5 +41,5 @@ dotnet publish src/Hst.Commander.Plugins.Smb/Hst.Commander.Plugins.Smb.csproj -c
 - `SmbVolumeProvider` (`ILocationVolumeProvider`) parses the path with `SmbPath` and connects in `Connect`, throwing `CredentialsRequiredException` when credentials are needed, and returns an `SmbServerVolumeProvider` for the server and credentials with the share and directories to start in.
 - `SmbServerVolumeProvider` creates an `SmbVolume` with a new connection on each call; its `PathRoot` (`\\server`) makes the paths UNC paths.
 - `SmbVolume` lists the shares at its root and the files of a share below it, running the synchronous requests of SMBLibrary on the thread pool.
-- `SmbFileStream` reads and writes an opened file with requests of at most 1 MiB.
+- `SmbFileStream` reads and writes an opened file with requests of at most 1 MiB, filling the buffer of a read. The stream of a writable image (`OpenReadWrite`) owns a connection of its own (`SmbOpenedFile`) and reopens the file on a new connection when the server closed it.
 - `ISmbConnector`/`ISmbConnection` connect and log in (`SmbClientConnector` with SMBLibrary's `SMB2Client`), replaced by a test server in the tests. `SmbStatus` turns failed statuses into exceptions.

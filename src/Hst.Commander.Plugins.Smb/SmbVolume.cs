@@ -257,6 +257,77 @@ public sealed class SmbVolume : IVolume, IDisposable
         }, cancellationToken);
     }
 
+    /// <summary>
+    /// Id of a file in a share for writable images, its UNC path in lower case, e.g. "\\server\share\dir\disk.adf": SMB
+    /// paths ignore case, so differently cased paths of a file are the same image, and on Windows it equals the id of
+    /// the file opened with its UNC path in a local volume. Null in the share list.
+    /// </summary>
+    public string? GetWritableImageId(string name)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+
+        return IsShareList
+            ? null
+            : string.Join('\\', ["", "", _server, .._pathComponents, name]).ToLowerInvariant();
+    }
+
+    /// <summary>
+    /// Opens a file for reading and writing as a writable image, shared with other readers and writers, on a connection
+    /// of its own: the image is used by both panes and file operations as long as it's open, also after this volume is
+    /// disposed, and a volume's connection isn't thread safe. The stream connects again when the server closed its
+    /// connection. Throws <see cref="UnauthorizedAccessException" /> when the file can't be written, e.g. a read-only
+    /// file or share, and then the image is opened read-only.
+    /// </summary>
+    public Task<Stream> OpenReadWrite(string name, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+
+        var pathComponents = _pathComponents.ToList();
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return RunAsync<Stream>(() =>
+        {
+            var (_, path) = GetFile(pathComponents, name, "written");
+            var displayPath = GetDisplayPath(pathComponents, name);
+            var share = pathComponents[0];
+            var file = OpenReadWriteFile(share, path, displayPath);
+            try
+            {
+                var status = file.FileStore.GetFileInformation(out var information, file.Handle,
+                    FileInformationClass.FileStandardInformation);
+                SmbStatus.ThrowIfFailed(status, $"Reading '{displayPath}'");
+                return new SmbFileStream(file, path, ((FileStandardInformation)information).EndOfFile, true,
+                    () => OpenReadWriteFile(share, path, displayPath));
+            }
+            catch
+            {
+                file.FileStore.CloseFile(file.Handle);
+                file.Connection.Dispose();
+                throw;
+            }
+        }, cancellationToken);
+    }
+
+    /// <summary>Connects and opens a file for reading and writing, shared with other readers and writers.</summary>
+    private SmbOpenedFile OpenReadWriteFile(string share, string path, string displayPath)
+    {
+        var connection = _connector.Connect(_server, _credentials);
+        try
+        {
+            var fileStore = connection.OpenShare(share);
+            var status = fileStore.CreateFile(out var handle, out _, path,
+                AccessMask.GENERIC_READ | AccessMask.GENERIC_WRITE, FileAttributes.Normal,
+                ShareAccess.Read | ShareAccess.Write, CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE,
+                null);
+            SmbStatus.ThrowIfFailed(status, $"Opening '{displayPath}' for writing");
+            return new SmbOpenedFile(connection, fileStore, handle);
+        }
+        catch
+        {
+            connection.Dispose();
+            throw;
+        }
+    }
+
     public Task CreateContainer(string name, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(name);

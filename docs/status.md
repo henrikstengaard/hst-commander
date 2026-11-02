@@ -10,7 +10,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - Reading and writing MBR and GPT disk images (raw or vhd) with FAT and NTFS partitions, PiStorm RDB partitions (MBR type `0x76`, GPT type `3F82EEBC-87C9-4097-8165-89D6540557C0`) and hybrid MBR/RDB disks with the default Disk plugin, working with the Amiga plugin through `IPluginHost`.
 - Reading and writing Amiga disk files (adf, Fast File System) and the partitions (Fast File System, PFS3) of Amiga hard disk images with a rigid disk block (raw or vhd) with the default Amiga plugin, shared between panes and file operations (see [Writable images](volumes.md#writable-images)).
 - Reading and writing physical disks (internal and external, e.g. USB) with the default PhysicalDisk plugin on Windows (as administrator), Linux and macOS (as root): listed with their model in the `Physical disks` volume provider and opened like MBR, GPT and RDB disk images, shared between panes and file operations; read-only while the OS uses a volume on the disk; system disks are listed but not accessible; read and written through a block cache (32 MB per disk by default, set in the plugin's settings file) whose writes are written between file operations.
-- Browsing, reading and writing Windows file shares and other SMB 2/3 servers with the external Smb plugin (installed separately from the release's `smb-plugin.zip`): the `SMB` volume provider asks for an SMB path (`\\server\share` or `smb://server/share`, `\` or `/`) and for a user name and password when the server or share needs them.
+- Browsing, reading and writing Windows file shares and other SMB 2/3 servers with the external Smb plugin (installed separately from the release's `smb-plugin.zip`): the `SMB` volume provider asks for an SMB path (`\\server\share` or `smb://server/share`, `\` or `/`) and for a user name and password when the server or share needs them. Images on shares (adf, RDB and disk images) are writable and shared between panes like local ones.
 - Starting/executing local files with Enter or double-click, with executables drawn in green.
 - GUI entry icons: Amiga .info icons (the default Amiga plugin's icon provider) for the .info file and the entry it belongs to, icons contained in programs and .ico files (also inside images), otherwise the host OS icons for file types, folders and drives.
 - The volume abstraction layer and implementations: `LocalVolume`, `Iso9660Volume`, `ZipVolume`, `LhaVolume`, `LzxVolume`, `NestedVolume`, `EntryVolumeProvider`, and `NullVolume`.
@@ -43,6 +43,6 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - Writing an image file to a physical disk (the physical disk list is read-only).
 - Changing RDB, MBR and GPT partitions, other Amiga file systems (e.g. SFS), other PC file systems (exFAT, ext, ...) and vhdx/vmdk images.
 - Unloading or reloading plugins while running, and a list of loaded plugins in the UI.
-- SMB 1 servers, SMB ports other than 445, browsing the servers of the network, remembering SMB credentials, and writable images on SMB shares (they open read-only).
+- SMB 1 servers, SMB ports other than 445, browsing the servers of the network, and remembering SMB credentials.
 
 
