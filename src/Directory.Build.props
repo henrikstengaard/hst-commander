@@ -1,6 +1,8 @@
 <Project>
   <PropertyGroup>
     <Product>Hst Commander</Product>
+    <!-- Shown in Help > About of the apps (AppInfo.Description), set as their Description by Directory.Build.targets -->
+    <ProductDescription>A dual-pane file manager for Windows, macOS and Linux, inspired by Norton Commander and Midnight Commander. It browses local drives, ISO images, archives, disk images and Amiga disks in the same panes, and plugins can add more.</ProductDescription>
     <Copyright>Copyright © 2026</Copyright>
   </PropertyGroup>
   <PropertyGroup>

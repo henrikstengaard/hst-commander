@@ -10,7 +10,9 @@
         WindowStartupLocation="CenterOwner">
     <StackPanel Margin="16" Spacing="8">
         <TextBlock x:Name="NameAndVersionText" FontWeight="Bold" FontSize="16" />
+        <TextBlock x:Name="BuildDateText" />
         <TextBlock x:Name="AuthorText" TextWrapping="Wrap" />
+        <TextBlock x:Name="DescriptionText" TextWrapping="Wrap" Margin="0,8,0,0" />
         <TextBlock Text="Licenses" FontWeight="Bold" Margin="0,8,0,0" />
         <TextBlock x:Name="LicensesSummaryText" TextWrapping="Wrap" />
         <ListBox x:Name="LicensesList" Height="150">

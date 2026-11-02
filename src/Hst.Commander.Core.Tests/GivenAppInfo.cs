@@ -18,6 +18,34 @@ public class GivenAppInfo
     }
 
     [Fact]
+    public void When_FromExecutableAssembly_Then_DescriptionAndBuildDateAreRead()
+    {
+        // act - the test assembly is an executable like the apps, so Directory.Build.targets sets both
+        var appInfo = AppInfo.FromAssembly(typeof(GivenAppInfo).Assembly);
+
+        // assert
+        Assert.StartsWith("A dual-pane file manager", appInfo.Description);
+        Assert.NotNull(appInfo.BuildDate);
+        Assert.Equal(TimeSpan.Zero, appInfo.BuildDate.Value.Offset);
+        Assert.InRange(appInfo.BuildDate.Value, DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddMinutes(1));
+        var localDate = appInfo.BuildDate.Value.ToLocalTime();
+        Assert.Equal($"Built {localDate:yyyy}-{localDate:MM}-{localDate:dd} {localDate:HH}:{localDate:mm}",
+            appInfo.BuildDateText);
+    }
+
+    [Fact]
+    public void When_AssemblyIsALibrary_Then_DescriptionAndBuildDateAreEmpty()
+    {
+        // act - only executables get them, so libraries compile once
+        var appInfo = AppInfo.FromAssembly(typeof(AppInfo).Assembly);
+
+        // assert
+        Assert.Equal(string.Empty, appInfo.Description);
+        Assert.Null(appInfo.BuildDate);
+        Assert.Equal(string.Empty, appInfo.BuildDateText);
+    }
+
+    [Fact]
     public void When_AboutText_Then_NameVersionAndAuthorAreIncluded()
     {
         // arrange

@@ -19,6 +19,18 @@
   </Target>
 
   <!--
+    The apps get the product description and the date they're built as assembly attributes, shown in Help > About
+    (AppInfo). The date is UTC in the round-trip format ('o' is the same in every culture, unlike ':' in a custom
+    format). Only executables get the date, as it changes on every build and makes them compile again.
+  -->
+  <PropertyGroup Condition="'$(OutputType)' == 'Exe' Or '$(OutputType)' == 'WinExe'">
+    <Description>$(ProductDescription)</Description>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(OutputType)' == 'Exe' Or '$(OutputType)' == 'WinExe'">
+    <AssemblyMetadata Include="BuildDate" Value="$([System.DateTime]::UtcNow.ToString('o'))" />
+  </ItemGroup>
+
+  <!--
     Self-contained apps include the .NET runtime, so the third-party notices of the runtime pack used are embedded
     in the app as the resource THIRD-PARTY-NOTICES-DOTNET.txt, shown in Help > About > Licenses (see Licenses in
     Core), and published next to the app. Builds that aren't self-contained run on a .NET installed separately and
