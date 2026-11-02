@@ -360,16 +360,21 @@ public sealed class MacKeychainStore : ICredentialStore
 /// <summary>
 ///     Passwords in the Secret Service of the desktop (e.g. GNOME Keyring or KWallet) through the secret-tool command
 ///     of libsecret, with the attributes "application hst-commander bookmark &lt;id&gt;". The password is passed on
-///     standard input, never on the command line. Available when secret-tool is installed.
+///     standard input, never on the command line. Available when secret-tool is installed and a Secret Service
+///     answers it, checked once with a lookup that matches nothing (so it never asks to unlock a keyring) and a short
+///     timeout: without a desktop (e.g. Raspberry Pi OS Lite) there is often no keyring or session bus to answer.
 /// </summary>
 public sealed class SecretServiceStore : ICredentialStore
 {
     private const string SecretTool = "secret-tool";
     private static readonly TimeSpan Timeout = TimeSpan.FromMinutes(2);
+    private static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(3);
+
+    private readonly Lazy<bool> isAvailable = new(Probe);
 
     public string Name => "Secret Service keyring";
 
-    public bool IsAvailable { get; } = FindSecretTool() != null;
+    public bool IsAvailable => isAvailable.Value;
 
     public void Save(string id, string password)
     {
@@ -414,6 +419,33 @@ public sealed class SecretServiceStore : ICredentialStore
     private static IOException CreateException(string action, string error) =>
         new($"Failed to {action} the password in the keyring: {error.Trim()}");
 
+    /// <summary>
+    ///     True when a lookup by secret-tool answers in time with a result or "not found" (exit code 1 without an
+    ///     error), false when it reports an error, e.g. no Secret Service on the session bus or no session bus.
+    /// </summary>
+    private static bool IsProbeAnswer(int exitCode, string error) =>
+        exitCode == 0 || (exitCode == 1 && error.Trim().Length == 0);
+
+    private static bool Probe()
+    {
+        if (FindSecretTool() == null)
+        {
+            return false;
+        }
+
+        try
+        {
+            // attributes no item has, so the lookup never needs to unlock a keyring and prompt
+            var result = Execute(["lookup", "application", "hst-commander", "probe", "availability"], null,
+                ProbeTimeout);
+            return IsProbeAnswer(result.ExitCode, result.Error);
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+    }
+
     private static string? FindSecretTool() =>
         (Environment.GetEnvironmentVariable("PATH") ?? string.Empty)
         .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
@@ -429,6 +461,11 @@ public sealed class SecretServiceStore : ICredentialStore
             throw new IOException(BookmarkStore.GetUnavailableMessage());
         }
 
+        return Execute(arguments, input, Timeout);
+    }
+
+    private static Result Execute(IEnumerable<string> arguments, string? input, TimeSpan timeout)
+    {
         var startInfo = new ProcessStartInfo(SecretTool)
         {
             RedirectStandardInput = true,
@@ -454,9 +491,9 @@ public sealed class SecretServiceStore : ICredentialStore
             }
 
             process.StandardInput.Close();
-            if (!process.WaitForExit(Timeout))
+            if (!process.WaitForExit(timeout))
             {
-                process.Kill();
+                process.Kill(true);
                 throw new IOException($"{SecretTool} didn't answer");
             }
 
