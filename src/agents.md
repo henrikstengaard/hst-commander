@@ -17,7 +17,7 @@ The behavior of each feature is described in `docs/` at the repository root. Rea
 | Doc | Covers |
 |---|---|
 | [`docs/plugin-api.md`](../docs/plugin-api.md) | The Abstractions interfaces in detail, plugin loading and load contexts, `IPluginHost` |
-| [`docs/volumes.md`](../docs/volumes.md) | Volume implementations, images, writable images, going to the root, changing location, volume provider keys, Enter on files |
+| [`docs/volumes.md`](../docs/volumes.md) | Volume implementations, images, writable images, going to the root, changing location, bookmarks and their credential stores, volume provider keys, Enter on files |
 | [`docs/file-operations.md`](../docs/file-operations.md) | Copying, UAE metadata, moving/renaming, deleting, making directories, creating volumes, selecting groups, properties |
 | [`docs/viewer.md`](../docs/viewer.md) | F3 viewer: text/hex/image views, search, selection and copying |
 | [`docs/editor.md`](../docs/editor.md) | F4 editing: built-in editor, search and replace, external editors, editor settings |
@@ -140,7 +140,7 @@ These apply across features and aren't obvious from a single file:
 ## Not Implemented
 
 - Other file-management operations (e.g. creating a new file with Shift+F4); changing the viewer's encoding and going to an offset; changing the editor's encoding and line breaks.
-- SMB 1, SMB ports other than 445, browsing the network for servers and saving SMB credentials.
+- SMB 1, SMB ports other than 445 and browsing the network for servers (SMB credentials are only saved with bookmarks).
 - Writing to images other than Amiga adf and RDB images; ISO images and zip, lha and lzx archives are read-only, as are Amiga images inside other images.
 - Changing RDB, MBR and GPT partitions, other Amiga file systems (e.g. SFS), other PC file systems (exFAT, ext, ...) and vhdx/vmdk images.
 - Unloading or reloading plugins while running, and a list of loaded plugins in the UI.
@@ -169,7 +169,7 @@ These apply across features and aren't obvious from a single file:
 - Amiga plugin: `Hst.Commander.Plugins.Amiga`
 - Physical disk plugin: `Hst.Commander.Plugins.PhysicalDisk`
 - SMB plugin: `Hst.Commander.Plugins.Smb`
-- Core: `Hst.Commander.Core` (`AppInfo`, `EditorDocument`, `EditorKind`, `EditorSearch`, `EditorSession`, `EmbeddedIconReader`, `EnterFileAction`, `ExternalEditFile`, `ExternalEditor`, `Elevation`, `EntryProperties`, `FileSystemDetails`, `IconImage`, `ListingProgress`, `NavigationContext`, `NameFilter`, `PluginHost`, `PluginLoader`, `Plugins`, `IProgressIndicator`, `SelectGroupOptions`, `FileStarter`, `ImagePixels`, `SettingsPaths`, `SizeFormatter`, `StandardImageProvider`, `StartupOptions`, `PaneStartup`, `UaeMetadataFormat`, `ViewerDocument`, `ViewerSession`, `WindowsIconImageProvider`, `VolumeConnector`, `CredentialsRequest`, `Licenses`, `LicenseNotice`, `VolumeCreation`, `VolumeCreatorInput`), `Hst.Commander.Core.Volumes` (volumes, copying, UAE metadata)
+- Core: `Hst.Commander.Core` (`AppInfo`, `EditorDocument`, `EditorKind`, `EditorSearch`, `EditorSession`, `EmbeddedIconReader`, `EnterFileAction`, `ExternalEditFile`, `ExternalEditor`, `Elevation`, `EntryProperties`, `FileSystemDetails`, `IconImage`, `ListingProgress`, `NavigationContext`, `NameFilter`, `PluginHost`, `PluginLoader`, `Plugins`, `IProgressIndicator`, `SelectGroupOptions`, `FileStarter`, `ImagePixels`, `SettingsPaths`, `SizeFormatter`, `StandardImageProvider`, `StartupOptions`, `PaneStartup`, `UaeMetadataFormat`, `ViewerDocument`, `ViewerSession`, `WindowsIconImageProvider`, `VolumeConnector`, `CredentialsRequest`, `LocationConnection`, `Bookmark`, `BookmarkStore`, `BookmarkOpener`, `VolumeChoice`, `ICredentialStore`, `CredentialStores`, `Licenses`, `LicenseNotice`, `VolumeCreation`, `VolumeCreatorInput`), `Hst.Commander.Core.Volumes` (volumes, copying, UAE metadata)
 - Tui: `Hst.Commander.Tui`
 - Gui: `Hst.Commander.Gui`, `Hst.Commander.Gui.Icons` (entry icons)
 - Tests: `Hst.Commander.Core.Tests`

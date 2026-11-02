@@ -1,6 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:abstractions="using:Hst.Commander.Abstractions"
+        xmlns:core="using:Hst.Commander.Core"
         x:Class="Hst.Commander.Gui.VolumeProviderDialog"
         Title="Volume"
         Width="420"
@@ -9,11 +9,11 @@
         ShowInTaskbar="False"
         WindowStartupLocation="Manual">
     <StackPanel Margin="16" Spacing="8">
-        <ListBox x:Name="VolumeProvidersList" MaxHeight="320">
+        <ListBox x:Name="VolumeProvidersList" MaxHeight="400">
             <ListBox.ItemTemplate>
-                <DataTemplate x:DataType="abstractions:IVolumeProvider">
+                <DataTemplate x:DataType="core:VolumeChoice">
                     <StackPanel>
-                        <TextBlock Text="{Binding Name}" FontWeight="Bold" />
+                        <TextBlock Text="{Binding Name}" FontWeight="Bold" TextTrimming="CharacterEllipsis" />
                         <TextBlock Text="{Binding Description}" Opacity="0.7" TextTrimming="CharacterEllipsis" />
                     </StackPanel>
                 </DataTemplate>

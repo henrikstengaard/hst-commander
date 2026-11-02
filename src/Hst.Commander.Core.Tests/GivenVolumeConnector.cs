@@ -55,7 +55,7 @@ public class GivenVolumeConnector
 
         // assert
         Assert.NotNull(connection);
-        Assert.Equal(["dir"], connection.PathComponents);
+        Assert.Equal(["dir"], connection.Connection.PathComponents);
         Assert.Equal(3, volumeProvider.Attempts.Count);
         Assert.Null(volumeProvider.Attempts[0]);
         Assert.Equal(

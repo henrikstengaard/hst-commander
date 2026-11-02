@@ -1,4 +1,4 @@
-using Hst.Commander.Abstractions;
+using Hst.Commander.Core;
 using Terminal.Gui;
 
 namespace Hst.Commander.Tui;
@@ -13,9 +13,9 @@ public sealed class LocationDialog : Dialog
     private readonly TextField _pathField;
 
     /// <param name="path">Current path of the pane.</param>
-    /// <param name="chooseVolumeProvider">Shows the volume provider list, returning the chosen one or null.</param>
+    /// <param name="chooseVolumeProvider">Shows the volume provider list, returning the chosen volume provider or bookmark, or null.</param>
     /// <param name="palette">Palette of the theme.</param>
-    public LocationDialog(string path, Func<IVolumeProvider?> chooseVolumeProvider, TuiPalette palette)
+    public LocationDialog(string path, Func<VolumeChoice?> chooseVolumeProvider, TuiPalette palette)
     {
         Title = "Location";
         Width = Dim.Percent(70);
@@ -29,13 +29,13 @@ public sealed class LocationDialog : Dialog
         volumesButton.Accepting += (_, e) =>
         {
             e.Cancel = true;
-            if (chooseVolumeProvider() is not { } volumeProvider)
+            if (chooseVolumeProvider() is not { } volumeChoice)
             {
                 _pathField.SetFocus();
                 return;
             }
 
-            Result = new LocationDialogResult(null, volumeProvider);
+            Result = new LocationDialogResult(null, volumeChoice);
             Application.RequestStop(this);
         };
         var homeButton = new Button { Text = "_Home" };
@@ -72,6 +72,7 @@ public sealed class LocationDialog : Dialog
 }
 
 /// <summary>
-///     Result of the location dialog: a path to change to, a volume provider to show or going to the home directory.
+///     Result of the location dialog: a path to change to, a volume provider or bookmark to show or going to the home
+///     directory.
 /// </summary>
-public sealed record LocationDialogResult(string? Path, IVolumeProvider? VolumeProvider, bool IsHome = false);
+public sealed record LocationDialogResult(string? Path, VolumeChoice? VolumeChoice, bool IsHome = false);

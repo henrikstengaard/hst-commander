@@ -1,5 +1,5 @@
 using Avalonia.Controls;
-using Hst.Commander.Abstractions;
+using Hst.Commander.Core;
 
 namespace Hst.Commander.Gui;
 
@@ -10,23 +10,23 @@ namespace Hst.Commander.Gui;
 /// </summary>
 public partial class LocationDialog : Window
 {
-    public LocationDialog() : this(string.Empty, _ => Task.FromResult<IVolumeProvider?>(null))
+    public LocationDialog() : this(string.Empty, _ => Task.FromResult<VolumeChoice?>(null))
     {
     }
 
     /// <param name="path">Current path of the pane.</param>
     /// <param name="chooseVolumeProvider">
-    ///     Shows the volume provider list owned by the given window, returning the chosen one or null.
+    ///     Shows the volume provider list owned by the given window, returning the chosen volume provider or bookmark, or null.
     /// </param>
-    public LocationDialog(string path, Func<Window, Task<IVolumeProvider?>> chooseVolumeProvider)
+    public LocationDialog(string path, Func<Window, Task<VolumeChoice?>> chooseVolumeProvider)
     {
         InitializeComponent();
         PathTextBox.Text = path;
         VolumesButton.Click += async (_, _) =>
         {
-            if (await chooseVolumeProvider(this) is { } volumeProvider)
+            if (await chooseVolumeProvider(this) is { } volumeChoice)
             {
-                Close(new LocationDialogResult(null, volumeProvider));
+                Close(new LocationDialogResult(null, volumeChoice));
                 return;
             }
 
@@ -44,6 +44,7 @@ public partial class LocationDialog : Window
 }
 
 /// <summary>
-///     Result of the location dialog: a path to change to, a volume provider to show or going to the home directory.
+///     Result of the location dialog: a path to change to, a volume provider or bookmark to show or going to the home
+///     directory.
 /// </summary>
-public sealed record LocationDialogResult(string? Path, IVolumeProvider? VolumeProvider, bool IsHome = false);
+public sealed record LocationDialogResult(string? Path, VolumeChoice? VolumeChoice, bool IsHome = false);

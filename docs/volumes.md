@@ -126,6 +126,89 @@ The location dialog (Ctrl+L, double-clicking the path, File > Location) has the 
 - otherwise, with a non-local provider shown and an unrooted path, a path from the root of a new volume of that provider, where components are directories or images, e.g. `PhysicalDrive2\mbr\1`;
 - with a non-local provider with a `PathRoot` shown, a path starting with it is a path in its volumes the same way, e.g. `\\server\share\dir` of an SMB server (`CurrentPath` shows paths with it too).
 
+## Bookmarks
+
+Ctrl+B or File > Add bookmark bookmarks the location of the active pane with a description (`BookmarkDialog`, the last path component by default). The volume provider list (Alt+F1/Alt+F2 and `Volumes...` of the location dialog) has a `Bookmarks` item after the volume providers (`VolumeChoice.Bookmarks`); choosing it opens the bookmark list (`BookmarksDialog`), or says there are no bookmarks when none have been added. Choosing a bookmark in the list opens it in the pane, and cancelling goes back to the volume provider list. Del or `Delete` deletes the selected bookmark after confirming and F2 or `Rename` changes its description; the list closes when the last bookmark is deleted.
+
+- `NavigationContext.CreateBookmark` makes a `Bookmark` of the current location: `VolumeProviderName` (null for local paths), `Path` (`CurrentPath`, which may go into images) and, for a volume provider asking for a location (e.g. SMB), `Location`, the directory of the root volume outside images with the provider's `PathRoot`, e.g. `\\server\share\dir`, so it never holds credentials of an `smb://user:password@` URL, and the `UserName` connected with.
+- `NavigationContext.ConnectedLocation` is the `LocationConnection` returned by `VolumeConnector.ConnectAsync` (the `ILocationVolumeProvider`, the location entered, the `VolumeConnection` and the credentials entered) while the pane shows its volume provider, so the bookmark knows which provider to connect with and the credentials to offer storing.
+- `BookmarkStore.Default` keeps the bookmarks in `~/.hst-commander/bookmarks.json`, shared by the TUI and the GUI and read again each time the list opens, so both can run at once. An unreadable file is no bookmarks.
+- `BookmarkOpener.OpenAsync` opens a bookmark: a local or volume provider path with `NavigationContext.ChangeLocationAsync(volumeProvider, path)`, which resolves the path in a context of its own like the location dialog, so a failure leaves the pane unchanged; a location provider's bookmark connects to `Location` with `VolumeConnector.ConnectAsync` and changes to `Path` (`ChangeVolumeProviderAsync(connection, path)`). A bookmark of a volume provider needing administrator rights offers to restart as administrator with the pane at the bookmark; one of a plugin that isn't loaded is an error.
+
+### Bookmark credentials
+
+- When the bookmarked location was connected to with a user name and password, Hst Commander asks whether to store the password. The user name is in `bookmarks.json`; the password only in the credential store of the operating system (`ICredentialStore`, `CredentialStores.Default`), never in a file of Hst Commander:
+  - Windows: Windows Credential Manager (`CredWriteW`/`CredReadW`/`CredDeleteW`), generic credentials named `Hst Commander/bookmark/<id>`, encrypted by Windows for the user.
+  - macOS: the user's Keychain (Security framework), generic passwords of the service `Hst Commander` with the bookmark id as account.
+  - Linux: the Secret Service (e.g. GNOME Keyring, KWallet) through `secret-tool` with the attributes `application hst-commander bookmark <id>`; the password is passed on standard input, never on the command line. The store is available when `secret-tool` is installed and a Secret Service answers a lookup matching nothing (so it never asks to unlock a keyring) within 3 seconds, checked once when first needed; without a desktop (e.g. Raspberry Pi OS Lite) there is often no keyring or session bus, and `secret-tool` fails or waits (see [Headless Linux](#headless-linux-eg-raspberry-pi-os-lite)). Without a store Hst Commander says the password can't be stored securely, and the bookmark asks for it when opened.
+- Opening a bookmark connects with the stored password; when there is none or it's rejected, the credentials dialog asks with the user name filled in. When the stored password can't be read (e.g. a locked keyring) or is missing from the store, the credentials dialog says so instead of the server's reason (`BookmarkStore.GetCredentials` throws a message for it, without the store's own error, which for `secret-tool` can be a Python traceback). Deleting a bookmark deletes its password. A store failing when storing the password (e.g. a locked keyring) is shown as an error and the bookmark is kept without the password.
+
+### Headless Linux (e.g. Raspberry Pi OS Lite)
+
+Without a desktop there is no keyring, so `secret-tool` fails and bookmarks can't store passwords. [pass-secret-service](https://github.com/mdellweg/pass_secret_service) provides the Secret Service on top of [pass](https://www.passwordstore.org/), which encrypts each password with a GPG key; gpg-agent asks for the key's passphrase in the terminal and remembers it for a while, so it works over SSH. Hst Commander needs no setting for it: `secret-tool` finds it on the session bus.
+
+1. Install pass, `secret-tool`, a user session bus and pipx (for step 2), then log out and back in so the session bus exists (`echo $DBUS_SESSION_BUS_ADDRESS` shows `unix:path=/run/user/<uid>/bus`):
+
+   ```sh
+   sudo apt install pass libsecret-tools dbus-user-session pinentry-tty pipx git
+   ```
+
+2. Install pass-secret-service. Raspberry Pi OS and Debian have no package for it, and the release on PyPI is from 2018 and outdated, so install it from its repository with pipx, which puts `pass_secret_service` in `~/.local/bin`:
+
+   ```sh
+   pipx install git+https://github.com/mdellweg/pass_secret_service
+   ```
+
+   Then tell the session bus to start it when a program asks for the Secret Service, in `~/.local/share/dbus-1/services/org.freedesktop.secrets.service` (`Exec` needs the full path, `~` doesn't work):
+
+   ```ini
+   [D-BUS Service]
+   Name=org.freedesktop.secrets
+   Exec=/home/<user>/.local/bin/pass_secret_service
+   ```
+
+   Only one program can provide the Secret Service, so don't run gnome-keyring as well.
+
+3. Let gpg-agent ask in the terminal and remember the passphrase, e.g. for 8 hours. gpg-agent is installed with pass (through gnupg) and starts by itself when needed; `gpg-agent --version` shows it. Add to `~/.bashrc`:
+
+   ```sh
+   export GPG_TTY=$(tty)
+   ```
+
+   and to `~/.gnupg/gpg-agent.conf`, then restart the agent with `gpgconf --kill gpg-agent`:
+
+   ```
+   pinentry-program /usr/bin/pinentry-tty
+   default-cache-ttl 28800
+   max-cache-ttl 28800
+   ```
+
+4. Create a GPG key with a passphrase and a password store using it:
+
+   ```sh
+   gpg --quick-generate-key "<name> <<email>>" default default never
+   pass init "<email>"
+   pass insert unlock    # any value; used to unlock the key, see step 5
+   ```
+
+5. Unlock the key, once per login and again after gpg-agent has forgotten the passphrase (step 3), before using the Secret Service, so also before starting Hst Commander:
+
+   ```sh
+   pass show unlock > /dev/null
+   ```
+
+   pass-secret-service is started by the session bus without a terminal, so gpg-agent can't ask for the passphrase when it decrypts a password. With a locked key, `secret-tool lookup` fails (`'NoneType' object has no attribute 'encode'`, as pass-secret-service gets no password from pass), and a bookmark's credentials dialog says the stored password couldn't be read from the Secret Service keyring and asks for it. Storing a password and checking whether the store is available work with a locked key, as they don't decrypt anything.
+
+6. Check that the Secret Service works:
+
+   ```sh
+   secret-tool store --label test application test    # type a value
+   secret-tool lookup application test                # prints it
+   secret-tool clear application test
+   ```
+
+   `Cannot autolaunch D-Bus without X11 $DISPLAY` means there is no session bus: log in again after step 1 (a shell from `su` or an older `tmux` session doesn't have it either).
+
 ## Volume Provider Keys
 
 The volume provider list of the left/right pane opens with Alt+F1/Alt+F2 or Shift+F1/Shift+F2, chosen in the settings. Until chosen, the setting is null and `VolumeProviderKeyBindings.Default` applies: Alt on Windows, Shift elsewhere, because Linux desktops take Alt+F1/Alt+F2 and macOS terminals only send Alt with Option set as Meta. Choosing the keys already in effect keeps the setting unset.

@@ -8,6 +8,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 
 - `TestVolume` (`Hst.Commander.Core.Tests/TestVolume.cs`): in-memory `IVolume` backed by a `Dictionary<string, List<TestEntry>>`. Supports `..` in `ChangeDirectory`, reading/writing `TestEntry.Data`, creating, deleting and renaming entries; `GetEntry(pathComponents)` looks up an entry for assertions.
 - `TestVolumeProvider` (`Hst.Commander.Core.Tests/TestVolumeProvider.cs`): `IVolumeProvider` creating a new `TestVolume` filled by a setup action on each `CreateVolume`.
+- `TestCredentialStore` (`Hst.Commander.Core.Tests/TestCredentialStore.cs`): in-memory `ICredentialStore` for `BookmarkStore` tests (`Passwords`), unavailable when created with `false` and failing to store with `FailSave`; `GivenWindowsCredentialStore` uses the real Windows Credential Manager on Windows only.
 - `TestEntry` (`Hst.Commander.Core.Tests/TestEntry.cs`): in-memory `IEntry` with optional `byte[]? Data`.
 - Use `AddEntry(pathComponents, entry)` to build the in-memory tree.
 - `ZipTestData` (`Hst.Commander.Core.Tests/ZipTestData.cs`): creates zip archives in memory (`CreateZip((name, content)...)`, names ending with `/` are directories).
