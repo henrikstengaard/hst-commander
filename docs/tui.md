@@ -43,6 +43,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 ## Themes and Settings
 
 - Themes: Midnight Commander (default), Light and Dark, from `TuiPalette`. `MainWindow.ApplyTheme` reapplies them. The settings dialog previews theme changes live and reverts them on Cancel.
+- Message boxes (`MessageBox.Query`, `ErrorQuery`) use Terminal.Gui's global "Dialog" and "Error" color schemes, whose focused button barely differs from the others (dark gray instead of black text), so the focus seemed stuck. `MainWindow.ApplyMessageBoxColors` sets them to `TuiPalette.DialogColorScheme` and `ErrorColorScheme`, on theme changes and on `Application.InitializedChanged`, because `Application.Init` reloads Terminal.Gui's configuration and resets them.
 - The settings dialog groups the settings in a `TabView`: Appearance (theme), Panes (volume keys, Enter on file, copy limit, see [Temporary copies](volumes.md#temporary-copies)), Copying (UAE metadata) and Editor (see [Editor settings](editor.md#settings)). Its radio groups have `HighlightStyle.None`: Terminal.Gui saves a view's color scheme when it's pressed and sets it as the view's own when released, so a clicked radio group would keep the previous theme's colors instead of inheriting the dialog's previewed theme.
 - Settings are stored in `~/.hst-commander/tui-settings.json`; a missing or invalid file gives defaults.
 
