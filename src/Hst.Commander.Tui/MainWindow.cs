@@ -278,9 +278,12 @@ public sealed class MainWindow : Window
 
     private Key RightVolumeProviderKey => WithVolumeProviderModifier(Key.F2);
 
-    private Key WithVolumeProviderModifier(Key key) => _volumeProviderKeys == VolumeProviderKeys.ShiftFunctionKeys
-        ? key.WithShift
-        : key.WithAlt;
+    private Key WithVolumeProviderModifier(Key key) => _volumeProviderKeys switch
+    {
+        VolumeProviderKeys.FunctionKeys => key,
+        VolumeProviderKeys.ShiftFunctionKeys => key.WithShift,
+        _ => key.WithAlt
+    };
 
     private void ApplyPaneColors(Pane pane)
     {
@@ -487,8 +490,8 @@ public sealed class MainWindow : Window
                 key.Handled = true;
                 AddBookmark(pane);
             }
-            // plain F1/F2 too, for terminals that don't send the chosen keys, e.g. Terminal.app sends nothing for
-            // Shift+F1/Shift+F2 (see VolumeProviderKeyBindings)
+            // plain F1/F2 also when other keys are chosen, for terminals that don't send them, e.g. Terminal.app sends
+            // nothing for Shift+F1/Shift+F2 (see VolumeProviderKeyBindings)
             else if (key == LeftVolumeProviderKey || key == Key.F1)
             {
                 key.Handled = true;

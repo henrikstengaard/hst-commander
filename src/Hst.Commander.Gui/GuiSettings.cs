@@ -20,8 +20,8 @@ public sealed record GuiSettings
     public GuiTheme Theme { get; init; } = GuiTheme.MidnightCommander;
 
     /// <summary>
-    ///     Keys opening the volume provider list of the left and right pane, null for the default of the host operating
-    ///     system (see <see cref="VolumeProviderKeyBindings.Default" />).
+    ///     Keys opening the volume provider list of the left and right pane, null for the default
+    ///     (see <see cref="VolumeProviderKeyBindings.Default" />).
     /// </summary>
     public VolumeProviderKeys? VolumeProviderKeys { get; init; }
 

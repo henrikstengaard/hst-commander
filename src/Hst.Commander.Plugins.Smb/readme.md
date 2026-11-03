@@ -8,7 +8,7 @@ It is an **external plugin**, not included with Hst Commander: SMBLibrary is lic
 
 1. Download `hst-commander_v<version>_smb-plugin.zip` from the Hst Commander release (the same zip for Windows, Linux and macOS).
 2. Copy the `Hst.Commander.Plugins.Smb` directory from the zip to `~/.hst-commander/plugins/` (`%USERPROFILE%\.hst-commander\plugins\` on Windows), or to `plugins` next to the Hst Commander executable.
-3. Start Hst Commander. **SMB** is listed in the volume provider list (Alt+F1/Alt+F2), and Help > About > Licenses shows the plugin's notices.
+3. Start Hst Commander. **SMB** is listed in the volume provider list (F1/F2), and Help > About > Licenses shows the plugin's notices.
 
 The zip also holds `SMBLibrary-source-<version>.zip`, the source code of the SMBLibrary version included.
 

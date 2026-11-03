@@ -38,7 +38,7 @@ The executable is published as `hst.commander`.
 | F10 / Ctrl+Q / Esc | Quit (Ctrl+Q or Esc when the terminal uses F10, e.g. GNOME Terminal) |
 | Ctrl+P / Alt+Enter | Properties |
 | Ctrl+L | Change location |
-| Alt+F1 / Alt+F2 (Windows), Shift+F1 / Shift+F2 (Linux and macOS) | Choose the volume provider of the left / right pane (configurable in the settings) |
+| F1 / F2 | Choose the volume provider of the left / right pane (also Alt+F1 / Alt+F2 or Shift+F1 / Shift+F2, configurable in the settings) |
 | Ctrl+O | Show the output of programs run |
 
 ## Running
