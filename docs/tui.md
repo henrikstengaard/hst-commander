@@ -54,3 +54,10 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - Ctrl+B adds a bookmark (`BookmarkDialog`); the Bookmarks item of `VolumeProviderDialog` opens `BookmarksDialog` (or a message when there are no bookmarks), where Del deletes and F2 renames the selected bookmark.
 - Ctrl+O (`TerminalAction.ShowOutput`) shows the output screen until a key is pressed.
 - Windows Terminal and Unix terminals draw the TUI on the alternate screen, so the output survives. The classic Windows console doesn't, so `EnterTui` gives the TUI a screen buffer of its own there and `LeaveTui` restores the original, which is also needed because Terminal.Gui's `WindowsConsole.Cleanup` activates a new empty buffer on shutdown. Windows Terminal is detected by `WT_SESSION` or a pseudo console window (`PseudoConsoleWindow`): a program started as administrator, e.g. when restarting as administrator, doesn't get `WT_SESSION` but is shown in Windows Terminal when it's the default terminal, and a screen buffer of its own is never shown there, leaving the screen blank.
+
+## Terminals
+
+- From Windows, run the TUI on a remote machine with the Windows OpenSSH client (`ssh`) in Windows Terminal; it's the tested route. SSH usually doesn't pass on `COLORTERM`, so the TUI uses 16 colors there (see [Terminal.Gui](#terminalgui)).
+- PuTTY isn't supported, and there's no code for it: it sends `TERM=xterm` like other terminals, and only its answerback to ENQ identifies it.
+  - F1-F4 don't work with PuTTY's default keyboard setting, which sends `ESC[11~` to `ESC[14~` instead of xterm's `ESC OP` to `ESC OS` that Terminal.Gui reads. Set Terminal > Keyboard > "The Function keys and keypad" to Xterm R6.
+  - Some controls show black text on a black background in PuTTY; the cause isn't known yet.

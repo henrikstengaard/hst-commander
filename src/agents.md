@@ -22,7 +22,7 @@ The behavior of each feature is described in `docs/` at the repository root. Rea
 | [`docs/viewer.md`](../docs/viewer.md) | F3 viewer: text/hex/image views, search, selection and copying |
 | [`docs/editor.md`](../docs/editor.md) | F4 editing: built-in editor, search and replace, external editors, editor settings |
 | [`docs/icons-and-navigation-modes.md`](../docs/icons-and-navigation-modes.md) | Icon providers, GUI entry icons, navigation modes (list, thumbnails, Workbench, def icons) |
-| [`docs/tui.md`](../docs/tui.md) | TUI files, key handling, dialogs, themes, terminal programs |
+| [`docs/tui.md`](../docs/tui.md) | TUI files, key handling, dialogs, themes, terminal programs, supported terminals (PuTTY) |
 | [`docs/gui.md`](../docs/gui.md) | GUI files, key handling, dialogs, themes, icons |
 | [`docs/application.md`](../docs/application.md) | Versioning, release workflows, local publishing, About, licenses and third-party notices, quitting |
 | [`docs/testing.md`](../docs/testing.md) | Test helpers |
