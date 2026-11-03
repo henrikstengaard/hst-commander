@@ -16,6 +16,11 @@ public enum VolumeProviderKeys
     ShiftFunctionKeys
 }
 
+/// <summary>
+///     The chosen <see cref="VolumeProviderKeys" />. Both front-ends also open the lists with plain F1 and F2, for
+///     terminals that don't send the chosen keys (e.g. Terminal.app sends nothing for Shift+F1/Shift+F2, and Alt only
+///     with Option set as Meta key).
+/// </summary>
 public static class VolumeProviderKeyBindings
 {
     public static IReadOnlyList<VolumeProviderKeys> All { get; } =

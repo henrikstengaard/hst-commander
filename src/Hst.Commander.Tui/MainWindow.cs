@@ -487,12 +487,14 @@ public sealed class MainWindow : Window
                 key.Handled = true;
                 AddBookmark(pane);
             }
-            else if (key == LeftVolumeProviderKey)
+            // plain F1/F2 too, for terminals that don't send the chosen keys, e.g. Terminal.app sends nothing for
+            // Shift+F1/Shift+F2 (see VolumeProviderKeyBindings)
+            else if (key == LeftVolumeProviderKey || key == Key.F1)
             {
                 key.Handled = true;
                 ChooseLeftVolumeProvider();
             }
-            else if (key == RightVolumeProviderKey)
+            else if (key == RightVolumeProviderKey || key == Key.F2)
             {
                 key.Handled = true;
                 ChooseRightVolumeProvider();

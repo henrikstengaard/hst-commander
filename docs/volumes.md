@@ -222,6 +222,17 @@ Without a desktop there is no keyring, so `secret-tool` fails and bookmarks can'
 
 The volume provider list of the left/right pane opens with Alt+F1/Alt+F2 or Shift+F1/Shift+F2, chosen in the settings. Until chosen, the setting is null and `VolumeProviderKeyBindings.Default` applies: Alt on Windows, Shift elsewhere, because Linux desktops take Alt+F1/Alt+F2 and macOS terminals only send Alt with Option set as Meta. Choosing the keys already in effect keeps the setting unset.
 
+Plain F1/F2 also open the lists in both front-ends, whatever the setting, for terminals that don't send the chosen keys. The menu shows the chosen keys.
+
+### macOS Terminal
+
+Terminal.app sends nothing for Shift+F1/Shift+F2 (`cat -v` prints nothing for them), and Alt+F1/Alt+F2 only with Option set as Meta key. Plain F1/F2 work without setup (with fn, unless the keyboard is set to use F1, F2, etc. as standard function keys). To use the chosen keys:
+
+- Shift+F1/Shift+F2: in Settings > Profiles > Keyboard, add Shift+F1 sending `\033[1;2P` and Shift+F2 sending `\033[1;2Q`, the sequences of `kf13`/`kf14` in the `xterm-256color` terminfo, which ncurses reads as Shift+F1/Shift+F2.
+- Alt+F1/Alt+F2: in Settings > Profiles > Keyboard, turn on "Use Option as Meta key".
+
+Ctrl+F1/Ctrl+F2 can't be used: macOS takes them (keyboard navigation and focusing the menu bar).
+
 ## Enter on Files
 
 The `Enter on file` setting is `OpenAsVolume` (the default: detect images, otherwise start the file) or `StartWithHost` (always start local files with the host OS; files inside images are still opened as images when detected; Ctrl+PageDown still opens a file as a volume). Both front-ends set `NavigationContext.EnterFileAction` of both panes at startup and when the settings are saved.

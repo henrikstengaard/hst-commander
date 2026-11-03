@@ -221,11 +221,12 @@ public partial class MainWindow : Window
                 e.Handled = true;
                 (LeftPane.IsKeyboardFocusWithin ? RightPane : LeftPane).FocusEntries();
                 break;
-            case Key.F1 when e.KeyModifiers == VolumeProviderModifier:
+            // plain F1/F2 too, for terminals and keyboards that don't send the chosen keys (see VolumeProviderKeyBindings)
+            case Key.F1 when e.KeyModifiers == VolumeProviderModifier || e.KeyModifiers == KeyModifiers.None:
                 e.Handled = true;
                 await ChooseVolumeProviderAsync(LeftPane);
                 break;
-            case Key.F2 when e.KeyModifiers == VolumeProviderModifier:
+            case Key.F2 when e.KeyModifiers == VolumeProviderModifier || e.KeyModifiers == KeyModifiers.None:
                 e.Handled = true;
                 await ChooseVolumeProviderAsync(RightPane);
                 break;
