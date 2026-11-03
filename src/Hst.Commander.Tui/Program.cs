@@ -17,9 +17,15 @@ try
     while (true)
     {
         TerminalScreen.EnterTui();
-        // the default curses driver shows no colors on macOS (its ncurses reports none even for xterm-256color), so
-        // macOS uses the .NET console driver, which writes ANSI colors itself
-        Application.Init(driverName: OperatingSystem.IsMacOS() ? "NetDriver" : null);
+        Application.Init();
+        // Terminal.Gui writes 24-bit colors on Linux and macOS, which terminals without true color (e.g. Terminal.app
+        // before macOS 26) ignore, showing the TUI in monochrome. The palette only uses the 16 standard colors, so
+        // they're written as such unless the terminal says it has true color. Set after Init, which reloads
+        // Terminal.Gui's configuration and resets it.
+        if (!OperatingSystem.IsWindows() && !TerminalScreen.SupportsTrueColor)
+        {
+            Application.Force16Colors = true;
+        }
         Application.Run(mainWindow);
         Application.Shutdown();
         TerminalScreen.LeaveTui();

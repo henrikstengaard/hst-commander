@@ -39,6 +39,15 @@ public static class TerminalScreen
     private static IntPtr _tuiHandle;
 
     /// <summary>
+    ///     Whether the terminal says it shows 24-bit colors, with <c>COLORTERM</c> set to <c>truecolor</c> or
+    ///     <c>24bit</c> (e.g. iTerm2, GNOME Terminal and Konsole; not Terminal.app before macOS 26).
+    /// </summary>
+    public static bool SupportsTrueColor =>
+        Environment.GetEnvironmentVariable("COLORTERM") is { } colorTerm &&
+        (colorTerm.Equals("truecolor", StringComparison.OrdinalIgnoreCase) ||
+         colorTerm.Equals("24bit", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
     ///     Called before the TUI is started, so it doesn't draw over the output screen. Windows Terminal and Unix
     ///     terminals draw the TUI on the alternate screen, but the classic Windows console draws it on the standard
     ///     output's screen buffer, so there the TUI gets a screen buffer of its own.
