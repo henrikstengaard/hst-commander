@@ -18,6 +18,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 ## Terminal.Gui
 
 - Terminal.Gui **v2 pre-alpha** (`2.0.0-prealpha.1895`). The API differs from v1: consult the installed package, not online v1 docs.
+- Drivers: Windows uses `WindowsDriver` and Linux `CursesDriver` (Terminal.Gui's defaults), while macOS uses `NetDriver` (`Program.cs`). On macOS the curses driver shows the TUI in monochrome even with `TERM=xterm-256color`.
 - Pane keys are attached with `tableView.KeyDown += async (_, key) => { ... }`; window-level keys use `this.KeyUp`. The panes handle F9 and F10 before the menu bar does.
 - Dialogs: `new Dialog { Buttons = [okButton] }`, run with `Application.Run(dialog)`.
 - Background work (copy, move, delete, counting, search) runs with `Task.Run` and reports with `Application.Invoke`. Questions from a background operation (e.g. overwrite) are asked with `MessageBox.Query` invoked on the UI thread through a `TaskCompletionSource`. Cancel or Esc in a progress dialog cancels, and the dialog stays open until the operation has stopped.

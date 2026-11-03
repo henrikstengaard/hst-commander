@@ -17,7 +17,9 @@ try
     while (true)
     {
         TerminalScreen.EnterTui();
-        Application.Init();
+        // the default curses driver shows no colors on macOS (its ncurses reports none even for xterm-256color), so
+        // macOS uses the .NET console driver, which writes ANSI colors itself
+        Application.Init(driverName: OperatingSystem.IsMacOS() ? "NetDriver" : null);
         Application.Run(mainWindow);
         Application.Shutdown();
         TerminalScreen.LeaveTui();
