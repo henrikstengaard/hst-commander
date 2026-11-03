@@ -26,7 +26,7 @@ A plugin implements `IPlugin`, which returns the plugin's:
 
 | Interface | Purpose |
 |---|---|
-| `IVolumeProvider` | Volumes a pane can show, chosen with Alt+F1/Alt+F2 |
+| `IVolumeProvider` | Volumes a pane can show, chosen with F1/F2 |
 | `IFileVolumeProvider` | Files opened as volumes (images), detected by their magic signature with `IsMatch`; `CanWrite` for writable images |
 | `IVolumeCreator` | New volumes created as files with F9, with input fields (`VolumeCreatorField`) |
 | `IIconProvider` | Icons read from icon files next to entries, e.g. Amiga `.info` files, and lines for the properties dialog |

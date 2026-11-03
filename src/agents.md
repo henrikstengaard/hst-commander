@@ -104,7 +104,7 @@ All are in `Hst.Commander.Abstractions`; see [`docs/plugin-api.md`](../docs/plug
 |---|---|
 | `IVolume` | A browsable container with a current directory: list, change directory, open/read/write, create container, delete, rename, set dates, Amiga metadata and attributes. Write members throw `NotSupportedException` when read-only |
 | `IEntry` | An entry: `Name`, `Type` (container/item), `Size`, `ModifiedDate`, plus optional `DisplayName`, `Details`, `IsVolume`, `AmigaMetadata`, `Attributes` |
-| `IVolumeProvider` | What a pane can show (Alt+F1/Alt+F2); `CreateVolume` returns a new, independent volume on each call; optional `PathRoot` shows paths like `\\server\share\dir` |
+| `IVolumeProvider` | What a pane can show (F1/F2); `CreateVolume` returns a new, independent volume on each call; optional `PathRoot` shows paths like `\\server\share\dir` |
 | `ILocationVolumeProvider` | A volume provider asking for a location when chosen (e.g. an SMB path); `Connect` returns a `VolumeConnection` or throws `CredentialsRequiredException` to ask for a user name and password |
 | `IFileVolumeProvider` | Opens files as volumes (images), detected by magic signature with `IsMatch`; `CanWrite` for writable images |
 | `IVolumeCreator` | Creates a new volume file (F9) from input fields |
@@ -187,7 +187,7 @@ These apply across features and aren't obvious from a single file:
 2. **Implement all members**: `Name`, `CurrentPathComponents`, `ListEntries`, `ChangeDirectory`, `OpenEntry`, `OpenRead`, `OpenWrite`, `CreateContainer`, `Delete`, `Rename`, `SetModifiedDate` (throw `NotSupportedException` from the write members when the volume is read-only). Copying and moving to and from the volume then works through `VolumeCopy.CopyToAsync` and `VolumeMove.MoveToAsync`.
 3. **Handle `Paths.Root` and `Paths.Parent`** in `ChangeDirectory` — both are case-insensitive string comparisons.
 4. **Add unit tests** in `Hst.Commander.Core.Tests/` using the `Given<YourVolume>` naming pattern.
-5. **To make it selectable with Alt+F1/Alt+F2**, implement `IVolumeProvider` (see `LocalVolumeProvider`) and add it to `VolumeProviders.All`. To ask for a location (e.g. a server path) and credentials when chosen, implement `ILocationVolumeProvider` instead (see `SmbVolumeProvider` and [`docs/plugin-api.md`](../docs/plugin-api.md#ilocationvolumeprovider)).
+5. **To make it selectable with F1/F2**, implement `IVolumeProvider` (see `LocalVolumeProvider`) and add it to `VolumeProviders.All`. To ask for a location (e.g. a server path) and credentials when chosen, implement `ILocationVolumeProvider` instead (see `SmbVolumeProvider` and [`docs/plugin-api.md`](../docs/plugin-api.md#ilocationvolumeprovider)).
 6. **Or open files as the volume** (images): implement `IFileVolumeProvider` with `IsMatch` checking the file's magic signature (see `Iso9660FileVolumeProvider` and `ZipFileVolumeProvider`) and add it to `VolumeProviders.Files`, or return it from `IPlugin.FileVolumeProviders` of a plugin. `NavigationContext` then opens matching files as images (see [Images](../docs/volumes.md#images)). Return true from `CanWrite` when the volume can write to the file (see [Writable images](../docs/volumes.md#writable-images) and `AdfFileVolumeProvider`).
 
 7. **To create new volumes as files with F9**, implement `IVolumeCreator` (see `AdfVolumeCreator`) with its input fields and return it from `IPlugin.VolumeCreators` with `IPlugin.CanCreateVolumes` true (see [Creating volumes](../docs/file-operations.md#creating-volumes)).

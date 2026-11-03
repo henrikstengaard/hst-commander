@@ -63,7 +63,7 @@ Hst Commander comes with two front-ends that have the same functionality:
 | F10 | Quit |
 | Ctrl+P / Alt+Enter | Properties |
 | Ctrl+L | Change location |
-| Alt+F1 / Alt+F2 (Windows), Shift+F1 / Shift+F2 (Linux and macOS) | Choose the volume provider of the left / right pane (configurable in settings) |
+| F1 / F2 | Choose the volume provider of the left / right pane (also Alt+F1 / Alt+F2 or Shift+F1 / Shift+F2, configurable in settings) |
 | Ctrl+1 to Ctrl+9 | Choose the navigation mode (GUI only) |
 | Ctrl+O | Show the terminal output (TUI only) |
 

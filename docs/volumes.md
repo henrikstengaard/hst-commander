@@ -128,7 +128,7 @@ The location dialog (Ctrl+L, double-clicking the path, File > Location) has the 
 
 ## Bookmarks
 
-Ctrl+B or File > Add bookmark bookmarks the location of the active pane with a description (`BookmarkDialog`, the last path component by default). The volume provider list (Alt+F1/Alt+F2 and `Volumes...` of the location dialog) has a `Bookmarks` item after the volume providers (`VolumeChoice.Bookmarks`); choosing it opens the bookmark list (`BookmarksDialog`), or says there are no bookmarks when none have been added. Choosing a bookmark in the list opens it in the pane, and cancelling goes back to the volume provider list. Del or `Delete` deletes the selected bookmark after confirming and F2 or `Rename` changes its description; the list closes when the last bookmark is deleted.
+Ctrl+B or File > Add bookmark bookmarks the location of the active pane with a description (`BookmarkDialog`, the last path component by default). The volume provider list (F1/F2 and `Volumes...` of the location dialog) has a `Bookmarks` item after the volume providers (`VolumeChoice.Bookmarks`); choosing it opens the bookmark list (`BookmarksDialog`), or says there are no bookmarks when none have been added. Choosing a bookmark in the list opens it in the pane, and cancelling goes back to the volume provider list. Del or `Delete` deletes the selected bookmark after confirming and F2 or `Rename` changes its description; the list closes when the last bookmark is deleted.
 
 - `NavigationContext.CreateBookmark` makes a `Bookmark` of the current location: `VolumeProviderName` (null for local paths), `Path` (`CurrentPath`, which may go into images) and, for a volume provider asking for a location (e.g. SMB), `Location`, the directory of the root volume outside images with the provider's `PathRoot`, e.g. `\\server\share\dir`, so it never holds credentials of an `smb://user:password@` URL, and the `UserName` connected with.
 - `NavigationContext.ConnectedLocation` is the `LocationConnection` returned by `VolumeConnector.ConnectAsync` (the `ILocationVolumeProvider`, the location entered, the `VolumeConnection` and the credentials entered) while the pane shows its volume provider, so the bookmark knows which provider to connect with and the credentials to offer storing.
@@ -220,7 +220,22 @@ Without a desktop there is no keyring, so `secret-tool` fails and bookmarks can'
 
 ## Volume Provider Keys
 
-The volume provider list of the left/right pane opens with Alt+F1/Alt+F2 or Shift+F1/Shift+F2, chosen in the settings. Until chosen, the setting is null and `VolumeProviderKeyBindings.Default` applies: Alt on Windows, Shift elsewhere, because Linux desktops take Alt+F1/Alt+F2 and macOS terminals only send Alt with Option set as Meta. Choosing the keys already in effect keeps the setting unset.
+The volume provider list of the left/right pane opens with F1/F2, Alt+F1/Alt+F2 or Shift+F1/Shift+F2, chosen in the settings. Until chosen, the setting is null and `VolumeProviderKeyBindings.Default` applies: F1/F2 on every operating system, because they reach the TUI in Windows terminals and Terminal.app (except F1 in some Linux terminals, see below), while Terminal.app on macOS sends nothing for Shift+F1/Shift+F2 and Alt only with Option set as Meta key, and Linux desktops take Alt+F1/Alt+F2. Choosing the keys already in effect keeps the setting unset.
+
+Plain F1/F2 also open the lists in both front-ends when Alt or Shift is chosen, for terminals that don't send those keys. The menu shows the chosen keys.
+
+### Linux Terminals
+
+Some Linux desktop terminals use F1 for their help, e.g. GNOME Terminal, so the TUI never gets it; F2 usually gets through. Turn off the terminal's help shortcut, or choose Shift+F1/Shift+F2 in the settings, which these terminals pass on. The Linux text console passes F1 on.
+
+### macOS Terminal
+
+Terminal.app sends nothing for Shift+F1/Shift+F2 (`cat -v` prints nothing for them), and Alt+F1/Alt+F2 only with Option set as Meta key. F1/F2 work without setup (with fn, unless the keyboard is set to use F1, F2, etc. as standard function keys). To use Shift or Alt instead:
+
+- Shift+F1/Shift+F2: in Settings > Profiles > Keyboard, add Shift+F1 sending `\033[1;2P` and Shift+F2 sending `\033[1;2Q`, the sequences of `kf13`/`kf14` in the `xterm-256color` terminfo, which ncurses reads as Shift+F1/Shift+F2.
+- Alt+F1/Alt+F2: in Settings > Profiles > Keyboard, turn on "Use Option as Meta key".
+
+Ctrl+F1/Ctrl+F2 can't be used: macOS takes them (keyboard navigation and focusing the menu bar).
 
 ## Enter on Files
 

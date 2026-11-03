@@ -221,11 +221,12 @@ public partial class MainWindow : Window
                 e.Handled = true;
                 (LeftPane.IsKeyboardFocusWithin ? RightPane : LeftPane).FocusEntries();
                 break;
-            case Key.F1 when e.KeyModifiers == VolumeProviderModifier:
+            // plain F1/F2 also when other keys are chosen, like the TUI (see VolumeProviderKeyBindings)
+            case Key.F1 when e.KeyModifiers == VolumeProviderModifier || e.KeyModifiers == KeyModifiers.None:
                 e.Handled = true;
                 await ChooseVolumeProviderAsync(LeftPane);
                 break;
-            case Key.F2 when e.KeyModifiers == VolumeProviderModifier:
+            case Key.F2 when e.KeyModifiers == VolumeProviderModifier || e.KeyModifiers == KeyModifiers.None:
                 e.Handled = true;
                 await ChooseVolumeProviderAsync(RightPane);
                 break;
@@ -306,9 +307,12 @@ public partial class MainWindow : Window
         Close();
     }
 
-    private KeyModifiers VolumeProviderModifier => _volumeProviderKeys == VolumeProviderKeys.ShiftFunctionKeys
-        ? KeyModifiers.Shift
-        : KeyModifiers.Alt;
+    private KeyModifiers VolumeProviderModifier => _volumeProviderKeys switch
+    {
+        VolumeProviderKeys.FunctionKeys => KeyModifiers.None,
+        VolumeProviderKeys.ShiftFunctionKeys => KeyModifiers.Shift,
+        _ => KeyModifiers.Alt
+    };
 
     /// <summary>Sets the keys opening the volume provider lists, shown in the File menu.</summary>
     private void ApplyVolumeProviderKeys(VolumeProviderKeys keys)
