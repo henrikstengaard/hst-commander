@@ -113,6 +113,15 @@ public sealed class MainWindow : Window
         }
 
         ApplyTheme(theme);
+        // Application.Init reloads Terminal.Gui's configuration, resetting its color schemes, and runs again after a
+        // program has run in the terminal
+        Application.InitializedChanged += (_, args) =>
+        {
+            if (args.CurrentValue)
+            {
+                ApplyMessageBoxColors();
+            }
+        };
         ApplyVolumeProviderKeys(settings.EffectiveVolumeProviderKeys);
         ApplyEnterFileAction(settings.EnterFileAction);
         ApplyUaeMetadata(settings.UaeMetadata);
@@ -242,7 +251,19 @@ public sealed class MainWindow : Window
             ApplyPaneColors(pane);
         }
 
+        ApplyMessageBoxColors();
         NeedsDraw = true;
+    }
+
+    /// <summary>
+    ///     Message boxes (<c>MessageBox.Query</c> and <c>ErrorQuery</c>) use Terminal.Gui's "Dialog" and "Error" color
+    ///     schemes, whose focused buttons barely differ from the others (dark gray instead of black text), so they get
+    ///     the theme's dialog colors like the other dialogs.
+    /// </summary>
+    private void ApplyMessageBoxColors()
+    {
+        Colors.ColorSchemes["Dialog"] = _palette.DialogColorScheme;
+        Colors.ColorSchemes["Error"] = _palette.ErrorColorScheme;
     }
 
     /// <summary>Sets the keys opening the volume provider lists, shown in the File menu.</summary>

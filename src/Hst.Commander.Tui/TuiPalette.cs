@@ -126,4 +126,18 @@ public sealed record TuiPalette(
         HotFocus = DialogFocus,
         Disabled = Dialog
     };
+
+    /// <summary>Error message boxes, white on red with the focused button black on gray in every theme.</summary>
+    public ColorScheme ErrorColorScheme
+    {
+        get
+        {
+            var normal = new TuiAttribute(ColorName16.White, ColorName16.Red);
+            var focus = new TuiAttribute(ColorName16.Black, ColorName16.Gray);
+            return new ColorScheme
+            {
+                Normal = normal, Focus = focus, HotNormal = normal, HotFocus = focus, Disabled = normal
+            };
+        }
+    }
 }
