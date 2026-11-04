@@ -1,4 +1,4 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using Avalonia.Media;
 using Hst.Commander.Core;
 using Hst.Commander.Gui.Icons;
@@ -21,8 +21,12 @@ public sealed class EntryItem(IEntry entry, bool isMarked = false, bool isExecut
 
     public string Name => Entry.Name;
 
-    /// <summary>Name shown in the pane, e.g. "1 - DH0 - Workbench" for an RDB partition (<see cref="IEntry.DisplayName" />).</summary>
-    public string DisplayName => Entry.DisplayName;
+    /// <summary>
+    /// Name shown in the pane, e.g. "1 - DH0 - Workbench" for an RDB partition (<see cref="IEntry.DisplayName" />),
+    /// or the name when the display name is empty, e.g. the root drive "/" on macOS and Linux, shown as "" in the drive
+    /// list as the TUI shows a slash before directories.
+    /// </summary>
+    public string DisplayName => string.IsNullOrEmpty(Entry.DisplayName) ? Entry.Name : Entry.DisplayName;
 
     public bool IsContainer => Entry.Type == EntryType.Container;
 

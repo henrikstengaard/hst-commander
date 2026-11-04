@@ -1,4 +1,4 @@
-# Volumes and Navigation
+﻿# Volumes and Navigation
 
 The volume implementations, images, writable images and how a pane navigates and changes location. Read this when working on a volume, a file volume provider or `NavigationContext` navigation.
 
@@ -30,7 +30,7 @@ Plugin volumes:
 | `PhysicalDiskVolume` (PhysicalDisk) | The physical disks of the computer, listed as items opened like images. See below |
 | `SmbVolume` (Smb, external plugin) | Windows file shares and other SMB 2/3 servers: the root lists the shares of a server, writable as the user's rights allow. See below |
 
-ISO images and zip, lha and lzx archives are read-only. `LocalVolume.CreateContainer` throws `NotSupportedException` in the drive list. The drive list shows the size of each drive in the size column, like the physical disk list; a drive without media (e.g. an empty card reader) has no size. Local directories have no size (`<DIR>`).
+ISO images and zip, lha and lzx archives are read-only. `LocalVolume.CreateContainer` throws `NotSupportedException` in the drive list. The drive list shows the size of each drive in the size column, like the physical disk list; a drive without media (e.g. an empty card reader) has no size. On macOS and Linux the drives are mount points starting with a slash (`/`, `/mnt/usb`), which is trimmed from their display names, as the TUI already shows a slash before directories (otherwise `//` and `//mnt/usb`); the GUI shows the name when the display name is empty (`/`). Local directories have no size (`<DIR>`).
 
 ### Amiga file systems
 

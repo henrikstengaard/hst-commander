@@ -5,6 +5,21 @@ namespace Hst.Commander.Core.Tests;
 
 public class GivenLocalVolume
 {
+    [Theory]
+    [InlineData("/", "")]
+    [InlineData("/mnt/usb", "mnt/usb")]
+    [InlineData("C:\\", "C:\\")]
+    public void When_GetDriveDisplayName_Then_FirstSlashIsTrimmed(string name, string expectedDisplayName) =>
+        Assert.Equal(expectedDisplayName, LocalVolume.GetDriveDisplayName(name));
+
+    [Fact]
+    public async Task When_ListEntriesInRoot_Then_DisplayNamesDontStartWithSlash()
+    {
+        var entries = await new LocalVolume(string.Empty).ListEntries().ToListAsync();
+
+        Assert.All(entries, entry => Assert.False(entry.DisplayName.StartsWith('/')));
+    }
+
     [Fact]
     public async Task When_ListEntriesInRoot_Then_LocalVolumeListsEntries()
     {
