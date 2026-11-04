@@ -19,7 +19,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 ## Avalonia
 
 - Avalonia 12 with the Fluent theme and plain code-behind (no MVVM framework).
-- Most keys (function keys, Tab, `+`/`-`/`*`, Ctrl+L, Ctrl+B, Ctrl+P/Alt+Enter, the volume provider keys, Ctrl+1-9) are handled at window level with tunnelling `KeyDown` handlers. Enter, Backspace, Ctrl+PageDown and Ctrl+\ are handled with a tunnelling handler on the list.
+- Most keys (function keys, Tab, `+`/`-`/`*`, Ctrl+L, Ctrl+B, Ctrl+R, Ctrl+U, Ctrl+P/Alt+Enter, the volume provider keys, Ctrl+1-9) are handled at window level with tunnelling `KeyDown` handlers. Enter, Backspace, Ctrl+PageDown and Ctrl+\ are handled with a tunnelling handler on the list.
 - The volume provider and create volume lists handle Enter with a tunnelling handler on the list, because the focused list item takes Enter before the default OK button sees it.
 - `+`, `-` and `*` are matched by `KeySymbol` (plus `Key.Add`/`Subtract`/`Multiply`) and shown in the menu headers, because key gestures would display as `OemPlus`. Ctrl+\ matches the `\` symbol, `Key.OemPipe` or `Key.OemBackslash`.
 - Dialogs are shown with `ShowDialog(owner)`. Progress dialogs (copy/move, delete) start the operation with `Task.Run` when opened and report through a `Progress<T>` created on the UI thread; questions such as overwriting are shown over them with `Dispatcher.UIThread.InvokeAsync`. Closing the window cancels, and the dialog closes when the operation has stopped and exposes its `Exception`.
@@ -32,6 +32,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - The name column fills the remaining width and is trimmed with an ellipsis. Column dividers are a non-hit-testable grid behind the list, so they continue below the last entry.
 - The path panel keeps its height when the marked summary and disk space are empty.
 - The `ListBox` isn't focusable and arrow keys only move the selection while an item has focus, so `PaneView.FocusEntries` focuses the selected item's container (realizing it with `UpdateLayout` if needed). The left pane has the focus on startup; Tab always switches panes.
+- Ctrl+R (File > Refresh) lists the active pane again. Ctrl+U (File > Swap panes) swaps the panes' contents with `PaneView.SwapWithAsync` (navigation context, entries, cursor and navigation mode, as `LeftPane`/`RightPane` are fixed controls) and saves the navigation modes for their new sides; the focus moves to the other side, with the active pane's contents.
 - PageUp/PageDown and Home/End are handled in `PaneView`, because the list's `ScrollViewer` would otherwise only scroll the view without moving the selection.
 - The current row is only shown in the active pane: `MainWindow.SetActivePane` sets `PaneView.IsActive`, which adds the `active` class; rows of the other list have no selection background in any theme.
 - Row classes: `executable` (green) comes before the current-row and `marked` (yellow) styles, so marked entries stay yellow under the cursor.

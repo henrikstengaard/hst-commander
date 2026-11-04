@@ -273,6 +273,40 @@ public partial class PaneView : UserControl
     /// <summary>Lists the entries of the current location again, e.g. after copying.</summary>
     public Task RefreshEntriesAsync() => RunNavigationAsync(() => Task.CompletedTask);
 
+    /// <summary>
+    ///     Swaps the location, entries, cursor and navigation mode with another pane (Ctrl+U), listing both again. The
+    ///     window moves the focus to the other pane afterwards.
+    /// </summary>
+    public Task SwapWithAsync(PaneView other)
+    {
+        ArgumentNullException.ThrowIfNull(other);
+
+        foreach (var pane in new[] { this, other })
+        {
+            pane._iconsCancellation?.Cancel();
+            pane._volumeFilesCancellation?.Cancel();
+        }
+
+        var (navigationContext, navigationMode) = (NavigationContext, NavigationMode);
+        var (items, selectedIndex, path) = (EntriesList.ItemsSource, EntriesList.SelectedIndex, PathText.Text);
+        TakeOver(other.NavigationContext, other.EntriesList.ItemsSource, other.EntriesList.SelectedIndex,
+            other.PathText.Text);
+        other.TakeOver(navigationContext, items, selectedIndex, path);
+
+        // setting the navigation modes lists the entries again, keeping the cursor as the path is unchanged
+        var otherNavigationMode = other.NavigationMode;
+        return Task.WhenAll(SetNavigationModeAsync(otherNavigationMode), other.SetNavigationModeAsync(navigationMode));
+    }
+
+    private void TakeOver(NavigationContext navigationContext, System.Collections.IEnumerable? items,
+        int selectedIndex, string? path)
+    {
+        NavigationContext = navigationContext;
+        EntriesList.ItemsSource = items;
+        EntriesList.SelectedIndex = selectedIndex;
+        PathText.Text = path;
+    }
+
     /// <summary>Shows the root of a new volume from a volume provider, e.g. chosen with Alt+F1/Alt+F2.</summary>
     public Task ChangeVolumeProviderAsync(IVolumeProvider volumeProvider) =>
         RunNavigationAsync(() => NavigationContext.ChangeVolumeProviderAsync(volumeProvider));
