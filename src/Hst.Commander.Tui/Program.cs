@@ -3,7 +3,7 @@ using Hst.Commander.Tui;
 using Terminal.Gui;
 
 // set before any palette is created, as attributes keep the RGB values of their colors
-TuiPalette.ApplyTrueColors();
+TuiTrueColors.Apply();
 
 // plugins are loaded before the panes are created, so their volume providers are used
 var pluginErrors = Plugins.FormatErrors(Plugins.Load());
@@ -21,7 +21,7 @@ try
     {
         TerminalScreen.EnterTui();
         Application.Init();
-        TuiPalette.ApplyTrueColors();
+        TuiTrueColors.Apply();
         // Terminal.Gui writes 24-bit colors on Linux and macOS, which terminals without true color (e.g. Terminal.app
         // before macOS 26) ignore, showing the TUI in monochrome. The palette only uses the 16 standard colors, so
         // they're written as such unless the terminal says it has true color. Set after Init, which reloads
