@@ -85,6 +85,8 @@ public sealed class MainWindow : Window
             Height = 1,
             Items =
             [
+                new FunctionKeyItem("F1", "Left", ChooseLeftVolumeProvider),
+                new FunctionKeyItem("F2", "Right", ChooseRightVolumeProvider),
                 new FunctionKeyItem("F3", "View", ViewInActivePane),
                 new FunctionKeyItem("F4", "Edit", EditInActivePane),
                 new FunctionKeyItem("F5", "Copy", CopyFromActivePane),

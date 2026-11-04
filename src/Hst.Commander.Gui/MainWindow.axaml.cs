@@ -66,6 +66,8 @@ public partial class MainWindow : Window
         SelectGroupMenuItem.Click += async (_, _) => await SelectGroupAsync(_activePane, true);
         UnselectGroupMenuItem.Click += async (_, _) => await SelectGroupAsync(_activePane, false);
         InvertSelectionMenuItem.Click += (_, _) => InvertSelection(_activePane);
+        LeftVolumeButton.Click += async (_, _) => await ChooseVolumeProviderAsync(LeftPane);
+        RightVolumeButton.Click += async (_, _) => await ChooseVolumeProviderAsync(RightPane);
         ViewButton.Click += async (_, _) => await ViewAsync(_activePane);
         EditButton.Click += async (_, _) => await EditAsync(_activePane);
         CopyButton.Click += async (_, _) => await CopyAsync(_activePane);
