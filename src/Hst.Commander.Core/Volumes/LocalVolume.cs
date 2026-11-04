@@ -292,7 +292,14 @@ public class LocalVolume(string path) : IVolume
     
     /// <summary>Drive with its size shown in the size column; a drive without media has no size.</summary>
     private static IEntry CreateEntry(DriveInfo driveInfo) =>
-        new Entry(driveInfo.Name, EntryType.Container, GetTotalSize(driveInfo));
+        new Entry(driveInfo.Name, EntryType.Container, GetTotalSize(driveInfo),
+            displayName: GetDriveDisplayName(driveInfo.Name));
+
+    /// <summary>
+    /// Name of a drive shown in the drive list: on macOS and Linux drives are mount points starting with a slash
+    /// (e.g. "/" and "/mnt/usb"), which is trimmed, as the TUI already shows a slash before directories ("//").
+    /// </summary>
+    public static string GetDriveDisplayName(string name) => name.StartsWith('/') ? name[1..] : name;
 
     private static long? GetTotalSize(DriveInfo driveInfo)
     {
