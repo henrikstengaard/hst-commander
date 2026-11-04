@@ -4,8 +4,8 @@ using TuiAttribute = Terminal.Gui.Attribute;
 namespace Hst.Commander.Tui;
 
 /// <summary>
-///     Bar at the bottom of the window with the function key items (e.g. <c>F5 Copy</c>), each getting an equal share of
-///     the width. Clicking an item runs its action; items without an action do nothing.
+///     Bar at the bottom of the window with the function key items (e.g. <c>F5Copy</c>, with no space so the ten items
+///     fit in 80 columns), each getting an equal share of the width. Clicking an item runs its action; items without an action do nothing.
 /// </summary>
 public sealed class FunctionKeyBarView : View
 {
@@ -32,7 +32,7 @@ public sealed class FunctionKeyBarView : View
             }
 
             var key = Items[index].Key;
-            var text = (key + " " + Items[index].Title).PadRight(itemWidth)[..itemWidth];
+            var text = (key + Items[index].Title).PadRight(itemWidth)[..itemWidth];
             var keyLength = Math.Min(key.Length, itemWidth);
 
             Move(start, 0);
