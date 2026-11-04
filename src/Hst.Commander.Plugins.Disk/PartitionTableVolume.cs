@@ -1,4 +1,6 @@
 using System.Globalization;
+using DiscUtils.ExFat;
+using DiscUtils.Ext;
 using DiscUtils.Fat;
 using DiscUtils.Ntfs;
 using DiscUtils.Partitions;
@@ -13,9 +15,10 @@ namespace Hst.Commander.Plugins.Disk;
 /// table, e.g. "mbr\1". The partitions are shown with their number and volume label when they have one, or
 /// "PiStorm RDB" for PiStorm partitions (MBR type 0x76 or GPT type 3F82EEBC-87C9-4097-8165-89D6540557C0, e.g. "1 - EMU68BOOT" and "2 - PiStorm RDB", see
 /// <see cref="IEntry.DisplayName" />) and their partition details in the properties dialog
-/// (<see cref="IEntry.Details" />). Partitions with FAT or NTFS are mounted with
-/// DiscUtils, other partitions with the file volume providers of the host, e.g. a PiStorm partition with a rigid disk
-/// block by the Amiga plugin. The partitions can't be changed, their file systems are writable when the stream is.
+/// (<see cref="IEntry.Details" />). Partitions with FAT, exFAT, NTFS or ext2/3/4 are
+/// mounted with DiscUtils, other partitions with the file volume providers of the host, e.g. a PiStorm partition with a
+/// rigid disk block by the Amiga plugin. The partitions can't be changed, their file systems are writable when the
+/// stream is, except ext2/3/4, which DiscUtils only reads.
 /// </summary>
 public sealed class PartitionTableVolume : VolumeListVolume
 {
@@ -36,7 +39,7 @@ public sealed class PartitionTableVolume : VolumeListVolume
 
     /// <param name="name">Name of the partition table, "MBR" or "GPT".</param>
     /// <param name="partitions">Partitions of the partition table, at least one.</param>
-    /// <param name="host">Host opening partitions not mounted by DiscUtils, null to only mount FAT and NTFS.</param>
+    /// <param name="host">Host opening partitions not mounted by DiscUtils, null to only mount the file systems read by DiscUtils.</param>
     /// <param name="resource">Resource disposed with the volume after the partitions, e.g. a virtual disk.</param>
     /// <param name="sectorSize">Sector size of the disk in bytes, 512 or 4096.</param>
     /// <param name="diskSize">
@@ -120,7 +123,10 @@ public sealed class PartitionTableVolume : VolumeListVolume
         }
     }
 
-    /// <summary>Mounts the file systems read by DiscUtils, FAT and NTFS; null for other file systems.</summary>
+    /// <summary>
+    /// Mounts the file systems read by DiscUtils, FAT, exFAT, NTFS and ext2/3/4 (read-only); null for other file
+    /// systems.
+    /// </summary>
     private static DiscFileSystemVolume? MountFileSystem(string name, Stream stream)
     {
         stream.Position = 0;
@@ -131,6 +137,16 @@ public sealed class PartitionTableVolume : VolumeListVolume
         }
 
         stream.Position = 0;
+        if (ExFatFileSystem.Detect(stream))
+        {
+            var volumeLabel = ExFatVolumeLabel.Read(stream);
+            stream.Position = 0;
+            // the separators default to the OS's (only '/' on macOS and Linux), DiscFileSystemVolume joins paths with '\'
+            return new DiscFileSystemVolume(name, new ExFatFileSystem(stream, ExFatPathSeparators),
+                volumeLabel: volumeLabel);
+        }
+
+        stream.Position = 0;
         if (NtfsFileSystem.Detect(stream))
         {
             stream.Position = 0;
@@ -138,14 +154,44 @@ public sealed class PartitionTableVolume : VolumeListVolume
         }
 
         stream.Position = 0;
+        if (IsExtFileSystem(stream))
+        {
+            stream.Position = 0;
+            return new DiscFileSystemVolume(name, new ExtFileSystem(stream), caseSensitive: true);
+        }
+
+        stream.Position = 0;
         return null;
+    }
+
+    /// <summary>Path separators of exFAT paths, '\' first as it's used to join paths.</summary>
+    private static readonly char[] ExFatPathSeparators = ['\\', '/'];
+
+    /// <summary>Offset of the ext2/3/4 superblock in a partition.</summary>
+    private const int ExtSuperblockOffset = 1024;
+
+    /// <summary>Offset of the magic number (0xEF53, little-endian) in the ext2/3/4 superblock.</summary>
+    private const int ExtMagicOffset = 0x38;
+
+    /// <summary>True when the stream has an ext2/3/4 superblock, detected by its magic number.</summary>
+    private static bool IsExtFileSystem(Stream stream)
+    {
+        if (stream.Length < ExtSuperblockOffset + 1024)
+        {
+            return false;
+        }
+
+        stream.Position = ExtSuperblockOffset + ExtMagicOffset;
+        Span<byte> magic = stackalloc byte[2];
+        stream.ReadExactly(magic);
+        return magic[0] == 0x53 && magic[1] == 0xEF;
     }
 
     protected override IEntry CreateEntry(int index, IVolume? volume)
     {
         var name = GetEntryName(index);
         var partition = _partitions[index];
-        var gptName = (partition as GuidPartitionInfo)?.Name.Trim();
+        var gptName = (partition as GuidPartitionInfo)?.Name?.Trim();
         var volumeLabel = (volume as DiscFileSystemVolume)?.VolumeLabel.Trim();
 
         var label = !string.IsNullOrEmpty(volumeLabel) ? volumeLabel

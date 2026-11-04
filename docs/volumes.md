@@ -26,7 +26,7 @@ Plugin volumes:
 | `RdbVolume` (Amiga) | Hard disk images with a rigid disk block (raw, fixed or dynamic vhd). See below |
 | `VolumeListVolume`, `PartitionTableVolume` (Disk) | MBR and GPT disk images. See below |
 | `HybridDiskVolume` (Disk) | A disk with both an MBR and another volume on the whole disk (e.g. a rigid disk block in blocks 1-15): the root lists both partition tables, e.g. `hybrid.img\rdb\1` |
-| `DiscFileSystemVolume` (Disk) | FAT (long names) and NTFS via DiscUtils, writable when the file system is; dates are UTC; attributes can be changed; free/total space shown in the path panel (`GetSpace`) |
+| `DiscFileSystemVolume` (Disk) | FAT (long names), exFAT, NTFS and ext2/3/4 via DiscUtils, writable when the file system is (ext2/3/4 is read-only: DiscUtils only reads it); names are case-insensitive, except on ext2/3/4; dates are UTC; attributes can be changed; free/total space shown in the path panel (`GetSpace`) |
 | `PhysicalDiskVolume` (PhysicalDisk) | The physical disks of the computer, listed as items opened like images. See below |
 | `SmbVolume` (Smb, external plugin) | Windows file shares and other SMB 2/3 servers: the root lists the shares of a server, writable as the user's rights allow. See below |
 
@@ -45,7 +45,9 @@ ISO images and zip, lha and lzx archives are read-only. `LocalVolume.CreateConta
 
 - The root of an RDB, MBR or GPT disk lists the partition table as a single directory (`rdb`, `mbr` or `gpt` in paths, shown in upper case), so paths always show it, e.g. `disk.hdf\rdb\1` or `pistorm.img\mbr\2\rdb\1`. It lists the partitions as directories `1`..`n` marked `IsVolume`, with a `DisplayName` (e.g. `1 - DH0 - Workbench`, `2 - PiStorm RDB`), the partition size as `Size` (shown in the size column instead of `<DIR>`) and `Details` for the properties dialog. The partition table directory has the disk size as `Size`, also shown in the size column and as `Disk size` in its properties: the disk's length for MBR and GPT (MBR doesn't store the disk size, and the partition table covers the whole disk), and cylinders * heads * sectors * block size of the rigid disk block for RDB.
 - A partition is mounted when listed or opened and stays mounted until disposed; one that can't be mounted is only tried once when listed and throws `IOException` when opened. Partition lists are read-only.
-- MBR/GPT partitions are mounted as FAT or NTFS, otherwise through `IPluginHost.OpenVolume` (e.g. a PiStorm partition, MBR type `0x76` or its GPT type, opens as an `RdbVolume`).
+- MBR/GPT partitions are mounted as FAT, exFAT, NTFS or ext2/3/4 (detected by their contents, not the partition type), otherwise through `IPluginHost.OpenVolume` (e.g. a PiStorm partition, MBR type `0x76` or its GPT type, opens as an `RdbVolume`).
+- exFAT is read and written by `LTRData.DiscUtils.ExFat`, which doesn't read the volume label, so `ExFatVolumeLabel` reads it from the root directory. Writes go to the stream right away (no delayed writes), so a shared physical disk can be committed between operations like FAT.
+- ext2/3/4 is read-only (`LTRData.DiscUtils.Ext` only reads). Names are case-sensitive (`file1.txt` and `File1.txt` are different files); DiscUtils lists names with characters Windows doesn't allow (e.g. `:` or `?`) with them replaced by `_` and opens them by those names. Its size is the block count times the block size, as DiscUtils' `Size` is too small.
 - Sector sizes of 512 and 4096 bytes are supported. GPT tells by the header offset. MBR doesn't store it, so 4096 is used only when the partitions only fit with 4096-byte sectors, or also fit and more of them start with a recognizable volume there.
 - `DiskFileVolumeProvider` doesn't match the boot sector of an unpartitioned FAT/exFAT/NTFS volume, which also ends with `0x55 0xAA`.
 

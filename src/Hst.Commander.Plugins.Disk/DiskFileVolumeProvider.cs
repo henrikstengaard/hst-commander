@@ -41,7 +41,7 @@ public class DiskFileVolumeProvider : IFileVolumeProvider
 
     /// <summary>
     /// Host opening partitions not mounted by the plugin, e.g. PiStorm partitions with a rigid disk block, and finding
-    /// other volumes on hybrid disks; null to only mount FAT and NTFS partitions.
+    /// other volumes on hybrid disks; null to only mount FAT, exFAT, NTFS and ext2/3/4 partitions.
     /// </summary>
     public IPluginHost? Host { get; set; }
 

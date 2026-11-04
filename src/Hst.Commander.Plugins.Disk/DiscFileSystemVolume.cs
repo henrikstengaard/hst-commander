@@ -1,13 +1,16 @@
 using System.Runtime.CompilerServices;
 using DiscUtils;
+using DiscUtils.Ext;
 using Hst.Commander.Abstractions;
 
 namespace Hst.Commander.Plugins.Disk;
 
 /// <summary>
-/// Volume browsing a file system read by DiscUtils, e.g. FAT or NTFS of a partition, writable when the file system is
-/// (mounted from a writable stream). Names are case-insensitive like the file systems. Entries have their attributes,
-/// which can be changed when writable. Errors of the file system are thrown as <see cref="IOException" />.
+/// Volume browsing a file system read by DiscUtils, e.g. FAT, exFAT, NTFS or ext4 of a partition, writable when the file
+/// system is (mounted from a writable stream; ext2/3/4 is read-only). Names are case-insensitive like FAT, exFAT and
+/// NTFS, or case-sensitive like ext2/3/4 (DiscUtils lists ext names with characters Windows doesn't allow, e.g. ':',
+/// replaced by '_', and opens them by those names). Entries have their attributes, which can be changed when writable.
+/// Errors of the file system are thrown as <see cref="IOException" />.
 /// </summary>
 public sealed class DiscFileSystemVolume : IVolume, IDisposable
 {
@@ -19,17 +22,29 @@ public sealed class DiscFileSystemVolume : IVolume, IDisposable
         EntryAttributes.ReadOnly | EntryAttributes.Hidden | EntryAttributes.System | EntryAttributes.Archive;
 
     private readonly DiscFileSystem _fileSystem;
+    private readonly bool _caseSensitive;
+    private readonly string? _volumeLabel;
     private List<string> _currentPathComponents = [];
 
     /// <param name="name">Name of the volume.</param>
     /// <param name="fileSystem">File system at its root, disposed with the volume.</param>
-    public DiscFileSystemVolume(string name, DiscFileSystem fileSystem)
+    /// <param name="caseSensitive">True for case-sensitive file systems (e.g. ext2/3/4), false for FAT, exFAT and NTFS.</param>
+    /// <param name="volumeLabel">
+    /// Volume label for file systems whose DiscUtils implementation doesn't read it (exFAT), null to read it from the
+    /// file system.
+    /// </param>
+    public DiscFileSystemVolume(string name, DiscFileSystem fileSystem, bool caseSensitive = false,
+        string? volumeLabel = null)
     {
         ArgumentNullException.ThrowIfNull(fileSystem);
 
         Name = name;
         _fileSystem = fileSystem;
+        _caseSensitive = caseSensitive;
+        _volumeLabel = volumeLabel;
     }
+
+    private StringComparer NameComparer => _caseSensitive ? StringComparer.Ordinal : StringComparer.OrdinalIgnoreCase;
 
     public string Name { get; }
 
@@ -39,10 +54,15 @@ public sealed class DiscFileSystemVolume : IVolume, IDisposable
     public string FileSystemName => _fileSystem.FriendlyName;
 
     /// <summary>Volume label of the file system, e.g. "EMU68BOOT".</summary>
-    public string VolumeLabel => Run(() => _fileSystem.VolumeLabel);
+    public string VolumeLabel => _volumeLabel ?? Run(() => _fileSystem.VolumeLabel ?? string.Empty);
 
-    /// <summary>Size of the file system in bytes.</summary>
-    public long Size => Run(() => _fileSystem.Size);
+    /// <summary>
+    /// Size of the file system in bytes. DiscUtils returns too small a size for ext2/3/4 (less than the free space), so
+    /// it's the number of blocks times the block size.
+    /// </summary>
+    public long Size => Run(() => _fileSystem is ExtFileSystem extFileSystem
+        ? extFileSystem.TotalClusters * extFileSystem.ClusterSize
+        : _fileSystem.Size);
 
     /// <summary>Free space of the file system in bytes.</summary>
     public long Free => Run(() => _fileSystem.AvailableSpace);
@@ -59,11 +79,11 @@ public sealed class DiscFileSystemVolume : IVolume, IDisposable
             return directoryInfo.GetDirectories()
                 .Select(directory => (IEntry)new DiscEntry(directory.Name, EntryType.Container, null,
                     directory.LastWriteTimeUtc, ToEntryAttributes(directory.Attributes)))
-                .OrderBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase)
+                .OrderBy(entry => entry.Name, NameComparer)
                 .Concat(directoryInfo.GetFiles()
                     .Select(file => new DiscEntry(file.Name, EntryType.Item, file.Length, file.LastWriteTimeUtc,
                         ToEntryAttributes(file.Attributes)))
-                    .OrderBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase))
+                    .OrderBy(entry => entry.Name, NameComparer))
                 .ToList();
         });
 
@@ -210,7 +230,7 @@ public sealed class DiscFileSystemVolume : IVolume, IDisposable
         }
 
         // names are case-insensitive, so only the case is changed by renaming to a temporary name first
-        if (info.Name.Equals(newName, StringComparison.OrdinalIgnoreCase))
+        if (!_caseSensitive && info.Name.Equals(newName, StringComparison.OrdinalIgnoreCase))
         {
             var temporaryName = GetTemporaryName();
             Move(info, info.Name, temporaryName);
@@ -286,8 +306,8 @@ public sealed class DiscFileSystemVolume : IVolume, IDisposable
         (EntryAttributes)attributes & ChangeableAttributes;
 
     /// <summary>
-    /// Finds an entry in a directory, case-insensitive like the file systems, with the name as stored. Null when not
-    /// found or the name is invalid.
+    /// Finds an entry in a directory, case-insensitive like FAT, exFAT and NTFS (preferring the exact name) or
+    /// case-sensitive like ext2/3/4, with the name as stored. Null when not found or the name is invalid.
     /// </summary>
     private FoundEntry? FindEntry(IReadOnlyList<string> directoryPathComponents, string name)
     {
@@ -303,7 +323,9 @@ public sealed class DiscFileSystemVolume : IVolume, IDisposable
                 .Concat(directoryInfo.GetFiles().Select(info => new FoundEntry(info.Name, false)))
                 .ToList();
             return entries.FirstOrDefault(entry => entry.Name.Equals(name, StringComparison.Ordinal)) ??
-                   entries.FirstOrDefault(entry => entry.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+                   (_caseSensitive
+                       ? null
+                       : entries.FirstOrDefault(entry => entry.Name.Equals(name, StringComparison.OrdinalIgnoreCase)));
         });
     }
 

@@ -47,7 +47,7 @@ src/
   Hst.Commander.Abstractions/   Plugin API: IVolume, IEntry, IVolumeProvider, IFileVolumeProvider, IPlugin, IPluginHost, IWriteCache, ... and Paths (no external deps)
   Hst.Commander.Plugins.Zip/    Zip archives (default plugin)
   Hst.Commander.Plugins.LhaLzx/ Lha and lzx archives (default plugin)
-  Hst.Commander.Plugins.Disk/   MBR/GPT disk images with FAT/NTFS partitions, hybrid MBR/RDB disks (default plugin)
+  Hst.Commander.Plugins.Disk/   MBR/GPT disk images with FAT/exFAT/NTFS/ext partitions, hybrid MBR/RDB disks (default plugin)
   Hst.Commander.Plugins.Amiga/  Writable adf and RDB images, .info icons, Workbench navigation mode, Amiga images (default plugin)
   Hst.Commander.Plugins.PhysicalDisk/ Internal and external physical disks on Windows, Linux and macOS (default plugin)
   Hst.Commander.Plugins.Smb/    Windows file shares and other SMB 2/3 servers (external plugin, released separately: SMBLibrary is LGPL)
@@ -142,7 +142,7 @@ These apply across features and aren't obvious from a single file:
 - Other file-management operations (e.g. creating a new file with Shift+F4); changing the viewer's encoding and going to an offset; changing the editor's encoding and line breaks.
 - SMB 1, SMB ports other than 445 and browsing the network for servers (SMB credentials are only saved with bookmarks).
 - Writing to images other than Amiga adf and RDB images; ISO images and zip, lha and lzx archives are read-only, as are Amiga images inside other images.
-- Changing RDB, MBR and GPT partitions, other Amiga file systems (e.g. SFS), other PC file systems (exFAT, ext, ...) and vhdx/vmdk images.
+- Changing RDB, MBR and GPT partitions, other Amiga file systems (e.g. SFS), writing ext2/3/4, other PC file systems (btrfs, XFS, ...) and vhdx/vmdk images.
 - Unloading or reloading plugins while running, and a list of loaded plugins in the UI.
 
 ---
@@ -265,13 +265,13 @@ dotnet test src/Hst.Commander.Core.Tests/Hst.Commander.Core.Tests.csproj --logge
 
 | Package | Version | Used in |
 |---|---|---|
-| `LTRData.DiscUtils.Iso9660` | 1.0.54 | `Hst.Commander.Core` — ISO 9660 reading |
+| `LTRData.DiscUtils.Iso9660` | 1.0.90 | `Hst.Commander.Core` — ISO 9660 reading |
 | `SkiaSharp`, `SkiaSharp.NativeAssets.Linux` | 3.119.4 | `Hst.Commander.Core` — decoding PNG, JPEG, GIF, BMP and WebP images viewed with F3 in the GUI (the version Avalonia uses; part of the TUI too, as it references Core) |
 | `System.Linq.Async` | 6.0.1 | `Hst.Commander.Core` — async LINQ |
 | `Hst.Compression` | 0.4.96 | `Hst.Commander.Plugins.LhaLzx` — lha and lzx archive reading |
 | `Hst.Amiga` | 0.6.245 | `Hst.Commander.Plugins.Amiga` — Amiga rigid disk block, Fast File System and PFS3 reading and writing, .info icons; `Hst.Commander.Core` — UAE metadata (UAEFSDB and metafiles) |
-| `LTRData.DiscUtils.Vhd` | 1.0.54 | `Hst.Commander.Plugins.Amiga`, `Hst.Commander.Plugins.Disk` — vhd images |
-| `LTRData.DiscUtils.Core`, `.Fat`, `.Ntfs` | 1.0.54 | `Hst.Commander.Plugins.Disk` — MBR/GPT partition tables, FAT and NTFS reading and writing |
+| `LTRData.DiscUtils.Vhd` | 1.0.90 | `Hst.Commander.Plugins.Amiga`, `Hst.Commander.Plugins.Disk` — vhd images |
+| `LTRData.DiscUtils.Core`, `.Fat`, `.ExFat`, `.Ntfs`, `.Ext` | 1.0.90 | `Hst.Commander.Plugins.Disk` — MBR/GPT partition tables, FAT, exFAT and NTFS reading and writing, ext2/3/4 reading |
 | `SMBLibrary` | 1.5.8.1 | `Hst.Commander.Plugins.Smb` (external plugin, not included with the apps) — SMB 2/3 client (LGPL-3.0-or-later); its version and source commit are also in the plugin's `THIRD-PARTY-NOTICES.txt` and `build-and-release.yml` |
 | `Terminal.Gui` | 2.0.0-prealpha.1895 | `Hst.Commander.Tui` — TUI framework |
 | `Microsoft.Build.Tasks.Git` | 10.0.402 | `Hst.Commander.Tui` — build only (`PrivateAssets="all"`), overrides the vulnerable 8.0.0 (GHSA-23fw-v26w-5fgq) pulled in by Terminal.Gui's `Microsoft.SourceLink.GitHub` 8.0.0 dependency |
