@@ -228,7 +228,7 @@ The details for each front-end are in [`docs/tui.md`](../docs/tui.md) and [`docs
 
 - **TUI:** Terminal.Gui **v2 pre-alpha** (`2.0.0-prealpha.1895`). Its API differs from v1, so consult the installed package, not online v1 docs. Each pane is a private `Pane` class holding its `NavigationContext`; pane keys are handled in `tableView.KeyDown`, window keys in `this.KeyUp`. Dialogs are `new Dialog { Buttons = [...] }` run with `Application.Run(dialog)`; background work reports back with `Application.Invoke`.
 - **GUI:** Avalonia 12 with the Fluent theme and plain code-behind (no MVVM). `PaneView` holds a `NavigationContext`; most keys are handled at window level with tunnelling `KeyDown` handlers. Dialogs are shown with `ShowDialog(owner)`; background work reports through a `Progress<T>` created on the UI thread. Theme brushes live in `App.axaml` `ThemeDictionaries` and are referenced with `DynamicResource`.
-- Both front-ends have the same File menu, function key bar (F3-F10), themes (Midnight Commander, Light, Dark) and settings dialog with tabs (Appearance, Panes, Copying, Editor; stored separately in `~/.hst-commander/tui-settings.json` and `gui-settings.json`).
+- Both front-ends have the same File menu, function key bar (F1-F10), themes (Midnight Commander, Light, Dark) and settings dialog with tabs (Appearance, Panes, Copying, Editor; stored separately in `~/.hst-commander/tui-settings.json` and `gui-settings.json`).
 
 ## Git Workflow
 

@@ -66,6 +66,12 @@
                     <Setter Property="Padding" Value="6,3,0,3" />
                 </Style>
             </UniformGrid.Styles>
+            <Button x:Name="LeftVolumeButton" Classes="functionKey">
+                <StackPanel Orientation="Horizontal"><TextBlock Classes="key" Text="F1" /><TextBlock Text="Left" /></StackPanel>
+            </Button>
+            <Button x:Name="RightVolumeButton" Classes="functionKey">
+                <StackPanel Orientation="Horizontal"><TextBlock Classes="key" Text="F2" /><TextBlock Text="Right" /></StackPanel>
+            </Button>
             <Button x:Name="ViewButton" Classes="functionKey">
                 <StackPanel Orientation="Horizontal"><TextBlock Classes="key" Text="F3" /><TextBlock Text="View" /></StackPanel>
             </Button>

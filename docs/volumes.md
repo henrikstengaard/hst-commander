@@ -222,7 +222,7 @@ Without a desktop there is no keyring, so `secret-tool` fails and bookmarks can'
 
 The volume provider list of the left/right pane opens with F1/F2, Alt+F1/Alt+F2 or Shift+F1/Shift+F2, chosen in the settings. Until chosen, the setting is null and `VolumeProviderKeyBindings.Default` applies: F1/F2 on every operating system, because they reach the TUI in Windows terminals and Terminal.app (except F1 in some Linux terminals, see below), while Terminal.app on macOS sends nothing for Shift+F1/Shift+F2 and Alt only with Option set as Meta key, and Linux desktops take Alt+F1/Alt+F2. Choosing the keys already in effect keeps the setting unset.
 
-Plain F1/F2 also open the lists in both front-ends when Alt or Shift is chosen, for terminals that don't send those keys. The menu shows the chosen keys.
+Plain F1/F2 also open the lists in both front-ends when Alt or Shift is chosen, for terminals that don't send those keys. The menu shows the chosen keys. The function key bar shows `F1 Left` and `F2 Right` whichever keys are chosen, as plain F1/F2 always work, and clicking them opens the lists too.
 
 ### Linux Terminals
 
