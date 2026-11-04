@@ -36,6 +36,8 @@
                     <MenuItem x:Name="RightVolumeMenuItem" Header="_Right volume..." />
                     <MenuItem x:Name="LocationMenuItem" Header="L_ocation..." InputGesture="Ctrl+L" />
                     <MenuItem x:Name="AddBookmarkMenuItem" Header="Add _bookmark..." InputGesture="Ctrl+B" />
+                    <MenuItem x:Name="RefreshMenuItem" Header="Re_fresh" InputGesture="Ctrl+R" />
+                    <MenuItem x:Name="SwapPanesMenuItem" Header="Sw_ap panes" InputGesture="Ctrl+U" />
                     <Separator />
                     <MenuItem x:Name="SettingsMenuItem" Header="_Settings..." />
                     <Separator />

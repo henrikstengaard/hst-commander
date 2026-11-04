@@ -16,8 +16,8 @@ public sealed class MainWindow : Window
     private readonly MenuBar _menuBar;
     private readonly Label? _administratorLabel;
     private readonly FunctionKeyBarView _functionKeyBar;
-    private readonly Pane _leftPane;
-    private readonly Pane _rightPane;
+    private Pane _leftPane;
+    private Pane _rightPane;
     private readonly MenuItem _leftVolumeMenuItem;
     private readonly MenuItem _rightVolumeMenuItem;
     private VolumeProviderKeys _volumeProviderKeys;
@@ -66,6 +66,8 @@ public sealed class MainWindow : Window
                     _rightVolumeMenuItem,
                     new("L_ocation...", "Ctrl+L", ShowLocationOfActivePane),
                     new("Add _bookmark...", "Ctrl+B", AddBookmarkInActivePane),
+                    new("Re_fresh", "Ctrl+R", RefreshActivePane),
+                    new("Sw_ap panes", "Ctrl+U", SwapPanes),
                     null!,
                     new("_Settings...", string.Empty, ShowSettings),
                     null!,
@@ -513,6 +515,16 @@ public sealed class MainWindow : Window
                 key.Handled = true;
                 AddBookmark(pane);
             }
+            else if (key == Key.R.WithCtrl)
+            {
+                key.Handled = true;
+                _ = RunNavigationAsync(pane, () => Task.CompletedTask);
+            }
+            else if (key == Key.U.WithCtrl)
+            {
+                key.Handled = true;
+                SwapPanes();
+            }
             // plain F1/F2 also when other keys are chosen, for terminals that don't send them, e.g. Terminal.app sends
             // nothing for Shift+F1/Shift+F2 (see VolumeProviderKeyBindings)
             else if (key == LeftVolumeProviderKey || key == Key.F1)
@@ -597,6 +609,23 @@ public sealed class MainWindow : Window
     private void ChooseRightVolumeProvider() => _ = ChooseVolumeProviderAsync(_rightPane);
 
     private void ShowLocationOfActivePane() => _ = ShowLocationAsync(_activePane);
+
+    /// <summary>Lists the entries of the active pane again (Ctrl+R), e.g. after files were changed outside.</summary>
+    private void RefreshActivePane() => _ = RunNavigationAsync(_activePane, () => Task.CompletedTask);
+
+    /// <summary>
+    ///     Swaps the left and right panes (Ctrl+U), like Midnight Commander: each pane moves to the other side with its
+    ///     location, entries, marks and cursor, and the active pane stays active, so the focus moves to the other side.
+    /// </summary>
+    private void SwapPanes()
+    {
+        (_leftPane, _rightPane) = (_rightPane, _leftPane);
+        _leftPane.View.X = Pos.Percent(0);
+        _rightPane.View.X = Pos.Percent(50);
+        _activePane.TableView.SetFocus();
+        SetNeedsLayout();
+        NeedsDraw = true;
+    }
 
     private void AddBookmarkInActivePane() => AddBookmark(_activePane);
 

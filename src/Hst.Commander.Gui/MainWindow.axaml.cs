@@ -80,6 +80,8 @@ public partial class MainWindow : Window
         RightVolumeMenuItem.Click += async (_, _) => await ChooseVolumeProviderAsync(RightPane);
         LocationMenuItem.Click += async (_, _) => await ShowLocationAsync(_activePane);
         AddBookmarkMenuItem.Click += async (_, _) => await AddBookmarkAsync(_activePane);
+        RefreshMenuItem.Click += async (_, _) => await RefreshAsync(_activePane);
+        SwapPanesMenuItem.Click += async (_, _) => await SwapPanesAsync();
         LeftPane.PathDoubleClicked += async (_, _) => await ShowLocationAsync(LeftPane);
         RightPane.PathDoubleClicked += async (_, _) => await ShowLocationAsync(RightPane);
         SettingsMenuItem.Click += async (_, _) => await ShowSettingsAsync();
@@ -176,6 +178,39 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>Lists the entries of a pane again (Ctrl+R), e.g. after files were changed outside.</summary>
+    private static async Task RefreshAsync(PaneView pane)
+    {
+        await pane.RefreshEntriesAsync();
+        pane.FocusEntries();
+    }
+
+    /// <summary>
+    ///     Swaps the left and right panes (Ctrl+U), like Midnight Commander: each pane's location, entries, marks,
+    ///     cursor and navigation mode move to the other side, and the focus moves with the active pane to the other
+    ///     side. The navigation modes are remembered for their new sides.
+    /// </summary>
+    private async Task SwapPanesAsync()
+    {
+        await LeftPane.SwapWithAsync(RightPane);
+        var activePane = _activePane == LeftPane ? RightPane : LeftPane;
+        SetActivePane(activePane);
+        activePane.FocusEntries();
+        try
+        {
+            (GuiSettings.Load() with
+            {
+                LeftNavigationMode = LeftPane.NavigationMode.Name,
+                RightNavigationMode = RightPane.NavigationMode.Name
+            }).Save();
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            await ShowErrorAsync(new IOException(
+                $"Failed to save settings to '{GuiSettings.FilePath}': {exception.Message}", exception));
+        }
+    }
+
     /// <summary>Makes a pane the active pane, only the active pane shows the current entry.</summary>
     private void SetActivePane(PaneView pane)
     {
@@ -244,6 +279,14 @@ public partial class MainWindow : Window
             case Key.B when e.KeyModifiers == KeyModifiers.Control:
                 e.Handled = true;
                 await AddBookmarkAsync(_activePane);
+                break;
+            case Key.R when e.KeyModifiers == KeyModifiers.Control:
+                e.Handled = true;
+                await RefreshAsync(_activePane);
+                break;
+            case Key.U when e.KeyModifiers == KeyModifiers.Control:
+                e.Handled = true;
+                await SwapPanesAsync();
                 break;
             case Key.F3:
                 e.Handled = true;
