@@ -1,4 +1,7 @@
+using System.IO.Compression;
 using DiscUtils;
+using DiscUtils.ExFat;
+using DiscUtils.ExFat.Internal;
 using DiscUtils.Fat;
 using DiscUtils.Ntfs;
 using DiscUtils.Partitions;
@@ -8,8 +11,8 @@ using Hst.Commander.Plugins.Disk;
 namespace Hst.Commander.Core.Tests;
 
 /// <summary>
-/// Creates disk images with a master boot record (MBR) or a GUID partition table (GPT) for tests: FAT and NTFS
-/// partitions, PiStorm partitions with a rigid disk block and hybrid disks with both an MBR and a rigid disk block.
+/// Creates disk images with a master boot record (MBR) or a GUID partition table (GPT) for tests: FAT, exFAT, NTFS and
+/// ext4 partitions, PiStorm partitions with a rigid disk block and hybrid disks with both an MBR and a rigid disk block.
 /// </summary>
 public static class DiskTestData
 {
@@ -25,6 +28,18 @@ public static class DiskTestData
     public const string FatLabel = "FATPART";
     public const string NtfsLabel = "NTFSPART";
     public const string GptFatName = "EFI boot";
+    public const string ExFatLabel = "EXFATPART";
+
+    /// <summary>
+    /// Volume label of the ext4 file system in TestData/Disks/ext4.img.gz, made with mke2fs 1.47.0 in Debian 12:
+    /// "mkfs.ext4 -L EXT4PART -b 1024 -N 64 -E root_owner=0:0 -d src ext4.img 4M", with src holding file1.txt
+    /// ("Hello ext4", modified 2024-05-06 07:08:10 UTC), File1.txt ("Case"), a:b?.txt ("colon") and dir1/file2.txt
+    /// ("Nested").
+    /// </summary>
+    public const string ExtLabel = "EXT4PART";
+
+    /// <summary>Modified date of file1.txt in the ext4 file system.</summary>
+    public static readonly DateTime ExtFile1ModifiedDate = new(2024, 5, 6, 7, 8, 10, DateTimeKind.Utc);
 
     /// <summary>Creates an MBR disk with a FAT partition.</summary>
     public static Stream CreateMbrDisk()
@@ -101,6 +116,41 @@ public static class DiskTestData
         {
             NtfsFileSystem.Format(partitionStream, NtfsLabel, geometry, ntfsFirstSector, ntfsSectorCount).Dispose();
         }
+        stream.Position = 0;
+        return stream;
+    }
+
+    /// <summary>Creates an MBR disk with an exFAT partition (type 0x07) labelled <see cref="ExFatLabel" />.</summary>
+    public static Stream CreateExFatDisk()
+    {
+        var stream = CreateStream(DiskSize);
+        var geometry = Geometry.FromCapacity(DiskSize);
+        BiosPartitionTable.Initialize(stream, geometry).CreatePrimaryBySector(FirstSector,
+            FirstSector + FatSectorCount - 1, BiosPartitionTypes.Ntfs, true);
+        var physicalVolume = new VolumeManager(stream).GetPhysicalVolumes().Single();
+        ExFatFileSystem.Format(physicalVolume, new ExFatFormatOptions(), ExFatLabel).Dispose();
+        stream.Position = 0;
+        return stream;
+    }
+
+    /// <summary>
+    /// Creates an MBR disk with a Linux partition (type 0x83) holding the ext4 file system of
+    /// TestData/Disks/ext4.img.gz (see <see cref="ExtLabel" />).
+    /// </summary>
+    public static async Task<Stream> CreateExtDisk()
+    {
+        var stream = CreateStream(DiskSize);
+        var geometry = Geometry.FromCapacity(DiskSize);
+        BiosPartitionTable.Initialize(stream, geometry).CreatePrimaryBySector(FirstSector,
+            FirstSector + FatSectorCount - 1, BiosPartitionTypes.LinuxNative, false);
+        await using (var imageStream = new GZipStream(
+                         File.OpenRead(Path.Combine(AppContext.BaseDirectory, "TestData", "Disks", "ext4.img.gz")),
+                         CompressionMode.Decompress))
+        await using (var partitionStream = OpenPartition(stream, FirstSector, FatSectorCount))
+        {
+            await imageStream.CopyToAsync(partitionStream);
+        }
+
         stream.Position = 0;
         return stream;
     }

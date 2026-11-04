@@ -90,7 +90,7 @@ public sealed class EntryProperties
 
     /// <summary>
     ///     Lines of check boxes shown after the sections of a single entry: the attributes of entries with them (e.g.
-    ///     local files, FAT and NTFS partitions) and the Amiga protection bits (Amiga volumes, lha/lzx archives and
+    ///     local files, FAT, exFAT and NTFS partitions) and the Amiga protection bits (Amiga volumes, lha/lzx archives and
     ///     entries with UAE metadata). Empty for several entries and drives.
     /// </summary>
     public IReadOnlyList<PropertyFlagGroup> FlagGroups { get; }

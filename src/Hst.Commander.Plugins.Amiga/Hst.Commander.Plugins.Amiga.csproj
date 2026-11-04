@@ -12,7 +12,7 @@
 
     <ItemGroup>
       <PackageReference Include="Hst.Amiga" Version="0.6.245" />
-      <PackageReference Include="LTRData.DiscUtils.Vhd" Version="1.0.54" />
+      <PackageReference Include="LTRData.DiscUtils.Vhd" Version="1.0.90" />
     </ItemGroup>
 
 </Project>

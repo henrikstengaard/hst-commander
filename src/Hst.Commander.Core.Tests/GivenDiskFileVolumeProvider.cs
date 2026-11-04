@@ -342,4 +342,163 @@ public class GivenDiskFileVolumeProvider : IDisposable
         Assert.Equal(["mbr"], tableEntries.Select(entry => entry.Name));
         Assert.Equal($"1 - {DiskTestData.FatLabel}", Assert.Single(entries).DisplayName);
     }
+
+    [Fact]
+    public async Task When_FilesAreWrittenToExFatPartition_Then_TheyAreReadAfterOpeningAgain()
+    {
+        // arrange
+        await using var disk = DiskTestData.CreateExFatDisk();
+
+        // act
+        using (var volume = (VolumeListVolume)await _provider.CreateVolume(disk))
+        {
+            await volume.ChangeDirectory(["mbr", "1"]);
+            await volume.CreateContainer("dir1");
+            await volume.ChangeDirectory(["dir1"]);
+            await WriteTextAsync(volume, "a long file name.txt", "exFAT");
+            await volume.SetModifiedDate("a long file name.txt", new DateTime(2024, 5, 6, 7, 8, 10, DateTimeKind.Utc));
+            await volume.SetAttributes("a long file name.txt", EntryAttributes.ReadOnly | EntryAttributes.Archive);
+        }
+
+        disk.Position = 0;
+        using var reopened = (VolumeListVolume)await _provider.CreateVolume(disk);
+        await reopened.ChangeDirectory(["mbr"]);
+        var partition = Assert.Single(await ListAsync(reopened));
+        await reopened.ChangeDirectory(["1", "DIR1"]);
+        var entry = Assert.Single(await ListAsync(reopened));
+        var text = await ReadTextAsync(reopened, "A LONG FILE NAME.TXT");
+        var changeableAttributes = await reopened.GetChangeableAttributes();
+        await reopened.SetAttributes("a long file name.txt", EntryAttributes.None);
+        await reopened.Rename("a long file name.txt", "A LONG FILE NAME.TXT");
+        var renamed = Assert.Single(await ListAsync(reopened));
+        await reopened.Delete("A LONG FILE NAME.TXT");
+        var entriesAfterDelete = await ListAsync(reopened);
+
+        // assert
+        Assert.Equal($"1 - {DiskTestData.ExFatLabel}", partition.DisplayName);
+        var properties = partition.Details!.Sections.SelectMany(section => section).ToList();
+        Assert.Contains(properties, property => property is { Label: "File system", Value: "Microsoft exFAT" });
+        Assert.Contains(properties, property => property.Label == "Capacity" && property.Bytes > 0);
+        Assert.Equal("a long file name.txt", entry.Name);
+        Assert.Equal(5, entry.Size);
+        Assert.Equal(new DateTime(2024, 5, 6, 7, 8, 10, DateTimeKind.Utc), entry.ModifiedDate!.Value,
+            TimeSpan.FromSeconds(2));
+        Assert.Equal(EntryAttributes.ReadOnly | EntryAttributes.Archive, entry.Attributes);
+        Assert.Equal("exFAT", text);
+        Assert.NotEqual(EntryAttributes.None, changeableAttributes);
+        Assert.Equal("A LONG FILE NAME.TXT", renamed.Name);
+        Assert.Empty(entriesAfterDelete);
+    }
+
+    [Fact]
+    public async Task When_ExFatDiskIsReadOnly_Then_PartitionIsReadButNotWritten()
+    {
+        // arrange
+        var path = Path.Combine(_rootPath, "exfat.img");
+        await using (var created = DiskTestData.CreateExFatDisk())
+        {
+            using (var volume = (VolumeListVolume)await _provider.CreateVolume(created))
+            {
+                await volume.ChangeDirectory(["mbr", "1"]);
+                await WriteTextAsync(volume, "file1.txt", "exFAT");
+            }
+
+            await DiskTestData.WriteToFile(created, path);
+        }
+
+        var bytesBefore = await File.ReadAllBytesAsync(path);
+        await using var disk = File.OpenRead(path);
+
+        // act
+        using var reopened = (VolumeListVolume)await _provider.CreateVolume(disk);
+        await reopened.ChangeDirectory(["mbr", "1"]);
+        var text = await ReadTextAsync(reopened, "file1.txt");
+        var changeableAttributes = await reopened.GetChangeableAttributes();
+
+        // assert
+        Assert.Equal("exFAT", text);
+        Assert.Equal(EntryAttributes.None, changeableAttributes);
+        await Assert.ThrowsAsync<NotSupportedException>(() => reopened.CreateContainer("dir1"));
+        Assert.Equal(bytesBefore, await File.ReadAllBytesAsync(path));
+    }
+
+    [Fact]
+    public async Task When_ExtPartitionIsOpened_Then_FilesAreReadCaseSensitively()
+    {
+        // arrange
+        await using var disk = await DiskTestData.CreateExtDisk();
+
+        // act
+        using var volume = (VolumeListVolume)await _provider.CreateVolume(disk);
+        await volume.ChangeDirectory(["mbr"]);
+        var partition = Assert.Single(await ListAsync(volume));
+        await volume.ChangeDirectory(["1"]);
+        var entries = await ListAsync(volume);
+        var file1 = await ReadTextAsync(volume, "file1.txt");
+        var upperFile1 = await ReadTextAsync(volume, "File1.txt");
+        var colon = await ReadTextAsync(volume, "a_b_.txt");
+        await volume.ChangeDirectory(["dir1"]);
+        var file2 = await ReadTextAsync(volume, "file2.txt");
+
+        // assert
+        Assert.Equal($"1 - {DiskTestData.ExtLabel}", partition.DisplayName);
+        Assert.Contains(partition.Details!.Sections.SelectMany(section => section),
+            property => property.Label == "File system");
+        Assert.Contains(partition.Details!.Sections.SelectMany(section => section),
+            property => property is { Label: "Capacity", Bytes: 4 * 1024 * 1024 });
+        Assert.Contains(entries, entry => entry is { Name: "dir1", Type: EntryType.Container });
+        Assert.Contains(entries, entry => entry is { Name: "a_b_.txt", Size: 5 });
+        Assert.Contains(entries, entry => entry is { Name: "File1.txt", Size: 4 });
+        var file1Entry = Assert.Single(entries, entry => entry.Name == "file1.txt");
+        Assert.Equal(10, file1Entry.Size);
+        Assert.Equal(DiskTestData.ExtFile1ModifiedDate, file1Entry.ModifiedDate!.Value.ToUniversalTime(),
+            TimeSpan.FromSeconds(1));
+        Assert.Equal("Hello ext4", file1);
+        Assert.Equal("Case", upperFile1);
+        Assert.Equal("colon", colon);
+        Assert.Equal("Nested", file2);
+        await Assert.ThrowsAsync<DirectoryNotFoundException>(() => volume.ChangeDirectory([Paths.Parent, "DIR1"]));
+    }
+
+    [Fact]
+    public async Task When_ExtPartitionIsWritten_Then_ItIsReadOnly()
+    {
+        // arrange
+        await using var disk = await DiskTestData.CreateExtDisk();
+        using var volume = (VolumeListVolume)await _provider.CreateVolume(disk);
+        await volume.ChangeDirectory(["mbr", "1"]);
+
+        // act
+        var changeableAttributes = await volume.GetChangeableAttributes();
+
+        // assert
+        Assert.Equal(EntryAttributes.None, changeableAttributes);
+        await Assert.ThrowsAsync<NotSupportedException>(() => volume.CreateContainer("dir2"));
+        await Assert.ThrowsAsync<NotSupportedException>(() => volume.OpenWrite("file3.txt"));
+        await Assert.ThrowsAsync<NotSupportedException>(() => volume.Delete("file1.txt"));
+        await Assert.ThrowsAsync<NotSupportedException>(() => volume.Rename("file1.txt", "file3.txt"));
+    }
+
+    [Fact]
+    public async Task When_FileIsWrittenToExFatPartition_Then_ItIsOnTheDiskBeforeTheVolumeIsClosed()
+    {
+        // arrange
+        await using var disk = DiskTestData.CreateExFatDisk();
+        using var volume = (VolumeListVolume)await _provider.CreateVolume(disk);
+        await volume.ChangeDirectory(["mbr", "1"]);
+
+        // act
+        await volume.CreateContainer("dir1");
+        await WriteTextAsync(volume, "file1.txt", "Written");
+        await volume.Delete("dir1");
+        await using var copy = new MemoryStream(((MemoryStream)disk).ToArray());
+        using var copyVolume = (VolumeListVolume)await _provider.CreateVolume(copy);
+        await copyVolume.ChangeDirectory(["mbr", "1"]);
+        var names = (await ListAsync(copyVolume)).Select(entry => entry.Name).ToList();
+        var text = await ReadTextAsync(copyVolume, "file1.txt");
+
+        // assert
+        Assert.Equal(["file1.txt"], names);
+        Assert.Equal("Written", text);
+    }
 }
