@@ -49,6 +49,8 @@ public partial class MainWindow : Window
         // e.g. icon files written when saving icon positions, which the other pane may show
         LeftPane.EntriesChanged += async (_, _) => await RightPane.RefreshEntriesAsync();
         RightPane.EntriesChanged += async (_, _) => await LeftPane.RefreshEntriesAsync();
+        LeftPane.EntriesDropped += async (_, request) => await DropAsync(LeftPane, request);
+        RightPane.EntriesDropped += async (_, request) => await DropAsync(RightPane, request);
         BuildViewMenu();
         ViewMenuItem.Click += async (_, _) => await ViewAsync(_activePane);
         EditMenuItem.Click += async (_, _) => await EditAsync(_activePane);
@@ -982,17 +984,25 @@ public partial class MainWindow : Window
     ///     Copies the marked entries, or the entry under the cursor, of a pane to the other pane after confirming the
     ///     destination and filter in the copy dialog, showing the progress while copying.
     /// </summary>
-    private async Task CopyAsync(PaneView pane)
+    private Task CopyAsync(PaneView pane)
     {
         var otherPane = pane == LeftPane ? RightPane : LeftPane;
         var entries = pane.NavigationContext.GetOperationEntries(pane.SelectedEntry);
-        if (entries.Count == 0)
-        {
-            return;
-        }
+        return entries.Count == 0
+            ? Task.CompletedTask
+            : CopyAsync(pane, otherPane, entries, otherPane.NavigationContext.CurrentPath);
+    }
 
-        var request = await new CopyDialog(NavigationContext.GetCopyDescription(entries),
-            otherPane.NavigationContext.CurrentPath).ShowDialog<CopyDialogResult?>(this);
+    /// <summary>
+    ///     Copies entries of a pane to a destination of the other pane (or the same pane, when dropped on one of its
+    ///     directories) after confirming the destination and filter in the copy dialog, showing the progress while
+    ///     copying. Both panes are refreshed afterwards.
+    /// </summary>
+    private async Task CopyAsync(PaneView pane, PaneView otherPane, IReadOnlyList<IEntry> entries,
+        string destination)
+    {
+        var request = await new CopyDialog(NavigationContext.GetCopyDescription(entries), destination)
+            .ShowDialog<CopyDialogResult?>(this);
         if (request == null)
         {
             pane.FocusEntries();
@@ -1016,9 +1026,18 @@ public partial class MainWindow : Window
                 break;
         }
 
-        await pane.RefreshEntriesAsync();
-        await otherPane.RefreshEntriesAsync();
+        await RefreshPanesAsync(pane, otherPane);
         pane.FocusEntries();
+    }
+
+    /// <summary>Lists the entries of a pane and of the other pane again, once when they are the same pane.</summary>
+    private static async Task RefreshPanesAsync(PaneView pane, PaneView otherPane)
+    {
+        await pane.RefreshEntriesAsync();
+        if (otherPane != pane)
+        {
+            await otherPane.RefreshEntriesAsync();
+        }
     }
 
     /// <summary>
@@ -1026,15 +1045,23 @@ public partial class MainWindow : Window
     ///     destination and filter in the move dialog, showing the progress while moving. A single entry moved to a name
     ///     without path separators is renamed instead and selected.
     /// </summary>
-    private async Task MoveAsync(PaneView pane)
+    private Task MoveAsync(PaneView pane)
     {
         var otherPane = pane == LeftPane ? RightPane : LeftPane;
         var entries = pane.NavigationContext.GetOperationEntries(pane.SelectedEntry);
-        if (entries.Count == 0)
-        {
-            return;
-        }
+        return entries.Count == 0
+            ? Task.CompletedTask
+            : MoveAsync(pane, otherPane, entries, otherPane.NavigationContext.CurrentPath);
+    }
 
+    /// <summary>
+    ///     Moves entries of a pane to a destination of the other pane (or the same pane, when dropped on one of its
+    ///     directories) after confirming the destination and filter in the move dialog, like
+    ///     <see cref="MoveAsync(PaneView)" />.
+    /// </summary>
+    private async Task MoveAsync(PaneView pane, PaneView otherPane, IReadOnlyList<IEntry> entries,
+        string destination)
+    {
         if (pane.NavigationContext.MoveNotSupportedMessage is { } message)
         {
             await new ErrorDialog(message).ShowDialog(this);
@@ -1042,8 +1069,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        var request = await new CopyDialog(NavigationContext.GetMoveDescription(entries),
-            otherPane.NavigationContext.CurrentPath, "Move").ShowDialog<CopyDialogResult?>(this);
+        var request = await new CopyDialog(NavigationContext.GetMoveDescription(entries), destination, "Move")
+            .ShowDialog<CopyDialogResult?>(this);
         if (request == null)
         {
             pane.FocusEntries();
@@ -1066,7 +1093,11 @@ public partial class MainWindow : Window
         if (newName != null)
         {
             await pane.RenameAsync(entries[0], newName);
-            await otherPane.RefreshEntriesAsync();
+            if (otherPane != pane)
+            {
+                await otherPane.RefreshEntriesAsync();
+            }
+
             pane.FocusEntries();
             return;
         }
@@ -1088,9 +1119,79 @@ public partial class MainWindow : Window
                 break;
         }
 
-        await pane.RefreshEntriesAsync();
-        await otherPane.RefreshEntriesAsync();
+        await RefreshPanesAsync(pane, otherPane);
         pane.FocusEntries();
+    }
+
+    /// <summary>
+    ///     Copies or moves (Shift) entries dropped on a pane (see <see cref="PaneDropRequest" />) after confirming in the
+    ///     copy or move dialog: entries dragged from a pane like F5/F6 to the destination dropped on, and local files
+    ///     and directories dragged from another application through <see cref="DroppedEntries" />. The pane dropped on
+    ///     gets the focus.
+    /// </summary>
+    private async Task DropAsync(PaneView targetPane, PaneDropRequest request)
+    {
+        if (OwnedWindows.Count > 0)
+        {
+            return;
+        }
+
+        Activate();
+        if (request is { SourcePane: { } sourcePane, Entries: { } entries })
+        {
+            await (request.IsMove
+                ? MoveAsync(sourcePane, targetPane, entries, request.Destination)
+                : CopyAsync(sourcePane, targetPane, entries, request.Destination));
+        }
+        else if (request.LocalPaths is { } paths)
+        {
+            await DropLocalPathsAsync(targetPane, paths, request.Destination, request.IsMove);
+        }
+
+        SetActivePane(targetPane);
+        targetPane.FocusEntries();
+    }
+
+    /// <summary>Copies or moves local files and directories dragged from another application to a pane.</summary>
+    private async Task DropLocalPathsAsync(PaneView targetPane, IReadOnlyList<string> paths, string destination,
+        bool isMove)
+    {
+        var otherPane = targetPane == LeftPane ? RightPane : LeftPane;
+        DroppedEntries dropped;
+        try
+        {
+            dropped = await DroppedEntries.OpenAsync(paths, targetPane.NavigationContext);
+        }
+        catch (Exception exception)
+        {
+            await ShowErrorAsync(exception);
+            return;
+        }
+
+        using (dropped)
+        {
+            var title = isMove ? "Move" : "Copy";
+            var request = await new CopyDialog(isMove ? dropped.MoveDescription : dropped.CopyDescription,
+                destination, title).ShowDialog<CopyDialogResult?>(this);
+            if (request == null)
+            {
+                return;
+            }
+
+            var progressDialog = new CopyProgressDialog((progress, confirmOverwrite, cancellationToken) => isMove
+                ? dropped.MoveAsync(targetPane.NavigationContext, request.Destination, request.Filter, progress,
+                    confirmOverwrite, cancellationToken)
+                : dropped.CopyAsync(targetPane.NavigationContext, request.Destination, request.Filter, progress,
+                    confirmOverwrite, cancellationToken), title);
+            await progressDialog.ShowDialog(this);
+            if (progressDialog.Exception is { } exception and not OperationCanceledException)
+            {
+                await ShowErrorAsync(exception);
+            }
+        }
+
+        // the other pane may show the location dropped in or the one moved from
+        await RefreshPanesAsync(targetPane, otherPane);
     }
 
     private async Task ShowSettingsAsync()

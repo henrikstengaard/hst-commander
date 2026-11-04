@@ -47,6 +47,17 @@ public partial class PaneView : UserControl
             }
         };
 
+        EntriesList.AddHandler(PointerPressedEvent, OnEntriesPointerPressed, RoutingStrategies.Tunnel, true);
+        EntriesList.AddHandler(PointerMovedEvent, OnEntriesPointerMoved, RoutingStrategies.Tunnel, true);
+        EntriesList.AddHandler(PointerReleasedEvent, OnEntriesPointerReleased, RoutingStrategies.Tunnel, true);
+        DragDrop.SetAllowDrop(this, true);
+        // Avalonia raises DragEnter instead of DragOver when the pointer moves onto another element, e.g. from a row to
+        // the space below the entries, and uses its effect, so both are handled alike
+        DragDrop.AddDragEnterHandler(this, OnDragOver);
+        DragDrop.AddDragOverHandler(this, OnDragOver);
+        DragDrop.AddDragLeaveHandler(this, (_, _) => ShowDropTarget(null, false));
+        DragDrop.AddDropHandler(this, OnDrop);
+
         IconLayout.AddHandler(KeyDownEvent, OnEntriesKeyDown, RoutingStrategies.Tunnel);
         IconLayout.PropertyChanged += (_, e) =>
         {

@@ -526,6 +526,12 @@ internal sealed class UaeMetadataWriter
     internal static bool IsWindowsReservedName(string name) =>
         WindowsReservedNameRegex.IsMatch(name) || WindowsReservedNameRegex.IsMatch(Path.GetFileNameWithoutExtension(name));
 
+    /// <summary>
+    ///     Name an entry gets in a local directory without UAE metadata (<see cref="UaeMetadataFormat.None" />):
+    ///     invalid characters replaced with "_" and Windows reserved names prefixed with "_".
+    /// </summary>
+    internal static string GetLocalName(string name) => ReplaceInvalidCharacters(name);
+
     /// <summary>Name with invalid characters replaced with "_" and Windows reserved names prefixed with "_".</summary>
     private static string ReplaceInvalidCharacters(string name)
     {

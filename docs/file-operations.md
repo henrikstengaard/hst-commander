@@ -21,7 +21,8 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - Before overwriting an existing item, `CopyOptions.ConfirmOverwrite` is asked with an `OverwriteRequest` and answers `Yes`, `No` (skip; removed from the progress totals) or `All`. Without a callback items are overwritten. Destination directories are listed once to detect existing items, and the speed/ETA clock is paused while asking.
 - `CopyOptions` also holds the filter (`EntryFilter`: `*`/`?` wildcards, several patterns separated by `;`, case-insensitive, applied to items only; containers are always copied) and an optional target name for copying a single item under another name.
 - When a copy is cancelled or fails during an item, the destination stream is closed and the partial item is deleted; cleanup errors are ignored so the original error is kept.
-- `NavigationContext.CopyAsync` resolves the destination text: the other pane's current path means that pane's location (which may be an image); otherwise a local directory (relative to the source's local directory, created when missing); a single file copied to a non-directory path whose parent exists is copied under that name. Copying entries onto themselves or a directory into itself throws `IOException`.
+- `NavigationContext.CopyAsync` resolves the destination text: the other pane's current path means that pane's location (which may be an image); otherwise a local directory (relative to the source's local directory, created when missing); a single file copied to a non-directory path whose parent exists is copied under that name. A path below the other pane's current path (e.g. `c:\disk.adf\dir1` while it shows `c:\disk.adf`) means that directory in its location, so entries dropped on a directory inside an image are copied into it; a missing directory throws `IOException`. Copying entries onto themselves or a directory into itself throws `IOException`.
+- Files dropped on a GUI pane from another application are copied or moved by `DroppedEntries`: their paths are grouped by directory, each opened as a `NavigationContext` with the UAE metadata setting of the pane dropped on, and copied with `CopyAsync`/`MoveAsync`, so they work like entries of a pane (see [Drag and drop](gui.md#drag-and-drop)).
 
 ## UAE Metadata
 
@@ -44,6 +45,7 @@ Amiga names can contain characters other file systems can't (e.g. `*`, `?`, `#`)
   - **Moving:** metadata of moved entries is removed from the source, so moved directories can be deleted. On the same local drive, nodes and metafiles move to the destination; entries that need it go through `VolumeMove.MoveToAsync`.
   - **Properties:** changing the protection bits of an entry with UAE metadata rewrites its node or metafile.
 - The panes show names as stored, e.g. `__uae___file_1`. The properties dialog shows the Amiga name, comment and protection bits from the entry's UAE metadata.
+- Entries of images dragged out of the GUI to other applications get the same names and metadata files as copying them to a local directory (see [Drag and drop](gui.md#drag-and-drop)).
 - `None` turns all UAE metadata handling off: no reading, writing, updating or showing.
 - The format is set in both front-ends' settings and passed to `NavigationContext.UaeMetadata` of both panes. Core references `Hst.Amiga` for the readers and writers.
 

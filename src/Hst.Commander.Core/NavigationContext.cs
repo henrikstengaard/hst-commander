@@ -2550,6 +2550,11 @@ public sealed class NavigationContext : IDisposable
             return (await destinationContext.OpenLocationAsync(cancellationToken), null);
         }
 
+        if (await destinationContext.OpenSubdirectoryLocationAsync(path, cancellationToken) is { } subdirectory)
+        {
+            return (subdirectory, null);
+        }
+
         var basePath = LocalPath;
         if (basePath == null && !Path.IsPathRooted(path))
         {
@@ -2572,6 +2577,75 @@ public sealed class NavigationContext : IDisposable
 
         Directory.CreateDirectory(fullPath);
         return (CreateLocalLocation(fullPath), null);
+    }
+
+    /// <summary>
+    ///     Opens a volume of its own at a directory below the current location when the path is the current path
+    ///     followed by directory names, e.g. "c:\disk.adf\dir1" in "c:\disk.adf" where a dropped entry is copied into
+    ///     "dir1". Null for other paths and for local directories, which are found by their full path.
+    /// </summary>
+    private async Task<VolumeLocation?> OpenSubdirectoryLocationAsync(string path,
+        CancellationToken cancellationToken)
+    {
+        if (!IsInImage && _rootVolume is LocalVolume)
+        {
+            return null;
+        }
+
+        var prefix = Path.EndsInDirectorySeparator(CurrentPath)
+            ? CurrentPath
+            : CurrentPath + Path.DirectorySeparatorChar;
+        if (!path.StartsWith(prefix, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var pathComponents = path[prefix.Length..]
+            .Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
+        if (pathComponents.Length == 0 || pathComponents.Any(component => component == "." || component == Paths.Parent))
+        {
+            return null;
+        }
+
+        var location = await OpenLocationAsync(cancellationToken);
+        try
+        {
+            await location.Volume.ChangeDirectory(pathComponents, cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            location.Dispose();
+            throw new IOException($"Destination '{path}' was not found", exception);
+        }
+
+        return new VolumeLocation(location.Volume, path, location) { SharedImage = location.SharedImage };
+    }
+
+    /// <summary>
+    ///     Full local paths of entries in the current location, e.g. to drag them to another application; null when
+    ///     any entry isn't a local file or directory (inside images, other volume providers and "..").
+    /// </summary>
+    public IReadOnlyList<string>? GetLocalPaths(IReadOnlyCollection<IEntry> entries)
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+
+        if (IsDriveList)
+        {
+            return null;
+        }
+
+        var paths = new List<string>();
+        foreach (var entry in entries)
+        {
+            if (GetLocalPath(entry) is not { } path)
+            {
+                return null;
+            }
+
+            paths.Add(path);
+        }
+
+        return paths;
     }
 
     private static VolumeLocation CreateLocalLocation(string path)

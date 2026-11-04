@@ -35,6 +35,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - Ctrl+R (File > Refresh) lists the active pane again. Ctrl+U (File > Swap panes) swaps the `Pane` objects and their views' `X`, so each pane moves to the other side with its location, entries, marks and cursor; the active pane stays active, so the focus moves to the other side.
 - Ctrl+\ arrives as the control character `0x1C`, which is also sent for Ctrl+4, so both match. The Windows driver decodes Ctrl with the key's character in the current layout, so Ctrl+`<` matches too: the key left of Z is `<` on e.g. Danish and German layouts.
 - Ctrl+P is the main properties key (shown in the menu), because Windows Terminal and the classic console use Alt+Enter for full screen; Alt+Enter still works where the terminal passes it on.
+- No drag and drop: terminals can't drag files out and only some type a dropped file's path (see [Drag and drop](gui.md#drag-and-drop) in the GUI).
 - The volume provider list is centered over its pane. It and the create volume list (F9) have OK and Cancel buttons like the GUI. Enter in the list is handled in the list's `KeyDown` and chooses the selected item, as do OK and double-click.
 
 ## Viewer

@@ -42,6 +42,14 @@
             <Setter Property="Foreground" Value="{DynamicResource HeaderForeground}" />
             <Setter Property="HorizontalAlignment" Value="Center" />
         </Style>
+        <!-- drag and drop: the directory row or the pane the dragged entries are dropped in -->
+        <Style Selector="ListBox.entries ListBoxItem.drop-target /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="BorderBrush" Value="{DynamicResource ActivePathBackground}" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+        <Style Selector="Border#EntriesBorder.drop-target">
+            <Setter Property="BorderBrush" Value="{DynamicResource ActivePathBackground}" />
+        </Style>
         <Style Selector="Border#PathBadge">
             <Setter Property="Background" Value="{DynamicResource PaneBackground}" />
         </Style>
@@ -90,8 +98,8 @@
             </Grid>
         </Border>
 
-        <Border Grid.Row="1" Background="{DynamicResource PaneBackground}" BorderBrush="{DynamicResource PaneBorder}"
-                BorderThickness="1" Margin="2">
+        <Border x:Name="EntriesBorder" Grid.Row="1" Background="{DynamicResource PaneBackground}"
+                BorderBrush="{DynamicResource PaneBorder}" BorderThickness="1" Margin="2">
             <Grid RowDefinitions="Auto,*">
                 <!-- column dividers continue below the last entry -->
                 <Grid x:Name="DividersGrid" Grid.RowSpan="2" IsHitTestVisible="False" ColumnDefinitions="*,90,150">

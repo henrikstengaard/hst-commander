@@ -7,9 +7,10 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 ## Files
 
 - `MainWindow.axaml(.cs)`: the dual-pane window, menus, function key bar, window-level keys and error display.
-- `PaneView.axaml(.cs)`: one pane: path panel, column header, entry `ListBox` (list or thumbnails), `IconLayoutView` for plugin navigation modes, the icon positions bar and the listing progress (an indeterminate progress bar with "Reading ..." shown when listing takes longer than `ListingProgress.Delay`, 2 seconds, and, with a progress bar and a Cancel button, when making a temporary copy takes as long through `NavigationContext.ProgressIndicator`).
+- `PaneView.axaml(.cs)`, `PaneView.DragDrop.cs` (see [Drag and drop](#drag-and-drop)): one pane: path panel, column header, entry `ListBox` (list or thumbnails), `IconLayoutView` for plugin navigation modes, the icon positions bar and the listing progress (an indeterminate progress bar with "Reading ..." shown when listing takes longer than `ListingProgress.Delay`, 2 seconds, and, with a progress bar and a Cancel button, when making a temporary copy takes as long through `NavigationContext.ProgressIndicator`).
 - `PaneNavigationMode.cs`, `IconLayoutView.cs`: navigation modes, see [Navigation modes](icons-and-navigation-modes.md#navigation-modes).
 - `EntryItem.cs`: a display row for an `IEntry`.
+- `Windows/WindowsVirtualFileDrag.cs`, `MacOS/MacFilePromiseDrag.cs`: dragging entries of images and other volumes out as virtual files and file promises, see [Drag and drop](#drag-and-drop).
 - `Icons/`: `FileIcons` (loading and caching entry icons), `IFileIconProvider` with Windows, freedesktop and macOS implementations, and `ViewerIcon` for the icon viewer.
 - `ViewerDialog` with `ViewerControl` and `ViewerSearchDialog`: the viewer.
 - `ThemeManager.cs`, `GuiTheme.cs`, `MidnightCommanderStyles.axaml`, `GuiSettings.cs`: themes and settings.
@@ -19,6 +20,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 ## Avalonia
 
 - Avalonia 12 with the Fluent theme and plain code-behind (no MVVM framework).
+- `Program.Main` has `[STAThread]` (not top-level statements, which run the main thread as MTA): Avalonia only uses OLE on an STA UI thread on Windows, and without OLE windows don't accept drops and dragging out fails.
 - Most keys (function keys, Tab, `+`/`-`/`*`, Ctrl+L, Ctrl+B, Ctrl+R, Ctrl+U, Ctrl+P/Alt+Enter, the volume provider keys, Ctrl+1-9) are handled at window level with tunnelling `KeyDown` handlers. Enter, Backspace, Ctrl+PageDown and Ctrl+\ are handled with a tunnelling handler on the list.
 - The volume provider and create volume lists handle Enter with a tunnelling handler on the list, because the focused list item takes Enter before the default OK button sees it.
 - `+`, `-` and `*` are matched by `KeySymbol` (plus `Key.Add`/`Subtract`/`Multiply`) and shown in the menu headers, because key gestures would display as `OemPlus`. Ctrl+\ matches the `\` symbol, `Key.OemPipe` or `Key.OemBackslash`.
@@ -37,6 +39,20 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - The current row is only shown in the active pane: `MainWindow.SetActivePane` sets `PaneView.IsActive`, which adds the `active` class; rows of the other list have no selection background in any theme.
 - Row classes: `executable` (green) comes before the current-row and `marked` (yellow) styles, so marked entries stay yellow under the cursor.
 - Icons: see [GUI icons](icons-and-navigation-modes.md#gui-icons).
+
+## Drag and Drop
+
+The TUI has no drag and drop: terminals can't drag files out, and dropping only types the path in some terminals.
+
+- **Dragging out:** in the list and thumbnail modes, dragging an entry with the left button (after moving 4 pixels) drags the marked entries when it's marked, otherwise just that entry (".." can't be dragged). Local entries are dragged as their files (`NavigationContext.GetLocalPaths`) with copy and move allowed. When another application moves them (e.g. Explorer with Shift), both panes are listed again.
+- **Entries in images and other volumes** (archives, Amiga images, SMB, physical disks) aren't copied first: the drag starts at once and the application dropped on reads them through `VolumeDragSource`, which opens the pane's location again on the thread pool (so the pane can keep navigating) and gives them the names and UAE metadata copying to a local directory gives them with the UAE metadata setting (see [UAE metadata](file-operations.md#uae-metadata)): the metadata files (`_UAEFSDB.___` or `.uaem`) are made in memory for each dragged directory and dragged after its entries, metadata files of the source aren't dragged, and with `None` entries get local names (e.g. `file_1` for the Amiga name `file*1`). Dropped in a directory that already has a `_UAEFSDB.___` file, Explorer asks to replace it rather than adding to it.
+  - **Windows** (`Windows/WindowsVirtualFileDrag.cs`): virtual files in an OLE data object of our own run with `SHDoDragDrop`, because Avalonia's drag source only offers data in memory. "FileGroupDescriptorW" lists the files and directories, "FileContents" gives a stream per file and "Preferred DropEffect" asks for a copy. The data object supports `IDataObjectAsyncCapability`, so Explorer copies after the drop with its own progress dialog. Explorer's calls arrive on the UI thread, so reads run on the thread pool and are waited for. The drag source is closed once the drag has ended, Explorer has finished copying (`EndOperation`) and every stream it was given has been read to its end (reading again at the end reads no bytes, as Explorer reads until it gets none, and seeking only moves the position the next read goes to, as Explorer seeks after reading the end); a drag whose files stopped being read (e.g. cancelled) is closed when the next drag starts. Explorer always copies (a move with Shift doesn't delete anything in the volume).
+  - **macOS** (`MacOS/MacFilePromiseDrag.cs`): file promises (`NSFilePromiseProvider`) in a dragging session of our own on the window's `NSView` (`IMacOSTopLevelPlatformHandle`), with the delegate and dragging source registered as Objective-C classes through the Objective-C runtime. Finder asks for each dragged entry to be written where it was dropped (`VolumeDragSource.CopyToLocalAsync`, on an operation queue), copied there with UAE metadata like copying; the entry gets the promised name (its local name) unless it has UAE metadata, which refers to the name copying gave it.
+  - **Linux:** no file manager reads such files, so these entries are only dragged to the panes.
+  - Errors reading the entries are shown when the drop target reads them.
+- **Dropping** on a pane, from either pane or another application, copies, or moves with Shift. In the list and thumbnails, dropping on a directory row copies into that directory (the row is outlined), otherwise into the current location (the pane is outlined). In the plugins' navigation modes (e.g. the Workbench, whose icons are dragged to move them), entries can only be dropped. The drive list only takes drops on a drive. A pane's own entries are only dropped on one of its other directories.
+- A drop opens the copy or move dialog with the destination filled in, like F5/F6 (`MainWindow.DropAsync`): entries of a pane through `CopyAsync`/`MoveAsync` of their pane, local files through `DroppedEntries`. A drop always reports the copy effect to the application dragged from, because Explorer would delete the files of a move itself while Hst Commander still asks.
+- Entries dragged from a pane travel in an in-process data format (`PaneDragFormat`) next to the files, so a drop on a pane copies them like F5. A drag of the operating system (virtual files, file promises) doesn't carry Avalonia's in-process data, so the dragged entries are kept in `s_nativePaneDrag` while it runs. Drops are handled after the drag has ended (`Dispatcher.UIThread.Post`), so the dialogs aren't opened inside the drag of the operating system.
 
 ## Viewer
 
