@@ -8,6 +8,8 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+        <!-- function pointers of the macOS file promise drag (MacOS/MacFilePromiseDrag.cs) -->
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <ApplicationIcon>..\icon\hst-commander.ico</ApplicationIcon>
     </PropertyGroup>
 
