@@ -18,6 +18,12 @@ public record DeleteProgress(string CurrentName, int DeletedEntries, int TotalEn
     /// <summary>Fraction of the entries deleted, between 0 and 1.</summary>
     public double TotalFraction => TotalEntries <= 0 ? 1 : Math.Clamp((double)DeletedEntries / TotalEntries, 0, 1);
 
+    /// <summary>
+    /// Fraction of the whole delete, between 0 and 1: of the cached writes of a disk while they are written, otherwise
+    /// of the entries. Shown outside the window with <see cref="TaskbarProgressReporter" />.
+    /// </summary>
+    public double OverallFraction => DiskWrite?.Fraction ?? TotalFraction;
+
     /// <summary>Deleted and total entries, e.g. "3/10 entries".</summary>
     public string TotalText => $"{DeletedEntries}/{TotalEntries} entries";
 

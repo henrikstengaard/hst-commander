@@ -1,3 +1,4 @@
+using Hst.Commander.Core;
 using Hst.Commander.Core.Volumes;
 using Terminal.Gui;
 
@@ -17,6 +18,9 @@ public sealed class DeleteProgressDialog : Dialog
     private readonly Label _etaLabel;
     private readonly Button _cancelButton;
     private bool _completed;
+
+    /// <summary>Progress shown in the terminal's tab or taskbar button while the dialog is open.</summary>
+    private readonly TaskbarProgressReporter _taskbar = TerminalProgressOutput.CreateReporter();
 
     public DeleteProgressDialog(TuiPalette palette)
     {
@@ -58,6 +62,7 @@ public sealed class DeleteProgressDialog : Dialog
         Add(_currentLabel, _totalLabel, _totalProgressBar, _etaLabel);
         AddButton(_cancelButton);
         Initialized += (_, _) => _cancelButton.SetFocus();
+        _taskbar.Start();
     }
 
     public CancellationToken CancellationToken => _cancellationTokenSource.Token;
@@ -69,6 +74,8 @@ public sealed class DeleteProgressDialog : Dialog
         {
             return;
         }
+
+        _taskbar.Report(progress.OverallFraction);
 
         // cached writes of a disk being written, e.g. of a physical disk, take the place of the current entry
         if (progress.DiskWrite is { } diskWrite)
@@ -92,6 +99,7 @@ public sealed class DeleteProgressDialog : Dialog
     public void Complete()
     {
         _completed = true;
+        _taskbar.Clear();
         Application.RequestStop(this);
     }
 
@@ -100,6 +108,7 @@ public sealed class DeleteProgressDialog : Dialog
         if (disposing)
         {
             _cancellationTokenSource.Dispose();
+            _taskbar.Dispose();
         }
 
         base.Dispose(disposing);
@@ -113,6 +122,7 @@ public sealed class DeleteProgressDialog : Dialog
         }
 
         _cancellationTokenSource.Cancel();
+        _taskbar.Pause();
         _cancelButton.Enabled = false;
         _currentLabel.Text = "Cancelling...";
     }

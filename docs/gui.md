@@ -11,6 +11,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - `PaneNavigationMode.cs`, `IconLayoutView.cs`: navigation modes, see [Navigation modes](icons-and-navigation-modes.md#navigation-modes).
 - `EntryItem.cs`: a display row for an `IEntry`.
 - `Windows/WindowsVirtualFileDrag.cs`, `MacOS/MacFilePromiseDrag.cs`: dragging entries of images and other volumes out as virtual files and file promises, see [Drag and drop](#drag-and-drop).
+- `TaskbarProgress.cs`, `Windows/WindowsTaskbarProgress.cs`, `MacOS/MacDockProgress.cs`: the progress of file operations on the taskbar button and Dock tile, see [Taskbar progress](#taskbar-progress). `MacOS/ObjC.cs`: the Objective-C runtime calls shared by the macOS interop.
 - `Icons/`: `FileIcons` (loading and caching entry icons), `IFileIconProvider` with Windows, freedesktop and macOS implementations, and `ViewerIcon` for the icon viewer.
 - `ViewerDialog` with `ViewerControl` and `ViewerSearchDialog`: the viewer.
 - `ThemeManager.cs`, `GuiTheme.cs`, `MidnightCommanderStyles.axaml`, `GuiSettings.cs`: themes and settings.
@@ -53,6 +54,14 @@ The TUI has no drag and drop: terminals can't drag files out, and dropping only 
 - **Dropping** on a pane, from either pane or another application, copies, or moves with Shift. In the list and thumbnails, dropping on a directory row copies into that directory (the row is outlined), otherwise into the current location (the pane is outlined). In the plugins' navigation modes (e.g. the Workbench, whose icons are dragged to move them), entries can only be dropped. The drive list only takes drops on a drive. A pane's own entries are only dropped on one of its other directories.
 - A drop opens the copy or move dialog with the destination filled in, like F5/F6 (`MainWindow.DropAsync`): entries of a pane through `CopyAsync`/`MoveAsync` of their pane, local files through `DroppedEntries`. A drop always reports the copy effect to the application dragged from, because Explorer would delete the files of a move itself while Hst Commander still asks.
 - Entries dragged from a pane travel in an in-process data format (`PaneDragFormat`) next to the files, so a drop on a pane copies them like F5. A drag of the operating system (virtual files, file promises) doesn't carry Avalonia's in-process data, so the dragged entries are kept in `s_nativePaneDrag` while it runs. Drops are handled after the drag has ended (`Dispatcher.UIThread.Post`), so the dialogs aren't opened inside the drag of the operating system.
+
+## Taskbar Progress
+
+The copy, move and delete progress dialogs show their progress outside the window too (see [Common rules](file-operations.md#common-rules)). Avalonia has no API for it (it uses `ITaskbarList3` only internally), so `TaskbarProgress.Create` picks a platform `ITaskbarProgress` when the dialog opens:
+
+- **Windows** (`Windows/WindowsTaskbarProgress.cs`): the shell's `ITaskbarList3` (`SetProgressState`, `SetProgressValue`) on the main window's handle, the dialog's owner, because the taskbar button belongs to it. The taskbar list is created once; when it can't be (e.g. without Explorer) nothing is shown.
+- **macOS** (`MacOS/MacDockProgress.cs`): while progress is shown, the Dock tile's content view is an `NSImageView` with the app icon and an `NSProgressIndicator` bar along its bottom, and the tile is redrawn (`display`) on each change; clearing removes the content view, so the plain icon is shown again. The Dock has no paused color.
+- **Linux:** nothing is shown.
 
 ## Viewer
 

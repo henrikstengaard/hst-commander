@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using Hst.Commander.Abstractions;
 using Hst.Commander.Core;
+using static Hst.Commander.Gui.MacOS.ObjC;
 
 namespace Hst.Commander.Gui.MacOS;
 
@@ -16,8 +17,6 @@ namespace Hst.Commander.Gui.MacOS;
 [SupportedOSPlatform("macos")]
 internal static unsafe class MacFilePromiseDrag
 {
-    private const string ObjCLibrary = "/usr/lib/libobjc.A.dylib";
-
     /// <summary>The drag in progress or whose promises may still be written, see <see cref="DragState" />.</summary>
     private static DragState? s_lastDrag;
 
@@ -307,76 +306,4 @@ internal static unsafe class MacFilePromiseDrag
         return SendError(Class("NSError"), Selector("errorWithDomain:code:userInfo:"), NSString("HstCommander"), 1,
             userInfo);
     }
-
-    private static IntPtr NSString(string value)
-    {
-        var utf8 = Marshal.StringToCoTaskMemUTF8(value);
-        try
-        {
-            return Send(Class("NSString"), Selector("stringWithUTF8String:"), utf8);
-        }
-        finally
-        {
-            Marshal.FreeCoTaskMem(utf8);
-        }
-    }
-
-    private static IntPtr Class(string name) => objc_getClass(name);
-
-    private static IntPtr Selector(string name) => sel_registerName(name);
-
-    [StructLayout(LayoutKind.Sequential)]
-    private readonly record struct CGPoint(double X, double Y);
-
-    [StructLayout(LayoutKind.Sequential)]
-    private readonly record struct CGRect(double X, double Y, double Width, double Height);
-
-    [DllImport(ObjCLibrary)]
-    private static extern IntPtr objc_getClass(string name);
-
-    [DllImport(ObjCLibrary)]
-    private static extern IntPtr objc_getProtocol(string name);
-
-    [DllImport(ObjCLibrary)]
-    private static extern IntPtr sel_registerName(string name);
-
-    [DllImport(ObjCLibrary)]
-    private static extern IntPtr objc_allocateClassPair(IntPtr superclass, string name, IntPtr extraBytes);
-
-    [DllImport(ObjCLibrary)]
-    private static extern void objc_registerClassPair(IntPtr cls);
-
-    [DllImport(ObjCLibrary)]
-    [return: MarshalAs(UnmanagedType.I1)]
-    private static extern bool class_addMethod(IntPtr cls, IntPtr selector, IntPtr implementation, string types);
-
-    [DllImport(ObjCLibrary)]
-    [return: MarshalAs(UnmanagedType.I1)]
-    private static extern bool class_addProtocol(IntPtr cls, IntPtr protocol);
-
-    [DllImport(ObjCLibrary, EntryPoint = "objc_msgSend")]
-    private static extern IntPtr Send(IntPtr receiver, IntPtr selector);
-
-    [DllImport(ObjCLibrary, EntryPoint = "objc_msgSend")]
-    private static extern IntPtr Send(IntPtr receiver, IntPtr selector, IntPtr argument);
-
-    [DllImport(ObjCLibrary, EntryPoint = "objc_msgSend")]
-    private static extern IntPtr Send(IntPtr receiver, IntPtr selector, IntPtr argument1, IntPtr argument2);
-
-    [DllImport(ObjCLibrary, EntryPoint = "objc_msgSend")]
-    private static extern IntPtr Send(IntPtr receiver, IntPtr selector, IntPtr argument1, IntPtr argument2,
-        IntPtr argument3);
-
-    [DllImport(ObjCLibrary, EntryPoint = "objc_msgSend")]
-    private static extern IntPtr SendError(IntPtr receiver, IntPtr selector, IntPtr domain, nint code,
-        IntPtr userInfo);
-
-    [DllImport(ObjCLibrary, EntryPoint = "objc_msgSend")]
-    private static extern CGPoint SendPoint(IntPtr receiver, IntPtr selector);
-
-    [DllImport(ObjCLibrary, EntryPoint = "objc_msgSend")]
-    private static extern CGPoint SendPoint(IntPtr receiver, IntPtr selector, CGPoint point, IntPtr view);
-
-    [DllImport(ObjCLibrary, EntryPoint = "objc_msgSend")]
-    private static extern void SendRect(IntPtr receiver, IntPtr selector, CGRect rect, IntPtr contents);
 }

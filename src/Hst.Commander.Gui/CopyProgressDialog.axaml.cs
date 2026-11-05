@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Threading;
+using Hst.Commander.Core;
 using Hst.Commander.Core.Volumes;
 
 namespace Hst.Commander.Gui;
@@ -14,6 +15,9 @@ public partial class CopyProgressDialog : Window
 {
     private readonly CancellationTokenSource _cancellationTokenSource = new();
     private bool _completed;
+
+    /// <summary>Progress shown on the taskbar button (Windows) or Dock tile (macOS) while the dialog is open.</summary>
+    private TaskbarProgressReporter? _taskbar;
 
     public CopyProgressDialog() : this((_, _, _) => Task.CompletedTask)
     {
@@ -43,6 +47,8 @@ public partial class CopyProgressDialog : Window
         Opened += async (_, _) =>
         {
             CancelButton.Focus();
+            _taskbar = TaskbarProgress.Create(Owner as TopLevel ?? this);
+            _taskbar.Start();
 
             // progress created on the UI thread reports on the UI thread
             var progress = new Progress<CopyProgress>(Update);
@@ -57,6 +63,7 @@ public partial class CopyProgressDialog : Window
             }
 
             _completed = true;
+            _taskbar.Dispose();
             Close();
         };
     }
@@ -75,6 +82,8 @@ public partial class CopyProgressDialog : Window
         {
             return;
         }
+
+        _taskbar?.Report(progress.OverallFraction);
 
         // cached writes of a disk being written, e.g. of a physical disk, take the place of the current file
         if (progress.DiskWrite is { } diskWrite)
@@ -104,6 +113,7 @@ public partial class CopyProgressDialog : Window
         }
 
         _cancellationTokenSource.Cancel();
+        _taskbar?.Pause();
         CancelButton.IsEnabled = false;
         CurrentText.Text = "Cancelling...";
     }
