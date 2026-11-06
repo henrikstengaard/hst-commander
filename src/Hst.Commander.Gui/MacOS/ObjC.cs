@@ -76,19 +76,6 @@ internal static class ObjC
     public static extern IntPtr Send(IntPtr receiver, IntPtr selector, IntPtr argument1, IntPtr argument2,
         IntPtr argument3);
 
-    /// <summary>Sends a message with an <c>NSInteger</c> or <c>NSUInteger</c> argument, e.g. <c>setStyle:</c>.</summary>
-    [DllImport(ObjCLibrary, EntryPoint = "objc_msgSend")]
-    public static extern void SendInteger(IntPtr receiver, IntPtr selector, nint argument);
-
-    /// <summary>Sends a message with a <c>double</c> argument, e.g. <c>setDoubleValue:</c>.</summary>
-    [DllImport(ObjCLibrary, EntryPoint = "objc_msgSend")]
-    public static extern void SendDouble(IntPtr receiver, IntPtr selector, double argument);
-
-    /// <summary>Sends a message with a <c>BOOL</c> argument, e.g. <c>setIndeterminate:</c>.</summary>
-    [DllImport(ObjCLibrary, EntryPoint = "objc_msgSend")]
-    public static extern void SendBool(IntPtr receiver, IntPtr selector,
-        [MarshalAs(UnmanagedType.I1)] bool argument);
-
     [DllImport(ObjCLibrary, EntryPoint = "objc_msgSend")]
     public static extern IntPtr SendError(IntPtr receiver, IntPtr selector, IntPtr domain, nint code,
         IntPtr userInfo);
@@ -99,14 +86,25 @@ internal static class ObjC
     [DllImport(ObjCLibrary, EntryPoint = "objc_msgSend")]
     public static extern CGPoint SendPoint(IntPtr receiver, IntPtr selector, CGPoint point, IntPtr view);
 
-    /// <summary>Sends a message returning a <c>CGSize</c>, e.g. <c>size</c> of a Dock tile.</summary>
-    [DllImport(ObjCLibrary, EntryPoint = "objc_msgSend")]
-    public static extern CGSize SendSize(IntPtr receiver, IntPtr selector);
-
     [DllImport(ObjCLibrary, EntryPoint = "objc_msgSend")]
     public static extern void SendRect(IntPtr receiver, IntPtr selector, CGRect rect, IntPtr contents);
 
-    /// <summary>Sends a message with a <c>CGRect</c> argument returning an object, e.g. <c>initWithFrame:</c>.</summary>
+    /// <summary>Sends a message with a <c>CGSize</c> argument returning an object, e.g. <c>initWithSize:</c>.</summary>
     [DllImport(ObjCLibrary, EntryPoint = "objc_msgSend")]
-    public static extern IntPtr SendRect(IntPtr receiver, IntPtr selector, CGRect rect);
+    public static extern IntPtr SendWithSize(IntPtr receiver, IntPtr selector, CGSize size);
+
+    /// <summary>Sends <c>drawInRect:fromRect:operation:fraction:</c> to an image.</summary>
+    [DllImport(ObjCLibrary, EntryPoint = "objc_msgSend")]
+    public static extern void SendDrawInRect(IntPtr receiver, IntPtr selector, CGRect rect, CGRect fromRect,
+        nuint operation, double fraction);
+
+    /// <summary>Sends <c>bezierPathWithRoundedRect:xRadius:yRadius:</c> to <c>NSBezierPath</c>.</summary>
+    [DllImport(ObjCLibrary, EntryPoint = "objc_msgSend")]
+    public static extern IntPtr SendRoundedRect(IntPtr receiver, IntPtr selector, CGRect rect, double xRadius,
+        double yRadius);
+
+    /// <summary>Sends a message with four <c>double</c> arguments returning an object, e.g. <c>colorWithSRGBRed:green:blue:alpha:</c>.</summary>
+    [DllImport(ObjCLibrary, EntryPoint = "objc_msgSend")]
+    public static extern IntPtr SendColor(IntPtr receiver, IntPtr selector, double red, double green, double blue,
+        double alpha);
 }

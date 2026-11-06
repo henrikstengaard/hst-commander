@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Platform;
 using Hst.Commander.Core;
 using Hst.Commander.Gui.MacOS;
 using Hst.Commander.Gui.Windows;
@@ -28,9 +29,25 @@ internal static class TaskbarProgress
         if (OperatingSystem.IsMacOS())
         {
             // the app has one Dock tile
-            return new TaskbarProgressReporter(s_macDockProgress ??= new MacDockProgress());
+            return new TaskbarProgressReporter(s_macDockProgress ??= new MacDockProgress(ReadAppIcon()));
         }
 
         return new TaskbarProgressReporter(null);
+    }
+
+    /// <summary>Reads the app icon file (also the main window's icon), empty when it can't be read.</summary>
+    private static byte[] ReadAppIcon()
+    {
+        try
+        {
+            using var stream = AssetLoader.Open(new Uri("avares://Hst.Commander.Gui/Assets/hst-commander.ico"));
+            using var memory = new MemoryStream();
+            stream.CopyTo(memory);
+            return memory.ToArray();
+        }
+        catch (Exception exception) when (exception is IOException or FileNotFoundException)
+        {
+            return [];
+        }
     }
 }
