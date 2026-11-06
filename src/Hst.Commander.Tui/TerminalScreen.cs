@@ -165,9 +165,9 @@ public static class TerminalScreen
     ///     console and not its screen buffers. The environment variables aren't enough: a program started as
     ///     administrator doesn't get them, but is still shown in Windows Terminal when it's the default terminal.
     /// </summary>
-    private static bool IsWindowsTerminal => Environment.GetEnvironmentVariable("WT_SESSION") != null ||
-                                             Environment.GetEnvironmentVariable("VSAPPIDNAME") != null ||
-                                             IsPseudoConsole;
+    internal static bool IsWindowsTerminal => Environment.GetEnvironmentVariable("WT_SESSION") != null ||
+                                            Environment.GetEnvironmentVariable("VSAPPIDNAME") != null ||
+                                            IsPseudoConsole;
 
     private static bool IsPseudoConsole
     {

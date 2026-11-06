@@ -37,6 +37,12 @@ public record CopyProgress(
     /// <summary>Fraction of all items copied, between 0 and 1.</summary>
     public double TotalFraction => GetFraction(CopiedBytes, TotalBytes);
 
+    /// <summary>
+    /// Fraction of the whole copy, between 0 and 1: of the cached writes of a disk while they are written, otherwise of
+    /// all items. Shown outside the window with <see cref="TaskbarProgressReporter" />.
+    /// </summary>
+    public double OverallFraction => DiskWrite?.Fraction ?? TotalFraction;
+
     /// <summary>Copied and total size with copied and total items, e.g. "12M/40M, 3/10 files".</summary>
     public string TotalText =>
         $"{SizeFormatter.FormatHumanized(CopiedBytes)}/{SizeFormatter.FormatHumanized(TotalBytes)}, " +

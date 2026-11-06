@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Hst.Commander.Core;
 using Hst.Commander.Core.Volumes;
 
 namespace Hst.Commander.Gui;
@@ -12,6 +13,9 @@ public partial class DeleteProgressDialog : Window
 {
     private readonly CancellationTokenSource _cancellationTokenSource = new();
     private bool _completed;
+
+    /// <summary>Progress shown on the taskbar button (Windows) or Dock tile (macOS) while the dialog is open.</summary>
+    private TaskbarProgressReporter? _taskbar;
 
     public DeleteProgressDialog() : this((_, _) => Task.CompletedTask)
     {
@@ -35,6 +39,8 @@ public partial class DeleteProgressDialog : Window
         Opened += async (_, _) =>
         {
             CancelButton.Focus();
+            _taskbar = TaskbarProgress.Create(Owner as TopLevel ?? this);
+            _taskbar.Start();
 
             // progress created on the UI thread reports on the UI thread
             var progress = new Progress<DeleteProgress>(Update);
@@ -49,6 +55,7 @@ public partial class DeleteProgressDialog : Window
             }
 
             _completed = true;
+            _taskbar.Dispose();
             Close();
         };
     }
@@ -62,6 +69,8 @@ public partial class DeleteProgressDialog : Window
         {
             return;
         }
+
+        _taskbar?.Report(progress.OverallFraction);
 
         // cached writes of a disk being written, e.g. of a physical disk, take the place of the current entry
         if (progress.DiskWrite is { } diskWrite)
@@ -89,6 +98,7 @@ public partial class DeleteProgressDialog : Window
         }
 
         _cancellationTokenSource.Cancel();
+        _taskbar?.Pause();
         CancelButton.IsEnabled = false;
         CurrentText.Text = "Cancelling...";
     }
