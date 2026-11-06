@@ -12,6 +12,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - Write members throw `NotSupportedException` when read-only. `OpenWrite` creates or overwrites; `CreateContainer` is a no-op when the container exists; `Delete` only deletes items and empty containers; `Rename` throws `IOException` when the new name exists (case-only changes are allowed); `SetModifiedDate` treats an unspecified `DateTimeKind` as UTC.
 - `GetWritableImageId(name)` and `OpenReadWrite(name)` (optional, default null and `NotSupportedException`): an item with an id unique across volumes (e.g. a local file's full path, a file's UNC path on an SMB share or a physical disk's device path) is opened once for reading and writing as a writable image shared by both panes, see [Writable images](volumes.md#writable-images). `OpenReadWrite` throws `UnauthorizedAccessException` or `IOException` when the item can only be read, and the image is then opened read-only with `OpenRead`.
 - Optional members with defaults: `SupportsAmigaMetadata` (the current directory stores Amiga names, protection bits and comments as they are, see [UAE metadata](file-operations.md#uae-metadata)), `CanSetAmigaMetadata`/`SetAmigaMetadata` and `GetChangeableAttributes`/`SetAttributes` (only the changeable attributes are changed). The properties dialog uses `CanSetAmigaMetadata` and `GetChangeableAttributes` to decide what can be changed. `GetSpace` (default null) returns the free and total space (`VolumeSpace(Free, Total)`) of the file system of the current directory, read after each listing and shown as free/total in the path panel like local drives (e.g. FAT, NTFS and Amiga file systems); volumes wrapping other volumes (partition tables, RDB partitions, hybrid disks) forward it to the current one.
+- `GetReadOrder(name)` (optional, default null): the position of an item in the order the volume stores its data, e.g. the files of a solid archive, where reading a file decompresses the files before it. Copying then reads the items in this order (see [Copying](file-operations.md#copying)), so each file is decompressed once. `NestedVolume` and `EntryVolumeProvider` forward it.
 
 ### IEntry
 
@@ -39,6 +40,12 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - Opens files as volumes (images). `IsMatch(name, stream)` checks the magic signature; the stream is at the start and may not be seekable. `CreateVolume(stream)` gets a seekable stream.
 - Hst Commander owns the stream: it stays open while the volume is used and is disposed after the volume. It is read-only unless `CanWrite` is true and the file can be written, see [Writable images](volumes.md#writable-images).
 - `VolumeProviders.Files` is the built-in ISO 9660 provider followed by the plugins' providers, asked in order.
+
+### ArchiveVolume
+
+- `ArchiveVolume<TArchiveEntry>` is a base class for read-only archive volumes (used by the Zip, LhaLzx and RarSevenZip plugins), so archive plugins don't each need their own directory tree. A derived class adds the archive's entries with `AddEntry(path, size, modifiedDate, archiveEntry, amigaMetadata, isDirectory)` and opens them with `OpenArchiveEntry(name, archiveEntry, cancellationToken)`, throwing `NotSupportedException` for entries it can't read (e.g. encrypted ones). A derived class overriding `ReadsInArchiveOrder` with true (e.g. for a solid archive) makes `GetReadOrder` return the order files were added in, the archive's order.
+- Directories are the archive's directory entries plus the directories in file paths; `/` and `\` both separate, a path ending with one (or `isDirectory`) is a directory, and empty, `.` and `..` components are skipped, so entries can't point outside the archive. Names match exactly, otherwise case-insensitively.
+- The write members throw `NotSupportedException` ("<Name> archives are read-only"). `SupportsAmigaMetadata` returns the constructor's `supportsAmigaMetadata`, true for archives storing Amiga protection bits and comments (lha, lzx). A volume owning a disposable archive implements `IDisposable` itself.
 
 ### IVolumeCreator
 
@@ -82,7 +89,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 
 ## Loading Plugins
 
-- `Plugins.BuiltIn` lists the plugins included by default (Zip, LhaLzx, Disk, Amiga, PhysicalDisk), referenced by Core. Disk comes before Amiga so hybrid disks (an MBR and a rigid disk block, which `RdbFileVolumeProvider` would also match) are opened by the Disk plugin. `Plugins.All` is the built-in plugins followed by the loaded ones; the `VolumeProviders` lists are rebuilt when it changes.
+- `Plugins.BuiltIn` lists the plugins included by default (Zip, LhaLzx, RarSevenZip, Disk, Amiga, PhysicalDisk), referenced by Core. Disk comes before Amiga so hybrid disks (an MBR and a rigid disk block, which `RdbFileVolumeProvider` would also match) are opened by the Disk plugin. `Plugins.All` is the built-in plugins followed by the loaded ones; the `VolumeProviders` lists are rebuilt when it changes.
 - Both front-ends call `Plugins.Load()` once at startup, before the panes are created, because each `NavigationContext` takes `VolumeProviders.Files` when it's created: the TUI in `Program.cs`, the GUI in `App.OnFrameworkInitializationCompleted`. In the GUI it must be written `Hst.Commander.Core.Plugins`, as `Plugins` there resolves to the `Hst.Commander.Plugins` namespace.
 - Load errors (including a failing `Initialize`) are joined by `Plugins.FormatErrors` and shown once the main window is loaded; the other plugins still load.
 - `PluginLoader.Directories` are `~/.hst-commander/plugins` and then `plugins` next to the executable; missing directories are skipped and a directory listed twice is scanned once.

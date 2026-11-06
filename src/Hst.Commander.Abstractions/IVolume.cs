@@ -144,6 +144,15 @@ public interface IVolume
     string? GetWritableImageId(string name) => null;
 
     /// <summary>
+    /// Position of an item in current directory in the order the volume stores the data of its items, e.g. the order
+    /// of the files in a solid archive, where reading a file decompresses the files before it. Copying reads the items
+    /// in this order when the volume returns one, so each file is decompressed once. Null (the default) when items can
+    /// be read in any order.
+    /// </summary>
+    /// <param name="name">Name of the item.</param>
+    long? GetReadOrder(string name) => null;
+
+    /// <summary>
     /// Open an item in current directory with an id (<see cref="GetWritableImageId" />) for reading and writing as a
     /// seekable stream, shared with other readers and writers and unbuffered, so changes are seen by others reading
     /// it. Throws <see cref="UnauthorizedAccessException"/> or <see cref="IOException"/> when it can't be written, e.g.

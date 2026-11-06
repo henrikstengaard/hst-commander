@@ -13,4 +13,4 @@ The LhaLzx plugin adds lha and lzx archives, the common archive formats on the A
 ## Volumes
 
 - `LhaFileVolumeProvider` and `LzxFileVolumeProvider` detect and open the archives.
-- `LhaVolume` and `LzxVolume` share the directory tree of `ArchiveVolume<T>`.
+- `LhaVolume` and `LzxVolume` derive from `ArchiveVolume<T>` in `Hst.Commander.Abstractions`, which builds the directory tree.

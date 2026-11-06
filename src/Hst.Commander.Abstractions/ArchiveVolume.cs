@@ -1,23 +1,31 @@
-﻿using System.Runtime.CompilerServices;
-using Hst.Commander.Abstractions;
+using System.Runtime.CompilerServices;
 
-namespace Hst.Commander.Plugins.LhaLzx;
+namespace Hst.Commander.Abstractions;
 
 /// <summary>
-/// Read-only volume browsing the entries of an archive. Directories are the directory entries of the archive and the
-/// directories in the paths of its files, as archives don't need to contain entries for directories. Archives store
-/// Amiga names, protection bits and comments (<see cref="IEntry.AmigaMetadata" />) as they are, so copying from them
-/// keeps them like copying from an Amiga volume.
+/// Base class for read-only volumes browsing the entries of an archive (e.g. zip, lha, rar). A derived class adds the
+/// archive's entries with <see cref="AddEntry" /> and opens them with <see cref="OpenArchiveEntry" />. Directories are
+/// the directory entries of the archive and the directories in the paths of its files, as archives don't need to
+/// contain entries for directories. Names are case-sensitive like in the archive, but found case-insensitive when no
+/// name matches exactly.
 /// </summary>
 /// <typeparam name="TArchiveEntry">Entry of the archive, read with <see cref="OpenArchiveEntry" />.</typeparam>
 public abstract class ArchiveVolume<TArchiveEntry> : IVolume
 {
+    private readonly bool _supportsAmigaMetadata;
     private readonly ArchiveDirectory _root = new(string.Empty);
     private List<ArchiveDirectory> _currentDirectories = [];
+    private long _fileCount;
 
-    protected ArchiveVolume(string name)
+    /// <param name="name">Name of the volume, e.g. "Zip", also used in the read-only messages.</param>
+    /// <param name="supportsAmigaMetadata">
+    /// True when the archive stores Amiga names, protection bits and comments as they are (e.g. lha and lzx archives),
+    /// given to <see cref="AddEntry" />, so copying from it keeps them like copying from an Amiga volume.
+    /// </param>
+    protected ArchiveVolume(string name, bool supportsAmigaMetadata = false)
     {
         Name = name;
+        _supportsAmigaMetadata = supportsAmigaMetadata;
     }
 
     public string Name { get; }
@@ -27,12 +35,28 @@ public abstract class ArchiveVolume<TArchiveEntry> : IVolume
     private ArchiveDirectory CurrentDirectory => _currentDirectories.Count > 0 ? _currentDirectories[^1] : _root;
 
     /// <summary>
-    /// Adds an archive entry to the directory tree. "/" and "\" separate path components and a path ending with one is
-    /// a directory. Empty, "." and ".." path components are skipped, so entries can't point outside the archive.
+    /// True when files are read faster in the order they are added with <see cref="AddEntry" /> (the archive's order),
+    /// e.g. in a solid archive; <see cref="GetReadOrder" /> then returns their position, so copying reads them in this
+    /// order. Defaults to false.
     /// </summary>
+    protected virtual bool ReadsInArchiveOrder => false;
+
+    /// <summary>
+    /// Adds an archive entry to the directory tree. "/" and "\" separate path components and a path ending with one is
+    /// a directory. Empty, "." and ".." path components are skipped, so entries can't point outside the archive. A
+    /// later file with the same path replaces an earlier one.
+    /// </summary>
+    /// <param name="path">Path of the entry in the archive.</param>
+    /// <param name="size">Size of a file, ignored for directories.</param>
+    /// <param name="modifiedDate">Modified date of the entry, preferably in UTC.</param>
+    /// <param name="archiveEntry">Entry given to <see cref="OpenArchiveEntry" /> when the file is read.</param>
+    /// <param name="amigaMetadata">Amiga protection bits and comment of the entry, if the archive stores them.</param>
+    /// <param name="isDirectory">True when the entry is a directory without a path separator at the end.</param>
     protected void AddEntry(string path, long size, DateTime? modifiedDate, TArchiveEntry archiveEntry,
-        AmigaMetadata? amigaMetadata = null)
+        AmigaMetadata? amigaMetadata = null, bool isDirectory = false)
     {
+        ArgumentNullException.ThrowIfNull(path);
+
         var pathComponents = path
             .Split(['/', '\\'], StringSplitOptions.RemoveEmptyEntries)
             .Where(pathComponent => pathComponent != "." && pathComponent != Paths.Parent)
@@ -42,7 +66,7 @@ public abstract class ArchiveVolume<TArchiveEntry> : IVolume
             return;
         }
 
-        var isDirectory = path.EndsWith('/') || path.EndsWith('\\');
+        isDirectory = isDirectory || path.EndsWith('/') || path.EndsWith('\\');
         var directoryCount = isDirectory ? pathComponents.Count : pathComponents.Count - 1;
         var directory = _root;
         for (var index = 0; index < directoryCount; index++)
@@ -57,12 +81,20 @@ public abstract class ArchiveVolume<TArchiveEntry> : IVolume
         }
         else
         {
-            directory.Files[pathComponents[^1]] = new ArchiveFile(size, modifiedDate, archiveEntry, amigaMetadata);
+            directory.Files[pathComponents[^1]] =
+                new ArchiveFile(size, modifiedDate, archiveEntry, amigaMetadata, _fileCount++);
         }
     }
 
-    /// <summary>Opens an archive entry for reading, decompressing it as it's read.</summary>
-    protected abstract Task<Stream> OpenArchiveEntry(TArchiveEntry archiveEntry);
+    /// <summary>
+    /// Opens an archive entry for reading, decompressing it as it's read. Throw <see cref="NotSupportedException" />
+    /// when the entry can't be read, e.g. when it's encrypted.
+    /// </summary>
+    /// <param name="name">Name of the file in the current directory, for error messages.</param>
+    /// <param name="archiveEntry">Entry given to <see cref="AddEntry" />.</param>
+    /// <param name="cancellationToken"></param>
+    protected abstract Task<Stream> OpenArchiveEntry(string name, TArchiveEntry archiveEntry,
+        CancellationToken cancellationToken);
 
     public async IAsyncEnumerable<IEntry> ListEntries(
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -128,15 +160,19 @@ public abstract class ArchiveVolume<TArchiveEntry> : IVolume
             return Task.FromResult(CreateEntry(subDirectory));
         }
 
-        return directory.FindFile(name) is (var fileName, var file)
+        return directory.FindFile(name) is var (fileName, file)
             ? Task.FromResult(CreateEntry(fileName, file))
             : throw new IOException($"Entry '{name}' not found");
     }
 
     public Task<Stream> OpenRead(string name, CancellationToken cancellationToken = default) =>
-        CurrentDirectory.FindFile(name) is (_, var file)
-            ? OpenArchiveEntry(file.ArchiveEntry)
+        CurrentDirectory.FindFile(name) is var (fileName, file)
+            ? OpenArchiveEntry(fileName, file.ArchiveEntry, cancellationToken)
             : throw new FileNotFoundException($"File '{name}' not found");
+
+    /// <summary>Position of a file in the archive's order when <see cref="ReadsInArchiveOrder" />, otherwise null.</summary>
+    public long? GetReadOrder(string name) =>
+        ReadsInArchiveOrder && CurrentDirectory.FindFile(name) is var (_, file) ? file.Index : null;
 
     public Task<Stream> OpenWrite(string name, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException($"{Name} archives are read-only");
@@ -153,7 +189,8 @@ public abstract class ArchiveVolume<TArchiveEntry> : IVolume
     public Task SetModifiedDate(string name, DateTime modifiedDate, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException($"{Name} archives are read-only");
 
-    public Task<bool> SupportsAmigaMetadata(CancellationToken cancellationToken = default) => Task.FromResult(true);
+    public Task<bool> SupportsAmigaMetadata(CancellationToken cancellationToken = default) =>
+        Task.FromResult(_supportsAmigaMetadata);
 
     public Task SetAmigaMetadata(string name, AmigaMetadata metadata, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException($"{Name} archives are read-only");
@@ -162,12 +199,8 @@ public abstract class ArchiveVolume<TArchiveEntry> : IVolume
         AmigaMetadata? AmigaMetadata) : IEntry;
 
     private sealed record ArchiveFile(long Size, DateTime? ModifiedDate, TArchiveEntry ArchiveEntry,
-        AmigaMetadata? AmigaMetadata);
+        AmigaMetadata? AmigaMetadata, long Index);
 
-    /// <summary>
-    /// Directory in the archive. Names are case-sensitive like in the archive, but found case-insensitive when no name
-    /// matches exactly.
-    /// </summary>
     private sealed class ArchiveDirectory(string name)
     {
         public string Name { get; } = name;

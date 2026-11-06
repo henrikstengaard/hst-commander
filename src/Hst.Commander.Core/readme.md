@@ -47,7 +47,7 @@ Long operations run on a background thread with a volume of their own, opened wi
 
 ## Plugins
 
-`Plugins.BuiltIn` lists the plugins included by default: Zip, LhaLzx, Disk and Amiga (Disk before Amiga, so hybrid disks open as hybrid disks). `Plugins.Load` loads other plugins at startup with `PluginLoader` from `~/.hst-commander/plugins` and `plugins` next to the executable, each in a load context of its own. `PluginHost` implements `IPluginHost`, letting plugins work together.
+`Plugins.BuiltIn` lists the plugins included by default: Zip, LhaLzx, RarSevenZip, Disk and Amiga (Disk before Amiga, so hybrid disks open as hybrid disks). `Plugins.Load` loads other plugins at startup with `PluginLoader` from `~/.hst-commander/plugins` and `plugins` next to the executable, each in a load context of its own. `PluginHost` implements `IPluginHost`, letting plugins work together.
 
 ## Other
 

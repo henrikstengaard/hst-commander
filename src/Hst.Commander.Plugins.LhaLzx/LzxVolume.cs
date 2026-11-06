@@ -10,7 +10,7 @@ public class LzxVolume : ArchiveVolume<LzxEntry>
 {
     private readonly LzxArchive _lzxArchive;
 
-    private LzxVolume(LzxArchive lzxArchive) : base("Lzx")
+    private LzxVolume(LzxArchive lzxArchive) : base("Lzx", true)
     {
         _lzxArchive = lzxArchive;
     }
@@ -60,6 +60,7 @@ public class LzxVolume : ArchiveVolume<LzxEntry>
         }
     }
 
-    protected override async Task<Stream> OpenArchiveEntry(LzxEntry archiveEntry) =>
+    protected override async Task<Stream> OpenArchiveEntry(string name, LzxEntry archiveEntry,
+        CancellationToken cancellationToken) =>
         await _lzxArchive.OpenEntry(archiveEntry);
 }

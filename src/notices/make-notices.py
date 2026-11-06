@@ -50,6 +50,7 @@ LICENSE_URLS = {
     'testably.txt': 'https://raw.githubusercontent.com/Testably/Testably.Abstractions/main/LICENSE',
     'jetbrains-annotations.txt': 'https://raw.githubusercontent.com/JetBrains/JetBrains.Annotations/main/license.md',
     'humanizer.txt': 'https://raw.githubusercontent.com/Humanizr/Humanizer/main/license.txt',
+    'sharpcompress.txt': 'https://raw.githubusercontent.com/adamhathcock/sharpcompress/master/LICENSE.txt',
     'discutils.txt': 'https://raw.githubusercontent.com/LTRData/DiscUtils/LTRData.DiscUtils-initial/LICENSE.txt',
     'ltrdata-library.txt': 'https://raw.githubusercontent.com/LTRData/Library/master/LICENSE',
     'apache-2.0.txt': 'https://www.apache.org/licenses/LICENSE-2.0.txt',
@@ -135,6 +136,13 @@ SECTIONS = [
      pkg('Hst.Amiga', 'license.txt')),
     ('Hst.Core, Hst.Compression and Hst.Imaging', 'https://github.com/henrikstengaard/hst-core', 'MIT', None,
      ['Hst.Core', 'Hst.Compression', 'Hst.Imaging', 'Hst.Imaging.Pngcs'], pkg('Hst.Core', 'license.txt')),
+    ('SharpCompress', 'https://github.com/adamhathcock/sharpcompress', 'MIT', None, ['SharpCompress'],
+     join(lic('sharpcompress.txt'),
+          'SharpCompress includes code based on XZ.NET (https://github.com/sambott/XZ.NET),\n'
+          'managed-lzma (https://code.google.com/p/managed-lzma/) and ZstdSharp\n'
+          '(https://github.com/oleg-st/ZstdSharp), and code from The Legion Of The Bouncy\n'
+          'Castle under this license:',
+          lic('sharpcompress-bouncycastle.txt'))),
     ('Pngcs (Hjg.Pngcs)', 'https://github.com/henrikstengaard/pngcs', 'Apache-2.0', None, ['Hjg.Pngcs'],
      join(pkg('Hjg.Pngcs', 'license.txt'), lic('apache-2.0.txt'))),
     # sni.dll, before the other .NET packages matching runtime.*
