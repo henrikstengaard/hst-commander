@@ -250,7 +250,7 @@ dotnet run --project src/Hst.Commander.Tui/Hst.Commander.Tui.csproj
 # Publish the TUI and GUI locally for testing (also .sh, and publish-windows/-macos; see docs/application.md)
 pwsh src/publish/publish-linux.ps1 -Runtime linux-arm64
 
-# Publish and package the macOS apps as .dmg for testing (on a Mac, needs create-dmg for the GUI)
+# Package the macOS apps as .dmg like build-and-release.yml, for testing (on a Mac, needs create-dmg for the GUI)
 bash src/publish/publish-macos-dmg.sh --app gui
 
 # Run unit tests
