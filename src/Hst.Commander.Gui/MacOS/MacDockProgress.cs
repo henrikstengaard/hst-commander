@@ -8,7 +8,7 @@ namespace Hst.Commander.Gui.MacOS;
 /// <summary>
 ///     Shows the progress of a file operation on the app's Dock tile on macOS by drawing the app icon with a progress
 ///     bar along its bottom into an image and setting it as the application icon image, which the Dock shows; the
-///     icon from before is set again when the progress is cleared. A content view on the Dock tile with an
+///     default icon is set again (nil) when the progress is cleared. A content view on the Dock tile with an
 ///     <c>NSProgressIndicator</c> doesn't work: the Dock tile draws its content view into an image, which the progress
 ///     indicator (drawn by its own layer) doesn't show up in. The app icon is drawn from the app's own icon file, as
 ///     <c>applicationIconImage</c> is a folder icon when the app isn't run from its bundle (e.g. with
@@ -26,8 +26,8 @@ internal sealed class MacDockProgress(byte[] iconData) : ITaskbarProgress
     /// <summary>The app icon drawn under the bar, made once.</summary>
     private IntPtr _icon;
 
-    /// <summary>The application icon image from before the progress was shown, null when none is shown.</summary>
-    private IntPtr _originalIcon;
+    /// <summary>True while the image with the progress is the application icon image.</summary>
+    private bool _shown;
 
     public void Set(TaskbarProgressState state, double fraction)
     {
@@ -45,20 +45,10 @@ internal sealed class MacDockProgress(byte[] iconData) : ITaskbarProgress
                 return;
             }
 
-            if (_originalIcon == IntPtr.Zero)
-            {
-                var originalIcon = Send(application, Selector("applicationIconImage"));
-                if (originalIcon == IntPtr.Zero)
-                {
-                    return;
-                }
-
-                _originalIcon = Send(originalIcon, Selector("retain"));
-            }
-
-            var image = Draw(state, fraction);
+            var image = Draw(application, state, fraction);
             Send(application, Selector("setApplicationIconImage:"), image);
             Send(image, Selector("release"));
+            _shown = true;
         }
         catch (Exception exception) when (exception is DllNotFoundException or EntryPointNotFoundException)
         {
@@ -67,7 +57,7 @@ internal sealed class MacDockProgress(byte[] iconData) : ITaskbarProgress
     }
 
     /// <summary>Draws the app icon with the progress bar into a new image, released by the caller.</summary>
-    private IntPtr Draw(TaskbarProgressState state, double fraction)
+    private IntPtr Draw(IntPtr application, TaskbarProgressState state, double fraction)
     {
         var image = SendWithSize(Send(Class("NSImage"), Selector("alloc")), Selector("initWithSize:"),
             new CGSize(Size, Size));
@@ -75,7 +65,7 @@ internal sealed class MacDockProgress(byte[] iconData) : ITaskbarProgress
         try
         {
             var icon = GetIcon();
-            SendDrawInRect(icon == IntPtr.Zero ? _originalIcon : icon, Selector("drawInRect:fromRect:operation:fraction:"),
+            SendDrawInRect(icon == IntPtr.Zero ? Send(application, Selector("applicationIconImage")) : icon, Selector("drawInRect:fromRect:operation:fraction:"),
                 new CGRect(0, 0, Size, Size), new CGRect(0, 0, 0, 0), CompositingOperationSourceOver, 1);
 
             // a rounded bar along the bottom, inset like the Dock's own download progress
@@ -148,13 +138,13 @@ internal sealed class MacDockProgress(byte[] iconData) : ITaskbarProgress
 
     private void Restore(IntPtr application)
     {
-        if (_originalIcon == IntPtr.Zero)
+        if (!_shown)
         {
             return;
         }
 
-        Send(application, Selector("setApplicationIconImage:"), _originalIcon);
-        Send(_originalIcon, Selector("release"));
-        _originalIcon = IntPtr.Zero;
+        // nil sets the default icon again: the bundle's icon, or the system's for an app run outside a bundle
+        Send(application, Selector("setApplicationIconImage:"), IntPtr.Zero);
+        _shown = false;
     }
 }
