@@ -71,6 +71,8 @@ public class EntryVolumeProvider(IEntry entry, IVolume volumeProvider) : IVolume
 
     public string? GetWritableImageId(string name) => volumeProvider.GetWritableImageId(name);
 
+    public long? GetReadOrder(string name) => volumeProvider.GetReadOrder(name);
+
     public Task<Stream> OpenReadWrite(string name, CancellationToken cancellationToken = default) =>
         volumeProvider.OpenReadWrite(name, cancellationToken);
 }

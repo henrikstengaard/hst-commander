@@ -89,6 +89,7 @@ public static class VolumeCopy
                 cancellationToken);
         }
 
+        items = OrderByReadOrder(items);
         var state = new CopyState(items, progress);
         var sourceDirectory = new List<string>();
         var destinationDirectory = new List<string>();
@@ -274,6 +275,7 @@ public static class VolumeCopy
         {
             if (filter.IsMatch(entry.Name))
             {
+                item.ReadOrder = source.GetReadOrder(entry.Name);
                 items.Add(item);
             }
 
@@ -302,6 +304,27 @@ public static class VolumeCopy
         }
 
         await source.ChangeDirectory([Paths.Parent], cancellationToken);
+    }
+
+    /// <summary>
+    /// Orders the items to copy by the order the source stores their data (<see cref="IVolume.GetReadOrder" />), e.g.
+    /// a solid archive, where reading the files in another order decompresses the files before each again: the
+    /// containers first (so they exist before their items are copied), then the items by their read order, those
+    /// without one last. Items are kept in their order when the source returns no read order.
+    /// </summary>
+    private static List<CopyItem> OrderByReadOrder(List<CopyItem> items)
+    {
+        if (items.All(item => item.ReadOrder == null))
+        {
+            return items;
+        }
+
+        return items
+            .Where(item => item.Entry.Type == EntryType.Container)
+            .Concat(items
+                .Where(item => item.Entry.Type != EntryType.Container)
+                .OrderBy(item => item.ReadOrder ?? long.MaxValue))
+            .ToList();
     }
 
     /// <summary>
@@ -514,6 +537,9 @@ public static class VolumeCopy
 
         /// <summary>Name in the destination, set when it is copied.</summary>
         public string DestinationName { get; set; } = entry.Name;
+
+        /// <summary>Position of an item in the order the source stores data (see <see cref="IVolume.GetReadOrder" />).</summary>
+        public long? ReadOrder { get; set; }
     }
 
     /// <summary>Tracks copied bytes and items and reports progress with speed and estimated time left.</summary>

@@ -38,15 +38,16 @@ The code is the source of truth for constants, key lists and colors; the docs de
 .github/workflows/              build-and-test.yml (every push, Windows/macOS/Linux), build-and-release.yml (manual, packages and drafts a prerelease)
 docs/                           Feature docs (see above)
 src/
-  Hst.Commander.sln             Solution file (11 projects)
+  Hst.Commander.sln             Solution file (12 projects)
   Directory.Build.props         Shared product name, version, authors and copyright
   Directory.Build.targets       Replaces the last version part with the git commit count
   packaging/                    Release packaging scripts (Linux AppImage/.deb, macOS .dmg, Windows Inno Setup)
   publish/                      Local publish scripts for testing, PowerShell and bash per platform (output in publish/ at the root, ignored)
   icon/                         App icon sources, rendered sizes and make scripts
-  Hst.Commander.Abstractions/   Plugin API: IVolume, IEntry, IVolumeProvider, IFileVolumeProvider, IPlugin, IPluginHost, IWriteCache, ... and Paths (no external deps)
+  Hst.Commander.Abstractions/   Plugin API: IVolume, IEntry, IVolumeProvider, IFileVolumeProvider, IPlugin, IPluginHost, IWriteCache, ..., Paths and the ArchiveVolume<T> base class (no external deps)
   Hst.Commander.Plugins.Zip/    Zip archives (default plugin)
   Hst.Commander.Plugins.LhaLzx/ Lha and lzx archives (default plugin)
+  Hst.Commander.Plugins.RarSevenZip/ Rar and 7z archives (default plugin)
   Hst.Commander.Plugins.Disk/   MBR/GPT disk images with FAT/exFAT/NTFS/ext partitions, hybrid MBR/RDB disks (default plugin)
   Hst.Commander.Plugins.Amiga/  Writable adf and RDB images, .info icons, Workbench navigation mode, Amiga images (default plugin)
   Hst.Commander.Plugins.PhysicalDisk/ Internal and external physical disks on Windows, Linux and macOS (default plugin)
@@ -64,11 +65,13 @@ src/
 ### Layer Diagram
 
 ```
-[IVolumeProvider / IFileVolumeProvider / IPlugin / IVolume / IEntry / Paths]  <- Hst.Commander.Abstractions
+[IVolumeProvider / IFileVolumeProvider / IPlugin / IVolume / IEntry / Paths / ArchiveVolume<T>]  <- Hst.Commander.Abstractions
         |                                    \
         |                          [ZipPlugin, ZipFileVolumeProvider, ZipVolume]  <- Hst.Commander.Plugins.Zip
         |                          [LhaLzxPlugin, Lha/LzxFileVolumeProvider,
         |                           LhaVolume, LzxVolume]  <- Hst.Commander.Plugins.LhaLzx
+        |                          [RarSevenZipPlugin, Rar/SevenZipFileVolumeProvider,
+        |                           SharpCompressVolume]  <- Hst.Commander.Plugins.RarSevenZip
         |                          [DiskPlugin, DiskFileVolumeProvider,
         |                           PartitionTableVolume, HybridDiskVolume,
         |                           DiscFileSystemVolume]  <- Hst.Commander.Plugins.Disk
@@ -141,7 +144,7 @@ These apply across features and aren't obvious from a single file:
 
 - Other file-management operations (e.g. creating a new file with Shift+F4); changing the viewer's encoding and going to an offset; changing the editor's encoding and line breaks.
 - SMB 1, SMB ports other than 445 and browsing the network for servers (SMB credentials are only saved with bookmarks).
-- Writing to images other than Amiga adf and RDB images; ISO images and zip, lha and lzx archives are read-only, as are Amiga images inside other images.
+- Writing to images other than Amiga adf and RDB images; ISO images and zip, lha, lzx, rar and 7z archives are read-only, as are Amiga images inside other images.
 - Changing RDB, MBR and GPT partitions, other Amiga file systems (e.g. SFS), writing ext2/3/4, other PC file systems (btrfs, XFS, ...) and vhdx/vmdk images.
 - Unloading or reloading plugins while running, and a list of loaded plugins in the UI.
 
@@ -162,9 +165,10 @@ These apply across features and aren't obvious from a single file:
 - Test methods: `When_<action>_Then_<expectation>` (e.g., `When_ListEntries_Then_EntriesAreReturned`).
 
 ### Namespaces
-- Abstractions: `Hst.Commander.Abstractions` (interfaces, `Paths`)
+- Abstractions: `Hst.Commander.Abstractions` (interfaces, `Paths`, `ArchiveVolume<T>`)
 - Zip plugin: `Hst.Commander.Plugins.Zip`
 - Lha and lzx plugin: `Hst.Commander.Plugins.LhaLzx`
+- Rar and 7z plugin: `Hst.Commander.Plugins.RarSevenZip`
 - Disk plugin: `Hst.Commander.Plugins.Disk`
 - Amiga plugin: `Hst.Commander.Plugins.Amiga`
 - Physical disk plugin: `Hst.Commander.Plugins.PhysicalDisk`
@@ -188,7 +192,7 @@ These apply across features and aren't obvious from a single file:
 3. **Handle `Paths.Root` and `Paths.Parent`** in `ChangeDirectory` — both are case-insensitive string comparisons.
 4. **Add unit tests** in `Hst.Commander.Core.Tests/` using the `Given<YourVolume>` naming pattern.
 5. **To make it selectable with F1/F2**, implement `IVolumeProvider` (see `LocalVolumeProvider`) and add it to `VolumeProviders.All`. To ask for a location (e.g. a server path) and credentials when chosen, implement `ILocationVolumeProvider` instead (see `SmbVolumeProvider` and [`docs/plugin-api.md`](../docs/plugin-api.md#ilocationvolumeprovider)).
-6. **Or open files as the volume** (images): implement `IFileVolumeProvider` with `IsMatch` checking the file's magic signature (see `Iso9660FileVolumeProvider` and `ZipFileVolumeProvider`) and add it to `VolumeProviders.Files`, or return it from `IPlugin.FileVolumeProviders` of a plugin. `NavigationContext` then opens matching files as images (see [Images](../docs/volumes.md#images)). Return true from `CanWrite` when the volume can write to the file (see [Writable images](../docs/volumes.md#writable-images) and `AdfFileVolumeProvider`).
+6. **Or open files as the volume** (images): implement `IFileVolumeProvider` with `IsMatch` checking the file's magic signature (see `Iso9660FileVolumeProvider` and `ZipFileVolumeProvider`; for a read-only archive, derive the volume from `ArchiveVolume<T>` like `ZipVolume`) and add it to `VolumeProviders.Files`, or return it from `IPlugin.FileVolumeProviders` of a plugin. `NavigationContext` then opens matching files as images (see [Images](../docs/volumes.md#images)). Return true from `CanWrite` when the volume can write to the file (see [Writable images](../docs/volumes.md#writable-images) and `AdfFileVolumeProvider`).
 
 7. **To create new volumes as files with F9**, implement `IVolumeCreator` (see `AdfVolumeCreator`) with its input fields and return it from `IPlugin.VolumeCreators` with `IPlugin.CanCreateVolumes` true (see [Creating volumes](../docs/file-operations.md#creating-volumes)).
 
@@ -269,6 +273,7 @@ dotnet test src/Hst.Commander.Core.Tests/Hst.Commander.Core.Tests.csproj --logge
 | `SkiaSharp`, `SkiaSharp.NativeAssets.Linux` | 3.119.4 | `Hst.Commander.Core` — decoding PNG, JPEG, GIF, BMP and WebP images viewed with F3 in the GUI (the version Avalonia uses; part of the TUI too, as it references Core) |
 | `System.Linq.Async` | 6.0.1 | `Hst.Commander.Core` — async LINQ |
 | `Hst.Compression` | 0.4.96 | `Hst.Commander.Plugins.LhaLzx` — lha and lzx archive reading |
+| `SharpCompress` | 0.50.8 | `Hst.Commander.Plugins.RarSevenZip` — rar and 7z archive reading |
 | `Hst.Amiga` | 0.6.245 | `Hst.Commander.Plugins.Amiga` — Amiga rigid disk block, Fast File System and PFS3 reading and writing, .info icons; `Hst.Commander.Core` — UAE metadata (UAEFSDB and metafiles) |
 | `LTRData.DiscUtils.Vhd` | 1.0.90 | `Hst.Commander.Plugins.Amiga`, `Hst.Commander.Plugins.Disk` — vhd images |
 | `LTRData.DiscUtils.Core`, `.Fat`, `.ExFat`, `.Ntfs`, `.Ext` | 1.0.90 | `Hst.Commander.Plugins.Disk` — MBR/GPT partition tables, FAT, exFAT and NTFS reading and writing, ext2/3/4 reading |

@@ -55,7 +55,9 @@ public class GivenNavigationContextOpeningImages
     [Theory]
     [InlineData("archive.lha", "dirs-files.lha")]
     [InlineData("archive.lzx", "dirs-files.lzx")]
-    public async Task When_OpenLhaOrLzxFile_Then_ArchiveIsDetectedBySignatureAndBrowsed(string name,
+    [InlineData("archive.rar", "dirs-files.rar")]
+    [InlineData("archive.7z", "dirs-files.7z")]
+    public async Task When_OpenArchiveFile_Then_ArchiveIsDetectedBySignatureAndBrowsed(string name,
         string testDataFileName)
     {
         // arrange

@@ -22,7 +22,7 @@ Hst Commander comes with two front-ends that have the same functionality:
 - Dual-pane browsing of local drives and directories.
 - Browsing images as if they were directories, detected by their contents regardless of the extension, also inside other images:
   - ISO 9660 images.
-  - Zip, lha and lzx archives.
+  - Zip, lha, lzx, rar and 7z archives.
   - MBR and GPT disk images (raw or vhd) with FAT and NTFS partitions, PiStorm disks and hybrid MBR/RDB disks.
   - Amiga disk files (adf) and hard disk images with a rigid disk block (RDB), with Fast File System and PFS3 partitions.
 - Writing to Amiga adf and RDB images and FAT and NTFS partitions of disk images, shared safely by both panes.
@@ -103,6 +103,7 @@ dotnet test src/Hst.Commander.Core.Tests/Hst.Commander.Core.Tests.csproj
 | [`Hst.Commander.Gui`](src/Hst.Commander.Gui/readme.md) | Desktop GUI application |
 | [`Hst.Commander.Plugins.Zip`](src/Hst.Commander.Plugins.Zip/readme.md) | Zip archives (default plugin) |
 | [`Hst.Commander.Plugins.LhaLzx`](src/Hst.Commander.Plugins.LhaLzx/readme.md) | Lha and lzx archives (default plugin) |
+| [`Hst.Commander.Plugins.RarSevenZip`](src/Hst.Commander.Plugins.RarSevenZip/readme.md) | Rar and 7z archives (default plugin) |
 | [`Hst.Commander.Plugins.Disk`](src/Hst.Commander.Plugins.Disk/readme.md) | MBR/GPT disk images with FAT and NTFS partitions, PiStorm and hybrid disks (default plugin) |
 | [`Hst.Commander.Plugins.Amiga`](src/Hst.Commander.Plugins.Amiga/readme.md) | Amiga adf and RDB images, `.info` icons, Workbench navigation mode and Amiga pictures (default plugin) |
 | [`Hst.Commander.Plugins.PhysicalDisk`](src/Hst.Commander.Plugins.PhysicalDisk/readme.md) | Internal and external physical disks, opened like MBR, GPT and RDB disk images (default plugin) |
@@ -116,7 +117,7 @@ See [src/agents.md](src/agents.md) for the architecture and coding conventions a
 Hst Commander is in early development. Not implemented yet:
 
 - Edit (F4); changing the viewer's encoding, word wrapping and going to an offset.
-- Writing to ISO images and zip, lha and lzx archives, and to Amiga images inside other images.
+- Writing to ISO images and zip, lha, lzx, rar and 7z archives, and to Amiga images inside other images.
 - Changing RDB, MBR and GPT partitions.
 - Other Amiga file systems (e.g. SFS), other PC file systems (e.g. exFAT, ext) and vhdx/vmdk images.
 - Unloading or reloading plugins while running.

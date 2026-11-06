@@ -14,6 +14,8 @@ Hst Commander Core implements its built-in volumes (local drives and directories
   - `AmigaMetadata`, the Amiga protection bits and comment.
   - `Attributes`, DOS/Windows attributes (`EntryAttributes`).
 - **`Paths`**: the root (`/`) and parent (`..`) path components.
+- **`IVolume.GetReadOrder`** (optional): the order a volume stores the data of its items (e.g. a solid archive), so copying reads them in that order.
+- **`ArchiveVolume<TArchiveEntry>`**: a base class for read-only archive volumes. The derived class adds the archive's entries with `AddEntry` and opens them with `OpenArchiveEntry`; the base class builds the directory tree (including directories only found in file paths), lists, changes directory and finds names case-insensitively. Used by the Zip, LhaLzx and RarSevenZip plugins.
 
 ### Amiga metadata and attributes
 

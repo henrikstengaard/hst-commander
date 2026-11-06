@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\Hst.Commander.Abstractions\Hst.Commander.Abstractions.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <InternalsVisibleTo Include="Hst.Commander.Core.Tests" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="SharpCompress" Version="0.50.8" />
+    </ItemGroup>
+
+</Project>

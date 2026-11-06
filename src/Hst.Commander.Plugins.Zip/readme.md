@@ -15,4 +15,4 @@ The plugin is also the smallest example of a plugin:
 
 - `ZipPlugin` implements `IPlugin` and returns the file volume provider.
 - `ZipFileVolumeProvider` implements `IFileVolumeProvider`, detecting zip archives with `IsMatch` and opening them with `CreateVolume`.
-- `ZipVolume` implements `IVolume` over a `ZipArchive`.
+- `ZipVolume` derives from `ArchiveVolume<T>` in `Hst.Commander.Abstractions` over a `ZipArchive`.

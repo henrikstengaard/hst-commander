@@ -16,7 +16,7 @@ public class LhaVolume : ArchiveVolume<LzHeader>
 
     private readonly LhaArchive _lhaArchive;
 
-    private LhaVolume(LhaArchive lhaArchive) : base("Lha")
+    private LhaVolume(LhaArchive lhaArchive) : base("Lha", true)
     {
         _lhaArchive = lhaArchive;
     }
@@ -67,6 +67,7 @@ public class LhaVolume : ArchiveVolume<LzHeader>
         return new AmigaMetadata(protectionBits, comment);
     }
 
-    protected override Task<Stream> OpenArchiveEntry(LzHeader archiveEntry) =>
+    protected override Task<Stream> OpenArchiveEntry(string name, LzHeader archiveEntry,
+        CancellationToken cancellationToken) =>
         Task.FromResult<Stream>(_lhaArchive.OpenEntry(archiveEntry));
 }

@@ -3,6 +3,7 @@ using Hst.Commander.Plugins.Amiga;
 using Hst.Commander.Plugins.Disk;
 using Hst.Commander.Plugins.LhaLzx;
 using Hst.Commander.Plugins.PhysicalDisk;
+using Hst.Commander.Plugins.RarSevenZip;
 using Hst.Commander.Plugins.Zip;
 
 namespace Hst.Commander.Core;
@@ -25,7 +26,8 @@ public static class Plugins
     ///     images by the other plugins.
     /// </summary>
     public static IReadOnlyList<IPlugin> BuiltIn { get; } =
-        Initialize([new ZipPlugin(), new LhaLzxPlugin(), new DiskPlugin(), new AmigaPlugin(), new PhysicalDiskPlugin()]);
+        Initialize([new ZipPlugin(), new LhaLzxPlugin(), new RarSevenZipPlugin(),
+            new DiskPlugin(), new AmigaPlugin(), new PhysicalDiskPlugin()]);
 
     private static IReadOnlyList<IPlugin> Initialize(IReadOnlyList<IPlugin> plugins)
     {

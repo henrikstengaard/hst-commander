@@ -9,7 +9,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - F4, the `F4 Edit` button or File > Edit opens the file under the cursor (not directories or `..`) in the editor chosen in the settings (`EditorKind`): the built-in editor (the default), the system editor or a custom command.
 - `NavigationContext.OpenEditorAsync(entry)` returns an `EditorSession` for the built-in editor; `OpenExternalEditAsync(entry)` returns an `ExternalEditFile` for an external one.
 - Local files are read and written directly. Files inside images and other volumes use a volume of their own from `OpenLocationAsync`, writing on the thread pool and committing the cached writes of a shared image afterwards (like file operations, see [Writable images](volumes.md#writable-images)).
-- A file in a read-only image (ISO, zip, lha, lzx, images inside images) opens read-only in the built-in editor; external editors refuse it, since the changes would be lost.
+- A file in a read-only image (ISO, zip, lha, lzx, rar, 7z, images inside images) opens read-only in the built-in editor; external editors refuse it, since the changes would be lost.
 - Both panes are refreshed after saving, as the other pane may show the same location.
 
 ## EditorDocument
