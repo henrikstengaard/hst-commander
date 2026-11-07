@@ -325,14 +325,15 @@ public partial class PaneView : UserControl
     /// <summary>
     ///     Connects to the location of a volume provider needing one (e.g. an SMB path) and shows it, asking for
     ///     credentials with <paramref name="askCredentials" /> when needed (see <see cref="VolumeConnector" />). The
-    ///     pane is unchanged when the credentials dialog is cancelled.
+    ///     pane is unchanged when the credentials dialog is cancelled. <paramref name="credentials" /> are tried first,
+    ///     e.g. those entered in the connection dialog.
     /// </summary>
     public Task ConnectAsync(ILocationVolumeProvider volumeProvider, string location,
-        Func<CredentialsRequest, Task<VolumeCredentials?>> askCredentials) =>
+        Func<CredentialsRequest, Task<VolumeCredentials?>> askCredentials, VolumeCredentials? credentials = null) =>
         RunNavigationAsync(async () =>
         {
             var connection = await VolumeConnector.ConnectAsync(volumeProvider, location, askCredentials,
-                ShowProgress, HideProgress);
+                ShowProgress, HideProgress, credentials);
             if (connection != null)
             {
                 await NavigationContext.ChangeVolumeProviderAsync(connection);

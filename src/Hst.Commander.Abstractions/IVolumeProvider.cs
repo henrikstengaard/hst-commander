@@ -31,6 +31,15 @@ public interface IVolumeProvider
     string? PathRoot => null;
 
     /// <summary>
+    /// True (the default) when listed files are read in the background after listing: to detect which can be opened
+    /// as volumes (images), marked in the panes, and to show icons from icon files (e.g. Amiga .info files) and icons
+    /// contained in files (e.g. Windows programs) in the GUI. False skips these reads, e.g. for FTP servers, which
+    /// often allow one connection per user, so reading the files on connections of their own would block browsing.
+    /// Files are still detected as images when opened, and icons read when asked for (e.g. properties).
+    /// </summary>
+    bool ReadListedFiles => true;
+
+    /// <summary>
     /// Create a new volume at its root. Each call returns a volume of its own, so e.g. a copy can use one on a
     /// background thread without changing the volume shown in a pane. A volume implementing <see cref="IDisposable"/>
     /// is disposed when it is no longer used.

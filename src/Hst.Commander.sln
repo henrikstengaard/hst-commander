@@ -29,6 +29,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hst.Commander.Plugins.Smb",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hst.Commander.Plugins.RarSevenZip", "Hst.Commander.Plugins.RarSevenZip\Hst.Commander.Plugins.RarSevenZip.csproj", "{918FC982-A5AA-4B6F-805B-A8AF82728984}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hst.Commander.Plugins.Ftp", "Hst.Commander.Plugins.Ftp\Hst.Commander.Plugins.Ftp.csproj", "{C3D90BB6-070B-4BFA-98DB-1E77FBEF6CA0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -183,6 +185,18 @@ Global
 		{918FC982-A5AA-4B6F-805B-A8AF82728984}.Release|x64.Build.0 = Release|Any CPU
 		{918FC982-A5AA-4B6F-805B-A8AF82728984}.Release|x86.ActiveCfg = Release|Any CPU
 		{918FC982-A5AA-4B6F-805B-A8AF82728984}.Release|x86.Build.0 = Release|Any CPU
+		{C3D90BB6-070B-4BFA-98DB-1E77FBEF6CA0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C3D90BB6-070B-4BFA-98DB-1E77FBEF6CA0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C3D90BB6-070B-4BFA-98DB-1E77FBEF6CA0}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{C3D90BB6-070B-4BFA-98DB-1E77FBEF6CA0}.Debug|x64.Build.0 = Debug|Any CPU
+		{C3D90BB6-070B-4BFA-98DB-1E77FBEF6CA0}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{C3D90BB6-070B-4BFA-98DB-1E77FBEF6CA0}.Debug|x86.Build.0 = Debug|Any CPU
+		{C3D90BB6-070B-4BFA-98DB-1E77FBEF6CA0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C3D90BB6-070B-4BFA-98DB-1E77FBEF6CA0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C3D90BB6-070B-4BFA-98DB-1E77FBEF6CA0}.Release|x64.ActiveCfg = Release|Any CPU
+		{C3D90BB6-070B-4BFA-98DB-1E77FBEF6CA0}.Release|x64.Build.0 = Release|Any CPU
+		{C3D90BB6-070B-4BFA-98DB-1E77FBEF6CA0}.Release|x86.ActiveCfg = Release|Any CPU
+		{C3D90BB6-070B-4BFA-98DB-1E77FBEF6CA0}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

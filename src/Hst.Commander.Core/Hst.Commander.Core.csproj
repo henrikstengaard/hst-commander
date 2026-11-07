@@ -15,6 +15,7 @@
       <ProjectReference Include="..\Hst.Commander.Plugins.Disk\Hst.Commander.Plugins.Disk.csproj" />
       <ProjectReference Include="..\Hst.Commander.Plugins.Amiga\Hst.Commander.Plugins.Amiga.csproj" />
       <ProjectReference Include="..\Hst.Commander.Plugins.PhysicalDisk\Hst.Commander.Plugins.PhysicalDisk.csproj" />
+      <ProjectReference Include="..\Hst.Commander.Plugins.Ftp\Hst.Commander.Plugins.Ftp.csproj" />
     </ItemGroup>
 
     <ItemGroup>
