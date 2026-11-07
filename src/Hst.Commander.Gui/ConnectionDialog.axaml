@@ -1,0 +1,35 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Hst.Commander.Gui.ConnectionDialog"
+        Width="480"
+        SizeToContent="Height"
+        CanResize="False"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner">
+    <StackPanel Margin="16" Spacing="8">
+        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto"
+              ColumnSpacing="12" RowSpacing="8">
+            <TextBlock Grid.Row="0" Grid.Column="0" Text="Protocol:" VerticalAlignment="Center" />
+            <ComboBox x:Name="ProtocolComboBox" Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch" />
+            <TextBlock Grid.Row="1" Grid.Column="0" Text="Host:" VerticalAlignment="Center" />
+            <Grid Grid.Row="1" Grid.Column="1" ColumnDefinitions="*,Auto,90" ColumnSpacing="8">
+                <TextBox x:Name="HostTextBox" Grid.Column="0" />
+                <TextBlock Grid.Column="1" Text="Port:" VerticalAlignment="Center" />
+                <TextBox x:Name="PortTextBox" Grid.Column="2" />
+            </Grid>
+            <TextBlock Grid.Row="2" Grid.Column="0" Text="Path:" VerticalAlignment="Center" />
+            <TextBox x:Name="PathTextBox" Grid.Row="2" Grid.Column="1" PlaceholderText="Home directory" />
+            <TextBlock Grid.Row="3" Grid.Column="0" Text="User name:" VerticalAlignment="Center" />
+            <TextBox x:Name="UserNameTextBox" Grid.Row="3" Grid.Column="1" />
+            <TextBlock Grid.Row="4" Grid.Column="0" Text="Password:" VerticalAlignment="Center" />
+            <TextBox x:Name="PasswordTextBox" Grid.Row="4" Grid.Column="1" PasswordChar="●" />
+        </Grid>
+        <TextBlock x:Name="ErrorText" TextWrapping="Wrap" IsVisible="False" />
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,8,0,0">
+            <Button x:Name="OkButton" Content="Connect" MinWidth="80" HorizontalContentAlignment="Center"
+                    IsDefault="True" />
+            <Button x:Name="CancelButton" Content="Cancel" MinWidth="80" HorizontalContentAlignment="Center"
+                    IsCancel="True" />
+        </StackPanel>
+    </StackPanel>
+</Window>

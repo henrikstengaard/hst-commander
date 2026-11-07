@@ -1,4 +1,5 @@
 using Hst.Commander.Abstractions;
+using Hst.Commander.Plugins.Ftp;
 using Hst.Commander.Plugins.Smb;
 using Hst.Commander.Plugins.Zip;
 
@@ -13,6 +14,8 @@ public class GivenNavigationContextBookmarks : IDisposable
     private readonly BookmarkStore _store;
     private readonly TestSmbServer _server = new();
     private readonly SmbVolumeProvider _smbVolumeProvider;
+    private readonly TestRemoteServer _ftpServer;
+    private readonly FtpVolumeProvider _ftpVolumeProvider;
     private readonly IFileVolumeProvider[] _fileVolumeProviders = [new ZipFileVolumeProvider()];
     private readonly VolumeCredentials _credentials = new(@"DOMAIN\user", "secret");
 
@@ -31,6 +34,8 @@ public class GivenNavigationContextBookmarks : IDisposable
             ZipTestData.CreateZip(("inner/file.txt", "content")));
         _server.AddShare("share", sharePath);
         _smbVolumeProvider = new SmbVolumeProvider(_server);
+        _ftpServer = new TestRemoteServer(_rootPath) { HomeDirectory = "/share", Credentials = _credentials };
+        _ftpVolumeProvider = new FtpVolumeProvider(_ftpServer);
     }
 
     public void Dispose()
@@ -42,7 +47,7 @@ public class GivenNavigationContextBookmarks : IDisposable
     private static string Join(params string[] parts) => string.Join(Path.DirectorySeparatorChar, parts);
 
     private IReadOnlyList<IVolumeProvider> VolumeProviders => [Core.VolumeProviders.Local, _testVolumeProvider,
-        _smbVolumeProvider];
+        _smbVolumeProvider, _ftpVolumeProvider];
 
     private NavigationContext CreateContext(string path = "") =>
         new(path, _ => { }, _fileVolumeProviders, []);
@@ -204,6 +209,63 @@ public class GivenNavigationContextBookmarks : IDisposable
         Assert.Equal(imagePath, otherContext.CurrentPath);
         Assert.Equal(_credentials, otherContext.ConnectedLocation?.Credentials);
         Assert.DoesNotContain("secret", File.ReadAllText(_store.FilePath));
+    }
+
+    [Fact]
+    public async Task When_SftpPathInsideImageIsBookmarked_Then_PathIsUrlAndPasswordIsUsedWhenOpened()
+    {
+        // arrange
+        using var context = CreateContext();
+        var connection = await VolumeConnector.ConnectAsync(_ftpVolumeProvider, "sftp://server:2222", NoCredentials,
+            Ignore, Ignore, _credentials);
+        await context.ChangeVolumeProviderAsync(connection!);
+        const string imagePath = "sftp://server:2222/share/dir1/archive.zip/inner";
+        await context.ChangeLocationAsync(imagePath);
+        var bookmark = context.CreateBookmark("inner");
+        _store.Add(bookmark);
+        _store.StorePassword(bookmark, context.ConnectedLocation!.Credentials!.Password);
+        bookmark = Assert.Single(_store.Load());
+        using var otherContext = CreateContext(_rootPath);
+        var requests = new List<CredentialsRequest>();
+
+        // act
+        var opened = await OpenAsync(otherContext, bookmark, request =>
+        {
+            requests.Add(request);
+            return Task.FromResult<VolumeCredentials?>(null);
+        });
+
+        // assert
+        Assert.Equal("FTP/SFTP", bookmark.VolumeProviderName);
+        Assert.Equal("sftp://server:2222/share/dir1", bookmark.Location);
+        Assert.Equal(imagePath, bookmark.Path);
+        Assert.Equal(_credentials.UserName, bookmark.UserName);
+        Assert.True(opened);
+        Assert.Empty(requests);
+        Assert.Equal(imagePath, otherContext.CurrentPath);
+        Assert.DoesNotContain("secret", File.ReadAllText(_store.FilePath));
+    }
+
+    [Fact]
+    public async Task When_FtpBookmarkHasNoPassword_Then_ItAsksWithUserName()
+    {
+        // arrange
+        var bookmark = new Bookmark("1", "share", "FTP/SFTP", "ftp://server/share", "ftp://server/share/dir1",
+            _credentials.UserName, false);
+        using var context = CreateContext(_rootPath);
+        var requests = new List<CredentialsRequest>();
+
+        // act
+        var opened = await OpenAsync(context, bookmark, request =>
+        {
+            requests.Add(request);
+            return Task.FromResult<VolumeCredentials?>(_credentials);
+        });
+
+        // assert
+        Assert.True(opened);
+        Assert.Equal(_credentials.UserName, Assert.Single(requests).UserName);
+        Assert.Equal("ftp://server/share/dir1", context.CurrentPath);
     }
 
     [Fact]

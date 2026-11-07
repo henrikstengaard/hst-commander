@@ -53,6 +53,7 @@ LICENSE_URLS = {
     'sharpcompress.txt': 'https://raw.githubusercontent.com/adamhathcock/sharpcompress/master/LICENSE.txt',
     'discutils.txt': 'https://raw.githubusercontent.com/LTRData/DiscUtils/LTRData.DiscUtils-initial/LICENSE.txt',
     'ltrdata-library.txt': 'https://raw.githubusercontent.com/LTRData/Library/master/LICENSE',
+    'ssh-net.txt': 'https://raw.githubusercontent.com/sshnet/SSH.NET/develop/LICENSE',
     'apache-2.0.txt': 'https://www.apache.org/licenses/LICENSE-2.0.txt',
     'lgpl-3.0.txt': 'https://www.gnu.org/licenses/lgpl-3.0.txt',
     'gpl-3.0.txt': 'https://www.gnu.org/licenses/gpl-3.0.txt',
@@ -143,6 +144,11 @@ SECTIONS = [
           '(https://github.com/oleg-st/ZstdSharp), and code from The Legion Of The Bouncy\n'
           'Castle under this license:',
           lic('sharpcompress-bouncycastle.txt'))),
+    ('FluentFTP', 'https://github.com/robinrodricks/FluentFTP', 'MIT', None, ['FluentFTP'],
+     pkg('FluentFTP', 'LICENSE.TXT')),
+    ('SSH.NET', 'https://github.com/sshnet/SSH.NET', 'MIT', None, ['SSH.NET'], lic('ssh-net.txt')),
+    ('Bouncy Castle (BouncyCastle.Cryptography)', 'https://github.com/bcgit/bc-csharp', 'MIT', None,
+     ['BouncyCastle.Cryptography'], pkg('BouncyCastle.Cryptography', 'LICENSE.md')),
     ('Pngcs (Hjg.Pngcs)', 'https://github.com/henrikstengaard/pngcs', 'Apache-2.0', None, ['Hjg.Pngcs'],
      join(pkg('Hjg.Pngcs', 'license.txt'), lic('apache-2.0.txt'))),
     # sni.dll, before the other .NET packages matching runtime.*
