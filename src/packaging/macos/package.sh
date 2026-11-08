@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Packages a published Hst Commander app for macOS as .dmg: the gui as an app bundle to drag to Applications
 # (create-dmg, window with dmg-background.svg), the tui as the executable (hdiutil).
-# Runs on macOS (codesign, tiffutil, hdiutil, create-dmg from brew). Apps are signed ad hoc, which arm64 requires.
+# Runs on macOS (codesign, tiffutil, hdiutil, create-dmg from brew). Apps are signed with the Developer ID identity
+# MACOS_SIGN_IDENTITY in the keychain MACOS_KEYCHAIN (set up by .github/scripts/macos-signing-setup.ps1) with the
+# hardened runtime notarization requires, else ad hoc, which arm64 requires. The dmg itself isn't signed here.
 # usage: package.sh <tui|gui> <osx-x64|osx-arm64> <version> <publish dir> <output dir>
 set -euo pipefail
 
@@ -18,12 +20,32 @@ trap 'rm -rf "$work"' EXIT
 stage=$work/dmg
 mkdir -p "$stage"
 
+# signs a file or bundle with the developer id identity when set up, else ad hoc
+sign() {
+  if [ -n "${MACOS_SIGN_IDENTITY:-}" ] && [ -n "${MACOS_KEYCHAIN:-}" ]; then
+    codesign --force --sign "$MACOS_SIGN_IDENTITY" --keychain "$MACOS_KEYCHAIN" --options runtime --timestamp \
+      --entitlements "$script_dir/hst-commander.entitlements" "$1"
+  else
+    codesign --force --sign - "$1"
+  fi
+  codesign --verify --strict --verbose=2 "$1"
+}
+
+# signs every mach-o binary in a directory (the executable and any native libraries next to it)
+sign_binaries() {
+  find "$1" -type f -print0 | while IFS= read -r -d '' file; do
+    if file -b "$file" | grep -q 'Mach-O'; then
+      sign "$file"
+    fi
+  done
+}
+
 case $app in
   tui)
     volume_name="Hst Commander TUI"
     cp -a "$publish_dir/." "$stage/"
     chmod 755 "$stage/hst.commander"
-    codesign --force --sign - "$stage/hst.commander"
+    sign_binaries "$stage"
     ;;
   gui)
     volume_name="Hst Commander"
@@ -60,7 +82,9 @@ case $app in
 </dict>
 </plist>
 EOF
-    codesign --force --deep --sign - "$bundle"
+    # binaries inside the bundle first, then the bundle (--deep isn't used, as it doesn't apply entitlements)
+    sign_binaries "$bundle/Contents/MacOS"
+    sign "$bundle"
     # 1x and 2x (retina) background in one tiff
     tiffutil -cathidpicheck "$script_dir/dmg-background.png" "$script_dir/dmg-background@2x.png" -out "$work/background.tiff"
     ;;

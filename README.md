@@ -75,6 +75,13 @@ Releases are published on the [GitHub releases page](https://github.com/henrikst
 - **macOS** (x64, arm64): dmg for the GUI app and the TUI.
 - **Linux** (x64, arm, arm64): AppImage and deb package.
 
+## Code signing
+
+Releases of Hst Commander are built from the source code in this repository by GitHub Actions and code signed as part of the build:
+- Windows: TUI and GUI apps and their installers are signed with [Azure Artifact Signing](https://learn.microsoft.com/azure/artifact-signing/).
+- macOS: TUI and GUI apps and their dmgs are signed with an Apple Developer ID certificate and notarized by Apple.
+- Linux: Releases are not code signed.
+
 ## Building
 
 Hst Commander requires the [.NET 10 SDK](https://dotnet.microsoft.com/download) and `git` on the path (the build number is the git commit count).
