@@ -1057,15 +1057,30 @@ public sealed class MainWindow : Window
 
     /// <summary>
     ///     Asks for the location of a volume provider needing one (e.g. an SMB path) and shows it in a pane, asking for
-    ///     a user name and password when the location needs them. The pane is unchanged when a dialog is cancelled.
+    ///     a user name and password when the location needs them. A volume provider asking for connection details (e.g.
+    ///     FTP/SFTP) shows the connection dialog instead, and connects with the credentials entered in it first. The pane
+    ///     is unchanged when a dialog is cancelled.
     /// </summary>
     private async Task ConnectAsync(Pane pane, ILocationVolumeProvider volumeProvider)
     {
-        var dialog = new VolumeLocationDialog(volumeProvider, VolumeConnector.GetLastLocation(volumeProvider),
-            _palette);
-        Application.Run(dialog);
-        var location = dialog.Result;
-        dialog.Dispose();
+        string? location;
+        VolumeCredentials? credentials = null;
+        if (volumeProvider is IConnectionVolumeProvider connectionVolumeProvider)
+        {
+            var connectionDialog = new ConnectionDialog(connectionVolumeProvider, _palette);
+            Application.Run(connectionDialog);
+            location = connectionDialog.Result?.Location;
+            credentials = connectionDialog.Result?.Credentials;
+            connectionDialog.Dispose();
+        }
+        else
+        {
+            var dialog = new VolumeLocationDialog(volumeProvider, VolumeConnector.GetLastLocation(volumeProvider),
+                _palette);
+            Application.Run(dialog);
+            location = dialog.Result;
+            dialog.Dispose();
+        }
 
         pane.TableView.SetFocus();
         if (location == null)
@@ -1076,7 +1091,7 @@ public sealed class MainWindow : Window
         await RunNavigationAsync(pane, async () =>
         {
             var connection = await VolumeConnector.ConnectAsync(volumeProvider, location, AskCredentials,
-                pane.Progress.Show, pane.Progress.Hide);
+                pane.Progress.Show, pane.Progress.Hide, credentials);
             if (connection != null)
             {
                 await pane.NavigationContext.ChangeVolumeProviderAsync(connection);

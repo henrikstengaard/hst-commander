@@ -34,6 +34,9 @@ Components:
 - Hst.Amiga (MIT, TUI and GUI): https://github.com/henrikstengaard/hst-amiga
 - Hst.Core, Hst.Compression and Hst.Imaging (MIT, TUI and GUI): https://github.com/henrikstengaard/hst-core
 - SharpCompress (MIT, TUI and GUI): https://github.com/adamhathcock/sharpcompress
+- FluentFTP (MIT, TUI and GUI): https://github.com/robinrodricks/FluentFTP
+- SSH.NET (MIT, TUI and GUI): https://github.com/sshnet/SSH.NET
+- Bouncy Castle (BouncyCastle.Cryptography) (MIT, TUI and GUI): https://github.com/bcgit/bc-csharp
 - Pngcs (Hjg.Pngcs) (Apache-2.0, TUI and GUI): https://github.com/henrikstengaard/pngcs
 - SQL Server Network Interface (sni.dll) (MICROSOFT .NET LIBRARY license, TUI and GUI on Windows): https://github.com/dotnet/corefx
 - .NET libraries (MIT, TUI and GUI): https://github.com/dotnet
@@ -641,6 +644,76 @@ FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
 COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN
 AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+################################################################################
+# FluentFTP
+# https://github.com/robinrodricks/FluentFTP
+# License: MIT. Used by: TUI and GUI.
+################################################################################
+
+Packages: FluentFTP
+
+Copyright (c) 2015 Robin Rodricks and FluentFTP Contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+################################################################################
+# SSH.NET
+# https://github.com/sshnet/SSH.NET
+# License: MIT. Used by: TUI and GUI.
+################################################################################
+
+Packages: SSH.NET
+
+The MIT License (MIT)
+
+Copyright (c) Renci, Oleg Kapeljushnik, Gert Driesen and contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+################################################################################
+# Bouncy Castle (BouncyCastle.Cryptography)
+# https://github.com/bcgit/bc-csharp
+# License: MIT. Used by: TUI and GUI.
+################################################################################
+
+Packages: BouncyCastle.Cryptography
+
+MIT License (https://opensource.org/licenses/MIT)
+
+Copyright (c) 2000-2026 The Legion of the Bouncy Castle Inc. (https://www.bouncycastle.org).
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
+associated documentation files (the "Software"), to deal in the Software without restriction,
+including without limitation the rights to use, copy, modify, merge, publish, distribute,
+sub license, and/or sell copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions: The above copyright notice and this
+permission notice shall be included in all copies or substantial portions of the Software.
+
+**THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT
+NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT
+OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.**
 
 ################################################################################
 # Pngcs (Hjg.Pngcs)

@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\Hst.Commander.Abstractions\Hst.Commander.Abstractions.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <InternalsVisibleTo Include="Hst.Commander.Core.Tests" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <!-- FTP and FTPS client -->
+      <PackageReference Include="FluentFTP" Version="55.1.0" />
+      <!-- SFTP client -->
+      <PackageReference Include="SSH.NET" Version="2026.0.0" />
+    </ItemGroup>
+
+</Project>

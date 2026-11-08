@@ -6,7 +6,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 
 ## Entry Icons
 
-- `ListEntriesAsync` finds each entry's icon file with the first icon provider (`VolumeProviders.Icons`) whose `GetIconFileName` names a listed file (exact match, otherwise case-insensitive), so an entry and its icon file (`file` and `file.info`, `drawer` and `drawer.info`) share the icon. `GetIconFile(entry)` returns it. Not for `..` or the drive list.
+- `ListEntriesAsync` finds each entry's icon file with the first icon provider (`VolumeProviders.Icons`) whose `GetIconFileName` names a listed file (exact match, otherwise case-insensitive), so an entry and its icon file (`file` and `file.info`, `drawer` and `drawer.info`) share the icon. `GetIconFile(entry)` returns it. Not for `..`, the drive list, or when the root volume provider doesn't read listed files (`ReadsListedFiles` false, e.g. FTP and SFTP servers allowing one connection per user).
 - Volume entries without a listed icon file get the providers' `GetVolumeIconFileName` (e.g. `Disk.info`), looked up when the icon is read. `HasIcon(entry)` covers both cases.
 - `ReadIconAsync(entry, size)` reads the icon file into memory (with a size limit; local files on a background thread, others with the pane's volume) and calls `ReadIcon` on the thread pool. `ReadIconsAsync` does the same for all icons. Unreadable or invalid icons and plugin errors give null/empty.
 - Icons inside volume entries are read with a location opened once per listing with `OpenLocationAsync` (closed when the entries are listed again or the context is disposed), on the thread pool and serialized by a semaphore, so the pane's volume isn't changed. A partition without the file, or that can't be mounted, has no icon.
@@ -20,6 +20,8 @@ Each row shows a 16x16 icon. `PaneView.LoadIcons` runs `FileIcons.LoadAsync` aft
 1. Icons of plugin icon files and inside volume entries (cached by the icon file's location, size, date and pixel size; icons inside volume entries aren't cached). Scaled into the square keeping their aspect ratio.
 2. Icons contained in files (`EmbeddedIconReader`): local files on a background thread, files inside images on the UI thread, because the pane's volume isn't thread safe. When a local file has no icon of its own but the OS shows one (`IFileIconProvider.HasFileIcon`, e.g. Windows system programs and shortcuts, `.icns` on macOS), the OS icon of the file is used.
 3. Type icons from the host OS, cached per extension, folder and drive and loaded one at a time, so both panes loading at startup get the same icon: Windows shell icons (`SHGetFileInfo` with attributes, so files don't need to exist), freedesktop icons on Linux (shared MIME database and PNG icon themes; SVG-only icons aren't supported), NSWorkspace on macOS (on the UI thread). Without one, the built-in icons stay.
+
+When listed files aren't read (`NavigationContext.ReadsListedFiles` false, e.g. FTP and SFTP), only type icons are loaded.
 
 The parent entry (`..`) in the list and thumbnails shows the folder icon (the OS one once loaded, otherwise the built-in one) with a green arrow up drawn over its lower right part, so it's clear it goes a directory up. It never gets an icon of its own. Plugin navigation modes (e.g. Workbench) don't show `..`; they have the `..` toolbar button instead.
 

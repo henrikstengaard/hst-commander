@@ -1,6 +1,7 @@
 ﻿using Hst.Commander.Abstractions;
 using Hst.Commander.Plugins.Amiga;
 using Hst.Commander.Plugins.Disk;
+using Hst.Commander.Plugins.Ftp;
 using Hst.Commander.Plugins.LhaLzx;
 using Hst.Commander.Plugins.PhysicalDisk;
 using Hst.Commander.Plugins.RarSevenZip;
@@ -23,11 +24,11 @@ public static class Plugins
     ///     Plugins included with Hst Commander, initialized with <see cref="PluginHost.Instance" />. The disk plugin comes
     ///     before the Amiga plugin, so hybrid disks with both a master boot record and a rigid disk block are opened by
     ///     the disk plugin, showing both. The physical disk plugin lists the disks of the computer, opened like disk
-    ///     images by the other plugins.
+    ///     images by the other plugins. The FTP plugin connects to FTP, FTPS and SFTP servers.
     /// </summary>
     public static IReadOnlyList<IPlugin> BuiltIn { get; } =
         Initialize([new ZipPlugin(), new LhaLzxPlugin(), new RarSevenZipPlugin(),
-            new DiskPlugin(), new AmigaPlugin(), new PhysicalDiskPlugin()]);
+            new DiskPlugin(), new AmigaPlugin(), new PhysicalDiskPlugin(), new FtpPlugin()]);
 
     private static IReadOnlyList<IPlugin> Initialize(IReadOnlyList<IPlugin> plugins)
     {

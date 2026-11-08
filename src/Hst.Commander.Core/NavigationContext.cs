@@ -58,6 +58,13 @@ public sealed class NavigationContext : IDisposable
     public IVolumeProvider VolumeProvider => _volumeProvider;
 
     /// <summary>
+    ///     True when listed files are read in the background, to detect volume files and read icons from icon files and
+    ///     files: false when the root volume provider doesn't read them (<see cref="IVolumeProvider.ReadListedFiles" />,
+    ///     e.g. FTP servers allowing one connection per user), also inside images opened from it.
+    /// </summary>
+    public bool ReadsListedFiles => _volumeProvider.ReadListedFiles;
+
+    /// <summary>
     ///     Shows a new volume from a volume provider at its root, e.g. chosen with Alt+F1/Alt+F2. Images opened in the
     ///     current volume are closed and marks are cleared.
     /// </summary>
@@ -195,7 +202,7 @@ public sealed class NavigationContext : IDisposable
             .Where(pathComponent => !pathComponent.Equals(Paths.Root, StringComparison.OrdinalIgnoreCase))
             .ToList();
         var location = _volumeProvider.PathRoot is { Length: > 0 } pathRoot
-            ? string.Join(Path.DirectorySeparatorChar, [pathRoot, ..rootPathComponents])
+            ? JoinPathRoot(pathRoot, rootPathComponents)
             : connection.Location;
         var userName = connection.Credentials is { UserName.Length: > 0 } credentials ? credentials.UserName : null;
         return new Bookmark(id, description, connection.LocationVolumeProvider.Name, location, CurrentPath, userName,
@@ -578,10 +585,19 @@ public sealed class NavigationContext : IDisposable
 
             // e.g. "\\server\share\dir" of an SMB server
             return _rootVolume is not LocalVolume && _volumeProvider.PathRoot is { Length: > 0 } pathRoot
-                ? string.Join(Path.DirectorySeparatorChar, [pathRoot, ..pathComponents])
+                ? JoinPathRoot(pathRoot, pathComponents)
                 : string.Join(Path.DirectorySeparatorChar, pathComponents);
         }
     }
+
+    /// <summary>
+    ///     Path of path components below the <see cref="IVolumeProvider.PathRoot" /> of a volume provider: separated
+    ///     by slashes after a URL, e.g. "sftp://server/home/user", otherwise by the directory separator of the
+    ///     operating system, e.g. "\\server\share\dir" of an SMB server on Windows.
+    /// </summary>
+    public static string JoinPathRoot(string pathRoot, IEnumerable<string> pathComponents) =>
+        string.Join(pathRoot.Contains("://", StringComparison.Ordinal) ? '/' : Path.DirectorySeparatorChar,
+            [pathRoot, ..pathComponents]);
 
     /// <summary>
     ///     True inside an image: a file opened as a volume by a file volume provider, e.g. an ISO image or a zip archive.
@@ -749,14 +765,15 @@ public sealed class NavigationContext : IDisposable
     /// <summary>
     ///     Finds the icon files of the listed entries with the icon providers: the first provider whose icon file for
     ///     an entry (e.g. "file.info" for "file" and for "file.info" itself) is a listed file, matched exactly,
-    ///     otherwise case-insensitive. Not in the drive list.
+    ///     otherwise case-insensitive. Not in the drive list, nor when listed files aren't read
+    ///     (<see cref="ReadsListedFiles" />, e.g. FTP servers), so entries have no icon files there.
     /// </summary>
     private void UpdateIconFiles(IReadOnlyList<IEntry> entries)
     {
         _iconFiles.Clear();
         _volumeIconFiles.Clear();
         CloseIconLocation();
-        if (_iconProviders.Count == 0 || IsDriveList)
+        if (_iconProviders.Count == 0 || IsDriveList || !ReadsListedFiles)
         {
             return;
         }
@@ -1137,6 +1154,7 @@ public sealed class NavigationContext : IDisposable
     ///     each detected file. The files are read on the thread pool from a volume of their own
     ///     (<see cref="OpenLocationAsync" />), so the pane's volume isn't used and navigating needn't wait. Files that
     ///     can't be read or fail detection are not volumes. Stops when cancelled, e.g. when the entries are listed again.
+    ///     Nothing is detected when listed files aren't read (<see cref="ReadsListedFiles" />, e.g. FTP servers).
     /// </summary>
     public async Task DetectVolumeFilesAsync(IReadOnlyList<IEntry> entries, Action<IEntry> detected,
         CancellationToken cancellationToken = default)
@@ -1145,7 +1163,7 @@ public sealed class NavigationContext : IDisposable
         ArgumentNullException.ThrowIfNull(detected);
 
         var files = entries.Where(entry => entry.Type == EntryType.Item).ToList();
-        if (files.Count == 0 || _fileVolumeProviders.Count == 0 || IsDriveList)
+        if (files.Count == 0 || _fileVolumeProviders.Count == 0 || IsDriveList || !ReadsListedFiles)
         {
             return;
         }
