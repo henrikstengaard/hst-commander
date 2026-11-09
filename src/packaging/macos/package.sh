@@ -51,7 +51,17 @@ case $app in
     volume_name="Hst Commander"
     bundle=$stage/Hst\ Commander.app
     mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources"
-    cp -a "$publish_dir/." "$bundle/Contents/MacOS/"
+    # only code goes in Contents/MacOS, as signing the bundle fails for files there that aren't signed (e.g.
+    # LICENSE.txt); other files (the license and notices, also embedded in the app) go in Contents/Resources
+    (cd "$publish_dir" && find . -type f -print0) | while IFS= read -r -d '' file; do
+      if file -b "$publish_dir/$file" | grep -q 'Mach-O'; then
+        target=$bundle/Contents/MacOS/$file
+      else
+        target=$bundle/Contents/Resources/$file
+      fi
+      mkdir -p "$(dirname "$target")"
+      cp -p "$publish_dir/$file" "$target"
+    done
     chmod 755 "$bundle/Contents/MacOS/hst.commander.gui"
     cp "$script_dir/../../icon/hst-commander.icns" "$bundle/Contents/Resources/hst-commander.icns"
     cat > "$bundle/Contents/Info.plist" <<EOF
