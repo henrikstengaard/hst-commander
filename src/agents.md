@@ -35,7 +35,8 @@ The code is the source of truth for constants, key lists and colors; the docs de
 ## Repository Layout
 
 ```
-.github/workflows/              build-and-test.yml (every push, Windows/macOS/Linux), build-and-release.yml (manual, packages and drafts a prerelease)
+.github/workflows/              build-and-test.yml (every push, Windows/macOS/Linux), build-and-release.yml (manual, packages, signs and drafts a prerelease)
+.github/scripts/                macOS code signing and notarization scripts used by build-and-release.yml
 docs/                           Feature docs (see above)
 src/
   Hst.Commander.sln             Solution file (13 projects)
