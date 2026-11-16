@@ -24,7 +24,19 @@ public sealed class PanelButtonDialog : Dialog
         var labelField = new TextField { X = 13, Y = 1, Width = Dim.Fill(1), Text = button.Label };
         var actionLabel = new Label { X = 1, Y = 3, Text = "Command:" };
         var actions = CommanderActions.All;
-        var actionList = new ListView { X = 13, Y = 3, Width = Dim.Fill(1), Height = 8 };
+        // an unfocused list draws its selected item in HotNormal, which is the dialog's normal color, so the button's
+        // command wouldn't stand out while the label is edited; the dialog's colors inverted show it
+        var actionList = new ListView
+        {
+            X = 13,
+            Y = 3,
+            Width = Dim.Fill(1),
+            Height = 8,
+            ColorScheme = new ColorScheme(palette.DialogColorScheme)
+            {
+                HotNormal = new Terminal.Gui.Attribute(palette.Dialog.Background, palette.Dialog.Foreground)
+            }
+        };
         actionList.SetSource(new ObservableCollection<string>(actions.Select(action => action.Description)));
         actionList.SelectedItem = Math.Max(0, actions.ToList().FindIndex(action => action.Id == button.Action));
         var backgroundLabel = new Label { X = 1, Y = 12, Text = "Background:" };
