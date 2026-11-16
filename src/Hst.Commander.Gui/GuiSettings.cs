@@ -24,6 +24,15 @@ public sealed record GuiSettings
     public string Theme { get; init; } = Themes.MidnightCommanderId;
 
     /// <summary>
+    ///     Font family of the panes and the bottom area, null for the theme's font or the default (see
+    ///     <see cref="GuiFonts" />).
+    /// </summary>
+    public string? FontFamily { get; init; }
+
+    /// <summary>Font size of the panes and the bottom area, null for the theme's size or the default.</summary>
+    public double? FontSize { get; init; }
+
+    /// <summary>
     ///     Keys opening the volume provider list of the left and right pane, null for the default
     ///     (see <see cref="VolumeProviderKeyBindings.Default" />).
     /// </summary>

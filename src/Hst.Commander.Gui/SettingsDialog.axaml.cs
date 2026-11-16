@@ -18,7 +18,10 @@ public partial class SettingsDialog : Window
     private const double ButtonsHeight = 600;
 
     private readonly IReadOnlyList<ThemeChoice> _themes = Themes.All;
-    private readonly Action<ThemeChoice> _preview;
+    private readonly Action<ThemeChoice, string?, double?> _preview;
+
+    /// <summary>Items of the font list: the default (the theme's font or the default fonts), then the installed fonts.</summary>
+    private readonly List<string> _fonts;
 
     /// <summary>Editors of the buttons by theme, so changes are kept when another theme is chosen and back again.</summary>
     private readonly Dictionary<ICustomizableButtonPanel, ButtonPanelEditorView> _buttonEditors = [];
@@ -31,22 +34,40 @@ public partial class SettingsDialog : Window
 
     /// <param name="settings">Settings shown.</param>
     /// <param name="preview">
-    ///     Applies a theme chosen in the dialog, and the theme of the settings again on cancel; only its colors when
-    ///     null.
+    ///     Applies a theme and font (family and size, null for the theme's) chosen in the dialog, and those of the
+    ///     settings again on cancel; only the theme's colors when null.
     /// </param>
-    public SettingsDialog(GuiSettings settings, Action<ThemeChoice>? preview = null)
+    public SettingsDialog(GuiSettings settings, Action<ThemeChoice, string?, double?>? preview = null)
     {
         InitializeComponent();
-        _preview = preview ?? ThemeManager.Apply;
+        _preview = preview ?? ((theme, _, _) => ThemeManager.Apply(theme));
 
         var originalTheme = Themes.Find(_themes, settings.Theme);
         ThemeComboBox.ItemsSource = _themes.Select(theme => theme.Name).ToList();
         ThemeComboBox.SelectedIndex = Math.Max(0, _themes.ToList().IndexOf(originalTheme));
         ThemeComboBox.SelectionChanged += (_, _) =>
         {
-            _preview(SelectedTheme);
+            Preview();
             UpdateButtonsTab();
         };
+        _fonts = [DefaultFontName, ..GuiFonts.Installed];
+        if (!string.IsNullOrWhiteSpace(settings.FontFamily) &&
+            !_fonts.Contains(settings.FontFamily, StringComparer.OrdinalIgnoreCase))
+        {
+            // a font that isn't installed any more is kept until another one is chosen
+            _fonts.Insert(1, settings.FontFamily);
+        }
+
+        FontComboBox.ItemsSource = _fonts;
+        FontComboBox.SelectedIndex = string.IsNullOrWhiteSpace(settings.FontFamily)
+            ? 0
+            : Math.Max(0, _fonts.FindIndex(font =>
+                string.Equals(font, settings.FontFamily, StringComparison.OrdinalIgnoreCase)));
+        FontComboBox.SelectionChanged += (_, _) => Preview();
+        FontSizeUpDown.Minimum = (decimal)GuiFonts.MinimumSize;
+        FontSizeUpDown.Maximum = (decimal)GuiFonts.MaximumSize;
+        FontSizeUpDown.Value = settings.FontSize is { } fontSize ? (decimal)fontSize : null;
+        FontSizeUpDown.ValueChanged += (_, _) => Preview();
         UpdateButtonsTab();
         VolumeProviderKeysComboBox.ItemsSource = VolumeProviderKeyBindings.All
             .Select(keys => keys == VolumeProviderKeyBindings.Default
@@ -93,6 +114,8 @@ public partial class SettingsDialog : Window
             Close((settings with
                 {
                     Theme = SelectedTheme.Id,
+                    FontFamily = SelectedFontFamily,
+                    FontSize = SelectedFontSize,
                     EnterFileAction = SelectedEnterFileAction,
                     UaeMetadata = SelectedUaeMetadata,
                     TemporaryCopyLimit = (long)Math.Max(0, TemporaryCopyLimitUpDown.Value ?? 0),
@@ -106,7 +129,7 @@ public partial class SettingsDialog : Window
         {
             if (!accepted)
             {
-                _preview(originalTheme);
+                _preview(originalTheme, settings.FontFamily, settings.FontSize);
             }
         };
         Opened += (_, _) => ThemeComboBox.Focus();
@@ -120,6 +143,18 @@ public partial class SettingsDialog : Window
     public (ICustomizableButtonPanel ButtonPanel, ButtonPanel Layout)? ChangedButtons { get; private set; }
 
     private ThemeChoice SelectedTheme => _themes[Math.Max(0, ThemeComboBox.SelectedIndex)];
+
+    private const string DefaultFontName = "Default (the theme's font)";
+
+    /// <summary>Font family chosen, null for the theme's font or the default.</summary>
+    private string? SelectedFontFamily => FontComboBox.SelectedIndex > 0 ? _fonts[FontComboBox.SelectedIndex] : null;
+
+    /// <summary>Font size chosen, null for the theme's size or the default.</summary>
+    private double? SelectedFontSize => FontSizeUpDown.Value is { } value
+        ? Math.Clamp((double)value, GuiFonts.MinimumSize, GuiFonts.MaximumSize)
+        : null;
+
+    private void Preview() => _preview(SelectedTheme, SelectedFontFamily, SelectedFontSize);
 
     private VolumeProviderKeys SelectedVolumeProviderKeys =>
         VolumeProviderKeyBindings.All[Math.Max(0, VolumeProviderKeysComboBox.SelectedIndex)];

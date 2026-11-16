@@ -85,6 +85,18 @@ public class GivenDirectoryOpus4Theme : IDisposable
     }
 
     [Fact]
+    public void When_Theme_Then_TopazFontIsUsedAtTwiceItsHeight()
+    {
+        // act
+        ITheme theme = new DirectoryOpus4Theme();
+
+        // assert
+        Assert.StartsWith("Topaz", theme.FontFamily);
+        Assert.Contains("MicroKnight", theme.FontFamily);
+        Assert.Equal(16, theme.FontSize);
+    }
+
+    [Fact]
     public void When_DefaultLayout_Then_EveryButtonRunsAKnownCommand()
     {
         // arrange

@@ -21,6 +21,11 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - Clicking a button raises `ActionInvoked` with its `Action`. `MainWindow.RunAction` (TUI) and `RunActionAsync` (GUI) run the matching `CommanderActions` command on the active pane. Each front-end handles every id in `CommanderActions.All`, so add new commands in both.
 - Viewer and editor dialogs keep their own `FunctionKeyBarView` (TUI) key bars; themes don't change them.
 
+## Fonts
+
+- A theme can name a font for the GUI with `ITheme.FontFamily` (fonts separated by commas, the first installed one is used) and `FontSize`. Themes don't include fonts: when none of the fonts is installed, the theme's font and size are ignored and the default monospace fonts are used.
+- The font chosen in Settings > Appearance overrides the theme's font, and its size the theme's size. See [GUI themes and settings](gui.md#themes-and-settings). The TUI uses the terminal's font.
+
 ## Parent Buttons
 
 - When `ITheme.ShowParentButtons` is true, each pane shows a narrow button on its outer side: left of the left pane and right of the right pane. Clicking it makes the pane active and goes to the parent (`NavigationContext.GoParentAsync`, the same as Backspace), including out of an image at its root.
@@ -45,4 +50,5 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 ## Directory Opus 4
 
 - The default `Hst.Commander.Plugins.DirectoryOpus` plugin adds `DirectoryOpus4Theme` (id `DirectoryOpus4`). It uses the eight colors of Directory Opus 4's default configuration (grey, black, white, blue, red, purple, orange and yellow): files in black and directories in blue on grey and the active path in white on red. Marked entries are inverted like selected entries in Directory Opus 4: directories white on blue and files white on black. Directory Opus 4 has no cursor, so the entry under the cursor is black on orange. It shows parent buttons, and has a 6-column, 3-row button bank like Directory Opus 4's (All/None/Toggle, Parent/Root/Rescan, Copy/Move/MakeDir, Delete/Info/Create, Read/Edit/Swap, Location/Bookmark/Config). Some buttons have their own colors.
+- Its GUI font is Topaz, the Amiga font Directory Opus 4 used, at 16 (twice its 8 pixel height, so it stays sharp), falling back to MicroKnight. The TrueType versions (e.g. from [amigafonts](https://github.com/rewtnull/amigafonts)) aren't included because of their licenses; users who install one get it.
 - The user's buttons are saved in `buttons.json` in the plugin's directory (`~/.hst-commander/plugins/directoryopus`, from `IPluginHost.GetPluginDirectory`), so the TUI and GUI share them. A missing or invalid file gives the default bank.

@@ -1,6 +1,7 @@
 ﻿using System.ComponentModel;
 using System.Diagnostics;
 using Avalonia.Controls;
+using Avalonia.Controls.Documents;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
@@ -53,7 +54,7 @@ public partial class MainWindow : Window
         RightPane.EntriesDropped += async (_, request) => await DropAsync(RightPane, request);
         BuildViewMenu();
         BottomPanel.ActionInvoked += async (_, action) => await RunActionAsync(action);
-        ApplyTheme(Themes.Find(settings.Theme));
+        ApplyAppearance(Themes.Find(settings.Theme), settings.FontFamily, settings.FontSize);
         ViewMenuItem.Click += async (_, _) => await ViewAsync(_activePane);
         EditMenuItem.Click += async (_, _) => await EditAsync(_activePane);
         CopyMenuItem.Click += async (_, _) => await CopyAsync(_activePane);
@@ -1202,11 +1203,19 @@ public partial class MainWindow : Window
 
     /// <summary>
     ///     Applies a theme: its colors, the buttons of the bottom area (the function key bar of the built-in themes) and
-    ///     the parent buttons at the outer side of the panes.
+    ///     the parent buttons at the outer side of the panes, and the font of the panes and the bottom area: the font of
+    ///     the settings (null for none), otherwise the theme's (see <see cref="GuiFonts" />).
     /// </summary>
-    private void ApplyTheme(ThemeChoice theme)
+    private void ApplyAppearance(ThemeChoice theme, string? fontFamily, double? fontSize)
     {
         ThemeManager.Apply(theme);
+        var (family, size) = GuiFonts.Resolve(theme, fontFamily, fontSize);
+        foreach (var control in new Control[] { LeftPane, RightPane, BottomPanel })
+        {
+            TextElement.SetFontFamily(control, family);
+            TextElement.SetFontSize(control, size);
+        }
+
         BottomPanel.CenterLabels = theme.Plugin != null;
         BottomPanel.Panel = theme.GetBottomPanel();
         LeftPane.ParentButtonSide = theme.ShowParentButtons ? ParentButtonSide.Left : null;
@@ -1301,7 +1310,7 @@ public partial class MainWindow : Window
 
     private async Task ShowSettingsAsync()
     {
-        var dialog = new SettingsDialog(GuiSettings.Load(), ApplyTheme);
+        var dialog = new SettingsDialog(GuiSettings.Load(), ApplyAppearance);
         var settings = await dialog.ShowDialog<GuiSettings?>(this);
         if (settings == null)
         {
@@ -1320,7 +1329,7 @@ public partial class MainWindow : Window
             }
         }
 
-        ApplyTheme(Themes.Find(settings.Theme));
+        ApplyAppearance(Themes.Find(settings.Theme), settings.FontFamily, settings.FontSize);
         ApplyVolumeProviderKeys(settings.EffectiveVolumeProviderKeys);
         ApplyEnterFileAction(settings.EnterFileAction);
         ApplyUaeMetadata(settings.UaeMetadata);

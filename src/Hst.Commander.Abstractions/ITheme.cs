@@ -29,6 +29,16 @@ public interface ITheme
     bool ShowParentButtons => false;
 
     /// <summary>
+    /// Font of the panes and the bottom area in the GUI, null for the default. Fonts aren't included with the theme: it
+    /// names fonts the user may have installed, separated by commas (e.g. "Topaz a600a1200a400, MicroKnight"), and is
+    /// only used when one of them is installed. The user's font setting overrides it; the TUI uses the terminal's font.
+    /// </summary>
+    string? FontFamily => null;
+
+    /// <summary>Font size used with <see cref="FontFamily" /> when one of its fonts is installed, null for the default.</summary>
+    double? FontSize => null;
+
+    /// <summary>
     /// Buttons shown in the bottom area of the window, in columns. Called when the theme is applied and again after the
     /// settings are changed, e.g. after the user changed the buttons.
     /// </summary>

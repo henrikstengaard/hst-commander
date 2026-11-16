@@ -1,4 +1,5 @@
-﻿using Avalonia.Controls;
+﻿using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Templates;
 using Avalonia.Input;
@@ -30,6 +31,7 @@ public partial class PaneView : UserControl
     public PaneView()
     {
         InitializeComponent();
+        UpdateColumnWidths();
         ListingCancelButton.Click += (_, _) => CancelProgress();
 
         _listItemTemplate = EntriesList.ItemTemplate;
@@ -179,6 +181,31 @@ public partial class PaneView : UserControl
     {
         await RefreshEntriesAsync();
         FocusEntries();
+    }
+
+    /// <summary>Widths of the size and modified columns at the default font size, scaled with the font size.</summary>
+    private const double SizeColumnWidth = 90;
+
+    private const double ModifiedColumnWidth = 150;
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        if (change.Property == FontSizeProperty)
+        {
+            UpdateColumnWidths();
+        }
+    }
+
+    /// <summary>
+    ///     Sets the widths of the size and modified columns (the resources SizeColumnWidth and ModifiedColumnWidth used
+    ///     by the header, the dividers and the rows) for the font size.
+    /// </summary>
+    private void UpdateColumnWidths()
+    {
+        var scale = FontSize / GuiFonts.DefaultSize;
+        Resources["SizeColumnWidth"] = new GridLength(Math.Round(SizeColumnWidth * scale));
+        Resources["ModifiedColumnWidth"] = new GridLength(Math.Round(ModifiedColumnWidth * scale));
     }
 
     private void UpdatePathBadge() =>

@@ -75,9 +75,17 @@
         <TabControl x:Name="TabControl" Margin="0,0,0,12" Padding="0"
                     ItemContainerTheme="{StaticResource SettingsTabItem}">
             <TabItem Header="Appearance">
-                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto" RowSpacing="12" VerticalAlignment="Top">
+                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="12" VerticalAlignment="Top">
                     <TextBlock Grid.Row="0" Grid.Column="0" Text="Theme:" VerticalAlignment="Center" Margin="0,0,12,0" />
                     <ComboBox x:Name="ThemeComboBox" Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch" />
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Font:" VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <ComboBox x:Name="FontComboBox" Grid.Row="1" Grid.Column="1" HorizontalAlignment="Stretch"
+                              MaxDropDownHeight="320" />
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Font size:" VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <NumericUpDown x:Name="FontSizeUpDown" Grid.Row="2" Grid.Column="1" HorizontalAlignment="Left"
+                                   MinWidth="160" Increment="1" FormatString="0.#" PlaceholderText="Default" />
+                    <TextBlock Grid.Row="3" Grid.Column="1" TextWrapping="Wrap" Opacity="0.7"
+                               Text="Font of the panes and the bottom area. Default uses the theme's font when it's installed (e.g. Topaz for Directory Opus 4), otherwise a monospace font. An empty size uses the theme's size." />
                 </Grid>
             </TabItem>
             <TabItem Header="Panes">

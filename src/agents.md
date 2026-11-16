@@ -124,7 +124,7 @@ All are in `Hst.Commander.Abstractions`; see [`docs/plugin-api.md`](../docs/plug
 | `IIconProvider` | Reads icons from icon files next to entries (e.g. `.info`) |
 | `INavigationMode` | Lays out a directory as icons at positions in the GUI (e.g. Workbench) |
 | `IImageProvider` | Reads the images of a file for the viewer (F3) |
-| `ITheme` | A theme: colors (`ThemeColors`), the buttons of the bottom area (`ButtonPanel` of columns of `PanelButton`s running `CommanderActions`) and optional parent buttons beside the panes |
+| `ITheme` | A theme: colors (`ThemeColors`), the buttons of the bottom area (`ButtonPanel` of columns of `PanelButton`s running `CommanderActions`) optional parent buttons beside the panes and an optional GUI font |
 | `ICustomizableButtonPanel` | A theme whose buttons the user changes in a settings tab with the button editor; the plugin saves the layout |
 | `IPlugin` | Returns a plugin's providers, creators, modes and themes and its `ThirdPartyNotices` (shown in About > Licenses); `Initialize(IPluginHost)` |
 | `IPluginHost` | Lets plugins work together without sharing types (e.g. the Disk plugin opens a PiStorm partition with the Amiga plugin) |

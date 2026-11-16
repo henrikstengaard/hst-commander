@@ -127,12 +127,22 @@
                 BorderBrush="{DynamicResource PaneBorder}" BorderThickness="1" Margin="2">
             <Grid RowDefinitions="Auto,*">
                 <!-- column dividers continue below the last entry -->
-                <Grid x:Name="DividersGrid" Grid.RowSpan="2" IsHitTestVisible="False" ColumnDefinitions="*,90,150">
+                <Grid x:Name="DividersGrid" Grid.RowSpan="2" IsHitTestVisible="False">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="{DynamicResource SizeColumnWidth}" />
+                        <ColumnDefinition Width="{DynamicResource ModifiedColumnWidth}" />
+                    </Grid.ColumnDefinitions>
                     <Border Grid.Column="1" BorderBrush="{DynamicResource PaneBorder}" BorderThickness="1,0,0,0" />
                     <Border Grid.Column="2" BorderBrush="{DynamicResource PaneBorder}" BorderThickness="1,0,0,0" />
                 </Grid>
 
-                <Grid x:Name="HeaderGrid" Grid.Row="0" Classes="header" ColumnDefinitions="*,90,150">
+                <Grid x:Name="HeaderGrid" Grid.Row="0" Classes="header">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="{DynamicResource SizeColumnWidth}" />
+                        <ColumnDefinition Width="{DynamicResource ModifiedColumnWidth}" />
+                    </Grid.ColumnDefinitions>
                     <TextBlock Grid.Column="0" Text="Name" />
                     <TextBlock Grid.Column="1" Text="Size" />
                     <TextBlock Grid.Column="2" Text="Modified" />
@@ -143,8 +153,12 @@
                         <DataTemplate x:DataType="local:EntryItem">
                             <Grid Classes="row" Classes.container="{Binding IsContainer}"
                                   Classes.executable="{Binding IsExecutable}"
-                                  Classes.marked="{Binding IsMarked}"
-                                  ColumnDefinitions="*,90,150">
+                                  Classes.marked="{Binding IsMarked}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="{DynamicResource SizeColumnWidth}" />
+                                    <ColumnDefinition Width="{DynamicResource ModifiedColumnWidth}" />
+                                </Grid.ColumnDefinitions>
                                 <DockPanel Grid.Column="0">
                                     <Image DockPanel.Dock="Left" Width="16" Height="16" Margin="4,0,0,0"
                                            Source="{Binding Icon}" RenderOptions.BitmapInterpolationMode="HighQuality" />

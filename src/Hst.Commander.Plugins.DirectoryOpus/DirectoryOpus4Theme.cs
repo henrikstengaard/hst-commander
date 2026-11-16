@@ -46,6 +46,17 @@ public sealed class DirectoryOpus4Theme : ITheme, ICustomizableButtonPanel
     public bool ShowParentButtons => true;
 
     /// <summary>
+    /// TrueType versions of Topaz, the Amiga font Directory Opus 4 used, and MicroKnight, used in the GUI when the user
+    /// has installed one of them (e.g. from https://github.com/rewtnull/amigafonts). They aren't included because of
+    /// their licenses.
+    /// </summary>
+    public string FontFamily =>
+        "Topaz a600a1200a400, Topaz a500a1000a2000, TopazPlus a600a1200a400, TopazPlus a500a1000a2000, Topaz Unicode, Topaz, MicroKnight";
+
+    /// <summary>Twice the 8 pixel height of Topaz, so it stays sharp.</summary>
+    public double? FontSize => 16;
+
+    /// <summary>
     /// Colors of the default Directory Opus 4 configuration: files in black and directories in blue on grey, marked
     /// (selected) directories in white on blue, marked files in white on black and the path of the active pane in white
     /// on red. Directory Opus 4 has no cursor; the entry under the cursor is black on orange.
