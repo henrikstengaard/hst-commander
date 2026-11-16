@@ -4,7 +4,7 @@ using Hst.Commander.Abstractions;
 namespace Hst.Commander.Plugins.DirectoryOpus;
 
 /// <summary>
-/// Theme looking like Directory Opus 4 on the Amiga: the grey, black, white and blue of the Workbench 2 palette, a bank
+/// Theme looking like Directory Opus 4 on the Amiga: the eight colors of its default configuration, a bank
 /// of colored buttons in columns below the panes and parent buttons at the outer side of the panes. The user changes
 /// the buttons in the settings; they are saved in "buttons.json" in the plugin's directory, shared by the TUI and GUI.
 /// </summary>
@@ -16,7 +16,11 @@ public sealed class DirectoryOpus4Theme : ITheme, ICustomizableButtonPanel
     private const string Grey = "#AAAAAA";
     private const string Black = "#000000";
     private const string White = "#FFFFFF";
-    private const string Blue = "#6688BB";
+    private const string Blue = "#0055BB";
+    private const string Red = "#CC2200";
+    private const string Purple = "#770077";
+    private const string Orange = "#EEAA44";
+    private const string Yellow = "#FFFF00";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -41,18 +45,22 @@ public sealed class DirectoryOpus4Theme : ITheme, ICustomizableButtonPanel
 
     public bool ShowParentButtons => true;
 
+    /// <summary>
+    /// Colors of the default Directory Opus 4 configuration: files in black and directories in blue on grey, the
+    /// selected entry in white on black and the path of the active pane in white on red.
+    /// </summary>
     public ThemeColors Colors { get; } = new(
-        PaneBackground: Black,
-        PaneBorder: Grey,
-        Header: Grey,
-        Container: White,
-        Item: Grey,
-        Executable: "#66BB66",
-        Marked: "#EEBB00",
-        Path: Grey,
-        ActivePathBackground: Blue,
+        PaneBackground: Grey,
+        PaneBorder: Black,
+        Header: Black,
+        Container: Blue,
+        Item: Black,
+        Executable: Black,
+        Marked: Red,
+        Path: Black,
+        ActivePathBackground: Red,
         ActivePathForeground: White,
-        CursorBackground: Blue,
+        CursorBackground: Black,
         CursorForeground: White,
         MenuBackground: Grey,
         MenuForeground: Black,
@@ -70,18 +78,24 @@ public sealed class DirectoryOpus4Theme : ITheme, ICustomizableButtonPanel
     /// </summary>
     public ButtonPanel DefaultLayout { get; } = new(
     [
-        Column(Button("All", CommanderActions.SelectAll), Button("None", CommanderActions.SelectNone),
-            Button("Toggle", CommanderActions.InvertSelection)),
-        Column(Button("Parent", CommanderActions.Parent), Button("Root", CommanderActions.Root),
-            Button("Rescan", CommanderActions.Refresh)),
-        Column(Button("Copy", CommanderActions.Copy, Blue, White), Button("Move", CommanderActions.Move, Blue, White),
-            Button("MakeDir", CommanderActions.MakeDirectory, Blue, White)),
-        Column(Button("Delete", CommanderActions.Delete, "#BB3333", White), Button("Info", CommanderActions.Properties),
-            Button("Create", CommanderActions.CreateVolume)),
-        Column(Button("Read", CommanderActions.View, Black, White), Button("Edit", CommanderActions.Edit, Black, White),
+        Column(Button("All", CommanderActions.SelectAll, Blue, Yellow),
+            Button("None", CommanderActions.SelectNone, Blue, Yellow),
+            Button("Toggle", CommanderActions.InvertSelection, Blue, Yellow)),
+        Column(Button("Parent", CommanderActions.Parent, Blue, Yellow),
+            Button("Root", CommanderActions.Root, Blue, Yellow),
+            Button("Rescan", CommanderActions.Refresh, Blue, Yellow)),
+        Column(Button("Copy", CommanderActions.Copy, Purple, Yellow),
+            Button("Move", CommanderActions.Move, Purple, Yellow),
+            Button("MakeDir", CommanderActions.MakeDirectory, Orange, Purple)),
+        Column(Button("Delete", CommanderActions.Delete, Red, White),
+            Button("Info", CommanderActions.Properties, Orange, Purple),
+            Button("Create", CommanderActions.CreateVolume, Orange, Purple)),
+        Column(Button("Read", CommanderActions.View, Red, Yellow),
+            Button("Edit", CommanderActions.Edit, Red, Yellow),
             Button("Swap", CommanderActions.SwapPanes)),
-        Column(Button("Location", CommanderActions.Location), Button("Bookmark", CommanderActions.AddBookmark),
-            Button("Config", CommanderActions.Settings))
+        Column(Button("Location", CommanderActions.Location, foreground: Purple),
+            Button("Bookmark", CommanderActions.AddBookmark, foreground: Purple),
+            Button("Config", CommanderActions.Settings, Black, Orange))
     ]);
 
     public ButtonPanel Layout => _layout ??= Load() ?? DefaultLayout;
