@@ -91,9 +91,27 @@ public class GivenDirectoryOpus4Theme : IDisposable
         ITheme theme = new DirectoryOpus4Theme();
 
         // assert
-        Assert.StartsWith("Topaz", theme.FontFamily);
+        Assert.StartsWith("Topaz a600a1200a400,", theme.FontFamily);
         Assert.Contains("MicroKnight", theme.FontFamily);
         Assert.Equal(16, theme.FontSize);
+    }
+
+    [Fact]
+    public void When_Theme_Then_FontDownloadsArePinnedAndHashed()
+    {
+        // act
+        ITheme theme = new DirectoryOpus4Theme();
+
+        // assert
+        Assert.Contains(theme.FontDownloads, download => download.FileName.EndsWith(".ttf"));
+        Assert.All(theme.FontDownloads, download =>
+        {
+            Assert.StartsWith("https://raw.githubusercontent.com/rewtnull/amigafonts/d42987535d94ebbfb51e64fee76f9974c6ae145a/",
+                download.Url);
+            Assert.Matches("^[0-9a-f]{64}$", download.Sha256);
+            Assert.Equal(Path.GetFileName(download.FileName), download.FileName);
+            Assert.StartsWith("https://", download.SourceUrl);
+        });
     }
 
     [Fact]

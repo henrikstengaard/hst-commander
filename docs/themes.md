@@ -25,6 +25,9 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 
 - A theme can name a font for the GUI with `ITheme.FontFamily` (fonts separated by commas, the first installed one is used) and `FontSize`. Themes don't include fonts: when none of the fonts is installed, the theme's font and size are ignored and the default monospace fonts are used.
 - The font chosen in Settings > Appearance overrides the theme's font, and its size the theme's size. See [GUI themes and settings](gui.md#themes-and-settings). The TUI uses the terminal's font.
+- A theme can let the user download its font (`ITheme.FontDownloads`, a list of `ThemeFontDownload`s). While the theme is chosen, none of its fonts is installed and no font of the user's own is chosen, Settings > Appearance shows a Download font button. `FontDownloadDialog` shows each file's name, license and project before anything is downloaded.
+- `FontDownloader` (Core) only downloads over https and checks each file's SHA-256 hash. It saves the files only when all of them match (through a `.tmp` file), and rejects file names with a directory. The files go to `~/.hst-commander/fonts`, which only Hst Commander loads fonts from (`GuiFonts.LoadDownloadedFonts`, an Avalonia font collection registered as `fonts:hst-commander`). Nothing is installed in the operating system, and deleting the files removes the font.
+- Fonts copied to `~/.hst-commander/fonts` by hand are loaded too.
 
 ## Parent Buttons
 
@@ -50,5 +53,18 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 ## Directory Opus 4
 
 - The default `Hst.Commander.Plugins.DirectoryOpus` plugin adds `DirectoryOpus4Theme` (id `DirectoryOpus4`). It uses the eight colors of Directory Opus 4's default configuration (grey, black, white, blue, red, purple, orange and yellow): files in black and directories in blue on grey and the active path in white on red. Marked entries are inverted like selected entries in Directory Opus 4: directories white on blue and files white on black. Directory Opus 4 has no cursor, so the entry under the cursor is black on orange. It shows parent buttons, and has a 6-column, 3-row button bank like Directory Opus 4's (All/None/Toggle, Parent/Root/Rescan, Copy/Move/MakeDir, Delete/Info/Create, Read/Edit/Swap, Location/Bookmark/Config). Some buttons have their own colors.
-- Its GUI font is Topaz, the Amiga font Directory Opus 4 used, at 16 (twice its 8 pixel height, so it stays sharp), falling back to MicroKnight. The TrueType versions (e.g. from [amigafonts](https://github.com/rewtnull/amigafonts)) aren't included because of their licenses; users who install one get it.
+- Its GUI font is Topaz, the Amiga font Directory Opus 4 used, at 16 (twice its 8 pixel height, so it stays sharp), falling back to MicroKnight. The family names are the ones stored in the [amigafonts](https://github.com/rewtnull/amigafonts) TrueType files. Topaz of Kickstart 2.x is `Topaz a600a1200a400`, though the readme says `a4000`.
+- **License:** the amigafonts files are under the GPL with the font exception and © dMG/t!s^dS!, but the readme also says "Topaz is © AmigaInc". So it's unclear whether the font may be redistributed, and GPL components stay out of the apps. Hst Commander therefore doesn't include the font.
+- **Download button:** it downloads `Topaz_a1200_v1.0.ttf` and the project's readme (saved as `amigafonts-README.txt`, with the license and credits) from GitHub. The download is pinned to commit `d42987535d94ebbfb51e64fee76f9974c6ae145a` and checked against the hashes in `DirectoryOpus4Theme.FontDownloads`.
+
+### Installing the Font Manually
+
+Download `Topaz_a1200_v1.0.ttf` from the `ttf` folder of [amigafonts](https://github.com/rewtnull/amigafonts), then:
+
+- **Windows:** right-click the file and choose Install, or "Install for all users".
+- **macOS:** double-click the file and click Install in Font Book.
+- **Linux:** copy the file to `~/.local/share/fonts/` and run `fc-cache -f`.
+- **Hst Commander only, any OS:** copy the file to `~/.hst-commander/fonts/`.
+
+Then restart Hst Commander.
 - The user's buttons are saved in `buttons.json` in the plugin's directory (`~/.hst-commander/plugins/directoryopus`, from `IPluginHost.GetPluginDirectory`), so the TUI and GUI share them. A missing or invalid file gives the default bank.

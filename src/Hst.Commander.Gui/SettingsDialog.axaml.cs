@@ -49,6 +49,7 @@ public partial class SettingsDialog : Window
         {
             Preview();
             UpdateButtonsTab();
+            UpdateFontDownload();
         };
         _fonts = [DefaultFontName, ..GuiFonts.Installed];
         if (!string.IsNullOrWhiteSpace(settings.FontFamily) &&
@@ -63,7 +64,13 @@ public partial class SettingsDialog : Window
             ? 0
             : Math.Max(0, _fonts.FindIndex(font =>
                 string.Equals(font, settings.FontFamily, StringComparison.OrdinalIgnoreCase)));
-        FontComboBox.SelectionChanged += (_, _) => Preview();
+        FontComboBox.SelectionChanged += (_, _) =>
+        {
+            Preview();
+            UpdateFontDownload();
+        };
+        DownloadFontButton.Click += async (_, _) => await DownloadFontAsync();
+        UpdateFontDownload();
         FontSizeUpDown.Minimum = (decimal)GuiFonts.MinimumSize;
         FontSizeUpDown.Maximum = (decimal)GuiFonts.MaximumSize;
         FontSizeUpDown.Value = settings.FontSize is { } fontSize ? (decimal)fontSize : null;
@@ -155,6 +162,49 @@ public partial class SettingsDialog : Window
         : null;
 
     private void Preview() => _preview(SelectedTheme, SelectedFontFamily, SelectedFontSize);
+
+    /// <summary>
+    ///     Shows the button downloading the theme's font when the theme has one to download, none of its fonts is
+    ///     installed and no font of its own is chosen.
+    /// </summary>
+    private void UpdateFontDownload()
+    {
+        var theme = SelectedTheme.Plugin;
+        var visible = theme is { FontDownloads.Count: > 0, FontFamily: { } family } &&
+                      !GuiFonts.IsInstalled(family) && SelectedFontFamily == null;
+        FontDownloadPanel.IsVisible = visible;
+        if (visible)
+        {
+            FontDownloadText.Text = $"{SelectedTheme.Name} uses a font that isn't installed, so a monospace font is used instead.";
+        }
+    }
+
+    /// <summary>Downloads the theme's font after asking, then lists and uses it.</summary>
+    private async Task DownloadFontAsync()
+    {
+        if (SelectedTheme.Plugin is not { } theme)
+        {
+            return;
+        }
+
+        var downloaded = await new FontDownloadDialog(SelectedTheme.Name, theme.FontDownloads).ShowDialog<bool>(this);
+        if (!downloaded)
+        {
+            return;
+        }
+
+        // list the downloaded fonts, keeping the chosen one
+        var selected = SelectedFontFamily;
+        _fonts.RemoveRange(1, _fonts.Count - 1);
+        _fonts.AddRange(GuiFonts.Installed);
+        FontComboBox.ItemsSource = null;
+        FontComboBox.ItemsSource = _fonts;
+        FontComboBox.SelectedIndex = selected == null
+            ? 0
+            : Math.Max(0, _fonts.FindIndex(font => string.Equals(font, selected, StringComparison.OrdinalIgnoreCase)));
+        Preview();
+        UpdateFontDownload();
+    }
 
     private VolumeProviderKeys SelectedVolumeProviderKeys =>
         VolumeProviderKeyBindings.All[Math.Max(0, VolumeProviderKeysComboBox.SelectedIndex)];

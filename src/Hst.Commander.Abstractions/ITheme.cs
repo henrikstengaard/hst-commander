@@ -39,11 +39,36 @@ public interface ITheme
     double? FontSize => null;
 
     /// <summary>
+    /// Font files the user can download for <see cref="FontFamily" /> from Settings > Appearance in the GUI, when none of
+    /// its fonts is installed. Themes don't include fonts; Hst Commander downloads them only when the user chooses to,
+    /// after showing their licenses, and checks their hashes. Defaults to none.
+    /// </summary>
+    IReadOnlyList<ThemeFontDownload> FontDownloads => [];
+
+    /// <summary>
     /// Buttons shown in the bottom area of the window, in columns. Called when the theme is applied and again after the
     /// settings are changed, e.g. after the user changed the buttons.
     /// </summary>
     ButtonPanel GetBottomPanel();
 }
+
+/// <summary>
+/// A file of a theme's font the user can download (<see cref="ITheme.FontDownloads" />), e.g. a TrueType font or the
+/// license coming with it.
+/// </summary>
+/// <param name="FileName">Name the file is saved as, without a directory, e.g. "Topaz_a1200_v1.0.ttf".</param>
+/// <param name="Url">Https address of the file, pinned to a version so its hash doesn't change.</param>
+/// <param name="Sha256">SHA-256 hash of the file in hexadecimal; a download with another hash is rejected.</param>
+/// <param name="Name">Name shown to the user, e.g. "Topaz (Kickstart 2.x)".</param>
+/// <param name="License">License and copyright shown before downloading.</param>
+/// <param name="SourceUrl">Page of the project the file comes from, shown before downloading.</param>
+public sealed record ThemeFontDownload(
+    string FileName,
+    string Url,
+    string Sha256,
+    string Name,
+    string License,
+    string SourceUrl);
 
 /// <summary>Colors of a <see cref="ITheme" />, each "#RRGGBB".</summary>
 /// <param name="PaneBackground">Background of the panes.</param>

@@ -47,14 +47,39 @@ public sealed class DirectoryOpus4Theme : ITheme, ICustomizableButtonPanel
 
     /// <summary>
     /// TrueType versions of Topaz, the Amiga font Directory Opus 4 used, and MicroKnight, used in the GUI when the user
-    /// has installed one of them (e.g. from https://github.com/rewtnull/amigafonts). They aren't included because of
-    /// their licenses.
+    /// has installed or downloaded one of them (see <see cref="FontDownloads" />). The family names are those of the
+    /// fonts of https://github.com/rewtnull/amigafonts as stored in the font files (Topaz of Kickstart 2.x is
+    /// "a600a1200a400", though its readme says "a4000").
     /// </summary>
     public string FontFamily =>
-        "Topaz a600a1200a400, Topaz a500a1000a2000, TopazPlus a600a1200a400, TopazPlus a500a1000a2000, Topaz Unicode, Topaz, MicroKnight";
+        "Topaz a600a1200a400, Topaz a500a1000a2000, TopazPlus a600a1200a4000, TopazPlus a500a1000a2000, Topaz Unicode, Topaz, MicroKnight";
 
     /// <summary>Twice the 8 pixel height of Topaz, so it stays sharp.</summary>
     public double? FontSize => 16;
+
+    /// <summary>Commit of https://github.com/rewtnull/amigafonts the fonts are downloaded from (v1.02, 2020-01-17).</summary>
+    private const string AmigaFontsCommit = "d42987535d94ebbfb51e64fee76f9974c6ae145a";
+
+    private const string AmigaFontsUrl = "https://github.com/rewtnull/amigafonts";
+
+    private const string AmigaFontsRawUrl = "https://raw.githubusercontent.com/rewtnull/amigafonts/" + AmigaFontsCommit;
+
+    private const string AmigaFontsLicense =
+        "GPL with font exception. The TrueType version is \u00a9 dMG/t!s^dS!; Topaz is \u00a9 AmigaInc.";
+
+    /// <summary>
+    /// Topaz of Kickstart 2.x, downloaded by the user's choice from the amigafonts project, with its readme holding the
+    /// license and credits. The fonts aren't included with Hst Commander because of their licenses.
+    /// </summary>
+    public IReadOnlyList<ThemeFontDownload> FontDownloads { get; } =
+    [
+        new("Topaz_a1200_v1.0.ttf", AmigaFontsRawUrl + "/ttf/Topaz_a1200_v1.0.ttf",
+            "da95bfdd6d16ac3602f64ae01699808efede94665fa2a7ac5f33e61641a67e14", "Topaz (Kickstart 2.x)",
+            AmigaFontsLicense, AmigaFontsUrl),
+        new("amigafonts-README.txt", AmigaFontsRawUrl + "/README",
+            "eb2a92ecf5d371c786a6505aa8f6784b3f55faa2c8d9b323f45ead4124edccae", "Readme with the license and credits",
+            AmigaFontsLicense, AmigaFontsUrl)
+    ];
 
     /// <summary>
     /// Colors of the default Directory Opus 4 configuration: files in black and directories in blue on grey, marked
