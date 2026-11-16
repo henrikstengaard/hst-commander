@@ -81,6 +81,12 @@ public static class ThemeManager
             ["ActivePathForeground"] = Brush(colors.ActivePathForeground),
             ["SelectedEntryForeground"] = Brush(colors.CursorForeground),
             ["MarkedEntryForeground"] = Brush(colors.Marked),
+            ["MarkedContainerBackground"] = colors.MarkedContainerBackground == null
+                ? Brushes.Transparent
+                : Brush(colors.MarkedContainerBackground),
+            ["MarkedItemBackground"] = colors.MarkedItemBackground == null
+                ? Brushes.Transparent
+                : Brush(colors.MarkedItemBackground),
             ["AdministratorBackground"] = Brush("#C62828"),
             ["AdministratorForeground"] = Brush("#FFFFFF"),
             ["ViewerSelectionBackground"] = Brush(colors.CursorBackground),

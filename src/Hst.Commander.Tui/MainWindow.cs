@@ -1,4 +1,4 @@
-﻿using System.Data;
+using System.Data;
 using Hst.Commander.Core;
 using Hst.Commander.Core.Volumes;
 using Hst.Commander.Abstractions;
@@ -1841,7 +1841,12 @@ public sealed class MainWindow : Window
             : entry.Type == EntryType.Container
                 ? _palette.Container
                 : pane.NavigationContext.IsExecutable(entry) ? _palette.Executable : _palette.Item;
-        var normal = new TuiAttribute(foreground, _palette.PaneBackground);
+        // themes may give marked entries a background of their own, e.g. Directory Opus 4
+        var background = isMarked
+            ? (entry.Type == EntryType.Container ? _palette.MarkedContainerBackground : _palette.MarkedItemBackground)
+              ?? _palette.PaneBackground
+            : _palette.PaneBackground;
+        var normal = new TuiAttribute(foreground, background);
         // the current entry is only shown in the active pane
         var selected = pane == _activePane && rowIndex == pane.TableView.SelectedRow
             ? isMarked ? _palette.MarkedCursor : _palette.Cursor

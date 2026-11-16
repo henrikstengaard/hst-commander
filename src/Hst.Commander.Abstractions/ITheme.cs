@@ -55,6 +55,10 @@ public interface ITheme
 /// <param name="ButtonForeground">Text of buttons without their own colors.</param>
 /// <param name="DialogBackground">Background of dialogs in the TUI.</param>
 /// <param name="DialogForeground">Text of dialogs in the TUI.</param>
+/// <param name="MarkedContainerBackground">
+/// Background of marked directories and other containers, null for the pane background (only the text is colored).
+/// </param>
+/// <param name="MarkedItemBackground">Background of marked files, null for the pane background.</param>
 public sealed record ThemeColors(
     string PaneBackground,
     string PaneBorder,
@@ -74,4 +78,6 @@ public sealed record ThemeColors(
     string ButtonBackground,
     string ButtonForeground,
     string DialogBackground,
-    string DialogForeground);
+    string DialogForeground,
+    string? MarkedContainerBackground = null,
+    string? MarkedItemBackground = null);

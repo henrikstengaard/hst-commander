@@ -33,6 +33,20 @@
         <Style Selector="ListBox.entries Grid.row.marked TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource MarkedEntryForeground}" />
         </Style>
+        <!-- rows are transparent, so the current row shows through and the whole row can be clicked; themes may give
+             marked entries a background of their own (transparent otherwise), e.g. Directory Opus 4 -->
+        <Style Selector="ListBox.entries Grid.row">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="ListBox.entries Grid.row.marked">
+            <Setter Property="Background" Value="{DynamicResource MarkedItemBackground}" />
+        </Style>
+        <Style Selector="ListBox.entries Grid.row.marked.container">
+            <Setter Property="Background" Value="{DynamicResource MarkedContainerBackground}" />
+        </Style>
+        <Style Selector="ListBox.entries.active ListBoxItem:selected Grid.row.marked">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
         <Style Selector="Grid.row TextBlock, Grid.header TextBlock">
             <Setter Property="Padding" Value="4,1" />
             <Setter Property="TextTrimming" Value="CharacterEllipsis" />
@@ -71,7 +85,7 @@
         <DataTemplate x:Key="ThumbnailTemplate" x:DataType="local:EntryItem">
             <Grid Classes="row" Classes.container="{Binding IsContainer}"
                   Classes.executable="{Binding IsExecutable}"
-                  Classes.marked="{Binding IsMarked}" Background="Transparent"
+                  Classes.marked="{Binding IsMarked}"
                   Width="112" RowDefinitions="Auto,Auto" ToolTip.Tip="{Binding DisplayName}">
                 <Image Width="80" Height="80" Margin="0,6,0,2" Source="{Binding Icon}" Stretch="Uniform"
                        RenderOptions.BitmapInterpolationMode="HighQuality" />
@@ -129,7 +143,7 @@
                         <DataTemplate x:DataType="local:EntryItem">
                             <Grid Classes="row" Classes.container="{Binding IsContainer}"
                                   Classes.executable="{Binding IsExecutable}"
-                                  Classes.marked="{Binding IsMarked}" Background="Transparent"
+                                  Classes.marked="{Binding IsMarked}"
                                   ColumnDefinitions="*,90,150">
                                 <DockPanel Grid.Column="0">
                                     <Image DockPanel.Dock="Left" Width="16" Height="16" Margin="4,0,0,0"

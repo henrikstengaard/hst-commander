@@ -27,7 +27,9 @@ public sealed record TuiPalette(
     TuiAttribute FunctionKey,
     TuiAttribute Dialog,
     TuiAttribute DialogFocus,
-    TuiAttribute? Button = null)
+    TuiAttribute? Button = null,
+    ColorName16? MarkedContainerBackground = null,
+    ColorName16? MarkedItemBackground = null)
 {
     /// <summary>Blue panes with directories in white, files in gray, executables in green and cyan menu and function key bars.</summary>
     public static TuiPalette MidnightCommander { get; } = new(
@@ -130,7 +132,9 @@ public sealed record TuiPalette(
             FunctionKey: menu,
             Dialog: dialog,
             DialogFocus: cursor,
-            Button: Attribute(colors.ButtonForeground, colors.ButtonBackground));
+            Button: Attribute(colors.ButtonForeground, colors.ButtonBackground),
+            MarkedContainerBackground: colors.MarkedContainerBackground == null ? null : Closest(colors.MarkedContainerBackground),
+            MarkedItemBackground: colors.MarkedItemBackground == null ? null : Closest(colors.MarkedItemBackground));
     }
 
     /// <summary>The closest of the 16 colors to a "#RRGGBB" color, gray when it is invalid.</summary>

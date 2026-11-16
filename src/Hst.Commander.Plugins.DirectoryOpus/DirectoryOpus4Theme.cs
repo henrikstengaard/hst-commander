@@ -46,8 +46,9 @@ public sealed class DirectoryOpus4Theme : ITheme, ICustomizableButtonPanel
     public bool ShowParentButtons => true;
 
     /// <summary>
-    /// Colors of the default Directory Opus 4 configuration: files in black and directories in blue on grey, the
-    /// selected entry in white on black and the path of the active pane in white on red.
+    /// Colors of the default Directory Opus 4 configuration: files in black and directories in blue on grey, marked
+    /// (selected) directories in white on blue, marked files in white on black and the path of the active pane in white
+    /// on red. Directory Opus 4 has no cursor; the entry under the cursor is black on orange.
     /// </summary>
     public ThemeColors Colors { get; } = new(
         PaneBackground: Grey,
@@ -56,19 +57,21 @@ public sealed class DirectoryOpus4Theme : ITheme, ICustomizableButtonPanel
         Container: Blue,
         Item: Black,
         Executable: Black,
-        Marked: Red,
+        Marked: White,
         Path: Black,
         ActivePathBackground: Red,
         ActivePathForeground: White,
-        CursorBackground: Black,
-        CursorForeground: White,
+        CursorBackground: Orange,
+        CursorForeground: Black,
         MenuBackground: Grey,
         MenuForeground: Black,
         BottomBackground: Grey,
         ButtonBackground: Grey,
         ButtonForeground: Black,
         DialogBackground: Grey,
-        DialogForeground: Black);
+        DialogForeground: Black,
+        MarkedContainerBackground: Blue,
+        MarkedItemBackground: Black);
 
     public string SettingsTitle => "Buttons";
 

@@ -18,6 +18,8 @@
                     <SolidColorBrush x:Key="ActivePathForeground" Color="#000000" />
                     <SolidColorBrush x:Key="SelectedEntryForeground" Color="#000000" />
                     <SolidColorBrush x:Key="MarkedEntryForeground" Color="#FFFF55" />
+                    <SolidColorBrush x:Key="MarkedContainerBackground" Color="Transparent" />
+                    <SolidColorBrush x:Key="MarkedItemBackground" Color="Transparent" />
                     <SolidColorBrush x:Key="AdministratorBackground" Color="#C62828" />
                     <SolidColorBrush x:Key="AdministratorForeground" Color="#FFFFFF" />
                     <SolidColorBrush x:Key="ViewerSelectionBackground" Color="#00AAAA" />
@@ -35,6 +37,8 @@
                     <SolidColorBrush x:Key="ActivePathForeground" Color="#FFFFFF" />
                     <SolidColorBrush x:Key="SelectedEntryForeground" Color="#000000" />
                     <SolidColorBrush x:Key="MarkedEntryForeground" Color="#B07800" />
+                    <SolidColorBrush x:Key="MarkedContainerBackground" Color="Transparent" />
+                    <SolidColorBrush x:Key="MarkedItemBackground" Color="Transparent" />
                     <SolidColorBrush x:Key="AdministratorBackground" Color="#C62828" />
                     <SolidColorBrush x:Key="AdministratorForeground" Color="#FFFFFF" />
                     <SolidColorBrush x:Key="ViewerSelectionBackground" Color="#ADD6FF" />
@@ -52,6 +56,8 @@
                     <SolidColorBrush x:Key="ActivePathForeground" Color="#000000" />
                     <SolidColorBrush x:Key="SelectedEntryForeground" Color="#FFFFFF" />
                     <SolidColorBrush x:Key="MarkedEntryForeground" Color="#FFD700" />
+                    <SolidColorBrush x:Key="MarkedContainerBackground" Color="Transparent" />
+                    <SolidColorBrush x:Key="MarkedItemBackground" Color="Transparent" />
                     <SolidColorBrush x:Key="AdministratorBackground" Color="#C62828" />
                     <SolidColorBrush x:Key="AdministratorForeground" Color="#FFFFFF" />
                     <SolidColorBrush x:Key="ViewerSelectionBackground" Color="#264F78" />
