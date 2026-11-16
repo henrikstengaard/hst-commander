@@ -24,6 +24,7 @@ The behavior of each feature is described in `docs/` at the repository root. Rea
 | [`docs/icons-and-navigation-modes.md`](../docs/icons-and-navigation-modes.md) | Icon providers, GUI entry icons, navigation modes (list, thumbnails, Workbench, def icons) |
 | [`docs/tui.md`](../docs/tui.md) | TUI files, key handling, dialogs, themes, terminal programs, supported terminals (PuTTY) |
 | [`docs/gui.md`](../docs/gui.md) | GUI files, key handling, dialogs, themes, icons |
+| [`docs/themes.md`](../docs/themes.md) | Built-in and plugin themes, the bottom area's buttons, parent buttons, the button editor, Directory Opus 4 |
 | [`docs/application.md`](../docs/application.md) | Versioning, release workflows, local publishing, About, licenses and third-party notices, quitting |
 | [`docs/testing.md`](../docs/testing.md) | Test helpers |
 | [`docs/status.md`](../docs/status.md) | What works and what isn't implemented |
@@ -39,13 +40,13 @@ The code is the source of truth for constants, key lists and colors; the docs de
 .github/scripts/                macOS code signing and notarization scripts used by build-and-release.yml
 docs/                           Feature docs (see above)
 src/
-  Hst.Commander.sln             Solution file (13 projects)
+  Hst.Commander.sln             Solution file (14 projects)
   Directory.Build.props         Shared product name, version, authors and copyright
   Directory.Build.targets       Replaces the last version part with the git commit count
   packaging/                    Release packaging scripts (Linux AppImage/.deb, macOS .dmg, Windows Inno Setup)
   publish/                      Local publish scripts for testing, PowerShell and bash per platform (output in publish/ at the root, ignored)
   icon/                         App icon sources, rendered sizes and make scripts
-  Hst.Commander.Abstractions/   Plugin API: IVolume, IEntry, IVolumeProvider, IFileVolumeProvider, IPlugin, IPluginHost, IWriteCache, ..., Paths and the ArchiveVolume<T> base class (no external deps)
+  Hst.Commander.Abstractions/   Plugin API: IVolume, IEntry, IVolumeProvider, IFileVolumeProvider, IPlugin, IPluginHost, IWriteCache, ITheme, ..., Paths and the ArchiveVolume<T> base class (no external deps)
   Hst.Commander.Plugins.Zip/    Zip archives (default plugin)
   Hst.Commander.Plugins.LhaLzx/ Lha and lzx archives (default plugin)
   Hst.Commander.Plugins.RarSevenZip/ Rar and 7z archives (default plugin)
@@ -53,6 +54,7 @@ src/
   Hst.Commander.Plugins.Amiga/  Writable adf and RDB images, .info icons, Workbench navigation mode, Amiga images (default plugin)
   Hst.Commander.Plugins.PhysicalDisk/ Internal and external physical disks on Windows, Linux and macOS (default plugin)
   Hst.Commander.Plugins.Ftp/    FTP, FTPS and SFTP servers (default plugin)
+  Hst.Commander.Plugins.DirectoryOpus/ Directory Opus 4 theme with a customizable button bank (default plugin)
   Hst.Commander.Plugins.Smb/    Windows file shares and other SMB 2/3 servers (external plugin, released separately: SMBLibrary is LGPL)
   Hst.Commander.Core/           Volume implementations, NavigationContext, copy/move/delete, UAE metadata, viewer, plugin loading
   Hst.Commander.Tui/            Terminal.Gui TUI application
@@ -85,6 +87,8 @@ src/
         |                          [FtpPlugin, FtpVolumeProvider,
         |                           FtpServerVolumeProvider, RemoteVolume,
         |                           Ftp/SftpRemoteClient]  <- Hst.Commander.Plugins.Ftp
+        |                          [DirectoryOpusPlugin,
+        |                           DirectoryOpus4Theme]  <- Hst.Commander.Plugins.DirectoryOpus
         |                          [SmbPlugin, SmbVolumeProvider,
         |                           SmbServerVolumeProvider, SmbVolume,
         |                           SmbFileStream]  <- Hst.Commander.Plugins.Smb (external)
@@ -120,7 +124,9 @@ All are in `Hst.Commander.Abstractions`; see [`docs/plugin-api.md`](../docs/plug
 | `IIconProvider` | Reads icons from icon files next to entries (e.g. `.info`) |
 | `INavigationMode` | Lays out a directory as icons at positions in the GUI (e.g. Workbench) |
 | `IImageProvider` | Reads the images of a file for the viewer (F3) |
-| `IPlugin` | Returns a plugin's providers, creators and modes and its `ThirdPartyNotices` (shown in About > Licenses); `Initialize(IPluginHost)` |
+| `ITheme` | A theme: colors (`ThemeColors`), the buttons of the bottom area (`ButtonPanel` of columns of `PanelButton`s running `CommanderActions`) and optional parent buttons beside the panes |
+| `ICustomizableButtonPanel` | A theme whose buttons the user changes in a settings tab with the button editor; the plugin saves the layout |
+| `IPlugin` | Returns a plugin's providers, creators, modes and themes and its `ThirdPartyNotices` (shown in About > Licenses); `Initialize(IPluginHost)` |
 | `IPluginHost` | Lets plugins work together without sharing types (e.g. the Disk plugin opens a PiStorm partition with the Amiga plugin) |
 | `IWriteCache` | A writable image stream caching writes (e.g. physical disks), committed by Hst Commander when the file system is consistent (`Flush` doesn't write it) |
 
@@ -180,8 +186,9 @@ These apply across features and aren't obvious from a single file:
 - Amiga plugin: `Hst.Commander.Plugins.Amiga`
 - Physical disk plugin: `Hst.Commander.Plugins.PhysicalDisk`
 - FTP plugin: `Hst.Commander.Plugins.Ftp`
+- Directory Opus plugin: `Hst.Commander.Plugins.DirectoryOpus`
 - SMB plugin: `Hst.Commander.Plugins.Smb`
-- Core: `Hst.Commander.Core` (`AppInfo`, `EditorDocument`, `EditorKind`, `EditorSearch`, `EditorSession`, `EmbeddedIconReader`, `EnterFileAction`, `ExternalEditFile`, `ExternalEditor`, `Elevation`, `DroppedEntries`, `EntryProperties`, `FileSystemDetails`, `IconImage`, `ListingProgress`, `NavigationContext`, `NameFilter`, `PluginHost`, `PluginLoader`, `Plugins`, `IProgressIndicator`, `ITaskbarProgress`, `TaskbarProgressReporter`, `TaskbarProgressState`, `TerminalProgress`, `SelectGroupOptions`, `FileStarter`, `ImagePixels`, `SettingsPaths`, `SizeFormatter`, `StandardImageProvider`, `StartupOptions`, `PaneStartup`, `UaeMetadataFormat`, `ViewerDocument`, `ViewerSession`, `WindowsIconImageProvider`, `VolumeConnector`, `VolumeDragSource`, `CredentialsRequest`, `ConnectionRequest`, `LocationConnection`, `Bookmark`, `BookmarkStore`, `BookmarkOpener`, `VolumeChoice`, `ICredentialStore`, `CredentialStores`, `Licenses`, `LicenseNotice`, `VolumeCreation`, `VolumeCreatorInput`), `Hst.Commander.Core.Volumes` (volumes, copying, UAE metadata)
+- Core: `Hst.Commander.Core` (`AppInfo`, `EditorDocument`, `EditorKind`, `EditorSearch`, `EditorSession`, `EmbeddedIconReader`, `EnterFileAction`, `ExternalEditFile`, `ExternalEditor`, `Elevation`, `DroppedEntries`, `EntryProperties`, `FileSystemDetails`, `IconImage`, `ListingProgress`, `NavigationContext`, `NameFilter`, `PluginHost`, `PluginLoader`, `Plugins`, `IProgressIndicator`, `ITaskbarProgress`, `TaskbarProgressReporter`, `TaskbarProgressState`, `TerminalProgress`, `SelectGroupOptions`, `FileStarter`, `ImagePixels`, `SettingsPaths`, `SizeFormatter`, `StandardImageProvider`, `StartupOptions`, `PaneStartup`, `UaeMetadataFormat`, `ViewerDocument`, `ViewerSession`, `WindowsIconImageProvider`, `VolumeConnector`, `VolumeDragSource`, `CredentialsRequest`, `ConnectionRequest`, `LocationConnection`, `Bookmark`, `BookmarkStore`, `BookmarkOpener`, `VolumeChoice`, `ICredentialStore`, `CredentialStores`, `Licenses`, `LicenseNotice`, `VolumeCreation`, `VolumeCreatorInput`, `Themes`, `ThemeChoice`, `FunctionKeyBar`, `ButtonPanelEditor`), `Hst.Commander.Core.Volumes` (volumes, copying, UAE metadata)
 - Tui: `Hst.Commander.Tui`
 - Gui: `Hst.Commander.Gui`, `Hst.Commander.Gui.Icons` (entry icons)
 - Tests: `Hst.Commander.Core.Tests`
@@ -209,6 +216,8 @@ These apply across features and aren't obvious from a single file:
 9. **To show directories as icons at positions in the GUI** (like the Amiga Workbench), implement `INavigationMode` (see `WorkbenchNavigationMode`) and return it from `IPlugin.NavigationModes` (see [Navigation modes](../docs/icons-and-navigation-modes.md#navigation-modes)).
 
 10. **To view images of a file format with F3** (like Amiga icons and IFF ILBM pictures), implement `IImageProvider` (see `AmigaImageProvider`) and return it from `IPlugin.ImageProviders` (see [Viewer](../docs/viewer.md#images)).
+
+11. **To add a theme** with its own colors, bottom-area buttons and parent buttons, implement `ITheme` (see `DirectoryOpus4Theme`), plus `ICustomizableButtonPanel` to let the user change its buttons, and return it from `IPlugin.Themes` (see [Themes](../docs/themes.md)).
 
 Plugins are separate projects referencing only `Hst.Commander.Abstractions`, e.g. `Hst.Commander.Plugins.Zip`: implement `IPlugin` returning the plugin's volume providers, file volume providers, volume creators and icon providers, and either add it to `Plugins.BuiltIn` (`Hst.Commander.Core`, which references the plugins included by default) or build it and copy its output to `~/.hst-commander/plugins/<Name>/` or `plugins/<Name>/` next to the executable, with `<Name>.dll` as the plugin assembly (reference `Hst.Commander.Abstractions` with `<Private>false</Private>` and `<ExcludeAssets>runtime</ExcludeAssets>` so it isn't copied; a copy is ignored anyway).
 
@@ -240,7 +249,7 @@ The details for each front-end are in [`docs/tui.md`](../docs/tui.md) and [`docs
 
 - **TUI:** Terminal.Gui **v2 pre-alpha** (`2.0.0-prealpha.1895`). Its API differs from v1, so consult the installed package, not online v1 docs. Each pane is a private `Pane` class holding its `NavigationContext`; pane keys are handled in `tableView.KeyDown`, window keys in `this.KeyUp`. Dialogs are `new Dialog { Buttons = [...] }` run with `Application.Run(dialog)`; background work reports back with `Application.Invoke`.
 - **GUI:** Avalonia 12 with the Fluent theme and plain code-behind (no MVVM). `PaneView` holds a `NavigationContext`; most keys are handled at window level with tunnelling `KeyDown` handlers. Dialogs are shown with `ShowDialog(owner)`; background work reports through a `Progress<T>` created on the UI thread. Theme brushes live in `App.axaml` `ThemeDictionaries` and are referenced with `DynamicResource`.
-- Both front-ends have the same File menu, function key bar (F1-F10), themes (Midnight Commander, Light, Dark) and settings dialog with tabs (Appearance, Panes, Copying, Editor; stored separately in `~/.hst-commander/tui-settings.json` and `gui-settings.json`).
+- Both front-ends have the same File menu, bottom area (`ButtonPanelView`: the function key bar F1-F10, or a plugin theme's buttons), themes (Midnight Commander, Light, Dark and plugin themes) and settings dialog with tabs (Appearance, Panes, Copying, Editor; stored separately in `~/.hst-commander/tui-settings.json` and `gui-settings.json`).
 
 ## Git Workflow
 

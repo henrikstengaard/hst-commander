@@ -1,10 +1,13 @@
+using Hst.Commander.Abstractions;
+using Hst.Commander.Core;
 using Terminal.Gui;
 using TuiAttribute = Terminal.Gui.Attribute;
 
 namespace Hst.Commander.Tui;
 
 /// <summary>
-///     Colors of the TUI for a <see cref="TuiTheme" />, using the 16 legacy colors so they work in every terminal.
+///     Colors of the TUI for a theme (<see cref="ThemeChoice" />), using the 16 legacy colors so they work in every
+///     terminal. Themes of plugins get the closest of the 16 colors for each of their colors (<see cref="From" />).
 /// </summary>
 public sealed record TuiPalette(
     ColorName16 PaneBackground,
@@ -23,7 +26,8 @@ public sealed record TuiPalette(
     TuiAttribute MenuHot,
     TuiAttribute FunctionKey,
     TuiAttribute Dialog,
-    TuiAttribute DialogFocus)
+    TuiAttribute DialogFocus,
+    TuiAttribute? Button = null)
 {
     /// <summary>Blue panes with directories in white, files in gray, executables in green and cyan menu and function key bars.</summary>
     public static TuiPalette MidnightCommander { get; } = new(
@@ -85,12 +89,59 @@ public sealed record TuiPalette(
 
     public TuiAttribute PaneNormal => new(Border, PaneBackground);
 
-    public static TuiPalette For(TuiTheme theme) => theme switch
+    /// <summary>Buttons of the bottom area: the theme's buttons, or the titles of the function key bar.</summary>
+    public TuiAttribute ButtonTitle => Button ?? Menu;
+
+    /// <summary>Keys shown before the button labels, e.g. "F5" of the function key bar.</summary>
+    public TuiAttribute ButtonKey => Button ?? FunctionKey;
+
+    public static TuiPalette For(ThemeChoice theme) => theme.Plugin is { } pluginTheme
+        ? From(pluginTheme.Colors)
+        : theme.Id switch
+        {
+            Themes.LightId => Light,
+            Themes.DarkId => Dark,
+            _ => MidnightCommander
+        };
+
+    /// <summary>The palette of the colors of a plugin theme, the closest of the 16 colors for each.</summary>
+    public static TuiPalette From(ThemeColors colors)
     {
-        TuiTheme.Light => Light,
-        TuiTheme.Dark => Dark,
-        _ => MidnightCommander
-    };
+        ArgumentNullException.ThrowIfNull(colors);
+        var paneBackground = Closest(colors.PaneBackground);
+        var menu = Attribute(colors.MenuForeground, colors.MenuBackground);
+        var dialog = Attribute(colors.DialogForeground, colors.DialogBackground);
+        var cursor = Attribute(colors.CursorForeground, colors.CursorBackground);
+        return new TuiPalette(
+            PaneBackground: paneBackground,
+            Border: Closest(colors.PaneBorder),
+            Header: Closest(colors.Header),
+            Container: Closest(colors.Container),
+            Item: Closest(colors.Item),
+            Executable: Closest(colors.Executable),
+            Marked: Closest(colors.Marked),
+            Path: Closest(colors.Path),
+            Cursor: cursor,
+            MarkedCursor: new TuiAttribute(Closest(colors.Marked), Closest(colors.CursorBackground)),
+            ActivePath: Attribute(colors.ActivePathForeground, colors.ActivePathBackground),
+            Menu: menu,
+            MenuFocus: cursor,
+            MenuHot: new TuiAttribute(Closest(colors.ActivePathBackground), Closest(colors.MenuBackground)),
+            FunctionKey: menu,
+            Dialog: dialog,
+            DialogFocus: cursor,
+            Button: Attribute(colors.ButtonForeground, colors.ButtonBackground));
+    }
+
+    /// <summary>The closest of the 16 colors to a "#RRGGBB" color, gray when it is invalid.</summary>
+    public static ColorName16 Closest(string? color) =>
+        color != null && Color.TryParse(color, out Color? parsed) && parsed is { } value
+            ? value.GetClosestNamedColor16()
+            : ColorName16.Gray;
+
+    /// <summary>An attribute of the closest of the 16 colors to "#RRGGBB" colors.</summary>
+    public static TuiAttribute Attribute(string? foreground, string? background) =>
+        new(Closest(foreground), Closest(background));
 
     public ColorScheme MenuColorScheme => new()
     {

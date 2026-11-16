@@ -96,6 +96,8 @@ public partial class PaneView : UserControl
             FocusEntries();
         };
         IconLayout.PositionsChanged += (_, _) => IconPositionsBar.IsVisible = IconLayout.ChangedPositions.Count > 0;
+        LeftParentButton.Click += async (_, _) => await GoParentFromButtonAsync();
+        RightParentButton.Click += async (_, _) => await GoParentFromButtonAsync();
         SavePositionsButton.Click += async (_, _) => await SaveIconPositionsAsync();
         ResetPositionsButton.Click += (_, _) =>
         {
@@ -103,6 +105,41 @@ public partial class PaneView : UserControl
             FocusEntries();
         };
     }
+
+    /// <summary>
+    ///     Side of the pane showing a narrow button going to the parent, null for none: the outer side of each pane when
+    ///     the theme shows parent buttons (<see cref="ThemeChoice.ShowParentButtons" />).
+    /// </summary>
+    public ParentButtonSide? ParentButtonSide
+    {
+        get => LeftParentButton.IsVisible ? Gui.ParentButtonSide.Left :
+            RightParentButton.IsVisible ? Gui.ParentButtonSide.Right : null;
+        set
+        {
+            LeftParentButton.IsVisible = value == Gui.ParentButtonSide.Left;
+            RightParentButton.IsVisible = value == Gui.ParentButtonSide.Right;
+        }
+    }
+
+    /// <summary>Goes to the parent when a parent button is clicked, making the pane active.</summary>
+    private async Task GoParentFromButtonAsync()
+    {
+        FocusEntries();
+        await GoParentAsync();
+        FocusEntries();
+    }
+
+    /// <summary>Goes to the parent of the current directory, or out of an image at its root.</summary>
+    public Task GoParentAsync() => RunNavigationAsync(() => NavigationContext.GoParentAsync());
+
+    /// <summary>Goes to the root of the current volume.</summary>
+    public Task GoRootAsync() => RunNavigationAsync(() => NavigationContext.GoRootAsync());
+
+    /// <summary>Marks all entries.</summary>
+    public void MarkAll() => ChangeMarks(entries => NavigationContext.MarkAll(entries));
+
+    /// <summary>Unmarks all entries.</summary>
+    public void UnmarkAll() => ChangeMarks(_ => NavigationContext.ClearMarks());
 
     /// <summary>Raised when entries of the current location were changed by the pane, e.g. icon files written.</summary>
     public event EventHandler? EntriesChanged;

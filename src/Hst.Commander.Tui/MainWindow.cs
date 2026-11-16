@@ -15,7 +15,7 @@ public sealed class MainWindow : Window
 
     private readonly MenuBar _menuBar;
     private readonly Label? _administratorLabel;
-    private readonly FunctionKeyBarView _functionKeyBar;
+    private readonly ButtonPanelView _bottomPanel;
     private Pane _leftPane;
     private Pane _rightPane;
     private readonly MenuItem _leftVolumeMenuItem;
@@ -32,7 +32,7 @@ public sealed class MainWindow : Window
 
     public MainWindow(string initialPath, TuiSettings settings)
     {
-        var theme = settings.Theme;
+        var theme = Themes.Find(settings.Theme);
         BorderStyle = LineStyle.None;
         X = 0;
         Y = 0;
@@ -79,33 +79,22 @@ public sealed class MainWindow : Window
                 })
             ]
         };
-        _functionKeyBar = new FunctionKeyBarView
+        // the bottom area with the buttons of the theme, e.g. the function key bar; its height is set by ApplyTheme
+        _bottomPanel = new ButtonPanelView
         {
             X = 0,
             Y = Pos.AnchorEnd(1),
             Width = Dim.Fill(),
-            Height = 1,
-            Items =
-            [
-                new FunctionKeyItem("F1", "Left", ChooseLeftVolumeProvider),
-                new FunctionKeyItem("F2", "Right", ChooseRightVolumeProvider),
-                new FunctionKeyItem("F3", "View", ViewInActivePane),
-                new FunctionKeyItem("F4", "Edit", EditInActivePane),
-                new FunctionKeyItem("F5", "Copy", CopyFromActivePane),
-                new FunctionKeyItem("F6", "Move", MoveFromActivePane),
-                new FunctionKeyItem("F7", "Mkdir", MakeDirectoryInActivePane),
-                new FunctionKeyItem("F8", "Delete", DeleteFromActivePane),
-                new FunctionKeyItem("F9", "Create", CreateVolumeInActivePane),
-                new FunctionKeyItem("F10", "Quit", Quit)
-            ]
+            Height = 1
         };
+        _bottomPanel.ActionInvoked += (_, action) => RunAction(action);
         // the panes handle f9 (create volume) and f10 (quit) before the menu bar's key, so alt+f opens the menu
         Closing += (_, e) => e.Cancel = !ConfirmClosing();
-        _leftPane = CreatePane(new NavigationContext(initialPath, StartFile), 0);
-        _rightPane = CreatePane(new NavigationContext(initialPath, StartFile), 50);
+        _leftPane = CreatePane(new NavigationContext(initialPath, StartFile), 0, true);
+        _rightPane = CreatePane(new NavigationContext(initialPath, StartFile), 50, false);
         _activePane = _leftPane;
 
-        Add(_menuBar, _leftPane.View, _rightPane.View, _functionKeyBar);
+        Add(_menuBar, _leftPane.View, _rightPane.View, _bottomPanel);
 
         // running as administrator or root is shown at the right of the menu bar
         if (Elevation.IsElevated)
@@ -236,10 +225,25 @@ public sealed class MainWindow : Window
         _rightPane.NavigationContext.Dispose();
     }
 
-    /// <summary>Applies the colors of a theme to the menu bar, both panes and the function key bar.</summary>
-    public void ApplyTheme(TuiTheme theme)
+    /// <summary>
+    ///     Applies a theme: its colors to the menu bar, both panes and the bottom area, the buttons of the bottom area
+    ///     (the function key bar of the built-in themes) and the parent buttons at the outer side of the panes.
+    /// </summary>
+    public void ApplyTheme(ThemeChoice theme)
     {
         _palette = TuiPalette.For(theme);
+        var bottomPanel = theme.GetBottomPanel();
+        var bottomHeight = Math.Max(1, bottomPanel.Rows);
+        _bottomPanel.Panel = bottomPanel;
+        _bottomPanel.CenterLabels = theme.Plugin != null;
+        _bottomPanel.Height = bottomHeight;
+        _bottomPanel.Y = Pos.AnchorEnd(bottomHeight);
+        foreach (var pane in new[] { _leftPane, _rightPane })
+        {
+            pane.View.Height = Dim.Fill(bottomHeight);
+            ShowParentStrip(pane, theme.ShowParentButtons);
+        }
+
         _menuBar.ColorScheme = _palette.MenuColorScheme;
         _menuBar.NeedsDraw = true;
         if (_administratorLabel != null)
@@ -247,9 +251,9 @@ public sealed class MainWindow : Window
             _administratorLabel.ColorScheme = _palette.AdministratorColorScheme;
         }
 
-        _functionKeyBar.KeyAttribute = _palette.FunctionKey;
-        _functionKeyBar.TitleAttribute = _palette.Menu;
-        _functionKeyBar.NeedsDraw = true;
+        _bottomPanel.KeyAttribute = _palette.ButtonKey;
+        _bottomPanel.TitleAttribute = _palette.ButtonTitle;
+        _bottomPanel.NeedsDraw = true;
         foreach (var pane in new[] { _leftPane, _rightPane })
         {
             ApplyPaneColors(pane);
@@ -325,6 +329,110 @@ public sealed class MainWindow : Window
         pane.TableView.NeedsDraw = true;
         pane.BottomLine.ColorScheme = CreateColorScheme(normal, normal);
         pane.BottomLine.NeedsDraw = true;
+        pane.ParentStrip.Attribute = _palette.ButtonTitle;
+        pane.ParentStrip.NeedsDraw = true;
+    }
+
+    /// <summary>
+    ///     Shows or hides the parent button of a pane, one column at its outer side: left of the left pane and right of
+    ///     the right pane. The rest of the pane is moved next to it.
+    /// </summary>
+    private static void ShowParentStrip(Pane pane, bool show)
+    {
+        pane.ParentStrip.Visible = show;
+        var x = show && pane.IsLeft ? 1 : 0;
+        var width = show ? Dim.Fill(1) : Dim.Fill();
+        foreach (var view in new View[] { pane.PathPanel, pane.TableView, pane.BottomLine })
+        {
+            view.X = x;
+            view.Width = width;
+        }
+
+        pane.View.SetNeedsLayout();
+        pane.View.NeedsDraw = true;
+    }
+
+    /// <summary>Runs a command of a button in the bottom area (<see cref="CommanderActions" />) on the active pane.</summary>
+    private void RunAction(string action)
+    {
+        var pane = _activePane;
+        switch (action)
+        {
+            case CommanderActions.LeftVolume:
+                ChooseLeftVolumeProvider();
+                break;
+            case CommanderActions.RightVolume:
+                ChooseRightVolumeProvider();
+                break;
+            case CommanderActions.View:
+                ViewInActivePane();
+                break;
+            case CommanderActions.Edit:
+                EditInActivePane();
+                break;
+            case CommanderActions.Copy:
+                CopyFromActivePane();
+                break;
+            case CommanderActions.Move:
+                MoveFromActivePane();
+                break;
+            case CommanderActions.MakeDirectory:
+                MakeDirectoryInActivePane();
+                break;
+            case CommanderActions.Delete:
+                DeleteFromActivePane();
+                break;
+            case CommanderActions.CreateVolume:
+                CreateVolumeInActivePane();
+                break;
+            case CommanderActions.Properties:
+                ShowPropertiesOfActivePane();
+                break;
+            case CommanderActions.OpenAsVolume:
+                OpenAsVolumeInActivePane();
+                break;
+            case CommanderActions.Parent:
+                _ = RunNavigationAsync(pane, () => pane.NavigationContext.GoParentAsync());
+                break;
+            case CommanderActions.Root:
+                _ = RunNavigationAsync(pane, () => pane.NavigationContext.GoRootAsync());
+                break;
+            case CommanderActions.SelectAll:
+                pane.NavigationContext.MarkAll(pane.Entries);
+                UpdateMarks(pane);
+                break;
+            case CommanderActions.SelectNone:
+                pane.NavigationContext.ClearMarks();
+                UpdateMarks(pane);
+                break;
+            case CommanderActions.SelectGroup:
+                SelectGroupInActivePane();
+                break;
+            case CommanderActions.UnselectGroup:
+                UnselectGroupInActivePane();
+                break;
+            case CommanderActions.InvertSelection:
+                InvertSelectionInActivePane();
+                break;
+            case CommanderActions.Refresh:
+                RefreshActivePane();
+                break;
+            case CommanderActions.SwapPanes:
+                SwapPanes();
+                break;
+            case CommanderActions.Location:
+                ShowLocationOfActivePane();
+                break;
+            case CommanderActions.AddBookmark:
+                AddBookmarkInActivePane();
+                break;
+            case CommanderActions.Settings:
+                ShowSettings();
+                break;
+            case CommanderActions.Quit:
+                Quit();
+                break;
+        }
     }
 
     /// <summary>Shows the About dialog with the version, author and the license notices.</summary>
@@ -341,15 +449,28 @@ public sealed class MainWindow : Window
         var dialog = new SettingsDialog(settings, ApplyTheme, _palette);
         Application.Run(dialog);
         var result = dialog.Result;
+        var changedButtons = dialog.ChangedButtons;
         dialog.Dispose();
 
         if (result == null)
         {
-            ApplyTheme(settings.Theme);
+            ApplyTheme(Themes.Find(settings.Theme));
             return;
         }
 
-        ApplyTheme(result.Theme);
+        if (changedButtons is var (buttonPanel, layout))
+        {
+            try
+            {
+                buttonPanel.SaveLayout(layout);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                MessageBox.ErrorQuery("Error", $"Failed to save the buttons: {exception.Message}", "OK");
+            }
+        }
+
+        ApplyTheme(Themes.Find(result.Theme));
         ApplyVolumeProviderKeys(result.EffectiveVolumeProviderKeys);
         ApplyEnterFileAction(result.EnterFileAction);
         ApplyUaeMetadata(result.UaeMetadata);
@@ -365,7 +486,7 @@ public sealed class MainWindow : Window
         }
     }
 
-    private Pane CreatePane(NavigationContext navigationContext, int xPercent)
+    private Pane CreatePane(NavigationContext navigationContext, int xPercent, bool isLeft)
     {
         var view = new View
         {
@@ -401,8 +522,23 @@ public sealed class MainWindow : Window
             Width = Dim.Fill()
         };
 
+        // the parent button at the outer side of the pane, shown by themes of plugins (see ShowParentStrip)
+        var parentStrip = new ParentStripView
+        {
+            X = isLeft ? 0 : Pos.AnchorEnd(1),
+            Y = 0,
+            Width = 1,
+            Height = Dim.Fill(),
+            Visible = false
+        };
+
         var progress = new ListingProgressView();
-        var pane = new Pane(navigationContext, view, pathPanel, tableView, bottomLine, progress);
+        var pane = new Pane(navigationContext, view, pathPanel, tableView, bottomLine, progress, parentStrip, isLeft);
+        parentStrip.Clicked += (_, _) =>
+        {
+            pane.TableView.SetFocus();
+            _ = RunNavigationAsync(pane, () => pane.NavigationContext.GoParentAsync());
+        };
         progress.FocusOnHide = tableView;
         navigationContext.ProgressIndicator = progress;
         tableView.Style = new TableStyle
@@ -415,7 +551,7 @@ public sealed class MainWindow : Window
         };
         tableView.FrameChanged += (_, _) => UpdatePaneColumns(pane);
 
-        view.Add(pathPanel, tableView, bottomLine, progress);
+        view.Add(pathPanel, tableView, bottomLine, parentStrip, progress);
 
         return pane;
     }
@@ -1767,8 +1903,16 @@ public sealed class MainWindow : Window
         PathPanelView pathPanel,
         EntryTableView tableView,
         Label bottomLine,
-        ListingProgressView progress)
+        ListingProgressView progress,
+        ParentStripView parentStrip,
+        bool isLeft)
     {
+        /// <summary>Parent button at the outer side of the pane, shown by themes of plugins.</summary>
+        public ParentStripView ParentStrip { get; } = parentStrip;
+
+        /// <summary>True for the left pane, whose parent button is at its left side.</summary>
+        public bool IsLeft { get; } = isLeft;
+
         public NavigationContext NavigationContext { get; } = navigationContext;
         public View View { get; } = view;
         public PathPanelView PathPanel { get; } = pathPanel;

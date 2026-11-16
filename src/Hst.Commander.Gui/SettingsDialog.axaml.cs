@@ -1,33 +1,53 @@
 ﻿using Avalonia.Controls;
+using Hst.Commander.Abstractions;
 using Hst.Commander.Core;
 
 namespace Hst.Commander.Gui;
 
 /// <summary>
-///     Modal settings view with the settings grouped in tabs: appearance, panes, copying and the editor. Theme changes
-///     are previewed immediately and reverted on cancel; the dialog returns the changed settings on OK or null on
-///     cancel.
+///     Modal settings view with the settings grouped in tabs: appearance, panes, copying and the editor, and the buttons
+///     of a theme the user can change (<see cref="ICustomizableButtonPanel" />) while it is chosen. Theme changes are
+///     previewed immediately and reverted on cancel; the dialog returns the changed settings on OK or null on cancel,
+///     with the changed buttons in <see cref="ChangedButtons" />.
 /// </summary>
 public partial class SettingsDialog : Window
 {
-    private static readonly (GuiTheme Theme, string Name)[] Themes =
-    [
-        (GuiTheme.MidnightCommander, "Midnight Commander"),
-        (GuiTheme.Light, "Light"),
-        (GuiTheme.Dark, "Dark")
-    ];
+    private const double DefaultWidth = 520;
+    private const double DefaultHeight = 380;
+    private const double ButtonsWidth = 820;
+    private const double ButtonsHeight = 600;
+
+    private readonly IReadOnlyList<ThemeChoice> _themes = Themes.All;
+    private readonly Action<ThemeChoice> _preview;
+
+    /// <summary>Editors of the buttons by theme, so changes are kept when another theme is chosen and back again.</summary>
+    private readonly Dictionary<ICustomizableButtonPanel, ButtonPanelEditorView> _buttonEditors = [];
+
+    private TabItem? _buttonsTab;
 
     public SettingsDialog() : this(new GuiSettings())
     {
     }
 
-    public SettingsDialog(GuiSettings settings)
+    /// <param name="settings">Settings shown.</param>
+    /// <param name="preview">
+    ///     Applies a theme chosen in the dialog, and the theme of the settings again on cancel; only its colors when
+    ///     null.
+    /// </param>
+    public SettingsDialog(GuiSettings settings, Action<ThemeChoice>? preview = null)
     {
         InitializeComponent();
+        _preview = preview ?? ThemeManager.Apply;
 
-        ThemeComboBox.ItemsSource = Themes.Select(theme => theme.Name).ToList();
-        ThemeComboBox.SelectedIndex = Math.Max(0, Array.FindIndex(Themes, theme => theme.Theme == settings.Theme));
-        ThemeComboBox.SelectionChanged += (_, _) => ThemeManager.Apply(SelectedTheme);
+        var originalTheme = Themes.Find(_themes, settings.Theme);
+        ThemeComboBox.ItemsSource = _themes.Select(theme => theme.Name).ToList();
+        ThemeComboBox.SelectedIndex = Math.Max(0, _themes.ToList().IndexOf(originalTheme));
+        ThemeComboBox.SelectionChanged += (_, _) =>
+        {
+            _preview(SelectedTheme);
+            UpdateButtonsTab();
+        };
+        UpdateButtonsTab();
         VolumeProviderKeysComboBox.ItemsSource = VolumeProviderKeyBindings.All
             .Select(keys => keys == VolumeProviderKeyBindings.Default
                 ? $"{VolumeProviderKeyBindings.GetName(keys)} (default)"
@@ -63,10 +83,16 @@ public partial class SettingsDialog : Window
                 return;
             }
 
+            if (SelectedTheme.CustomizableButtons is { } buttonPanel &&
+                _buttonEditors.TryGetValue(buttonPanel, out var editorView))
+            {
+                ChangedButtons = (buttonPanel, editorView.Editor.ToPanel());
+            }
+
             accepted = true;
             Close((settings with
                 {
-                    Theme = SelectedTheme,
+                    Theme = SelectedTheme.Id,
                     EnterFileAction = SelectedEnterFileAction,
                     UaeMetadata = SelectedUaeMetadata,
                     TemporaryCopyLimit = (long)Math.Max(0, TemporaryCopyLimitUpDown.Value ?? 0),
@@ -80,13 +106,20 @@ public partial class SettingsDialog : Window
         {
             if (!accepted)
             {
-                ThemeManager.Apply(settings.Theme);
+                _preview(originalTheme);
             }
         };
         Opened += (_, _) => ThemeComboBox.Focus();
     }
 
-    private GuiTheme SelectedTheme => Themes[Math.Max(0, ThemeComboBox.SelectedIndex)].Theme;
+    /// <summary>
+    ///     Buttons of the chosen theme as changed in the editor, to be saved by the caller with
+    ///     <see cref="ICustomizableButtonPanel.SaveLayout" /> when OK was clicked; null when the theme's buttons can't be
+    ///     changed.
+    /// </summary>
+    public (ICustomizableButtonPanel ButtonPanel, ButtonPanel Layout)? ChangedButtons { get; private set; }
+
+    private ThemeChoice SelectedTheme => _themes[Math.Max(0, ThemeComboBox.SelectedIndex)];
 
     private VolumeProviderKeys SelectedVolumeProviderKeys =>
         VolumeProviderKeyBindings.All[Math.Max(0, VolumeProviderKeysComboBox.SelectedIndex)];
@@ -101,4 +134,35 @@ public partial class SettingsDialog : Window
 
     /// <summary>The command can only be entered for the custom editor.</summary>
     private void UpdateEditorCommand() => EditorCommandTextBox.IsEnabled = SelectedEditor == EditorKind.Custom;
+
+    /// <summary>
+    ///     Shows the tab with the button editor after the appearance tab while the chosen theme's buttons can be changed,
+    ///     making the dialog larger for it.
+    /// </summary>
+    private void UpdateButtonsTab()
+    {
+        if (_buttonsTab != null)
+        {
+            TabControl.Items.Remove(_buttonsTab);
+            _buttonsTab = null;
+        }
+
+        if (SelectedTheme.CustomizableButtons is not { } buttonPanel)
+        {
+            Width = DefaultWidth;
+            Height = DefaultHeight;
+            return;
+        }
+
+        if (!_buttonEditors.TryGetValue(buttonPanel, out var editorView))
+        {
+            editorView = new ButtonPanelEditorView(buttonPanel.Layout, buttonPanel.DefaultLayout);
+            _buttonEditors[buttonPanel] = editorView;
+        }
+
+        _buttonsTab = new TabItem { Header = buttonPanel.SettingsTitle, Content = editorView };
+        TabControl.Items.Insert(1, _buttonsTab);
+        Width = ButtonsWidth;
+        Height = ButtonsHeight;
+    }
 }

@@ -17,7 +17,11 @@ public sealed record TuiSettings
 
     public static string FilePath => Path.Combine(SettingsPaths.Directory, "tui-settings.json");
 
-    public TuiTheme Theme { get; init; } = TuiTheme.MidnightCommander;
+    /// <summary>
+    ///     Identifier of the theme (see <see cref="Themes" />), e.g. "MidnightCommander" or the identifier of a theme of a
+    ///     plugin; the names of the earlier theme enum are the identifiers of the built-in themes.
+    /// </summary>
+    public string Theme { get; init; } = Themes.MidnightCommanderId;
 
     /// <summary>
     ///     Keys opening the volume provider list of the left and right pane, null for the default
