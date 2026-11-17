@@ -126,8 +126,11 @@ public class LocalVolume(string path) : IVolume
         {
             var entry = CreateEntry(directoryInfo);
             
+            // a drive opened from the drive list keeps its name as listed: on Linux and macOS a mount point like
+            // "/run", whose directory name is only "run"
+            var component = _currentPath == null ? name : entry.Name;
             _currentPath = directoryInfo.FullName;
-            _currentPathComponents = _currentPathComponents.Concat([entry.Name]).ToList();
+            _currentPathComponents = _currentPathComponents.Concat([component]).ToList();
             
             return Task.FromResult(entry);
         }
