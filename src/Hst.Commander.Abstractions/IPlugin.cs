@@ -53,6 +53,11 @@ public interface IPlugin
     IEnumerable<IImageProvider> ImageProviders => [];
 
     /// <summary>
+    /// Themes listed in the settings after the built-in themes, e.g. Directory Opus 4 with its colors and buttons.
+    /// </summary>
+    IEnumerable<ITheme> Themes => [];
+
+    /// <summary>
     /// Notices of the third-party components the plugin uses, e.g. their copyright notices and licenses, shown in the
     /// Licenses section of the About dialog while the plugin is loaded, as some licenses require (e.g. the LGPL).
     /// Defaults to null (none).

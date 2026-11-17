@@ -77,9 +77,24 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - Both get the pane's volume and may change its directory (e.g. into a volume entry) as long as they change back before returning.
 - `Options` are `NavigationModeOption`s shown as check boxes; `GetValue(options)` gives the default for a missing value. See [Navigation modes](icons-and-navigation-modes.md#navigation-modes).
 
+### ITheme
+
+- `Id` is stored in the settings, so it must never change. `Name` is shown in Settings > Appearance. `IsDark` picks the Fluent variant the GUI uses for controls the theme doesn't color.
+- `Colors` is a `ThemeColors` record of "#RRGGBB" strings. The TUI uses the closest of its 16 colors for each one. Its optional `MarkedContainerBackground` and `MarkedItemBackground` give marked directories and files a background of their own.
+- `GetBottomPanel()` returns the buttons of the bottom area as a `ButtonPanel` of `ButtonColumn`s of `PanelButton(Label, Action, Key, Background, Foreground)`. `Action` is one of the `CommanderActions` ids. It's called again after the settings change.
+- `ShowParentButtons` (default false) shows a narrow parent button on the outer side of each pane. See [Themes](themes.md).
+- `HighlightActivePathPanel` (default false) colors the whole panel above the active pane with the active path's colors, not only the path.
+- `FontFamily` and `FontSize` (default null) set the font of the panes and the bottom area in the GUI. `FontFamily` names fonts separated by commas and is only used when one of them is installed, as themes don't include fonts. The user's font setting overrides it.
+- `FontDownloads` (default none) lists font files (`ThemeFontDownload`: file name, https URL pinned to a version, SHA-256 hash, name, license and project page) the user can download in the GUI's settings when none of the theme's fonts is installed. See [Fonts](themes.md#fonts).
+
+### ICustomizableButtonPanel
+
+- A theme implementing it gets a settings tab (`SettingsTitle`) with the button editor, starting from `Layout`. Reset restores `DefaultLayout`.
+- `SaveLayout(layout)` is called after OK. The plugin stores it itself (e.g. JSON in `IPluginHost.GetPluginDirectory`), so both front-ends use it. See [Button editor](themes.md#button-editor).
+
 ### IPlugin
 
-- Returns the plugin's volume providers, file volume providers, volume creators (with `CanCreateVolumes`), icon providers, navigation modes and image providers. `Initialize(host)` is called once before the plugin is used.
+- Returns the plugin's volume providers, file volume providers, volume creators (with `CanCreateVolumes`), icon providers, navigation modes, image providers and themes. `Initialize(host)` is called once before the plugin is used.
 - A plugin references only Abstractions. Plugins can't use each other's types, because each loads in its own load context, so they work together through `IPluginHost`.
 - `ThirdPartyNotices` (optional, default null): the copyright notices and licenses of the third-party components the plugin uses, shown in Help > About > Licenses while it's loaded, e.g. the SMB plugin returns SMBLibrary's notice with the LGPL and GPL texts (an embedded resource). A plugin throwing from it is left out of the list.
 
@@ -96,7 +111,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 
 ## Loading Plugins
 
-- `Plugins.BuiltIn` lists the plugins included by default (Zip, LhaLzx, RarSevenZip, Disk, Amiga, PhysicalDisk, Ftp), referenced by Core. Disk comes before Amiga so hybrid disks (an MBR and a rigid disk block, which `RdbFileVolumeProvider` would also match) are opened by the Disk plugin. `Plugins.All` is the built-in plugins followed by the loaded ones; the `VolumeProviders` lists are rebuilt when it changes.
+- `Plugins.BuiltIn` lists the plugins included by default (Zip, LhaLzx, RarSevenZip, Disk, Amiga, PhysicalDisk, Ftp, DirectoryOpus), referenced by Core. Disk comes before Amiga so hybrid disks (an MBR and a rigid disk block, which `RdbFileVolumeProvider` would also match) are opened by the Disk plugin. `Plugins.All` is the built-in plugins followed by the loaded ones; the `VolumeProviders` lists are rebuilt when it changes.
 - Both front-ends call `Plugins.Load()` once at startup, before the panes are created, because each `NavigationContext` takes `VolumeProviders.Files` when it's created: the TUI in `Program.cs`, the GUI in `App.OnFrameworkInitializationCompleted`. In the GUI it must be written `Hst.Commander.Core.Plugins`, as `Plugins` there resolves to the `Hst.Commander.Plugins` namespace.
 - Load errors (including a failing `Initialize`) are joined by `Plugins.FormatErrors` and shown once the main window is loaded; the other plugins still load.
 - `PluginLoader.Directories` are `~/.hst-commander/plugins` and then `plugins` next to the executable; missing directories are skipped and a directory listed twice is scanned once.

@@ -491,6 +491,12 @@ public sealed class NavigationContext : IDisposable
     }
 
     /// <summary>
+    ///     Marks all listed entries, files and directories, except the parent entry "..", e.g. with the "All" button of
+    ///     the Directory Opus 4 theme. Returns the number of entries.
+    /// </summary>
+    public int MarkAll(IEnumerable<IEntry> entries) => MarkGroup(entries, SelectGroupOptions.Default);
+
+    /// <summary>
     ///     Unmarks the listed entries whose names match the filter of the unselect group dialog (-), matched like
     ///     <see cref="MarkGroup" />; other marks are kept. Returns the number of matching entries. Throws
     ///     <see cref="IOException" /> when the filter is an invalid regular expression.

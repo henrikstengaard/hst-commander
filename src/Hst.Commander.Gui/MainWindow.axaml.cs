@@ -1,6 +1,7 @@
 ﻿using System.ComponentModel;
 using System.Diagnostics;
 using Avalonia.Controls;
+using Avalonia.Controls.Documents;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
@@ -52,6 +53,8 @@ public partial class MainWindow : Window
         LeftPane.EntriesDropped += async (_, request) => await DropAsync(LeftPane, request);
         RightPane.EntriesDropped += async (_, request) => await DropAsync(RightPane, request);
         BuildViewMenu();
+        BottomPanel.ActionInvoked += async (_, action) => await RunActionAsync(action);
+        ApplyAppearance(Themes.Find(settings.Theme), settings.FontFamily, settings.FontSize);
         ViewMenuItem.Click += async (_, _) => await ViewAsync(_activePane);
         EditMenuItem.Click += async (_, _) => await EditAsync(_activePane);
         CopyMenuItem.Click += async (_, _) => await CopyAsync(_activePane);
@@ -68,16 +71,6 @@ public partial class MainWindow : Window
         SelectGroupMenuItem.Click += async (_, _) => await SelectGroupAsync(_activePane, true);
         UnselectGroupMenuItem.Click += async (_, _) => await SelectGroupAsync(_activePane, false);
         InvertSelectionMenuItem.Click += (_, _) => InvertSelection(_activePane);
-        LeftVolumeButton.Click += async (_, _) => await ChooseVolumeProviderAsync(LeftPane);
-        RightVolumeButton.Click += async (_, _) => await ChooseVolumeProviderAsync(RightPane);
-        ViewButton.Click += async (_, _) => await ViewAsync(_activePane);
-        EditButton.Click += async (_, _) => await EditAsync(_activePane);
-        CopyButton.Click += async (_, _) => await CopyAsync(_activePane);
-        MoveButton.Click += async (_, _) => await MoveAsync(_activePane);
-        MkdirButton.Click += async (_, _) => await MakeDirectoryAsync(_activePane);
-        DeleteButton.Click += async (_, _) => await DeleteAsync(_activePane);
-        CreateButton.Click += async (_, _) => await CreateVolumeAsync(_activePane);
-        QuitButton.Click += (_, _) => Close();
         LeftVolumeMenuItem.Click += async (_, _) => await ChooseVolumeProviderAsync(LeftPane);
         RightVolumeMenuItem.Click += async (_, _) => await ChooseVolumeProviderAsync(RightPane);
         LocationMenuItem.Click += async (_, _) => await ShowLocationAsync(_activePane);
@@ -1208,15 +1201,137 @@ public partial class MainWindow : Window
         await RefreshPanesAsync(targetPane, otherPane);
     }
 
+    /// <summary>
+    ///     Applies a theme: its colors, the buttons of the bottom area (the function key bar of the built-in themes) and
+    ///     the parent buttons at the outer side of the panes, and the font of the panes and the bottom area: the font of
+    ///     the settings (null for none), otherwise the theme's (see <see cref="GuiFonts" />).
+    /// </summary>
+    private void ApplyAppearance(ThemeChoice theme, string? fontFamily, double? fontSize)
+    {
+        ThemeManager.Apply(theme);
+        var (family, size) = GuiFonts.Resolve(theme, fontFamily, fontSize);
+        foreach (var control in new Control[] { LeftPane, RightPane, BottomPanel })
+        {
+            TextElement.SetFontFamily(control, family);
+            TextElement.SetFontSize(control, size);
+        }
+
+        BottomPanel.CenterLabels = theme.Plugin != null;
+        BottomPanel.Panel = theme.GetBottomPanel();
+        LeftPane.ParentButtonSide = theme.ShowParentButtons ? ParentButtonSide.Left : null;
+        RightPane.ParentButtonSide = theme.ShowParentButtons ? ParentButtonSide.Right : null;
+        LeftPane.HighlightActivePathPanel = theme.HighlightActivePathPanel;
+        RightPane.HighlightActivePathPanel = theme.HighlightActivePathPanel;
+    }
+
+    /// <summary>Runs a command of a button in the bottom area (<see cref="CommanderActions" />) on the active pane.</summary>
+    private async Task RunActionAsync(string action)
+    {
+        var pane = _activePane;
+        switch (action)
+        {
+            case CommanderActions.LeftVolume:
+                await ChooseVolumeProviderAsync(LeftPane);
+                break;
+            case CommanderActions.RightVolume:
+                await ChooseVolumeProviderAsync(RightPane);
+                break;
+            case CommanderActions.View:
+                await ViewAsync(pane);
+                break;
+            case CommanderActions.Edit:
+                await EditAsync(pane);
+                break;
+            case CommanderActions.Copy:
+                await CopyAsync(pane);
+                break;
+            case CommanderActions.Move:
+                await MoveAsync(pane);
+                break;
+            case CommanderActions.MakeDirectory:
+                await MakeDirectoryAsync(pane);
+                break;
+            case CommanderActions.Delete:
+                await DeleteAsync(pane);
+                break;
+            case CommanderActions.CreateVolume:
+                await CreateVolumeAsync(pane);
+                break;
+            case CommanderActions.Properties:
+                await ShowPropertiesAsync(pane);
+                break;
+            case CommanderActions.OpenAsVolume:
+                await pane.OpenSelectedEntryAsVolumeAsync();
+                pane.FocusEntries();
+                break;
+            case CommanderActions.Parent:
+                await pane.GoParentAsync();
+                pane.FocusEntries();
+                break;
+            case CommanderActions.Root:
+                await pane.GoRootAsync();
+                pane.FocusEntries();
+                break;
+            case CommanderActions.SelectAll:
+                pane.MarkAll();
+                pane.FocusEntries();
+                break;
+            case CommanderActions.SelectNone:
+                pane.UnmarkAll();
+                pane.FocusEntries();
+                break;
+            case CommanderActions.SelectGroup:
+                await SelectGroupAsync(pane, true);
+                break;
+            case CommanderActions.UnselectGroup:
+                await SelectGroupAsync(pane, false);
+                break;
+            case CommanderActions.InvertSelection:
+                InvertSelection(pane);
+                break;
+            case CommanderActions.Refresh:
+                await RefreshAsync(pane);
+                break;
+            case CommanderActions.SwapPanes:
+                await SwapPanesAsync();
+                break;
+            case CommanderActions.Location:
+                await ShowLocationAsync(pane);
+                break;
+            case CommanderActions.AddBookmark:
+                await AddBookmarkAsync(pane);
+                break;
+            case CommanderActions.Settings:
+                await ShowSettingsAsync();
+                break;
+            case CommanderActions.Quit:
+                Close();
+                break;
+        }
+    }
+
     private async Task ShowSettingsAsync()
     {
-        var settings = await new SettingsDialog(GuiSettings.Load()).ShowDialog<GuiSettings?>(this);
+        var dialog = new SettingsDialog(GuiSettings.Load(), ApplyAppearance);
+        var settings = await dialog.ShowDialog<GuiSettings?>(this);
         if (settings == null)
         {
             return;
         }
 
-        ThemeManager.Apply(settings.Theme);
+        if (dialog.ChangedButtons is var (buttonPanel, layout))
+        {
+            try
+            {
+                buttonPanel.SaveLayout(layout);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                await ShowErrorAsync(new IOException($"Failed to save the buttons: {exception.Message}", exception));
+            }
+        }
+
+        ApplyAppearance(Themes.Find(settings.Theme), settings.FontFamily, settings.FontSize);
         ApplyVolumeProviderKeys(settings.EffectiveVolumeProviderKeys);
         ApplyEnterFileAction(settings.EnterFileAction);
         ApplyUaeMetadata(settings.UaeMetadata);

@@ -17,7 +17,20 @@ public sealed record GuiSettings
 
     public static string FilePath => Path.Combine(SettingsPaths.Directory, "gui-settings.json");
 
-    public GuiTheme Theme { get; init; } = GuiTheme.MidnightCommander;
+    /// <summary>
+    ///     Identifier of the theme (see <see cref="Themes" />), e.g. "MidnightCommander" or the identifier of a theme of a
+    ///     plugin; the names of the earlier theme enum are the identifiers of the built-in themes.
+    /// </summary>
+    public string Theme { get; init; } = Themes.MidnightCommanderId;
+
+    /// <summary>
+    ///     Font family of the panes and the bottom area, null for the theme's font or the default (see
+    ///     <see cref="GuiFonts" />).
+    /// </summary>
+    public string? FontFamily { get; init; }
+
+    /// <summary>Font size of the panes and the bottom area, null for the theme's size or the default.</summary>
+    public double? FontSize { get; init; }
 
     /// <summary>
     ///     Keys opening the volume provider list of the left and right pane, null for the default

@@ -7,7 +7,7 @@
         Width="1200" Height="750"
         WindowStartupLocation="CenterScreen">
     <DockPanel>
-        <DockPanel DockPanel.Dock="Top">
+        <DockPanel DockPanel.Dock="Top" Classes="menuBar">
             <!-- shown at the right of the menu bar when running as administrator or root -->
             <Border x:Name="AdministratorIndicator" DockPanel.Dock="Right" IsVisible="False"
                     Background="{DynamicResource AdministratorBackground}" CornerRadius="3" Margin="4,2"
@@ -50,55 +50,9 @@
                 </MenuItem>
             </Menu>
         </DockPanel>
-        <!-- function key bar; the buttons aren't focusable so the active pane keeps the focus -->
-        <UniformGrid DockPanel.Dock="Bottom" Rows="1">
-            <UniformGrid.Styles>
-                <Style Selector="Button.functionKey">
-                    <Setter Property="Focusable" Value="False" />
-                    <Setter Property="HorizontalAlignment" Value="Stretch" />
-                    <Setter Property="HorizontalContentAlignment" Value="Left" />
-                    <Setter Property="Margin" Value="1" />
-                    <Setter Property="Padding" Value="0" />
-                </Style>
-                <Style Selector="Button.functionKey TextBlock">
-                    <Setter Property="Padding" Value="6,3" />
-                </Style>
-                <Style Selector="Button.functionKey TextBlock.key">
-                    <Setter Property="FontWeight" Value="Bold" />
-                    <Setter Property="Padding" Value="6,3,0,3" />
-                </Style>
-            </UniformGrid.Styles>
-            <Button x:Name="LeftVolumeButton" Classes="functionKey">
-                <StackPanel Orientation="Horizontal"><TextBlock Classes="key" Text="F1" /><TextBlock Text="Left" /></StackPanel>
-            </Button>
-            <Button x:Name="RightVolumeButton" Classes="functionKey">
-                <StackPanel Orientation="Horizontal"><TextBlock Classes="key" Text="F2" /><TextBlock Text="Right" /></StackPanel>
-            </Button>
-            <Button x:Name="ViewButton" Classes="functionKey">
-                <StackPanel Orientation="Horizontal"><TextBlock Classes="key" Text="F3" /><TextBlock Text="View" /></StackPanel>
-            </Button>
-            <Button x:Name="EditButton" Classes="functionKey">
-                <StackPanel Orientation="Horizontal"><TextBlock Classes="key" Text="F4" /><TextBlock Text="Edit" /></StackPanel>
-            </Button>
-            <Button x:Name="CopyButton" Classes="functionKey">
-                <StackPanel Orientation="Horizontal"><TextBlock Classes="key" Text="F5" /><TextBlock Text="Copy" /></StackPanel>
-            </Button>
-            <Button x:Name="MoveButton" Classes="functionKey">
-                <StackPanel Orientation="Horizontal"><TextBlock Classes="key" Text="F6" /><TextBlock Text="Move" /></StackPanel>
-            </Button>
-            <Button x:Name="MkdirButton" Classes="functionKey">
-                <StackPanel Orientation="Horizontal"><TextBlock Classes="key" Text="F7" /><TextBlock Text="Mkdir" /></StackPanel>
-            </Button>
-            <Button x:Name="DeleteButton" Classes="functionKey">
-                <StackPanel Orientation="Horizontal"><TextBlock Classes="key" Text="F8" /><TextBlock Text="Delete" /></StackPanel>
-            </Button>
-            <Button x:Name="CreateButton" Classes="functionKey">
-                <StackPanel Orientation="Horizontal"><TextBlock Classes="key" Text="F9" /><TextBlock Text="Create" /></StackPanel>
-            </Button>
-            <Button x:Name="QuitButton" Classes="functionKey">
-                <StackPanel Orientation="Horizontal"><TextBlock Classes="key" Text="F10" /><TextBlock Text="Quit" /></StackPanel>
-            </Button>
-        </UniformGrid>
+        <!-- bottom area with the buttons of the theme, e.g. the function key bar; the buttons aren't focusable so the
+             active pane keeps the focus -->
+        <local:ButtonPanelView x:Name="BottomPanel" DockPanel.Dock="Bottom" />
         <Grid ColumnDefinitions="*,*">
             <local:PaneView x:Name="LeftPane" Grid.Column="0" />
             <local:PaneView x:Name="RightPane" Grid.Column="1" />

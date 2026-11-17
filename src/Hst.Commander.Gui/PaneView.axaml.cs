@@ -1,4 +1,5 @@
-﻿using Avalonia.Controls;
+﻿using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Templates;
 using Avalonia.Input;
@@ -30,6 +31,7 @@ public partial class PaneView : UserControl
     public PaneView()
     {
         InitializeComponent();
+        UpdateColumnWidths();
         ListingCancelButton.Click += (_, _) => CancelProgress();
 
         _listItemTemplate = EntriesList.ItemTemplate;
@@ -96,6 +98,8 @@ public partial class PaneView : UserControl
             FocusEntries();
         };
         IconLayout.PositionsChanged += (_, _) => IconPositionsBar.IsVisible = IconLayout.ChangedPositions.Count > 0;
+        LeftParentButton.Click += async (_, _) => await GoParentFromButtonAsync();
+        RightParentButton.Click += async (_, _) => await GoParentFromButtonAsync();
         SavePositionsButton.Click += async (_, _) => await SaveIconPositionsAsync();
         ResetPositionsButton.Click += (_, _) =>
         {
@@ -103,6 +107,57 @@ public partial class PaneView : UserControl
             FocusEntries();
         };
     }
+
+    /// <summary>
+    ///     Side of the pane showing a narrow button going to the parent, null for none: the outer side of each pane when
+    ///     the theme shows parent buttons (<see cref="ThemeChoice.ShowParentButtons" />).
+    /// </summary>
+    public ParentButtonSide? ParentButtonSide
+    {
+        get => LeftParentButton.IsVisible ? Gui.ParentButtonSide.Left :
+            RightParentButton.IsVisible ? Gui.ParentButtonSide.Right : null;
+        set
+        {
+            LeftParentButton.IsVisible = value == Gui.ParentButtonSide.Left;
+            RightParentButton.IsVisible = value == Gui.ParentButtonSide.Right;
+        }
+    }
+
+    /// <summary>
+    ///     True to color the whole panel above the pane like the active path while the pane is active
+    ///     (<see cref="ThemeChoice.HighlightActivePathPanel" />), not only the path.
+    /// </summary>
+    public bool HighlightActivePathPanel
+    {
+        get => _highlightActivePathPanel;
+        set
+        {
+            _highlightActivePathPanel = value;
+            UpdatePathBadge();
+        }
+    }
+
+    private bool _highlightActivePathPanel;
+
+    /// <summary>Goes to the parent when a parent button is clicked, making the pane active.</summary>
+    private async Task GoParentFromButtonAsync()
+    {
+        FocusEntries();
+        await GoParentAsync();
+        FocusEntries();
+    }
+
+    /// <summary>Goes to the parent of the current directory, or out of an image at its root.</summary>
+    public Task GoParentAsync() => RunNavigationAsync(() => NavigationContext.GoParentAsync());
+
+    /// <summary>Goes to the root of the current volume.</summary>
+    public Task GoRootAsync() => RunNavigationAsync(() => NavigationContext.GoRootAsync());
+
+    /// <summary>Marks all entries.</summary>
+    public void MarkAll() => ChangeMarks(entries => NavigationContext.MarkAll(entries));
+
+    /// <summary>Unmarks all entries.</summary>
+    public void UnmarkAll() => ChangeMarks(_ => NavigationContext.ClearMarks());
 
     /// <summary>Raised when entries of the current location were changed by the pane, e.g. icon files written.</summary>
     public event EventHandler? EntriesChanged;
@@ -144,8 +199,37 @@ public partial class PaneView : UserControl
         FocusEntries();
     }
 
-    private void UpdatePathBadge() =>
-        PathBadge.Classes.Set("active", EntriesList.IsKeyboardFocusWithin || IconLayout.IsKeyboardFocusWithin);
+    /// <summary>Widths of the size and modified columns at the default font size, scaled with the font size.</summary>
+    private const double SizeColumnWidth = 90;
+
+    private const double ModifiedColumnWidth = 150;
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        if (change.Property == FontSizeProperty)
+        {
+            UpdateColumnWidths();
+        }
+    }
+
+    /// <summary>
+    ///     Sets the widths of the size and modified columns (the resources SizeColumnWidth and ModifiedColumnWidth used
+    ///     by the header, the dividers and the rows) for the font size.
+    /// </summary>
+    private void UpdateColumnWidths()
+    {
+        var scale = FontSize / GuiFonts.DefaultSize;
+        Resources["SizeColumnWidth"] = new GridLength(Math.Round(SizeColumnWidth * scale));
+        Resources["ModifiedColumnWidth"] = new GridLength(Math.Round(ModifiedColumnWidth * scale));
+    }
+
+    private void UpdatePathBadge()
+    {
+        var active = EntriesList.IsKeyboardFocusWithin || IconLayout.IsKeyboardFocusWithin;
+        PathBadge.Classes.Set("active", active);
+        PathPanel.Classes.Set("highlighted", active && _highlightActivePathPanel);
+    }
 
     /// <summary>Shows the icon of the current entry selected in a navigation mode of a plugin.</summary>
     private void UpdateIconSelection()

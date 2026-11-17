@@ -33,6 +33,20 @@
         <Style Selector="ListBox.entries Grid.row.marked TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource MarkedEntryForeground}" />
         </Style>
+        <!-- rows are transparent, so the current row shows through and the whole row can be clicked; themes may give
+             marked entries a background of their own (transparent otherwise), e.g. Directory Opus 4 -->
+        <Style Selector="ListBox.entries Grid.row">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="ListBox.entries Grid.row.marked">
+            <Setter Property="Background" Value="{DynamicResource MarkedItemBackground}" />
+        </Style>
+        <Style Selector="ListBox.entries Grid.row.marked.container">
+            <Setter Property="Background" Value="{DynamicResource MarkedContainerBackground}" />
+        </Style>
+        <Style Selector="ListBox.entries.active ListBoxItem:selected Grid.row.marked">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
         <Style Selector="Grid.row TextBlock, Grid.header TextBlock">
             <Setter Property="Padding" Value="4,1" />
             <Setter Property="TextTrimming" Value="CharacterEllipsis" />
@@ -49,6 +63,20 @@
         </Style>
         <Style Selector="Border#EntriesBorder.drop-target">
             <Setter Property="BorderBrush" Value="{DynamicResource ActivePathBackground}" />
+        </Style>
+        <!-- the panel above the pane; themes may color all of it like the active path when the pane is active
+             (ITheme.HighlightActivePathPanel), e.g. Directory Opus 4 -->
+        <Style Selector="Border#PathPanel">
+            <Setter Property="Background" Value="{DynamicResource PaneBackground}" />
+        </Style>
+        <Style Selector="Border#PathPanel TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource PathForeground}" />
+        </Style>
+        <Style Selector="Border#PathPanel.highlighted">
+            <Setter Property="Background" Value="{DynamicResource ActivePathBackground}" />
+        </Style>
+        <Style Selector="Border#PathPanel.highlighted TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource ActivePathForeground}" />
         </Style>
         <Style Selector="Border#PathBadge">
             <Setter Property="Background" Value="{DynamicResource PaneBackground}" />
@@ -71,7 +99,7 @@
         <DataTemplate x:Key="ThumbnailTemplate" x:DataType="local:EntryItem">
             <Grid Classes="row" Classes.container="{Binding IsContainer}"
                   Classes.executable="{Binding IsExecutable}"
-                  Classes.marked="{Binding IsMarked}" Background="Transparent"
+                  Classes.marked="{Binding IsMarked}"
                   Width="112" RowDefinitions="Auto,Auto" ToolTip.Tip="{Binding DisplayName}">
                 <Image Width="80" Height="80" Margin="0,6,0,2" Source="{Binding Icon}" Stretch="Uniform"
                        RenderOptions.BitmapInterpolationMode="HighQuality" />
@@ -81,10 +109,21 @@
         </DataTemplate>
     </UserControl.Resources>
 
-    <Grid RowDefinitions="Auto,*,Auto">
+    <Grid RowDefinitions="Auto,*,Auto" ColumnDefinitions="Auto,*,Auto">
+        <!-- narrow buttons going to the parent at the outer side of the pane, shown by themes of plugins
+             (ITheme.ShowParentButtons), e.g. Directory Opus 4 -->
+        <Button x:Name="LeftParentButton" Grid.Row="0" Grid.RowSpan="3" Grid.Column="0" Classes="parentButton"
+                IsVisible="False" Focusable="False" Width="16" Padding="0" Margin="2,2,0,2"
+                VerticalAlignment="Stretch" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                Content="&#x25B2;" FontSize="9" ToolTip.Tip="Parent directory" />
+        <Button x:Name="RightParentButton" Grid.Row="0" Grid.RowSpan="3" Grid.Column="2" Classes="parentButton"
+                IsVisible="False" Focusable="False" Width="16" Padding="0" Margin="0,2,2,2"
+                VerticalAlignment="Stretch" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                Content="&#x25B2;" FontSize="9" ToolTip.Tip="Parent directory" />
+
         <!-- bordered panel above the pane with the current path, highlighted when the pane is active,
              and below it the summary of the marked entries and the free/total disk space of the current drive -->
-        <Border Grid.Row="0" Background="{DynamicResource PaneBackground}" BorderBrush="{DynamicResource PaneBorder}"
+        <Border x:Name="PathPanel" Grid.Row="0" Grid.Column="1" BorderBrush="{DynamicResource PaneBorder}"
                 BorderThickness="1" Margin="2,2,2,0" Padding="4,2">
             <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
                 <Border x:Name="PathBadge" Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2"
@@ -92,22 +131,31 @@
                     <TextBlock x:Name="PathText" TextTrimming="PrefixCharacterEllipsis" />
                 </Border>
                 <TextBlock x:Name="SummaryText" Grid.Row="1" Grid.Column="0" Margin="4,0,0,0"
-                           TextTrimming="CharacterEllipsis" Foreground="{DynamicResource PathForeground}" />
-                <TextBlock x:Name="DiskSpaceText" Grid.Row="1" Grid.Column="1" Margin="8,0,4,0"
-                           Foreground="{DynamicResource PathForeground}" />
+                           TextTrimming="CharacterEllipsis" />
+                <TextBlock x:Name="DiskSpaceText" Grid.Row="1" Grid.Column="1" Margin="8,0,4,0" />
             </Grid>
         </Border>
 
-        <Border x:Name="EntriesBorder" Grid.Row="1" Background="{DynamicResource PaneBackground}"
+        <Border x:Name="EntriesBorder" Grid.Row="1" Grid.Column="1" Background="{DynamicResource PaneBackground}"
                 BorderBrush="{DynamicResource PaneBorder}" BorderThickness="1" Margin="2">
             <Grid RowDefinitions="Auto,*">
                 <!-- column dividers continue below the last entry -->
-                <Grid x:Name="DividersGrid" Grid.RowSpan="2" IsHitTestVisible="False" ColumnDefinitions="*,90,150">
+                <Grid x:Name="DividersGrid" Grid.RowSpan="2" IsHitTestVisible="False">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="{DynamicResource SizeColumnWidth}" />
+                        <ColumnDefinition Width="{DynamicResource ModifiedColumnWidth}" />
+                    </Grid.ColumnDefinitions>
                     <Border Grid.Column="1" BorderBrush="{DynamicResource PaneBorder}" BorderThickness="1,0,0,0" />
                     <Border Grid.Column="2" BorderBrush="{DynamicResource PaneBorder}" BorderThickness="1,0,0,0" />
                 </Grid>
 
-                <Grid x:Name="HeaderGrid" Grid.Row="0" Classes="header" ColumnDefinitions="*,90,150">
+                <Grid x:Name="HeaderGrid" Grid.Row="0" Classes="header">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="{DynamicResource SizeColumnWidth}" />
+                        <ColumnDefinition Width="{DynamicResource ModifiedColumnWidth}" />
+                    </Grid.ColumnDefinitions>
                     <TextBlock Grid.Column="0" Text="Name" />
                     <TextBlock Grid.Column="1" Text="Size" />
                     <TextBlock Grid.Column="2" Text="Modified" />
@@ -118,8 +166,12 @@
                         <DataTemplate x:DataType="local:EntryItem">
                             <Grid Classes="row" Classes.container="{Binding IsContainer}"
                                   Classes.executable="{Binding IsExecutable}"
-                                  Classes.marked="{Binding IsMarked}" Background="Transparent"
-                                  ColumnDefinitions="*,90,150">
+                                  Classes.marked="{Binding IsMarked}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="{DynamicResource SizeColumnWidth}" />
+                                    <ColumnDefinition Width="{DynamicResource ModifiedColumnWidth}" />
+                                </Grid.ColumnDefinitions>
                                 <DockPanel Grid.Column="0">
                                     <Image DockPanel.Dock="Left" Width="16" Height="16" Margin="4,0,0,0"
                                            Source="{Binding Icon}" RenderOptions.BitmapInterpolationMode="HighQuality" />
@@ -153,7 +205,7 @@
         </Border>
 
         <!-- shown when icons were moved in a navigation mode of a plugin -->
-        <Border x:Name="IconPositionsBar" Grid.Row="2" IsVisible="False" Background="{DynamicResource PaneBackground}"
+        <Border x:Name="IconPositionsBar" Grid.Row="2" Grid.Column="1" IsVisible="False" Background="{DynamicResource PaneBackground}"
                 BorderBrush="{DynamicResource PaneBorder}" BorderThickness="1" Margin="2,0,2,2" Padding="4,2">
             <DockPanel>
                 <Button x:Name="ResetPositionsButton" DockPanel.Dock="Right" Content="Reset" Margin="4,0,0,0" />

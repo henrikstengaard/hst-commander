@@ -1,0 +1,31 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="using:Hst.Commander.Gui"
+        x:Class="Hst.Commander.Gui.PluginThemeStyles">
+    <!-- styles only applied for themes of plugins, using the brushes ThemeManager makes from the theme's colors:
+         the current row of the panes, the menu bar, the bottom area and its buttons and the parent buttons -->
+    <Style Selector="ListBox.entries ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="ListBox.entries.active ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource CursorBackground}" />
+    </Style>
+    <Style Selector="local|MainWindow">
+        <Setter Property="Background" Value="{DynamicResource BottomBackground}" />
+    </Style>
+    <Style Selector="DockPanel.menuBar">
+        <Setter Property="Background" Value="{DynamicResource MenuBackground}" />
+    </Style>
+    <Style Selector="DockPanel.menuBar > Menu > MenuItem">
+        <Setter Property="Foreground" Value="{DynamicResource MenuForeground}" />
+    </Style>
+    <Style Selector="local|ButtonPanelView">
+        <Setter Property="Background" Value="{DynamicResource BottomBackground}" />
+    </Style>
+    <Style Selector="Button.panelButton, Button.parentButton">
+        <Setter Property="Background" Value="{DynamicResource ButtonBackground}" />
+        <Setter Property="Foreground" Value="{DynamicResource ButtonForeground}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource PaneBorder}" />
+        <Setter Property="CornerRadius" Value="0" />
+    </Style>
+</Styles>
