@@ -114,7 +114,7 @@ All are in `Hst.Commander.Abstractions`; see [`docs/plugin-api.md`](../docs/plug
 
 | Interface | Purpose |
 |---|---|
-| `IVolume` | A browsable container with a current directory: list, change directory, open/read/write, create container, delete, rename, set dates, Amiga metadata and attributes. Write members throw `NotSupportedException` when read-only |
+| `IVolume` | A browsable container with a current directory: list, change directory, open/read/write, create container, delete, rename, set dates, Amiga metadata and attributes, host paths for starting files with the host OS. Write members throw `NotSupportedException` when read-only |
 | `IEntry` | An entry: `Name`, `Type` (container/item), `Size`, `ModifiedDate`, plus optional `DisplayName`, `Details`, `IsVolume`, `AmigaMetadata`, `Attributes` |
 | `IVolumeProvider` | What a pane can show (F1/F2); `CreateVolume` returns a new, independent volume on each call; optional `PathRoot` shows paths like `\\server\share\dir`; `ReadListedFiles` false skips reading listed files in the background for volume detection and icons (e.g. FTP) |
 | `IConnectionVolumeProvider` | A location volume provider asking for the protocol, host, port, path, user name and password in one connection dialog (e.g. FTP/SFTP), formatting them as a location with `FormatLocation` |

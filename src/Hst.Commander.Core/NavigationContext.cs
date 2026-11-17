@@ -733,6 +733,26 @@ public sealed class NavigationContext : IDisposable
     }
 
     /// <summary>
+    ///     Path of a listed item the host operating system can open, so it's started with the host like a local file:
+    ///     the full path of a local file, or the path of the volume (<see cref="IVolume.GetHostPath" />), e.g. the UNC
+    ///     path of a file in an SMB share on Windows. Null for containers, "..", in the drive list and inside images.
+    /// </summary>
+    public string? GetHostPath(IEntry entry)
+    {
+        if (IsInImage || entry.Type != EntryType.Item || entry.Name.Equals(Paths.Parent, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        if (_rootVolume is LocalVolume)
+        {
+            return LocalPath is { } localPath ? Path.Combine(localPath, entry.Name) : null;
+        }
+
+        return _rootVolume.GetHostPath(entry.Name);
+    }
+
+    /// <summary>
     ///     Opens a listed item in the current location for reading, e.g. to read its icon. Uses the pane's own volume,
     ///     so it must not run concurrently with navigation.
     /// </summary>
@@ -773,18 +793,17 @@ public sealed class NavigationContext : IDisposable
     {
         _executableNames.Clear();
 
-        // files inside images can't be executed
-        var localPath = !IsInImage ? LocalPath : null;
-        if (localPath == null)
-        {
-            return;
-        }
-
+        // only files the host can open can be executed, not files inside images or on e.g. FTP servers
         foreach (var entry in entries.Where(entry => entry.Type == EntryType.Item))
         {
+            if (GetHostPath(entry) is not { } hostPath)
+            {
+                continue;
+            }
+
             if (OperatingSystem.IsWindows()
                     ? IsExecutableName(entry.Name)
-                    : FileStarter.HasExecutePermission(Path.Combine(localPath, entry.Name)))
+                    : FileStarter.HasExecutePermission(hostPath))
             {
                 _executableNames.Add(entry.Name);
             }
@@ -1118,11 +1137,13 @@ public sealed class NavigationContext : IDisposable
             return;
         }
 
-        // local files are started without detecting images when set to start them with the host
+        // files the host can open (local files, files in SMB shares on Windows) are started without detecting images
+        // when set to start them with the host
         var localFilePath = !IsInImage && LocalPath is { } localPath ? Path.Combine(localPath, entry.Name) : null;
-        if (EnterFileAction == EnterFileAction.StartWithHost && localFilePath != null)
+        var hostPath = GetHostPath(entry);
+        if (EnterFileAction == EnterFileAction.StartWithHost && hostPath != null)
         {
-            _startFile(localFilePath);
+            _startFile(hostPath);
             return;
         }
 
@@ -1134,10 +1155,10 @@ public sealed class NavigationContext : IDisposable
             return;
         }
 
-        // local files are started, e.g. executing a program; files inside images can't be started
-        if (localFilePath != null)
+        // files the host can open are started, e.g. executing a program; files inside images can't be started
+        if (hostPath != null)
         {
-            _startFile(localFilePath);
+            _startFile(hostPath);
         }
     }
 

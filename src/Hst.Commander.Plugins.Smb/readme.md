@@ -28,6 +28,7 @@ dotnet publish src/Hst.Commander.Plugins.Smb/Hst.Commander.Plugins.Smb.csproj -c
 - Files and directories can be viewed, edited, copied, moved, renamed and deleted, and their read-only, hidden, system and archive attributes changed, as the user's rights allow. The free and total space of the share is shown next to the path.
 - Each file operation uses a connection of its own. A connection closed by the server, e.g. after being idle, is connected again.
 - Images on shares (adf, RDB and disk images) can be written like local ones and are shared by both panes. Each open image has a connection of its own, connected again when the server closed it. Writes go over the network uncached, so large hard disk images are slower than local ones. Read-only files open read-only.
+- On Windows, Enter starts files on shares with Windows like local files, by their UNC path. Windows opens them with its own SMB client and credentials, so it may ask for a user name and password for the server. Other systems only open mounted shares, so files aren't started there.
 - Only port 445 and SMB 2 and 3 are supported.
 
 ## Licenses

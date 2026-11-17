@@ -266,10 +266,24 @@ public sealed class SmbVolume : IVolume, IDisposable
     {
         ArgumentNullException.ThrowIfNull(name);
 
-        return IsShareList
-            ? null
-            : string.Join('\\', ["", "", _server, .._pathComponents, name]).ToLowerInvariant();
+        return GetUncPath(name)?.ToLowerInvariant();
     }
+
+    /// <summary>
+    /// UNC path of an entry in a share on Windows, e.g. "\\server\share\dir\file.txt", so Windows starts the file with
+    /// its own SMB client (using its own credentials for the server). Null on other systems, which can only open shares
+    /// they have mounted, and in the share list.
+    /// </summary>
+    public string? GetHostPath(string name)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+
+        return OperatingSystem.IsWindows() ? GetUncPath(name) : null;
+    }
+
+    /// <summary>UNC path of an entry in a share, e.g. "\\server\share\dir\file.txt"; null in the share list.</summary>
+    private string? GetUncPath(string name) =>
+        IsShareList ? null : string.Join('\\', ["", "", _server, .._pathComponents, name]);
 
     /// <summary>
     /// Opens a file for reading and writing as a writable image, shared with other readers and writers, on a connection
