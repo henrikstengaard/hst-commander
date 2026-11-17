@@ -2,11 +2,10 @@ using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.ComTypes;
 using System.Runtime.Versioning;
 using System.Text;
-using Hst.Commander.Core;
 using ComIStream = System.Runtime.InteropServices.ComTypes.IStream;
 using FILETIME = System.Runtime.InteropServices.ComTypes.FILETIME;
 
-namespace Hst.Commander.Gui.Windows;
+namespace Hst.Commander.Core;
 
 /// <summary>
 ///     Drags entries of an image or another volume that isn't a local directory to other applications on Windows as
@@ -17,7 +16,7 @@ namespace Hst.Commander.Gui.Windows;
 ///     source only offers data in memory, so this runs its own OLE drag with <c>SHDoDragDrop</c>.
 /// </summary>
 [SupportedOSPlatform("windows")]
-internal static class WindowsVirtualFileDrag
+public static class WindowsVirtualFileDrag
 {
     /// <summary>
     ///     Drags the entries of a drag source, returning when the drag has ended (the files may still be read
@@ -42,6 +41,178 @@ internal static class WindowsVirtualFileDrag
 
     /// <summary>Data object of the last drag, whose files may still be read.</summary>
     private static VirtualFileDataObject? s_lastDataObject;
+
+    /// <summary>
+    ///     Puts the entries of a drag source on the clipboard as virtual files, so other applications (e.g. Explorer)
+    ///     paste them by reading them like a drop (copy and paste of entries in images, see docs/file-operations.md).
+    ///     Cut entries (<paramref name="isCut" />) are offered as moved: the application pasting them says so when it
+    ///     has (Explorer with the move effect at the end of its operation, others with "Paste Succeeded"), and
+    ///     <paramref name="pasteMoved" /> is called once on any thread to delete them. The data object of the entries put on the clipboard before is released, and closed when nothing
+    ///     reads its files anymore. The clipboard is set on a thread of its own pumping messages (see
+    ///     <see cref="ClipboardThread" />), so this works from any thread, also in a console. Errors reading the
+    ///     entries are reported to <paramref name="failed" /> on any thread. Returns what was put on the clipboard,
+    ///     for <see cref="IsClipboardCurrent" />.
+    /// </summary>
+    public static object SetClipboard(Task<VolumeDragSource> source, bool isCut, Action<Exception> failed,
+        Action? pasteMoved)
+    {
+        var dataObject = new VirtualFileDataObject(source, failed, isCut, pasteMoved);
+        var result = ClipboardThread.Invoke(() => OleSetClipboard(dataObject));
+        if (result < 0)
+        {
+            dataObject.DragEnded();
+            Marshal.ThrowExceptionForHR(result);
+        }
+
+        lock (s_clipboardLock)
+        {
+            s_clipboardDataObject?.DragEnded();
+            s_clipboardDataObject = dataObject;
+        }
+
+        return dataObject;
+    }
+
+    /// <summary>True when the clipboard still holds what <see cref="SetClipboard" /> returned.</summary>
+    public static bool IsClipboardCurrent(object clipboardData)
+    {
+        lock (s_clipboardLock)
+        {
+            if (clipboardData is not VirtualFileDataObject dataObject ||
+                !ReferenceEquals(dataObject, s_clipboardDataObject))
+            {
+                return false;
+            }
+        }
+
+        return ClipboardThread.Invoke(() => OleIsCurrentClipboard((VirtualFileDataObject)clipboardData) == S_OK);
+    }
+
+    /// <summary>
+    ///     Releases the data object put on the clipboard by <see cref="SetClipboard" />, e.g. when other entries are put
+    ///     on it, closing its drag source when nothing reads its files anymore.
+    /// </summary>
+    public static void ReleaseClipboard()
+    {
+        VirtualFileDataObject? dataObject;
+        lock (s_clipboardLock)
+        {
+            dataObject = s_clipboardDataObject;
+            s_clipboardDataObject = null;
+        }
+
+        dataObject?.DragEnded();
+    }
+
+    private static readonly object s_clipboardLock = new();
+
+    /// <summary>Data object put on the clipboard, whose files may be pasted.</summary>
+    private static VirtualFileDataObject? s_clipboardDataObject;
+
+    [DllImport("ole32.dll")]
+    private static extern int OleSetClipboard(IOleDataObject? dataObject);
+
+    [DllImport("ole32.dll")]
+    private static extern int OleIsCurrentClipboard(IOleDataObject dataObject);
+
+    /// <summary>
+    ///     A thread of its own (single-threaded apartment) owning the OLE clipboard: the application pasting reads the
+    ///     data object through messages to the thread that put it on the clipboard, so that thread must keep pumping
+    ///     messages, which a console's main thread doesn't, and the GUI's UI thread shouldn't be blocked reading files.
+    /// </summary>
+    private static class ClipboardThread
+    {
+        private const uint Infinite = 0xFFFFFFFF;
+        private const uint QsAllInput = 0x04FF;
+        private const uint MwmoInputAvailable = 0x0004;
+        private const uint PmRemove = 0x0001;
+
+        private static readonly System.Collections.Concurrent.ConcurrentQueue<Action> s_work = new();
+        private static readonly AutoResetEvent s_workAdded = new(false);
+        private static readonly Lazy<Thread> s_thread = new(Start);
+
+        /// <summary>Runs a function on the clipboard thread, waiting for its result.</summary>
+        public static T Invoke<T>(Func<T> function)
+        {
+            if (Thread.CurrentThread == s_thread.Value)
+            {
+                return function();
+            }
+
+            var completion = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
+            s_work.Enqueue(() =>
+            {
+                try
+                {
+                    completion.SetResult(function());
+                }
+                catch (Exception exception)
+                {
+                    completion.SetException(exception);
+                }
+            });
+            s_workAdded.Set();
+            return completion.Task.GetAwaiter().GetResult();
+        }
+
+        private static Thread Start()
+        {
+            var thread = new Thread(Run) { IsBackground = true, Name = "Clipboard" };
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.Start();
+            return thread;
+        }
+
+        private static void Run()
+        {
+            OleInitialize(IntPtr.Zero);
+            var handles = new[] { s_workAdded.SafeWaitHandle.DangerousGetHandle() };
+            while (true)
+            {
+                MsgWaitForMultipleObjectsEx(1, handles, Infinite, QsAllInput, MwmoInputAvailable);
+                while (s_work.TryDequeue(out var work))
+                {
+                    work();
+                }
+
+                while (PeekMessage(out var message, IntPtr.Zero, 0, 0, PmRemove))
+                {
+                    TranslateMessage(ref message);
+                    DispatchMessage(ref message);
+                }
+            }
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct Msg
+        {
+            public IntPtr Hwnd;
+            public uint Message;
+            public IntPtr WParam;
+            public IntPtr LParam;
+            public uint Time;
+            public int X;
+            public int Y;
+            public uint Private;
+        }
+
+        [DllImport("ole32.dll")]
+        private static extern int OleInitialize(IntPtr reserved);
+
+        [DllImport("user32.dll")]
+        private static extern uint MsgWaitForMultipleObjectsEx(uint count, IntPtr[] handles, uint milliseconds,
+            uint wakeMask, uint flags);
+
+        [DllImport("user32.dll")]
+        private static extern bool PeekMessage(out Msg message, IntPtr hwnd, uint filterMin, uint filterMax,
+            uint remove);
+
+        [DllImport("user32.dll")]
+        private static extern bool TranslateMessage(ref Msg message);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr DispatchMessage(ref Msg message);
+    }
 
     private const int DropEffectCopy = 1;
     private const int DropEffectMove = 2;
@@ -119,6 +290,8 @@ internal static class WindowsVirtualFileDrag
     private static readonly short FileGroupDescriptorFormat = RegisterFormat("FileGroupDescriptorW");
     private static readonly short FileContentsFormat = RegisterFormat("FileContents");
     private static readonly short PreferredDropEffectFormat = RegisterFormat("Preferred DropEffect");
+    private static readonly short PasteSucceededFormat = RegisterFormat("Paste Succeeded");
+    private static readonly short PerformedDropEffectFormat = RegisterFormat("Performed DropEffect");
 
     private static short RegisterFormat(string name) => unchecked((short)RegisterClipboardFormat(name));
 
@@ -165,11 +338,20 @@ internal static class WindowsVirtualFileDrag
 
     /// <summary>
     ///     The dragged files: "FileGroupDescriptorW", a stream per file in "FileContents", "Preferred DropEffect" copy
-    ///     and the formats the shell stores with <c>SetData</c>, e.g. the drag image.
+    ///     (move for cut entries on the clipboard) and the formats the shell stores with <c>SetData</c>, e.g. the drag
+    ///     image. When cut entries have been moved, which Explorer reports with <c>EndOperation</c> (or "Performed
+    ///     DropEffect" when not reading on a thread of its own) and other applications with "Paste Succeeded",
+    ///     <paramref name="pasteMoved" /> is called.
     /// </summary>
-    private sealed class VirtualFileDataObject(Task<VolumeDragSource> source, Action<Exception> failed)
+    private sealed class VirtualFileDataObject(
+        Task<VolumeDragSource> source,
+        Action<Exception> failed,
+        bool isCut = false,
+        Action? pasteMoved = null)
         : IOleDataObject, IDataObjectAsyncCapability
     {
+        private bool _hasMoved;
+
         private readonly object _lock = new();
         private readonly Dictionary<short, byte[]> _storedData = [];
         private readonly HashSet<VolumeFileStream> _streams = [];
@@ -219,7 +401,7 @@ internal static class WindowsVirtualFileDrag
                 }
                 else if (format.cfFormat == PreferredDropEffectFormat)
                 {
-                    bytes = BitConverter.GetBytes(DropEffectCopy);
+                    bytes = BitConverter.GetBytes(isCut ? DropEffectMove : DropEffectCopy);
                 }
                 else
                 {
@@ -295,6 +477,21 @@ internal static class WindowsVirtualFileDrag
             if (release)
             {
                 ReleaseStgMedium(ref medium);
+            }
+
+            // Explorer reports a move with "Performed DropEffect" and, reading on a thread of its own, EndOperation;
+            // other applications may report it with "Paste Succeeded" (delete-on-paste)
+            bool inOperation;
+            lock (_lock)
+            {
+                inOperation = _inOperation;
+            }
+
+            if ((format.cfFormat == PasteSucceededFormat ||
+                 (format.cfFormat == PerformedDropEffectFormat && !inOperation)) &&
+                bytes.Length >= sizeof(int) && (BitConverter.ToInt32(bytes) & DropEffectMove) != 0)
+            {
+                PasteMoved();
             }
 
             return S_OK;
@@ -377,12 +574,33 @@ internal static class WindowsVirtualFileDrag
             return S_OK;
         }
 
+        /// <summary>Cut entries have been pasted, so they are deleted, once.</summary>
+        private void PasteMoved()
+        {
+            lock (_lock)
+            {
+                if (!isCut || _hasMoved)
+                {
+                    return;
+                }
+
+                _hasMoved = true;
+            }
+
+            pasteMoved?.Invoke();
+        }
+
         /// <summary>The drop target has read the files on its own thread, so the drag source is closed.</summary>
         public int EndOperation(int result, IntPtr bindContext, int effects)
         {
             lock (_lock)
             {
                 _inOperation = false;
+            }
+
+            if (result >= 0 && (effects & DropEffectMove) != 0)
+            {
+                PasteMoved();
             }
 
             DisposeWhenDone();

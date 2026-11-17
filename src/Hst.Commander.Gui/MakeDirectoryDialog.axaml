@@ -8,7 +8,7 @@
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner">
     <StackPanel Margin="16" Spacing="8">
-        <TextBlock Text="Enter directory name:" />
+        <TextBlock x:Name="PromptText" Text="Enter directory name:" />
         <TextBox x:Name="NameTextBox" />
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,8,0,0">
             <Button x:Name="OkButton" Content="OK" MinWidth="80" HorizontalContentAlignment="Center"

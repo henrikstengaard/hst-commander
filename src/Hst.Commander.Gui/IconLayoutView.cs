@@ -121,6 +121,9 @@ internal sealed class IconLayoutView : UserControl
     /// <summary>Raised when an icon is clicked, making its entry the current entry.</summary>
     public event EventHandler<EntryItem>? ItemClicked;
 
+    /// <summary>Raised when an icon is clicked with the right button, before its context menu opens.</summary>
+    public event EventHandler<EntryItem>? ItemRightClicked;
+
     /// <summary>Raised when an icon is clicked with Ctrl or Shift, toggling the mark of its entry.</summary>
     public event EventHandler<EntryItem>? ItemToggled;
 
@@ -446,6 +449,14 @@ internal sealed class IconLayoutView : UserControl
     private void OnIconPressed(IconVisual icon, PointerPressedEventArgs e)
     {
         var point = e.GetCurrentPoint(_canvas);
+        if (point.Properties.IsRightButtonPressed)
+        {
+            // the context menu opens when the button is released
+            Focus(NavigationMethod.Pointer);
+            ItemRightClicked?.Invoke(this, icon.Item);
+            return;
+        }
+
         if (!point.Properties.IsLeftButtonPressed)
         {
             return;

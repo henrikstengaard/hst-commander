@@ -8,7 +8,6 @@ using Avalonia.VisualTree;
 using Hst.Commander.Abstractions;
 using Hst.Commander.Core;
 using Hst.Commander.Gui.MacOS;
-using Hst.Commander.Gui.Windows;
 
 namespace Hst.Commander.Gui;
 
@@ -62,6 +61,12 @@ public partial class PaneView
     private void OnEntriesPointerPressed(object? sender, PointerPressedEventArgs e)
     {
         _dragPressed = null;
+        if (e.GetCurrentPoint(EntriesList).Properties.IsRightButtonPressed)
+        {
+            OnEntriesRightPressed(e);
+            return;
+        }
+
         if (!e.GetCurrentPoint(EntriesList).Properties.IsLeftButtonPressed ||
             FindItem(e.Source) is not { } item || item.Name == Paths.Parent)
         {

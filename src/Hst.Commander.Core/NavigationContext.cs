@@ -234,6 +234,34 @@ public sealed class NavigationContext : IDisposable
             _connectedLocation = _connectedLocation
         };
 
+    /// <summary>
+    ///     Opens a new context at the current location with the same providers and settings, e.g. to paste entries put
+    ///     on the clipboard (<see cref="EntryClipboard" />) after this context has changed location. Images are opened
+    ///     again, and a connected location (e.g. an SMB share) is connected again with its credentials.
+    /// </summary>
+    public async Task<NavigationContext> CloneAsync(CancellationToken cancellationToken = default)
+    {
+        var context = CreateChildContext(string.Empty);
+        try
+        {
+            if (ConnectedLocation is { } connection)
+            {
+                await context.ChangeVolumeProviderAsync(connection, CurrentPath, cancellationToken);
+            }
+            else
+            {
+                await context.ChangeLocationAsync(_volumeProvider, CurrentPath, cancellationToken);
+            }
+
+            return context;
+        }
+        catch
+        {
+            context.Dispose();
+            throw;
+        }
+    }
+
     /// <summary>Shows the location of a context made by <see cref="CreateChildContext" />, taking its volumes.</summary>
     private void Adopt(NavigationContext context)
     {

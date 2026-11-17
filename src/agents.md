@@ -6,7 +6,7 @@ Hst Commander is a dual-pane file manager for .NET 10, inspired by Norton Comman
 
 There are two front-ends with the same functionality: a terminal UI (TUI) built with Terminal.Gui v2 and a desktop GUI built with Avalonia 12. Both share `NavigationContext` from Core. The earlier ASP.NET Core + React web prototype has been removed and is no longer relevant.
 
-**Front-end parity:** user-facing features are implemented in both front-ends. Put navigation and volume logic in `Hst.Commander.Core` (e.g. `NavigationContext`) so the TUI and GUI only contain presentation and key handling. Exceptions where a terminal can't do what the GUI does: the TUI has no entry icons, navigation modes or drag and drop, and doesn't view images (they are viewed as binary files).
+**Front-end parity:** user-facing features are implemented in both front-ends. Put navigation and volume logic in `Hst.Commander.Core` (e.g. `NavigationContext`) so the TUI and GUI only contain presentation and key handling. Exceptions where a terminal can't do what the GUI does: the TUI has no entry icons, navigation modes or drag and drop, doesn't view images (they are viewed as binary files), and only exchanges clipboard files with other applications on Windows.
 
 ---
 
@@ -18,7 +18,7 @@ The behavior of each feature is described in `docs/` at the repository root. Rea
 |---|---|
 | [`docs/plugin-api.md`](../docs/plugin-api.md) | The Abstractions interfaces in detail, plugin loading and load contexts, `IPluginHost` |
 | [`docs/volumes.md`](../docs/volumes.md) | Volume implementations, images, writable images, going to the root, changing location, bookmarks and their credential stores, volume provider keys, Enter on files |
-| [`docs/file-operations.md`](../docs/file-operations.md) | Copying, UAE metadata, moving/renaming, deleting, making directories, creating volumes, selecting groups, properties |
+| [`docs/file-operations.md`](../docs/file-operations.md) | Copying, UAE metadata, moving and renaming, the clipboard, deleting, making directories, creating volumes, selecting groups, properties |
 | [`docs/viewer.md`](../docs/viewer.md) | F3 viewer: text/hex/image views, search, selection and copying |
 | [`docs/editor.md`](../docs/editor.md) | F4 editing: built-in editor, search and replace, external editors, editor settings |
 | [`docs/icons-and-navigation-modes.md`](../docs/icons-and-navigation-modes.md) | Icon providers, GUI entry icons, navigation modes (list, thumbnails, Workbench, def icons) |
@@ -188,7 +188,7 @@ These apply across features and aren't obvious from a single file:
 - FTP plugin: `Hst.Commander.Plugins.Ftp`
 - Directory Opus plugin: `Hst.Commander.Plugins.DirectoryOpus`
 - SMB plugin: `Hst.Commander.Plugins.Smb`
-- Core: `Hst.Commander.Core` (`AppInfo`, `EditorDocument`, `EditorKind`, `EditorSearch`, `EditorSession`, `EmbeddedIconReader`, `EnterFileAction`, `ExternalEditFile`, `ExternalEditor`, `Elevation`, `DroppedEntries`, `EntryProperties`, `FileSystemDetails`, `IconImage`, `ListingProgress`, `NavigationContext`, `NameFilter`, `PluginHost`, `PluginLoader`, `Plugins`, `IProgressIndicator`, `ITaskbarProgress`, `TaskbarProgressReporter`, `TaskbarProgressState`, `TerminalProgress`, `SelectGroupOptions`, `FileStarter`, `ImagePixels`, `SettingsPaths`, `SizeFormatter`, `StandardImageProvider`, `StartupOptions`, `PaneStartup`, `UaeMetadataFormat`, `ViewerDocument`, `ViewerSession`, `WindowsIconImageProvider`, `VolumeConnector`, `VolumeDragSource`, `CredentialsRequest`, `ConnectionRequest`, `LocationConnection`, `Bookmark`, `BookmarkStore`, `BookmarkOpener`, `VolumeChoice`, `ICredentialStore`, `CredentialStores`, `Licenses`, `LicenseNotice`, `VolumeCreation`, `VolumeCreatorInput`, `Themes`, `ThemeChoice`, `FunctionKeyBar`, `ButtonPanelEditor`, `FontDownloader`), `Hst.Commander.Core.Volumes` (volumes, copying, UAE metadata)
+- Core: `Hst.Commander.Core` (`AppInfo`, `EditorDocument`, `EditorKind`, `EditorSearch`, `EditorSession`, `EmbeddedIconReader`, `EnterFileAction`, `ExternalEditFile`, `ExternalEditor`, `Elevation`, `DroppedEntries`, `EntryProperties`, `FileSystemDetails`, `IconImage`, `ListingProgress`, `NavigationContext`, `NameFilter`, `PluginHost`, `PluginLoader`, `Plugins`, `IProgressIndicator`, `ITaskbarProgress`, `TaskbarProgressReporter`, `TaskbarProgressState`, `TerminalProgress`, `SelectGroupOptions`, `FileStarter`, `ImagePixels`, `SettingsPaths`, `SizeFormatter`, `StandardImageProvider`, `StartupOptions`, `PaneStartup`, `UaeMetadataFormat`, `ViewerDocument`, `ViewerSession`, `WindowsIconImageProvider`, `VolumeConnector`, `VolumeDragSource`, `CredentialsRequest`, `ConnectionRequest`, `LocationConnection`, `Bookmark`, `BookmarkStore`, `BookmarkOpener`, `VolumeChoice`, `ICredentialStore`, `CredentialStores`, `Licenses`, `LicenseNotice`, `VolumeCreation`, `VolumeCreatorInput`, `Themes`, `ThemeChoice`, `FunctionKeyBar`, `ButtonPanelEditor`, `FontDownloader`, `EntryClipboard`, `PasteSource`, `WindowsFileClipboard`, `WindowsVirtualFileDrag`), `Hst.Commander.Core.Volumes` (volumes, copying, UAE metadata)
 - Tui: `Hst.Commander.Tui`
 - Gui: `Hst.Commander.Gui`, `Hst.Commander.Gui.Icons` (entry icons)
 - Tests: `Hst.Commander.Core.Tests`
