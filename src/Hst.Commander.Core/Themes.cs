@@ -68,6 +68,9 @@ public sealed record ThemeChoice(string Id, string Name, ITheme? Plugin = null)
     /// <summary>True when the theme shows parent buttons at the outer side of the panes.</summary>
     public bool ShowParentButtons => Plugin?.ShowParentButtons ?? false;
 
+    /// <summary>True when the whole panel above the active pane has the active path's colors, not only the path.</summary>
+    public bool HighlightActivePathPanel => Plugin?.HighlightActivePathPanel ?? false;
+
     /// <summary>The editable buttons of the theme, null when the user can't change them.</summary>
     public ICustomizableButtonPanel? CustomizableButtons => Plugin as ICustomizableButtonPanel;
 }

@@ -83,6 +83,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - `Colors` is a `ThemeColors` record of "#RRGGBB" strings. The TUI uses the closest of its 16 colors for each one. Its optional `MarkedContainerBackground` and `MarkedItemBackground` give marked directories and files a background of their own.
 - `GetBottomPanel()` returns the buttons of the bottom area as a `ButtonPanel` of `ButtonColumn`s of `PanelButton(Label, Action, Key, Background, Foreground)`. `Action` is one of the `CommanderActions` ids. It's called again after the settings change.
 - `ShowParentButtons` (default false) shows a narrow parent button on the outer side of each pane. See [Themes](themes.md).
+- `HighlightActivePathPanel` (default false) colors the whole panel above the active pane with the active path's colors, not only the path.
 - `FontFamily` and `FontSize` (default null) set the font of the panes and the bottom area in the GUI. `FontFamily` names fonts separated by commas and is only used when one of them is installed, as themes don't include fonts. The user's font setting overrides it.
 - `FontDownloads` (default none) lists font files (`ThemeFontDownload`: file name, https URL pinned to a version, SHA-256 hash, name, license and project page) the user can download in the GUI's settings when none of the theme's fonts is installed. See [Fonts](themes.md#fonts).
 

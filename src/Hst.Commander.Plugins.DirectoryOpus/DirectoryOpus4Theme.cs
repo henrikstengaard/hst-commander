@@ -45,6 +45,9 @@ public sealed class DirectoryOpus4Theme : ITheme, ICustomizableButtonPanel
 
     public bool ShowParentButtons => true;
 
+    /// <summary>The whole panel above the active pane is white on red, not only its path.</summary>
+    public bool HighlightActivePathPanel => true;
+
     /// <summary>
     /// TrueType versions of Topaz, the Amiga font Directory Opus 4 used, and MicroKnight, used in the GUI when the user
     /// has installed or downloaded one of them (see <see cref="FontDownloads" />). The family names are those of the

@@ -1220,6 +1220,8 @@ public partial class MainWindow : Window
         BottomPanel.Panel = theme.GetBottomPanel();
         LeftPane.ParentButtonSide = theme.ShowParentButtons ? ParentButtonSide.Left : null;
         RightPane.ParentButtonSide = theme.ShowParentButtons ? ParentButtonSide.Right : null;
+        LeftPane.HighlightActivePathPanel = theme.HighlightActivePathPanel;
+        RightPane.HighlightActivePathPanel = theme.HighlightActivePathPanel;
     }
 
     /// <summary>Runs a command of a button in the bottom area (<see cref="CommanderActions" />) on the active pane.</summary>

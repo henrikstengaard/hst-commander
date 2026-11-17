@@ -36,6 +36,14 @@ public sealed class PathPanelView : View
 
     public bool IsActive { get; set; }
 
+    /// <summary>
+    ///     True to draw the whole panel of the active pane with <see cref="ActivePathAttribute" /> (the border keeps
+    ///     the color of <see cref="BorderAttribute" /> on that background), not only the path.
+    /// </summary>
+    public bool HighlightWhenActive { get; set; }
+
+    private bool IsHighlighted => IsActive && HighlightWhenActive;
+
     /// <summary>Raised when the path is double-clicked, opening the location dialog.</summary>
     public event EventHandler? PathDoubleClicked;
 
@@ -66,15 +74,26 @@ public sealed class PathPanelView : View
 
     private void DrawPanel(int width)
     {
-        SetAttribute(BorderAttribute);
+        var border = IsHighlighted ? new TuiAttribute(BorderAttribute.Foreground, ActivePathAttribute.Background) : BorderAttribute;
+        var inside = IsHighlighted ? ActivePathAttribute : BorderAttribute;
         for (var x = 0; x < width; x++)
         {
             var isLeft = x == 0;
             var isRight = x == width - 1;
+            SetAttribute(border);
             AddRune(x, 0, isLeft ? Glyphs.ULCorner : isRight ? Glyphs.URCorner : Glyphs.HLine);
-            AddRune(x, 1, isLeft || isRight ? Glyphs.VLine : (Rune)' ');
-            AddRune(x, 2, isLeft || isRight ? Glyphs.VLine : (Rune)' ');
             AddRune(x, 3, isLeft ? Glyphs.LLCorner : isRight ? Glyphs.LRCorner : Glyphs.HLine);
+            if (isLeft || isRight)
+            {
+                AddRune(x, 1, Glyphs.VLine);
+                AddRune(x, 2, Glyphs.VLine);
+            }
+            else
+            {
+                SetAttribute(inside);
+                AddRune(x, 1, (Rune)' ');
+                AddRune(x, 2, (Rune)' ');
+            }
         }
 
         // content is placed inside the left and right border, padded with a space on each side
@@ -116,7 +135,7 @@ public sealed class PathPanelView : View
             diskSpace = string.Empty;
         }
 
-        SetAttribute(PathAttribute);
+        SetAttribute(IsHighlighted ? ActivePathAttribute : PathAttribute);
         if (diskSpace.Length > 0)
         {
             Move(width - 2 - diskSpace.Length, 2);

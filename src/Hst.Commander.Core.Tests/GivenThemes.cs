@@ -37,6 +37,7 @@ public class GivenThemes
         Assert.Null(theme.Plugin);
         Assert.Equal(FunctionKeyBar.Default, theme.GetBottomPanel());
         Assert.False(theme.ShowParentButtons);
+        Assert.False(theme.HighlightActivePathPanel);
     }
 
     [Theory]
@@ -77,6 +78,7 @@ public class GivenThemes
         // assert
         Assert.Equal("Directory Opus 4", theme.Name);
         Assert.True(theme.ShowParentButtons);
+        Assert.True(theme.HighlightActivePathPanel);
         Assert.NotNull(theme.CustomizableButtons);
     }
 

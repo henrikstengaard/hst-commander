@@ -64,6 +64,20 @@
         <Style Selector="Border#EntriesBorder.drop-target">
             <Setter Property="BorderBrush" Value="{DynamicResource ActivePathBackground}" />
         </Style>
+        <!-- the panel above the pane; themes may color all of it like the active path when the pane is active
+             (ITheme.HighlightActivePathPanel), e.g. Directory Opus 4 -->
+        <Style Selector="Border#PathPanel">
+            <Setter Property="Background" Value="{DynamicResource PaneBackground}" />
+        </Style>
+        <Style Selector="Border#PathPanel TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource PathForeground}" />
+        </Style>
+        <Style Selector="Border#PathPanel.highlighted">
+            <Setter Property="Background" Value="{DynamicResource ActivePathBackground}" />
+        </Style>
+        <Style Selector="Border#PathPanel.highlighted TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource ActivePathForeground}" />
+        </Style>
         <Style Selector="Border#PathBadge">
             <Setter Property="Background" Value="{DynamicResource PaneBackground}" />
         </Style>
@@ -109,7 +123,7 @@
 
         <!-- bordered panel above the pane with the current path, highlighted when the pane is active,
              and below it the summary of the marked entries and the free/total disk space of the current drive -->
-        <Border Grid.Row="0" Grid.Column="1" Background="{DynamicResource PaneBackground}" BorderBrush="{DynamicResource PaneBorder}"
+        <Border x:Name="PathPanel" Grid.Row="0" Grid.Column="1" BorderBrush="{DynamicResource PaneBorder}"
                 BorderThickness="1" Margin="2,2,2,0" Padding="4,2">
             <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
                 <Border x:Name="PathBadge" Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2"
@@ -117,9 +131,8 @@
                     <TextBlock x:Name="PathText" TextTrimming="PrefixCharacterEllipsis" />
                 </Border>
                 <TextBlock x:Name="SummaryText" Grid.Row="1" Grid.Column="0" Margin="4,0,0,0"
-                           TextTrimming="CharacterEllipsis" Foreground="{DynamicResource PathForeground}" />
-                <TextBlock x:Name="DiskSpaceText" Grid.Row="1" Grid.Column="1" Margin="8,0,4,0"
-                           Foreground="{DynamicResource PathForeground}" />
+                           TextTrimming="CharacterEllipsis" />
+                <TextBlock x:Name="DiskSpaceText" Grid.Row="1" Grid.Column="1" Margin="8,0,4,0" />
             </Grid>
         </Border>
 

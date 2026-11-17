@@ -123,6 +123,22 @@ public partial class PaneView : UserControl
         }
     }
 
+    /// <summary>
+    ///     True to color the whole panel above the pane like the active path while the pane is active
+    ///     (<see cref="ThemeChoice.HighlightActivePathPanel" />), not only the path.
+    /// </summary>
+    public bool HighlightActivePathPanel
+    {
+        get => _highlightActivePathPanel;
+        set
+        {
+            _highlightActivePathPanel = value;
+            UpdatePathBadge();
+        }
+    }
+
+    private bool _highlightActivePathPanel;
+
     /// <summary>Goes to the parent when a parent button is clicked, making the pane active.</summary>
     private async Task GoParentFromButtonAsync()
     {
@@ -208,8 +224,12 @@ public partial class PaneView : UserControl
         Resources["ModifiedColumnWidth"] = new GridLength(Math.Round(ModifiedColumnWidth * scale));
     }
 
-    private void UpdatePathBadge() =>
-        PathBadge.Classes.Set("active", EntriesList.IsKeyboardFocusWithin || IconLayout.IsKeyboardFocusWithin);
+    private void UpdatePathBadge()
+    {
+        var active = EntriesList.IsKeyboardFocusWithin || IconLayout.IsKeyboardFocusWithin;
+        PathBadge.Classes.Set("active", active);
+        PathPanel.Classes.Set("highlighted", active && _highlightActivePathPanel);
+    }
 
     /// <summary>Shows the icon of the current entry selected in a navigation mode of a plugin.</summary>
     private void UpdateIconSelection()

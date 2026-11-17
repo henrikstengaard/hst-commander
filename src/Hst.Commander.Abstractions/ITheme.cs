@@ -29,6 +29,13 @@ public interface ITheme
     bool ShowParentButtons => false;
 
     /// <summary>
+    /// True to color the whole panel above the active pane (path, marked summary and disk space) with
+    /// <see cref="ThemeColors.ActivePathBackground" /> and <see cref="ThemeColors.ActivePathForeground" />, instead of
+    /// only the path. Defaults to false.
+    /// </summary>
+    bool HighlightActivePathPanel => false;
+
+    /// <summary>
     /// Font of the panes and the bottom area in the GUI, null for the default. Fonts aren't included with the theme: it
     /// names fonts the user may have installed, separated by commas (e.g. "Topaz a600a1200a400, MicroKnight"), and is
     /// only used when one of them is installed. The user's font setting overrides it; the TUI uses the terminal's font.

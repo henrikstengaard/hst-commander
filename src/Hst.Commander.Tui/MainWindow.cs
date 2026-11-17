@@ -242,6 +242,7 @@ public sealed class MainWindow : Window
         {
             pane.View.Height = Dim.Fill(bottomHeight);
             ShowParentStrip(pane, theme.ShowParentButtons);
+            pane.PathPanel.HighlightWhenActive = theme.HighlightActivePathPanel;
         }
 
         _menuBar.ColorScheme = _palette.MenuColorScheme;
