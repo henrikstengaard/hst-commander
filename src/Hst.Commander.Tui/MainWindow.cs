@@ -1097,7 +1097,7 @@ public sealed class MainWindow : Window
     /// </summary>
     private async Task ShowLocationAsync(Pane pane)
     {
-        var dialog = new LocationDialog(pane.NavigationContext.CurrentPath, () => ChooseVolumeProvider(pane), _palette);
+        var dialog = new LocationDialog(pane == _leftPane ? "Left location" : "Right location", pane.NavigationContext.CurrentPath, () => ChooseVolumeProvider(pane), _palette);
         Application.Run(dialog);
         var result = dialog.Result;
         dialog.Dispose();

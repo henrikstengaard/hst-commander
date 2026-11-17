@@ -133,7 +133,7 @@ After listing, both front-ends call `DetectVolumeFilesAsync` in the background t
 
 ## Changing Location
 
-The location dialog (Ctrl+L, clicking the path, File > Location) has the path, `Volumes...` (the volume provider list), `Home` (`GoHomeAsync`, switching to the Local provider) and OK. `ChangeLocationAsync(path)` keeps the location when the path fails or is unchanged, and resolves:
+The location dialog (Ctrl+L, clicking the path, File > Location), titled "Left location" or "Right location" after its pane, has the path, `Volumes...` (the volume provider list), `Home` (`GoHomeAsync`, switching to the Local provider) and OK. `ChangeLocationAsync(path)` keeps the location when the path fails or is unchanged, and resolves:
 
 - empty, or `Computer` in a local volume: the drive list;
 - a local directory (relative to the current local directory; `c:` means `c:\`), switching to the Local provider;

@@ -4,7 +4,7 @@ using Terminal.Gui;
 namespace Hst.Commander.Tui;
 
 /// <summary>
-///     Modal location dialog of a pane, opened with Ctrl+L or by double-clicking the path. The path field starts with
+///     Modal location dialog of a pane, opened with Ctrl+L or by clicking the path, titled "Left location" or "Right location". The path field starts with
 ///     the current path; OK changes to the entered path. Volumes opens the volume provider list, choosing one closes the
 ///     dialog. Home goes to the user's home directory. <see cref="Result" /> holds the path or volume provider, or null on cancel.
 /// </summary>
@@ -12,12 +12,13 @@ public sealed class LocationDialog : Dialog
 {
     private readonly TextField _pathField;
 
+    /// <param name="title">Title of the dialog, naming the pane.</param>
     /// <param name="path">Current path of the pane.</param>
     /// <param name="chooseVolumeProvider">Shows the volume provider list, returning the chosen volume provider or bookmark, or null.</param>
     /// <param name="palette">Palette of the theme.</param>
-    public LocationDialog(string path, Func<VolumeChoice?> chooseVolumeProvider, TuiPalette palette)
+    public LocationDialog(string title, string path, Func<VolumeChoice?> chooseVolumeProvider, TuiPalette palette)
     {
-        Title = "Location";
+        Title = title;
         Width = Dim.Percent(70);
         Height = 8;
         ColorScheme = palette.DialogColorScheme;

@@ -601,7 +601,7 @@ public partial class MainWindow : Window
     /// </summary>
     private async Task ShowLocationAsync(PaneView pane)
     {
-        var result = await new LocationDialog(pane.NavigationContext.CurrentPath,
+        var result = await new LocationDialog(pane == LeftPane ? "Left location" : "Right location", pane.NavigationContext.CurrentPath,
             owner => ChooseVolumeProviderAsync(owner, pane)).ShowDialog<LocationDialogResult?>(this);
         if (result?.VolumeChoice is { } volumeChoice)
         {
