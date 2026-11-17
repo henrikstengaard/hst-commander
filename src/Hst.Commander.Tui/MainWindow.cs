@@ -560,7 +560,7 @@ public sealed class MainWindow : Window
     private void ConfigurePaneKeys(Pane pane, Pane otherPane)
     {
         pane.TableView.CellActivated += async (_, _) => await ActivateSelectedEntryAsync(pane);
-        pane.PathPanel.PathDoubleClicked += async (_, _) => await ShowLocationAsync(pane);
+        pane.PathPanel.PathClicked += async (_, _) => await ShowLocationAsync(pane);
         pane.TableView.HasFocusChanged += (_, _) =>
         {
             if (pane.TableView.HasFocus)
@@ -1097,7 +1097,7 @@ public sealed class MainWindow : Window
     /// </summary>
     private async Task ShowLocationAsync(Pane pane)
     {
-        var dialog = new LocationDialog(pane.NavigationContext.CurrentPath, () => ChooseVolumeProvider(pane), _palette);
+        var dialog = new LocationDialog(pane == _leftPane ? "Left location" : "Right location", pane.NavigationContext.CurrentPath, () => ChooseVolumeProvider(pane), _palette);
         Application.Run(dialog);
         var result = dialog.Result;
         dialog.Dispose();

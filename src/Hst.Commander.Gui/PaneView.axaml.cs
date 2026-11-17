@@ -40,7 +40,7 @@ public partial class PaneView : UserControl
         EntriesList.AddHandler(KeyDownEvent, OnEntriesKeyDown, RoutingStrategies.Tunnel);
         EntriesList.DoubleTapped += async (_, _) => await ActivateSelectedEntryAsync();
         EntriesList.SelectionChanged += (_, _) => UpdateIconSelection();
-        PathBadge.DoubleTapped += (_, _) => PathDoubleClicked?.Invoke(this, EventArgs.Empty);
+        PathBadge.Tapped += (_, _) => PathClicked?.Invoke(this, EventArgs.Empty);
         EntriesList.PropertyChanged += (_, e) =>
         {
             if (e.Property == IsKeyboardFocusWithinProperty)
@@ -270,8 +270,8 @@ public partial class PaneView : UserControl
     /// <summary>Raised when navigation fails, so the window can show the error.</summary>
     public event EventHandler<Exception>? NavigationFailed;
 
-    /// <summary>Raised when the path is double-clicked, so the window can show the location dialog.</summary>
-    public event EventHandler? PathDoubleClicked;
+    /// <summary>Raised when the path is clicked, so the window can show the location dialog.</summary>
+    public event EventHandler? PathClicked;
 
     public NavigationContext NavigationContext
     {

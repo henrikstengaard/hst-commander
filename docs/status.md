@@ -20,7 +20,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - Going to the root of the volume with Ctrl+\ in both front-ends.
 - Quitting with F10, Ctrl+Q or File > Quit (and Esc in the TUI) after a confirm dialog in both front-ends.
 - Refreshing the active pane with Ctrl+R and swapping the left and right panes with Ctrl+U (File > Refresh, File > Swap panes) in both front-ends.
-- Changing location with Ctrl+L or by double-clicking the path (location dialog), including paths into images.
+- Changing location with Ctrl+L or by clicking the path (location dialog), including paths into images.
 - Bookmarking locations with Ctrl+B (File > Add bookmark) in both front-ends, listed by the Bookmarks item of the volume provider list (F1/F2), renamed with F2 and deleted with Del; SMB, FTP and SFTP passwords can be stored with a bookmark in Windows Credential Manager, the macOS Keychain or the Linux Secret Service (see [Bookmarks](volumes.md#bookmarks)).
 - Build versioning from the git commit count and a Help > About menu item in both front-ends, with a Licenses section showing the notices of Hst Commander, its third-party components and the loaded plugins, also installed next to the apps.
 - Running as administrator or root shown in the menu bar of both front-ends; choosing the physical disks when not elevated offers to restart as administrator (UAC on Windows, sudo in the TUI's terminal on Linux and macOS, pkexec in the GUI on Linux) with the panes where they were.

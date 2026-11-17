@@ -4,23 +4,25 @@ using Hst.Commander.Core;
 namespace Hst.Commander.Gui;
 
 /// <summary>
-///     Modal location dialog of a pane, opened with Ctrl+L or by double-clicking the path. The path text box starts
+///     Modal location dialog of a pane, opened with Ctrl+L or by clicking the path, titled "Left location" or "Right location". The path text box starts
 ///     with the current path; OK returns the entered path. Volumes opens the volume provider list over this dialog,
 ///     choosing one closes the dialog with it. Home goes to the user's home directory. The dialog returns null when cancelled.
 /// </summary>
 public partial class LocationDialog : Window
 {
-    public LocationDialog() : this(string.Empty, _ => Task.FromResult<VolumeChoice?>(null))
+    public LocationDialog() : this("Location", string.Empty, _ => Task.FromResult<VolumeChoice?>(null))
     {
     }
 
+    /// <param name="title">Title of the dialog, naming the pane.</param>
     /// <param name="path">Current path of the pane.</param>
     /// <param name="chooseVolumeProvider">
     ///     Shows the volume provider list owned by the given window, returning the chosen volume provider or bookmark, or null.
     /// </param>
-    public LocationDialog(string path, Func<Window, Task<VolumeChoice?>> chooseVolumeProvider)
+    public LocationDialog(string title, string path, Func<Window, Task<VolumeChoice?>> chooseVolumeProvider)
     {
         InitializeComponent();
+        Title = title;
         PathTextBox.Text = path;
         VolumesButton.Click += async (_, _) =>
         {

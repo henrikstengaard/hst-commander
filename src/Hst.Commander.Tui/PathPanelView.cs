@@ -44,15 +44,15 @@ public sealed class PathPanelView : View
 
     private bool IsHighlighted => IsActive && HighlightWhenActive;
 
-    /// <summary>Raised when the path is double-clicked, opening the location dialog.</summary>
-    public event EventHandler? PathDoubleClicked;
+    /// <summary>Raised when the path is clicked, opening the location dialog.</summary>
+    public event EventHandler? PathClicked;
 
     protected override bool OnMouseEvent(MouseEventArgs mouseEvent)
     {
         // the path is on the first line inside the border
-        if (mouseEvent.IsDoubleClicked && mouseEvent.Position.Y == 1)
+        if (mouseEvent.Flags.HasFlag(MouseFlags.Button1Clicked) && mouseEvent.Position.Y == 1)
         {
-            PathDoubleClicked?.Invoke(this, EventArgs.Empty);
+            PathClicked?.Invoke(this, EventArgs.Empty);
             return true;
         }
 

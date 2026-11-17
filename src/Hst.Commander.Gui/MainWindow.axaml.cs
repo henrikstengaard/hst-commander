@@ -77,8 +77,8 @@ public partial class MainWindow : Window
         AddBookmarkMenuItem.Click += async (_, _) => await AddBookmarkAsync(_activePane);
         RefreshMenuItem.Click += async (_, _) => await RefreshAsync(_activePane);
         SwapPanesMenuItem.Click += async (_, _) => await SwapPanesAsync();
-        LeftPane.PathDoubleClicked += async (_, _) => await ShowLocationAsync(LeftPane);
-        RightPane.PathDoubleClicked += async (_, _) => await ShowLocationAsync(RightPane);
+        LeftPane.PathClicked += async (_, _) => await ShowLocationAsync(LeftPane);
+        RightPane.PathClicked += async (_, _) => await ShowLocationAsync(RightPane);
         SettingsMenuItem.Click += async (_, _) => await ShowSettingsAsync();
         QuitMenuItem.Click += (_, _) => Close();
         AboutMenuItem.Click += async (_, _) => await new AboutDialog().ShowDialog(this);
@@ -601,7 +601,7 @@ public partial class MainWindow : Window
     /// </summary>
     private async Task ShowLocationAsync(PaneView pane)
     {
-        var result = await new LocationDialog(pane.NavigationContext.CurrentPath,
+        var result = await new LocationDialog(pane == LeftPane ? "Left location" : "Right location", pane.NavigationContext.CurrentPath,
             owner => ChooseVolumeProviderAsync(owner, pane)).ShowDialog<LocationDialogResult?>(this);
         if (result?.VolumeChoice is { } volumeChoice)
         {
