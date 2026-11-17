@@ -142,6 +142,8 @@ public class NestedVolume(IVolume volume) : IVolume
 
     public string? GetWritableImageId(string name) => _currentVolume.GetWritableImageId(name);
 
+    public string? GetHostPath(string name) => _currentVolume.GetHostPath(name);
+
     public long? GetReadOrder(string name) => _currentVolume.GetReadOrder(name);
 
     public Task<Stream> OpenReadWrite(string name, CancellationToken cancellationToken = default) =>

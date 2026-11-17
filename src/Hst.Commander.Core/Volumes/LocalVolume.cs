@@ -162,6 +162,9 @@ public class LocalVolume(string path) : IVolume
     public string? GetWritableImageId(string name) =>
         _currentPath == null ? null : Path.GetFullPath(Path.Combine(_currentPath, name));
 
+    /// <summary>Full path of an item, which the host can open; null in the drive list.</summary>
+    public string? GetHostPath(string name) => _currentPath == null ? null : Path.Combine(_currentPath, name);
+
     /// <summary>
     /// Opens an item for reading and writing, shared with other readers and writers, e.g. a pane copying the file.
     /// It's unbuffered, so changes are written to the file right away and seen by others reading it.

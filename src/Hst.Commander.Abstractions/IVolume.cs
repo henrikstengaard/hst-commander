@@ -144,6 +144,15 @@ public interface IVolume
     string? GetWritableImageId(string name) => null;
 
     /// <summary>
+    /// Path of an item in current directory that the host operating system can open, e.g. the full path of a local
+    /// file or the UNC path "\\server\share\dir\file.txt" of a file in an SMB share on Windows. Hst Commander starts
+    /// items with a host path with the host operating system, like local files (Enter on files). Null (the default)
+    /// when the host can't open the item, e.g. a file on an FTP server.
+    /// </summary>
+    /// <param name="name">Name of the item.</param>
+    string? GetHostPath(string name) => null;
+
+    /// <summary>
     /// Position of an item in current directory in the order the volume stores the data of its items, e.g. the order
     /// of the files in a solid archive, where reading a file decompresses the files before it. Copying reads the items
     /// in this order when the volume returns one, so each file is decompressed once. Null (the default) when items can

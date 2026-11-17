@@ -43,6 +43,16 @@ public class TestVolume : IVolume
 
     public IEnumerable<string> CurrentPathComponents => currentPathComponents;
 
+    /// <summary>
+    /// Root of the host paths of items (<see cref="GetHostPath" />), e.g. @"\\server\share"; null (the default) when the
+    /// host can't open items.
+    /// </summary>
+    public string? HostPathRoot { get; init; }
+
+    public string? GetHostPath(string name) => HostPathRoot is { } hostPathRoot
+        ? string.Join('\\', [hostPathRoot, ..currentPathComponents.Where(component => component != Paths.Root), name])
+        : null;
+
     private static string CreatePath(IEnumerable<string> pathComponents)
     {
         var pathComponentsArray = pathComponents as string[] ?? pathComponents.ToArray();

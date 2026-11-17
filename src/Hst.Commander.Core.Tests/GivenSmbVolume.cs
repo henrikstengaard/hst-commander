@@ -49,6 +49,22 @@ public class GivenSmbVolume : IDisposable
     }
 
     [Fact]
+    public async Task When_GettingHostPaths_Then_TheyAreUncPathsOnWindows()
+    {
+        // arrange
+        using var volume = OpenVolume();
+
+        // act
+        var shareListPath = volume.GetHostPath("share");
+        await volume.ChangeDirectory(["share", "DIR1"]);
+        var filePath = volume.GetHostPath("Disk.ADF");
+
+        // assert - Windows opens UNC paths itself, other systems only mounted shares
+        Assert.Null(shareListPath);
+        Assert.Equal(OperatingSystem.IsWindows() ? @"\\server\share\DIR1\Disk.ADF" : null, filePath);
+    }
+
+    [Fact]
     public async Task When_OpeningForReadingAndWriting_Then_FileIsChangedInPlaceOnAConnectionOfItsOwn()
     {
         // arrange
