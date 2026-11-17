@@ -77,8 +77,8 @@ public partial class MainWindow : Window
         AddBookmarkMenuItem.Click += async (_, _) => await AddBookmarkAsync(_activePane);
         RefreshMenuItem.Click += async (_, _) => await RefreshAsync(_activePane);
         SwapPanesMenuItem.Click += async (_, _) => await SwapPanesAsync();
-        LeftPane.PathDoubleClicked += async (_, _) => await ShowLocationAsync(LeftPane);
-        RightPane.PathDoubleClicked += async (_, _) => await ShowLocationAsync(RightPane);
+        LeftPane.PathClicked += async (_, _) => await ShowLocationAsync(LeftPane);
+        RightPane.PathClicked += async (_, _) => await ShowLocationAsync(RightPane);
         SettingsMenuItem.Click += async (_, _) => await ShowSettingsAsync();
         QuitMenuItem.Click += (_, _) => Close();
         AboutMenuItem.Click += async (_, _) => await new AboutDialog().ShowDialog(this);

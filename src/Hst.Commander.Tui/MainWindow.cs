@@ -560,7 +560,7 @@ public sealed class MainWindow : Window
     private void ConfigurePaneKeys(Pane pane, Pane otherPane)
     {
         pane.TableView.CellActivated += async (_, _) => await ActivateSelectedEntryAsync(pane);
-        pane.PathPanel.PathDoubleClicked += async (_, _) => await ShowLocationAsync(pane);
+        pane.PathPanel.PathClicked += async (_, _) => await ShowLocationAsync(pane);
         pane.TableView.HasFocusChanged += (_, _) =>
         {
             if (pane.TableView.HasFocus)
