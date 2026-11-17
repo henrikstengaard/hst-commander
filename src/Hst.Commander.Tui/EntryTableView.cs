@@ -4,11 +4,30 @@ using Terminal.Gui;
 namespace Hst.Commander.Tui;
 
 /// <summary>
-///     TableView that continues the column dividers below the last entry and shows the scroll position on its right border.
+///     TableView that continues the column dividers below the last entry, shows the scroll position on its right border
+///     and raises <see cref="RightClicked" /> for the context menu of the entries.
 /// </summary>
 public sealed class EntryTableView : TableView
 {
     private static readonly Rune ScrollThumb = new('█');
+
+    /// <summary>
+    ///     Raised when the right mouse button is clicked: the row clicked (null below the entries or on the header) and
+    ///     the position on the screen.
+    /// </summary>
+    public event EventHandler<(int? Row, System.Drawing.Point ScreenPosition)>? RightClicked;
+
+    protected override bool OnMouseEvent(MouseEventArgs mouseEvent)
+    {
+        if (!mouseEvent.Flags.HasFlag(MouseFlags.Button3Clicked))
+        {
+            return base.OnMouseEvent(mouseEvent);
+        }
+
+        var cell = ScreenToCell(mouseEvent.Position);
+        RightClicked?.Invoke(this, (cell?.Y, mouseEvent.ScreenPosition));
+        return true;
+    }
 
     public IReadOnlyList<int> ColumnWidths { get; set; } = [];
 

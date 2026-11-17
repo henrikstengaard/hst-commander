@@ -29,6 +29,8 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - Drag and drop in the GUI: dragging entries to other applications (entries in images and other volumes as virtual files on Windows and file promises on macOS, read when dropped) and between panes, and dropping files from other applications on a pane or one of its directories, copying or moving with Shift after the copy or move dialog (see [Drag and drop](gui.md#drag-and-drop)).
 - Keeping Amiga names, protection bits and comments when copying or moving between Amiga volumes (and from lha/lzx archives), and storing/reading them as UAE metadata (UAEFSDB or FS-UAE metafiles, chosen in the settings) when copying between Amiga volumes and other volumes, shown in the properties dialog.
 - Moving (F6) between panes and volumes, with the same confirm and progress dialogs as copying; a single entry moved to a plain name is renamed.
+- Renaming the entry under the cursor (Shift+F6) with a dialog.
+- A context menu on the entries (right-click) with Copy, Cut, Paste, Rename, Delete and Properties in both front-ends, and copying, cutting and pasting with Ctrl+C, Ctrl+X and Ctrl+V, also to and from Explorer through the Windows clipboard (local files and entries of images as virtual files, cut ones moved, in both front-ends) and other applications in the GUI on macOS and Linux (see [Clipboard](file-operations.md#clipboard)).
 - Making a directory (F7) in the active pane, with a dialog for the directory name.
 - Creating volumes (F9) with the volume creators of plugins, e.g. empty, formatted or bootable Amiga disk files with the Amiga plugin.
 - Deleting (F8 or Delete) the marked entries or the entry under the cursor, with a confirm dialog and a progress dialog.

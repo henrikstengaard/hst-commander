@@ -16,6 +16,10 @@ public static class CommanderActions
     public const string Delete = "Delete";
     public const string CreateVolume = "CreateVolume";
     public const string Properties = "Properties";
+    public const string Rename = "Rename";
+    public const string ClipboardCopy = "ClipboardCopy";
+    public const string ClipboardCut = "ClipboardCut";
+    public const string ClipboardPaste = "ClipboardPaste";
     public const string OpenAsVolume = "OpenAsVolume";
     public const string Parent = "Parent";
     public const string Root = "Root";
@@ -44,6 +48,10 @@ public static class CommanderActions
         new(Delete, "Delete"),
         new(CreateVolume, "Create volume"),
         new(Properties, "Properties"),
+        new(Rename, "Rename"),
+        new(ClipboardCopy, "Copy to clipboard"),
+        new(ClipboardCut, "Cut to clipboard"),
+        new(ClipboardPaste, "Paste from clipboard"),
         new(OpenAsVolume, "Open as volume"),
         new(Parent, "Parent directory"),
         new(Root, "Root directory"),

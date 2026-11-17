@@ -33,6 +33,7 @@ public partial class PaneView : UserControl
         InitializeComponent();
         UpdateColumnWidths();
         ListingCancelButton.Click += (_, _) => CancelProgress();
+        InitializeContextMenu();
 
         _listItemTemplate = EntriesList.ItemTemplate;
         _listItemsPanel = EntriesList.ItemsPanel;

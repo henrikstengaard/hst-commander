@@ -20,6 +20,7 @@ public sealed class MainWindow : Window
     private Pane _rightPane;
     private readonly MenuItem _leftVolumeMenuItem;
     private readonly MenuItem _rightVolumeMenuItem;
+    private ContextMenu? _entryMenu;
     private VolumeProviderKeys _volumeProviderKeys;
     private TuiPalette _palette;
     private Pane _activePane;
@@ -125,6 +126,16 @@ public sealed class MainWindow : Window
         // also when run again after a program has run in the terminal. The panes are listed once the window runs:
         // Application.Init installs Terminal.Gui's synchronization context, so awaiting a listing that isn't done at
         // once (e.g. the physical disks) before Application.Run would wait for a main loop that isn't running yet
+        // cut files pasted in another application (e.g. Explorer) are moved by it, so the panes are listed again;
+        // checked on the main loop through Application.Invoke, also after the window runs again when a program has run
+        // in the terminal
+        _cutMovedTimer = new Timer(_ => Application.Invoke(() =>
+        {
+            if (EntryClipboard.CheckCutMoved())
+            {
+                _ = InitializeAsync();
+            }
+        }), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
         Loaded += async (_, _) =>
         {
             _activePane.TableView.SetFocus();
@@ -132,6 +143,27 @@ public sealed class MainWindow : Window
             await SavePendingExternalEditAsync();
             await InitializeAsync();
         };
+    }
+
+    /// <summary>Timer checking whether cut files were moved by another application, kept from being collected.</summary>
+    private readonly Timer _cutMovedTimer;
+
+    /// <summary>
+    ///     Cut entries of an image pasted in another application have been deleted: the clipboard is emptied and the
+    ///     panes are listed again.
+    /// </summary>
+    private async Task ClipboardEntriesMovedAsync(EntryClipboard clipboard)
+    {
+        if (EntryClipboard.Current == clipboard)
+        {
+            EntryClipboard.Clear();
+            if (OperatingSystem.IsWindows())
+            {
+                WindowsFileClipboard.Clear();
+            }
+        }
+
+        await InitializeAsync();
     }
 
     /// <summary>Shows an error when the window is run again, e.g. when a program couldn't be started.</summary>
@@ -389,6 +421,18 @@ public sealed class MainWindow : Window
             case CommanderActions.Properties:
                 ShowPropertiesOfActivePane();
                 break;
+            case CommanderActions.Rename:
+                _ = RenameAsync(pane, GetOtherPane(pane));
+                break;
+            case CommanderActions.ClipboardCopy:
+                _ = CopyToClipboardAsync(pane, false);
+                break;
+            case CommanderActions.ClipboardCut:
+                _ = CopyToClipboardAsync(pane, true);
+                break;
+            case CommanderActions.ClipboardPaste:
+                _ = PasteAsync(pane, GetOtherPane(pane));
+                break;
             case CommanderActions.OpenAsVolume:
                 OpenAsVolumeInActivePane();
                 break;
@@ -573,6 +617,7 @@ public sealed class MainWindow : Window
             pane.PathPanel.NeedsDraw = true;
         };
         pane.TableView.SelectedCellChanged += (_, _) => pane.TableView.NeedsDraw = true;
+        pane.TableView.RightClicked += (_, click) => ShowEntryMenu(pane, click.Row, click.ScreenPosition);
         pane.TableView.KeyDown += (_, key) =>
         {
             if (key.KeyCode == KeyCode.Tab)
@@ -689,10 +734,27 @@ public sealed class MainWindow : Window
                 key.Handled = true;
                 _ = CopyAsync(pane, otherPane);
             }
+            else if (key == Key.F6.WithShift)
+            {
+                key.Handled = true;
+                _ = RenameAsync(pane, otherPane);
+            }
             else if (key.KeyCode == KeyCode.F6)
             {
                 key.Handled = true;
                 _ = MoveAsync(pane, otherPane);
+            }
+            else if (key == Key.C.WithCtrl || key == Key.X.WithCtrl)
+            {
+                key.Handled = true;
+                // Key equality includes Handled, so compare the key code once it's handled
+                _ = CopyToClipboardAsync(pane, key.KeyCode == Key.X.WithCtrl.KeyCode);
+            }
+            // Windows Terminal and the classic console paste text with Ctrl+V themselves, so Alt+V pastes too
+            else if (key == Key.V.WithCtrl || key == Key.V.WithAlt)
+            {
+                key.Handled = true;
+                _ = PasteAsync(pane, otherPane);
             }
             else if (key.KeyCode == KeyCode.F7)
             {
@@ -1547,6 +1609,182 @@ public sealed class MainWindow : Window
         catch (Exception exception)
         {
             MessageBox.ErrorQuery("Error", exception.Message, "OK");
+        }
+
+        await InitializePaneAsync(pane);
+        await InitializePaneAsync(otherPane);
+        pane.TableView.SetFocus();
+    }
+
+    private Pane GetOtherPane(Pane pane) => pane == _leftPane ? _rightPane : _leftPane;
+
+    /// <summary>
+    ///     Shows the context menu of the entries of a pane at the mouse (right-click): the row clicked becomes the
+    ///     current entry, and the menu acts on the marked entries or, when none are marked, the current entry, like the
+    ///     function keys. Copy, Cut, Rename and Delete need an entry (not ".."), drives only have properties.
+    /// </summary>
+    private void ShowEntryMenu(Pane pane, int? row, System.Drawing.Point screenPosition)
+    {
+        pane.TableView.SetFocus();
+        if (row is { } index && index >= 0 && index < pane.Entries.Count)
+        {
+            pane.TableView.SelectedRow = index;
+        }
+
+        var currentEntry = GetCurrentEntry(pane);
+        var hasEntries = pane.NavigationContext.GetOperationEntries(currentEntry).Count > 0;
+        var canChange = hasEntries && !pane.NavigationContext.IsDriveList;
+        var canRename = canChange && currentEntry != null && currentEntry.Name != Paths.Parent;
+        var canPaste = !pane.NavigationContext.IsDriveList;
+        var otherPane = GetOtherPane(pane);
+        _entryMenu?.Dispose();
+        _entryMenu = new ContextMenu { Position = screenPosition };
+        _entryMenu.Show(new MenuBarItem(new MenuItem[]
+        {
+            new("_Copy", "Ctrl+C", () => _ = CopyToClipboardAsync(pane, false), () => canChange),
+            new("Cu_t", "Ctrl+X", () => _ = CopyToClipboardAsync(pane, true), () => canChange),
+            new("_Paste", "Alt+V", () => _ = PasteAsync(pane, otherPane), () => canPaste),
+            null!,
+            new("_Rename...", "Shift+F6", () => _ = RenameAsync(pane, otherPane), () => canRename),
+            new("_Delete...", "F8", () => _ = DeleteAsync(pane, otherPane), () => canChange),
+            null!,
+            new("Pr_operties...", "Ctrl+P", () => _ = ShowPropertiesAsync(pane), () => hasEntries)
+        }));
+    }
+
+    /// <summary>
+    ///     Renames the entry under the cursor of a pane to the name entered (Shift+F6), see
+    ///     <see cref="NavigationContext.RenameAsync" />. The other pane is refreshed too, as it may show the same
+    ///     location.
+    /// </summary>
+    private async Task RenameAsync(Pane pane, Pane otherPane)
+    {
+        if (GetCurrentEntry(pane) is not { } entry || entry.Name == Paths.Parent ||
+            pane.NavigationContext.IsDriveList)
+        {
+            return;
+        }
+
+        if (pane.NavigationContext.MoveNotSupportedMessage is { } message)
+        {
+            MessageBox.ErrorQuery("Error", message, "OK");
+            pane.TableView.SetFocus();
+            return;
+        }
+
+        var dialog = new MakeDirectoryDialog(_palette, "Rename", $"Rename '{entry.Name}' to:", entry.Name);
+        Application.Run(dialog);
+        var newName = dialog.Result;
+        dialog.Dispose();
+
+        pane.TableView.SetFocus();
+        if (newName == null || newName == entry.Name)
+        {
+            return;
+        }
+
+        await RunNavigationAsync(pane, () => pane.NavigationContext.RenameAsync(entry, newName));
+        await InitializePaneAsync(otherPane);
+    }
+
+    /// <summary>
+    ///     Copies or cuts the marked entries, or the entry under the cursor, of a pane to the clipboard (Ctrl+C,
+    ///     Ctrl+X), see <see cref="EntryClipboard" />. On Windows, the entries are also put on the Windows clipboard,
+    ///     so Explorer can paste them (<see cref="EntryClipboard.SetWindowsClipboard" />); a terminal can't do that on
+    ///     other systems.
+    /// </summary>
+    private async Task CopyToClipboardAsync(Pane pane, bool isCut)
+    {
+        var entries = pane.NavigationContext.GetOperationEntries(GetCurrentEntry(pane));
+        if (entries.Count == 0 || pane.NavigationContext.IsDriveList)
+        {
+            return;
+        }
+
+        try
+        {
+            var clipboard = await EntryClipboard.SetAsync(pane.NavigationContext, entries, isCut);
+            if (OperatingSystem.IsWindows())
+            {
+                clipboard.SetWindowsClipboard(IntPtr.Zero,
+                    exception => Application.Invoke(() => MessageBox.ErrorQuery("Error", exception.Message, "OK")),
+                    moved => Application.Invoke(() => _ = ClipboardEntriesMovedAsync(moved)));
+            }
+        }
+        catch (Exception exception)
+        {
+            MessageBox.ErrorQuery("Error", exception.Message, "OK");
+        }
+
+        pane.TableView.SetFocus();
+    }
+
+    /// <summary>
+    ///     Pastes the clipboard in the current location of a pane (Ctrl+V): entries copied or cut in the panes, or on
+    ///     Windows files copied or cut in another application, copied or moved without asking for the destination,
+    ///     showing the progress. Pasted cut entries are removed from the clipboard.
+    /// </summary>
+    private async Task PasteAsync(Pane pane, Pane otherPane)
+    {
+        if (pane.NavigationContext.IsDriveList)
+        {
+            return;
+        }
+
+        PasteSource? source;
+        try
+        {
+            source = OperatingSystem.IsWindows()
+                ? await EntryClipboard.GetWindowsPasteSourceAsync(pane.NavigationContext)
+                : await EntryClipboard.GetPasteSourceAsync(true, null, false, pane.NavigationContext);
+        }
+        catch (Exception exception)
+        {
+            MessageBox.ErrorQuery("Error", exception.Message, "OK");
+            return;
+        }
+
+        if (source == null)
+        {
+            return;
+        }
+
+        using (source)
+        {
+            // paste in the background and update the dialog on the UI thread; it closes when pasting has stopped
+            var progressDialog = new CopyProgressDialog(_palette, source.Title);
+            var progress =
+                new UiProgress<CopyProgress>(value => Application.Invoke(() => progressDialog.Update(value)));
+            var cancellationToken = progressDialog.CancellationToken;
+            var pasteTask = Task.Run(() => source.PasteAsync(pane.NavigationContext, progress,
+                ConfirmOverwriteAsync, cancellationToken));
+            _ = pasteTask.ContinueWith(_ => Application.Invoke(progressDialog.Complete), TaskScheduler.Default);
+            Application.Run(progressDialog);
+            progressDialog.Dispose();
+
+            try
+            {
+                await pasteTask;
+                if (source.IsMove)
+                {
+                    if (!source.IsFromHost)
+                    {
+                        EntryClipboard.Clear();
+                    }
+
+                    if (OperatingSystem.IsWindows())
+                    {
+                        WindowsFileClipboard.Clear();
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception exception)
+            {
+                MessageBox.ErrorQuery("Error", exception.Message, "OK");
+            }
         }
 
         await InitializePaneAsync(pane);
