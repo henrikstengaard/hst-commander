@@ -1969,12 +1969,13 @@ public sealed class NavigationContext : IDisposable
     }
 
     /// <summary>
-    ///     Properties like <see cref="GetProperties" />, with the Amiga name, protection bits and comment of a single
-    ///     entry from the UAE metadata of the current directory (see <see cref="UaeMetadataReader" />) in volumes not
-    ///     storing them, e.g. a file copied from an Amiga volume to a local directory. Reads with the pane's volume,
-    ///     so call it on the thread using the pane. Not with <see cref="UaeMetadataFormat.None" />. The check boxes of
-    ///     a single entry (<see cref="EntryProperties.FlagGroups" />) can be changed when the volume can change its
-    ///     attributes (<see cref="IVolume.GetChangeableAttributes" />) or Amiga protection bits
+    ///     Properties like <see cref="GetProperties" />, with the Amiga name and protection bits of a single entry from
+    ///     the UAE metadata of the current directory (see <see cref="UaeMetadataReader" />) in volumes not storing
+    ///     them, e.g. a file copied from an Amiga volume to a local directory, and the tabs of the plugins
+    ///     (<see cref="EntryProperties.Tabs" />, see <see cref="VolumeProviders.PropertiesTabs" />). Reads with the
+    ///     pane's volume, so call it on the thread using the pane. Not with <see cref="UaeMetadataFormat.None" />. The
+    ///     check boxes of a single entry (<see cref="EntryProperties.FlagGroups" />) can be changed when the volume can
+    ///     change its attributes (<see cref="IVolume.GetChangeableAttributes" />) or Amiga protection bits
     ///     (<see cref="IVolume.CanSetAmigaMetadata" />, or UAE metadata in a writable location).
     /// </summary>
     public async Task<EntryProperties> GetPropertiesAsync(IReadOnlyList<IEntry> entries,
@@ -1988,14 +1989,64 @@ public sealed class NavigationContext : IDisposable
         }
 
         var uaeMetadata = entry.AmigaMetadata == null ? await FindUaeMetadataAsync(entry, cancellationToken) : null;
+        // entries in volumes not storing Amiga metadata get UAE metadata when it's changed, e.g. by adding a comment
+        var canSetAmigaMetadata = entry.AmigaMetadata != null
+            ? await _nestedVolume.CanSetAmigaMetadata(cancellationToken)
+            : (uaeMetadata != null || await CanCreateUaeMetadataAsync(cancellationToken)) &&
+              MoveNotSupportedMessage == null;
         var changes = new PropertyChanges(await _nestedVolume.GetChangeableAttributes(cancellationToken),
-            entry.AmigaMetadata != null
-                ? await _nestedVolume.CanSetAmigaMetadata(cancellationToken)
-                : uaeMetadata != null && MoveNotSupportedMessage == null);
+            canSetAmigaMetadata);
         var localDirectory = !IsInImage ? LocalPath : null;
+        var context = new EntryPropertiesContext(_nestedVolume, entry, GetIconFile(entry),
+            CreateDirectoryNotSupportedMessage == null, entry.AmigaMetadata ?? uaeMetadata?.Metadata,
+            canSetAmigaMetadata
+                ? (metadata, token) => SetAmigaMetadataAsync(entry, metadata, token)
+                : null);
+        var iconProperties = await ReadIconPropertiesAsync(entry, cancellationToken);
         return EntryProperties.Create(entries, CurrentPath, localDirectory, IsDriveList, uaeMetadata, changes,
-            await ReadIconPropertiesAsync(entry, cancellationToken));
+            iconProperties, await GetPropertiesTabsAsync(context, cancellationToken), context);
     }
+
+    /// <summary>
+    ///     Tabs of the properties dialog of an entry from the properties tab providers of the plugins, in plugin order.
+    ///     A provider failing is left out, as the tabs aren't essential.
+    /// </summary>
+    private static async Task<IReadOnlyList<PropertiesTab>> GetPropertiesTabsAsync(EntryPropertiesContext context,
+        CancellationToken cancellationToken)
+    {
+        var tabs = new List<PropertiesTab>();
+        foreach (var provider in VolumeProviders.PropertiesTabs)
+        {
+            try
+            {
+                tabs.AddRange(await provider.GetTabs(context, cancellationToken));
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                // a plugin failing to read its tabs just has none
+            }
+        }
+
+        return tabs;
+    }
+
+    /// <summary>
+    ///     True when UAE metadata can be created for entries in the current directory: the volume doesn't store Amiga
+    ///     metadata and the UAE metadata format isn't <see cref="UaeMetadataFormat.None" />.
+    /// </summary>
+    private async Task<bool> CanCreateUaeMetadataAsync(CancellationToken cancellationToken) =>
+        UaeMetadata != UaeMetadataFormat.None && !await _nestedVolume.SupportsAmigaMetadata(cancellationToken);
+
+    /// <summary>
+    ///     Changes the Amiga metadata of an entry in the current directory, with <see cref="IVolume.SetAmigaMetadata" />
+    ///     when the volume stores it, otherwise in the UAE metadata of the entry, created when it has none and removed
+    ///     when no longer needed (see <see cref="UaeMetadataUpdater.SetMetadataAsync" />).
+    /// </summary>
+    private Task SetAmigaMetadataAsync(IEntry entry, AmigaMetadata metadata, CancellationToken cancellationToken) =>
+        entry.AmigaMetadata != null
+            ? _nestedVolume.SetAmigaMetadata(entry.Name, metadata, cancellationToken)
+            : UaeMetadataUpdater.SetMetadataAsync(_nestedVolume, entry, metadata, UaeMetadata,
+                !IsInImage ? LocalPath : null, cancellationToken);
 
     /// <summary>
     ///     Properties of the icon file of a listed entry read by its icon provider
@@ -2020,15 +2071,18 @@ public sealed class NavigationContext : IDisposable
     }
 
     /// <summary>
-    ///     Changes the attributes and Amiga protection bits of the entry of properties from
-    ///     <see cref="GetPropertiesAsync" /> to its check boxes, given whether each check box of each
-    ///     <see cref="EntryProperties.FlagGroups" /> is checked. Only groups that can be changed and differ are changed:
-    ///     attributes with <see cref="IVolume.SetAttributes" />, protection bits with
-    ///     <see cref="IVolume.SetAmigaMetadata" /> or in the UAE metadata of the entry (see
-    ///     <see cref="UaeMetadataUpdater.SetMetadataAsync" />). Changes with the pane's volume, so call it on the thread
-    ///     using the pane. Returns true when something was changed.
+    ///     Saves the properties dialog of properties from <see cref="GetPropertiesAsync" />: changes the attributes and
+    ///     Amiga protection bits of the entry to its check boxes, given whether each check box of each
+    ///     <see cref="EntryProperties.FlagGroups" /> is checked, then saves the texts of
+    ///     <see cref="EntryProperties.Tabs" /> that changed (see <see cref="PropertiesTab.Save" />), given the text of
+    ///     each tab (null when it has none). Only groups that can be changed and differ are changed: attributes with
+    ///     <see cref="IVolume.SetAttributes" />, protection bits with <see cref="IVolume.SetAmigaMetadata" /> or in the
+    ///     UAE metadata of the entry (see <see cref="UaeMetadataUpdater.SetMetadataAsync" />). Empty texts are no text
+    ///     and texts are saved with "\n" line breaks. Changes with the pane's volume, so call it on the thread using
+    ///     the pane. Returns true when something was changed.
     /// </summary>
-    public async Task<bool> ChangeFlagsAsync(EntryProperties properties, IReadOnlyList<IReadOnlyList<bool>> isChecked,
+    public async Task<bool> ChangePropertiesAsync(EntryProperties properties,
+        IReadOnlyList<IReadOnlyList<bool>> isChecked, IReadOnlyList<string?>? tabTexts = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(properties);
@@ -2039,6 +2093,30 @@ public sealed class NavigationContext : IDisposable
             return false;
         }
 
+        var changed = await ChangeFlagsAsync(properties, entry, isChecked, cancellationToken);
+        for (var index = 0; tabTexts != null && index < properties.Tabs.Count && index < tabTexts.Count; index++)
+        {
+            var tab = properties.Tabs[index];
+            var text = NormalizeTabText(tabTexts[index]);
+            if (tab.Save == null || text == NormalizeTabText(tab.Text))
+            {
+                continue;
+            }
+
+            await tab.Save(text, cancellationToken);
+            changed = true;
+        }
+
+        return changed;
+    }
+
+    /// <summary>Text of a tab with "\n" line breaks, null when empty.</summary>
+    private static string? NormalizeTabText(string? text) =>
+        string.IsNullOrEmpty(text) ? null : text.ReplaceLineEndings("\n");
+
+    private async Task<bool> ChangeFlagsAsync(EntryProperties properties, IEntry entry,
+        IReadOnlyList<IReadOnlyList<bool>> isChecked, CancellationToken cancellationToken)
+    {
         var changed = false;
         for (var index = 0; index < properties.FlagGroups.Count && index < isChecked.Count; index++)
         {
@@ -2064,7 +2142,7 @@ public sealed class NavigationContext : IDisposable
                     break;
                 }
                 case PropertyFlagKind.ProtectionBits
-                    when (entry.AmigaMetadata ?? properties.UaeMetadata?.Metadata) is { } metadata:
+                    when properties.Context?.AmigaMetadata is { } metadata:
                 {
                     var protectionBits = EntryProperties.GetValue(group, metadata.ProtectionBits, isChecked[index]);
                     if (protectionBits == metadata.ProtectionBits)
@@ -2072,18 +2150,9 @@ public sealed class NavigationContext : IDisposable
                         break;
                     }
 
-                    if (entry.AmigaMetadata != null)
-                    {
-                        await _nestedVolume.SetAmigaMetadata(entry.Name,
-                            metadata with { ProtectionBits = protectionBits }, cancellationToken);
-                    }
-                    else
-                    {
-                        await UaeMetadataUpdater.SetMetadataAsync(_nestedVolume, entry,
-                            metadata with { ProtectionBits = protectionBits }, UaeMetadata,
-                            !IsInImage ? LocalPath : null, cancellationToken);
-                    }
-
+                    // through the context, so a comment saved by a tab keeps the changed protection bits
+                    await properties.Context.SetAmigaMetadata(metadata with { ProtectionBits = protectionBits },
+                        cancellationToken);
                     changed = true;
                     break;
                 }

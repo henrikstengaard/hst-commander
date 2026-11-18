@@ -34,6 +34,7 @@ A plugin implements `IPlugin`, which returns the plugin's:
 | `IIconProvider` | Icons read from icon files next to entries, e.g. Amiga `.info` files, and lines for the properties dialog |
 | `INavigationMode` | Directories shown as icons at positions in the GUI, e.g. the Amiga Workbench, with options shown as check boxes |
 | `IImageProvider` | Images of a file format shown in the viewer (F3), e.g. IFF ILBM pictures |
+| `IPropertiesTabProvider` | Tabs of the properties dialog with a text that can be added, edited and deleted (`PropertiesTab`), e.g. the comment and tooltypes of Amiga entries, saved when the user clicks Save |
 
 `IPlugin.Initialize` gets an `IPluginHost`, which lets plugins work together without sharing types, since each plugin is loaded in a load context of its own:
 

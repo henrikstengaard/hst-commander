@@ -17,13 +17,23 @@
             <TextBlock x:Name="NameText" FontWeight="Bold" FontSize="16" TextTrimming="CharacterEllipsis"
                        VerticalAlignment="Center" />
         </DockPanel>
-        <!-- separators and lines of the sections are added by the code-behind -->
-        <Grid x:Name="LinesGrid" ColumnDefinitions="Auto,*" />
-        <ProgressBar x:Name="UsedProgressBar" Minimum="0" Maximum="1" ShowProgressText="True" IsVisible="False" />
+        <!-- the General tab, followed by the tabs of the plugins added by the code-behind -->
+        <TabControl x:Name="TabControl" Classes="dialogTabs" Padding="0"
+                    ItemContainerTheme="{StaticResource DialogTabItem}">
+            <TabItem Header="General">
+                <StackPanel Spacing="8">
+                    <!-- separators and lines of the sections are added by the code-behind -->
+                    <Grid x:Name="LinesGrid" ColumnDefinitions="Auto,*" />
+                    <ProgressBar x:Name="UsedProgressBar" Minimum="0" Maximum="1" ShowProgressText="True"
+                                 IsVisible="False" />
+                </StackPanel>
+            </TabItem>
+        </TabControl>
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,8,0,0">
+            <!-- "Save" when something can be changed -->
             <Button x:Name="OkButton" Content="OK" MinWidth="80" HorizontalContentAlignment="Center"
                     IsDefault="True" IsCancel="True" />
-            <!-- shown when check boxes can be changed -->
+            <!-- shown when something can be changed -->
             <Button x:Name="CancelButton" Content="Cancel" MinWidth="80" HorizontalContentAlignment="Center"
                     IsVisible="False" />
         </StackPanel>

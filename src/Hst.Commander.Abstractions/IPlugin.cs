@@ -53,6 +53,12 @@ public interface IPlugin
     IEnumerable<IImageProvider> ImageProviders => [];
 
     /// <summary>
+    /// Properties tab providers adding tabs to the properties dialog of a single entry, e.g. the comment and the
+    /// tooltypes of Amiga entries, after the General tab in plugin order.
+    /// </summary>
+    IEnumerable<IPropertiesTabProvider> PropertiesTabProviders => [];
+
+    /// <summary>
     /// Themes listed in the settings after the built-in themes, e.g. Directory Opus 4 with its colors and buttons.
     /// </summary>
     IEnumerable<ITheme> Themes => [];

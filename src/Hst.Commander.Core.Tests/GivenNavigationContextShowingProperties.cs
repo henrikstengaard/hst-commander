@@ -129,7 +129,7 @@ public class GivenNavigationContextShowingProperties
             var attributes = Assert.Single(properties.FlagGroups);
 
             // act
-            var changed = await navigationContext.ChangeFlagsAsync(properties,
+            var changed = await navigationContext.ChangePropertiesAsync(properties,
                 [attributes.Flags.Select(flag => flag.Label == "Read-only" || flag.IsSet).ToList()]);
 
             // assert

@@ -51,7 +51,7 @@ src/
   Hst.Commander.Plugins.LhaLzx/ Lha and lzx archives (default plugin)
   Hst.Commander.Plugins.RarSevenZip/ Rar and 7z archives (default plugin)
   Hst.Commander.Plugins.Disk/   MBR/GPT disk images with FAT/exFAT/NTFS/ext partitions, hybrid MBR/RDB disks (default plugin)
-  Hst.Commander.Plugins.Amiga/  Writable adf and RDB images, .info icons, Workbench navigation mode, Amiga images (default plugin)
+  Hst.Commander.Plugins.Amiga/  Writable adf and RDB images, .info icons, Workbench navigation mode, Amiga images, comment and tooltypes properties tabs (default plugin)
   Hst.Commander.Plugins.PhysicalDisk/ Internal and external physical disks on Windows, Linux and macOS (default plugin)
   Hst.Commander.Plugins.Ftp/    FTP, FTPS and SFTP servers (default plugin)
   Hst.Commander.Plugins.DirectoryOpus/ Directory Opus 4 theme with a customizable button bank (default plugin)
@@ -124,9 +124,10 @@ All are in `Hst.Commander.Abstractions`; see [`docs/plugin-api.md`](../docs/plug
 | `IIconProvider` | Reads icons from icon files next to entries (e.g. `.info`) |
 | `INavigationMode` | Lays out a directory as icons at positions in the GUI (e.g. Workbench) |
 | `IImageProvider` | Reads the images of a file for the viewer (F3) |
+| `IPropertiesTabProvider` | Adds tabs to the properties dialog of an entry with a text that can be added, edited and deleted (`PropertiesTab`, e.g. the Amiga comment and tooltypes), saved when the user clicks Save |
 | `ITheme` | A theme: colors (`ThemeColors`), the buttons of the bottom area (`ButtonPanel` of columns of `PanelButton`s running `CommanderActions`) optional parent buttons beside the panes and an optional GUI font |
 | `ICustomizableButtonPanel` | A theme whose buttons the user changes in a settings tab with the button editor; the plugin saves the layout |
-| `IPlugin` | Returns a plugin's providers, creators, modes and themes and its `ThirdPartyNotices` (shown in About > Licenses); `Initialize(IPluginHost)` |
+| `IPlugin` | Returns a plugin's providers, creators, modes, themes and properties tab providers and its `ThirdPartyNotices` (shown in About > Licenses); `Initialize(IPluginHost)` |
 | `IPluginHost` | Lets plugins work together without sharing types (e.g. the Disk plugin opens a PiStorm partition with the Amiga plugin) |
 | `IWriteCache` | A writable image stream caching writes (e.g. physical disks), committed by Hst Commander when the file system is consistent (`Flush` doesn't write it) |
 
@@ -217,7 +218,9 @@ These apply across features and aren't obvious from a single file:
 
 10. **To view images of a file format with F3** (like Amiga icons and IFF ILBM pictures), implement `IImageProvider` (see `AmigaImageProvider`) and return it from `IPlugin.ImageProviders` (see [Viewer](../docs/viewer.md#images)).
 
-11. **To add a theme** with its own colors, bottom-area buttons and parent buttons, implement `ITheme` (see `DirectoryOpus4Theme`), plus `ICustomizableButtonPanel` to let the user change its buttons, and return it from `IPlugin.Themes` (see [Themes](../docs/themes.md)).
+11. **To add tabs to the properties dialog** (like the Amiga comment and tooltypes), implement `IPropertiesTabProvider` (see `AmigaPropertiesTabProvider`) and return it from `IPlugin.PropertiesTabProviders` (see [Tabs of plugins](../docs/file-operations.md#tabs-of-plugins)).
+
+12. **To add a theme** with its own colors, bottom-area buttons and parent buttons, implement `ITheme` (see `DirectoryOpus4Theme`), plus `ICustomizableButtonPanel` to let the user change its buttons, and return it from `IPlugin.Themes` (see [Themes](../docs/themes.md)).
 
 Plugins are separate projects referencing only `Hst.Commander.Abstractions`, e.g. `Hst.Commander.Plugins.Zip`: implement `IPlugin` returning the plugin's volume providers, file volume providers, volume creators and icon providers, and either add it to `Plugins.BuiltIn` (`Hst.Commander.Core`, which references the plugins included by default) or build it and copy its output to `~/.hst-commander/plugins/<Name>/` or `plugins/<Name>/` next to the executable, with `<Name>.dll` as the plugin assembly (reference `Hst.Commander.Abstractions` with `<Private>false</Private>` and `<ExcludeAssets>runtime</ExcludeAssets>` so it isn't copied; a copy is ignored anyway).
 

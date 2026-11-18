@@ -5,12 +5,14 @@ using Terminal.Gui;
 namespace Hst.Commander.Tui;
 
 /// <summary>
-///     Modal properties dialog (Alt+Enter) showing the name and the sections of lines of <see cref="EntryProperties" />
-///     separated by lines, the used space of drives as a progress bar and the check boxes of
-///     <see cref="EntryProperties.FlagGroups" /> (attributes and Amiga protection bits), enabled when they can be
-///     changed. The size and contents are counted in the background and shown with <see cref="Update" />; closing the
-///     dialog (OK, Cancel or Esc) cancels counting through <see cref="CancellationToken" />. OK sets
-///     <see cref="CheckedFlags" /> when check boxes can be changed.
+///     Modal properties dialog (Alt+Enter) showing the name and, in the General tab, the sections of lines of
+///     <see cref="EntryProperties" /> separated by lines, the used space of drives as a progress bar and the check boxes
+///     of <see cref="EntryProperties.FlagGroups" /> (attributes and Amiga protection bits), enabled when they can be
+///     changed, followed by the tabs of the plugins (<see cref="EntryProperties.Tabs" />, see
+///     <see cref="PropertiesTabView" />). The size and contents are counted in the background and shown with
+///     <see cref="Update" />; closing the dialog (Save, OK, Cancel or Esc) cancels counting through
+///     <see cref="CancellationToken" />. When something can be changed the dialog has Save and Cancel, and Save sets
+///     <see cref="CheckedFlags" /> and <see cref="TabTexts" />; nothing is changed before.
 /// </summary>
 public sealed class PropertiesDialog : Dialog
 {
@@ -18,6 +20,7 @@ public sealed class PropertiesDialog : Dialog
     private readonly CancellationTokenSource _cancellationTokenSource = new();
     private readonly List<Label> _valueLabels = [];
     private readonly List<List<CheckBox>> _flagCheckBoxes = [];
+    private readonly List<PropertiesTabView> _tabViews = [];
     private bool _closed;
 
     public PropertiesDialog(EntryProperties properties, TuiPalette palette)
@@ -31,45 +34,57 @@ public sealed class PropertiesDialog : Dialog
             .Concat(properties.FlagGroups.Select(group => group.Label))
             .Select(label => label.Length).DefaultIfEmpty(0).Max() + 2;
 
-        // wide enough for the check boxes (glyph, space, label and a space between them), within the borders
+        // wide enough for the check boxes (glyph, space, label and a space between them), within the borders of the
+        // dialog and the tab view
         var checkBoxesWidth = properties.FlagGroups
             .Select(group => group.Flags.Sum(flag => flag.Label.Length + 3) + group.Flags.Count - 1)
             .DefaultIfEmpty(0).Max();
-        var minimumWidth = 1 + labelWidth + checkBoxesWidth + 1 + 2;
+        var minimumWidth = 1 + 1 + labelWidth + checkBoxesWidth + 1 + 1 + 2;
         Width = Dim.Func(() => Math.Min(Application.Screen.Width,
             Math.Max(Application.Screen.Width * 70 / 100, minimumWidth)));
-        var y = 1;
-        Add(new Label { X = 1, Y = y++, Width = Dim.Fill(1), Text = properties.Name });
+        Add(new Label { X = 1, Y = 1, Width = Dim.Fill(1), Text = properties.Name });
+
+        var general = new View { Width = Dim.Fill(), Height = Dim.Fill(), CanFocus = true };
+        var y = 0;
         foreach (var section in sections)
         {
-            Add(new Line { X = 1, Y = y++, Width = Dim.Fill(1) });
+            // separators between the sections, not above the first one
+            if (y > 0)
+            {
+                general.Add(new Line { X = 0, Y = y++, Width = Dim.Fill() });
+            }
+
             foreach (var line in section)
             {
-                var valueLabel = new Label { X = 1 + labelWidth, Y = y, Width = Dim.Fill(1), Text = line.Value };
+                var valueLabel = new Label { X = labelWidth, Y = y, Width = Dim.Fill(), Text = line.Value };
                 _valueLabels.Add(valueLabel);
-                Add(new Label { X = 1, Y = y++, Text = $"{line.Label}:" }, valueLabel);
+                general.Add(new Label { X = 0, Y = y++, Text = $"{line.Label}:" }, valueLabel);
             }
         }
 
         if (properties.FlagGroups.Count > 0)
         {
-            Add(new Line { X = 1, Y = y++, Width = Dim.Fill(1) });
+            if (y > 0)
+            {
+                general.Add(new Line { X = 0, Y = y++, Width = Dim.Fill() });
+            }
+
             foreach (var group in properties.FlagGroups)
             {
-                Add(new Label { X = 1, Y = y, Text = $"{group.Label}:" });
+                general.Add(new Label { X = 0, Y = y, Text = $"{group.Label}:" });
                 var checkBoxes = new List<CheckBox>();
                 foreach (var flag in group.Flags)
                 {
                     var checkBox = new CheckBox
                     {
-                        X = checkBoxes.Count == 0 ? 1 + labelWidth : Pos.Right(checkBoxes[^1]) + 1,
+                        X = checkBoxes.Count == 0 ? labelWidth : Pos.Right(checkBoxes[^1]) + 1,
                         Y = y,
                         Text = flag.Label,
                         CheckedState = flag.IsSet ? CheckState.Checked : CheckState.UnChecked,
                         Enabled = group.CanChange
                     };
                     checkBoxes.Add(checkBox);
-                    Add(checkBox);
+                    general.Add(checkBox);
                 }
 
                 _flagCheckBoxes.Add(checkBoxes);
@@ -79,11 +94,11 @@ public sealed class PropertiesDialog : Dialog
 
         if (properties.UsedFraction is { } usedFraction)
         {
-            Add(new ProgressBar
+            general.Add(new ProgressBar
             {
-                X = 1,
+                X = 0,
                 Y = ++y,
-                Width = Dim.Fill(1),
+                Width = Dim.Fill(),
                 Height = 1,
                 Fraction = (float)usedFraction,
                 ProgressBarStyle = ProgressBarStyle.Continuous,
@@ -92,19 +107,33 @@ public sealed class PropertiesDialog : Dialog
             y++;
         }
 
-        // borders and the button row below the lines
-        Height = y + 5;
+        // the tab view is as high as its highest tab, with the 3 rows of the tabs and the bottom border
+        var contentRows = properties.Tabs.Count > 0 ? Math.Max(y, PropertiesTabView.Rows) : y;
+        var tabView = new TabView { X = 1, Y = 2, Width = Dim.Fill(1), Height = contentRows + 4 };
+        tabView.AddTab(new Tab { DisplayText = "General", View = general }, true);
+        foreach (var tab in properties.Tabs)
+        {
+            var tabContent = new PropertiesTabView(tab);
+            _tabViews.Add(tabContent);
+            tabView.AddTab(new Tab { DisplayText = tab.Title, View = tabContent }, false);
+        }
 
-        var okButton = new Button { Text = "OK", IsDefault = true };
+        Add(tabView);
+
+        // the name, the tab view, the borders and the button row
+        Height = 2 + contentRows + 4 + 5;
+
+        var okButton = new Button { Text = properties.CanChange ? "Save" : "OK", IsDefault = true };
         okButton.Accepting += (_, e) =>
         {
-            if (properties.CanChangeFlags)
+            if (properties.CanChange)
             {
                 CheckedFlags = _flagCheckBoxes
                     .Select(checkBoxes => (IReadOnlyList<bool>)checkBoxes
                         .Select(checkBox => checkBox.CheckedState == CheckState.Checked)
                         .ToList())
                     .ToList();
+                TabTexts = _tabViews.Select(tabContent => tabContent.EditedText).ToList();
             }
 
             e.Cancel = true;
@@ -113,7 +142,7 @@ public sealed class PropertiesDialog : Dialog
         Closing += (_, _) => Close();
 
         AddButton(okButton);
-        if (properties.CanChangeFlags)
+        if (properties.CanChange)
         {
             var cancelButton = new Button { Text = "Cancel" };
             cancelButton.Accepting += (_, e) =>
@@ -128,10 +157,16 @@ public sealed class PropertiesDialog : Dialog
     }
 
     /// <summary>
-    ///     Whether each check box of each flag group is checked when OK was pressed and check boxes can be changed,
-    ///     for <see cref="NavigationContext.ChangeFlagsAsync" />. Null otherwise.
+    ///     Whether each check box of each flag group is checked when Save was pressed, for
+    ///     <see cref="NavigationContext.ChangePropertiesAsync" />. Null when not saved.
     /// </summary>
     public IReadOnlyList<IReadOnlyList<bool>>? CheckedFlags { get; private set; }
+
+    /// <summary>
+    ///     Text of each of <see cref="EntryProperties.Tabs" /> when Save was pressed, null for a tab without text, for
+    ///     <see cref="NavigationContext.ChangePropertiesAsync" />. Null when not saved.
+    /// </summary>
+    public IReadOnlyList<string?>? TabTexts { get; private set; }
 
     /// <summary>Cancelled when the dialog closes, stopping counting the size and contents.</summary>
     public CancellationToken CancellationToken => _cancellationTokenSource.Token;

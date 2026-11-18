@@ -72,7 +72,7 @@ The copy, move and delete progress dialogs show their progress outside the windo
 
 ## Properties and Icon Viewer
 
-- `PropertiesDialog` shows the entry icon (loaded in the dialog's pixel size; for several entries of one type the type icon) and `SelectableTextBlock` values, so paths can be copied.
+- `PropertiesDialog` shows the entry icon (loaded in the dialog's pixel size; for several entries of one type the type icon) and, in the General tab, `SelectableTextBlock` values, so paths can be copied. The tabs of plugins are `PropertiesTabView`s. The tabs use the `DialogTabItem` theme and `dialogTabs` class of `App.axaml`, shared with `SettingsDialog`.
 - Clicking the icon opens `IconViewerDialog` with all icons of the entry: the plugin icon file's icons, otherwise the icons contained in the file, otherwise the OS icon in the distinct sizes the OS returns, otherwise the built-in icon. Images are fitted or zoomed on a selectable background; icons up to 256 pixels are scaled without smoothing so pixels stay sharp. `ViewerIcon` bitmaps are created only when shown.
 
 ## Themes and Settings

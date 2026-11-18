@@ -8,7 +8,7 @@ The Amiga plugin adds Amiga disk images, file systems, icons and pictures to Hst
 - **Hard disk images with a rigid disk block (RDB)**: raw images (e.g. `.hdf`, `.img`) and vhd images (fixed, dynamic and differencing). The root lists the partition table as `RDB` and its partitions shown with their number, drive and volume names, e.g. `1 - DH0 - Workbench`. Partitions with the Fast File System or PFS3 are opened as volumes; other file systems, e.g. SFS, can't be opened yet.
 - PiStorm disks (an MBR or GPT partition holding a rigid disk block) and hybrid MBR/RDB disks open through the Disk plugin, which uses this plugin for the RDB partition.
 - **Writable**: adfs and RDB images opened from a local directory can be written to: copying, moving, renaming, deleting and making directories work like in local directories, and both panes share the image safely. Images inside other images (e.g. an adf inside a zip archive) are read-only.
-- Amiga names, protection bits (`hsparwed`) and comments are kept when copying between Amiga volumes and stored as UAE metadata (UAEFSDB or FS-UAE metafiles) when copying to other volumes, see the UAE metadata setting. The properties dialog (Ctrl+P) shows and changes the protection bits and comment.
+- Amiga names, protection bits (`hsparwed`) and comments are kept when copying between Amiga volumes and stored as UAE metadata (UAEFSDB or FS-UAE metafiles) when copying to other volumes, see the UAE metadata setting. The properties dialog (Ctrl+P) shows and changes the protection bits, and the comment of any entry in its Comment tab: written to Amiga file systems, and as UAE metadata elsewhere (created when needed and removed when no longer needed).
 - The properties of a partition show its partition number, drive name, volume name, file system, boot priority and used/free space.
 
 ## Creating adfs (F9)
@@ -18,6 +18,8 @@ The Amiga plugin adds Amiga disk images, file systems, icons and pictures to Hst
 ## Icons
 
 - `.info` files (disk objects) are shown as the icons of their entries in the GUI, e.g. `file.info` for `file` and the drawer `dir.info` for the directory `dir`, and `Disk.info` as the icon of a partition. Supported images: true color (AmigaOS 4 PNG icons), color icons (GlowIcons), NewIcons and planar images drawn with the AmigaOS palette.
+- The properties dialog shows the icon file, the icon type (e.g. `Project`), its position on the Workbench (or `None`) and its size, e.g. `46 x 23 pixels` (the size of the image shown).
+- The Tooltypes tab of the properties dialog shows the tooltypes of an entry's icon, one per line, which can be added, edited and deleted (except for PNG icons). The tooltypes holding a NewIcon image are hidden and kept.
 - The properties dialog shows the icon type and its Workbench position; clicking the icon shows all images of the icon (normal and selected of each kind).
 
 ## Workbench navigation mode (GUI)

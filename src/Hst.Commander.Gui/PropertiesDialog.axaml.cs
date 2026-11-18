@@ -2,24 +2,29 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Threading;
+using Hst.Commander.Abstractions;
 using Hst.Commander.Core;
 using Hst.Commander.Core.Volumes;
 
 namespace Hst.Commander.Gui;
 
 /// <summary>
-///     Modal properties dialog (Alt+Enter) showing the name and the sections of lines of <see cref="EntryProperties" />
-///     separated by lines, the used space of drives as a progress bar and the check boxes of
-///     <see cref="EntryProperties.FlagGroups" /> (attributes and Amiga protection bits), enabled when they can be
-///     changed. Clicking the icon shows it in a higher resolution in the <see cref="IconViewerDialog" />. When opened it
-///     counts the size and contents in the background and updates the lines; closing the dialog cancels counting. OK
-///     sets <see cref="CheckedFlags" /> when check boxes can be changed.
+///     Modal properties dialog (Alt+Enter) showing the name and, in the General tab, the sections of lines of
+///     <see cref="EntryProperties" /> separated by lines, the used space of drives as a progress bar and the check boxes
+///     of <see cref="EntryProperties.FlagGroups" /> (attributes and Amiga protection bits), enabled when they can be
+///     changed, followed by the tabs of the plugins (<see cref="EntryProperties.Tabs" />, see
+///     <see cref="PropertiesTabView" />). Clicking the icon shows it in a higher resolution in the
+///     <see cref="IconViewerDialog" />. When opened it counts the size and contents in the background and updates the
+///     lines; closing the dialog cancels counting. When something can be changed the dialog has Save and Cancel, and
+///     Save sets <see cref="CheckedFlags" /> and <see cref="TabTexts" />; nothing is changed before.
 /// </summary>
 public partial class PropertiesDialog : Window
 {
     private readonly CancellationTokenSource _cancellationTokenSource = new();
     private readonly List<SelectableTextBlock> _valueTexts = [];
     private readonly List<List<CheckBox>> _flagCheckBoxes = [];
+    private readonly List<PropertiesTabView> _tabViews = [];
     private bool _closed;
 
     public PropertiesDialog()
@@ -35,6 +40,7 @@ public partial class PropertiesDialog : Window
                         .Select(checkBox => checkBox.IsChecked == true)
                         .ToList())
                     .ToList();
+                TabTexts = _tabViews.Select(tabView => tabView.EditedText).ToList();
             }
 
             Close();
@@ -84,7 +90,19 @@ public partial class PropertiesDialog : Window
 
         AddLines(properties.GetSections());
         AddFlagGroups(properties.FlagGroups);
-        CancelButton.IsVisible = properties.CanChangeFlags;
+        AddTabs(properties.Tabs);
+        if (properties.CanChange)
+        {
+            // Esc cancels instead of saving
+            OkButton.Content = "Save";
+            OkButton.IsCancel = false;
+            CancelButton.IsCancel = true;
+            CancelButton.IsVisible = true;
+        }
+
+        // the tabs are at least as high as the General tab, so the dialog doesn't shrink when changing tab
+        Opened += (_, _) => Dispatcher.UIThread.Post(() => TabControl.MinHeight = TabControl.Bounds.Height,
+            DispatcherPriority.Loaded);
         if (properties.UsedFraction is { } usedFraction)
         {
             UsedProgressBar.Value = usedFraction;
@@ -136,11 +154,30 @@ public partial class PropertiesDialog : Window
         }
     }
 
+    private void AddTabs(IReadOnlyList<PropertiesTab> tabs)
+    {
+        foreach (var tab in tabs)
+        {
+            var tabView = new PropertiesTabView(tab);
+            _tabViews.Add(tabView);
+            TabControl.Items.Add(new TabItem { Header = tab.Title, Content = tabView });
+        }
+    }
+
+    /// <summary>Adds a separator between sections, not above the first one.</summary>
+    private void AddSeparator()
+    {
+        if (LinesGrid.RowDefinitions.Count > 0)
+        {
+            AddRow(new Separator { Margin = new Thickness(0, 4) }, 0, 2);
+        }
+    }
+
     private void AddLines(IReadOnlyList<IReadOnlyList<PropertyLine>> sections)
     {
         foreach (var section in sections)
         {
-            AddRow(new Separator { Margin = new Thickness(0, 4) }, 0, 2);
+            AddSeparator();
             foreach (var line in section)
             {
                 var row = AddRow(new TextBlock
@@ -164,10 +201,16 @@ public partial class PropertiesDialog : Window
     }
 
     /// <summary>
-    ///     Whether each check box of each flag group is checked when OK was pressed and check boxes can be changed,
-    ///     for <see cref="NavigationContext.ChangeFlagsAsync" />. Null otherwise.
+    ///     Whether each check box of each flag group is checked when Save was pressed, for
+    ///     <see cref="NavigationContext.ChangePropertiesAsync" />. Null when not saved.
     /// </summary>
     public IReadOnlyList<IReadOnlyList<bool>>? CheckedFlags { get; private set; }
+
+    /// <summary>
+    ///     Text of each of <see cref="EntryProperties.Tabs" /> when Save was pressed, null for a tab without text, for
+    ///     <see cref="NavigationContext.ChangePropertiesAsync" />. Null when not saved.
+    /// </summary>
+    public IReadOnlyList<string?>? TabTexts { get; private set; }
 
     private void AddFlagGroups(IReadOnlyList<PropertyFlagGroup> groups)
     {
@@ -176,7 +219,7 @@ public partial class PropertiesDialog : Window
             return;
         }
 
-        AddRow(new Separator { Margin = new Thickness(0, 4) }, 0, 2);
+        AddSeparator();
         foreach (var group in groups)
         {
             var row = AddRow(new TextBlock

@@ -1067,25 +1067,27 @@ public sealed class MainWindow : Window
 
         Application.Run(dialog);
         var checkedFlags = dialog.CheckedFlags;
+        var tabTexts = dialog.TabTexts;
         dialog.Dispose();
         if (checkedFlags != null)
         {
-            await ChangeFlagsAsync(pane, properties, checkedFlags);
+            await ChangePropertiesAsync(pane, properties, checkedFlags, tabTexts);
         }
 
         pane.TableView.SetFocus();
     }
 
     /// <summary>
-    ///     Changes the attributes and Amiga protection bits of the entry of the properties dialog to its check boxes,
-    ///     refreshing both panes when changed, as the other pane may show the same location.
+    ///     Saves the properties dialog: changes the attributes and Amiga protection bits of the entry to its check boxes
+    ///     and saves the changed texts of its tabs, refreshing both panes when changed, as the other pane may show the
+    ///     same location.
     /// </summary>
-    private async Task ChangeFlagsAsync(Pane pane, EntryProperties properties,
-        IReadOnlyList<IReadOnlyList<bool>> checkedFlags)
+    private async Task ChangePropertiesAsync(Pane pane, EntryProperties properties,
+        IReadOnlyList<IReadOnlyList<bool>> checkedFlags, IReadOnlyList<string?>? tabTexts)
     {
         try
         {
-            if (!await pane.NavigationContext.ChangeFlagsAsync(properties, checkedFlags))
+            if (!await pane.NavigationContext.ChangePropertiesAsync(properties, checkedFlags, tabTexts))
             {
                 return;
             }

@@ -45,24 +45,29 @@ public class AmigaIconProvider : IIconProvider
         (await ReadIcons(name, stream, cancellationToken)).FirstOrDefault()?.Images[0];
 
     /// <summary>
-    /// The type of the icon (disk object), e.g. "Drawer", and its position on the Workbench, e.g. "10, 20", or "None"
-    /// when the Workbench places it.
+    /// The type of the icon (disk object), e.g. "Drawer", its position on the Workbench, e.g. "10, 20", or "None"
+    /// when the Workbench places it, and its size, e.g. "46 x 23 pixels": the size of the image shown (see
+    /// <see cref="ReadIcons" />), or of the disk object's gadget when it has no image.
     /// </summary>
     public async Task<IReadOnlyList<EntryProperty>> ReadIconProperties(string name, Stream stream,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(stream);
 
-        if (await ReadAmigaIconAsync(stream, cancellationToken) is not { DiskObject: { } diskObject })
+        if (await ReadAmigaIconAsync(stream, cancellationToken) is not { DiskObject: { } diskObject } amigaIcon)
         {
             return [];
         }
 
         var hasPosition = diskObject.CurrentX != NoIconPosition && diskObject.CurrentY != NoIconPosition;
+        var (width, height) = GetIcons(amigaIcon).FirstOrDefault()?.Images[0] is { } image
+            ? (image.Width, image.Height)
+            : (diskObject.Gadget?.Width ?? 0, diskObject.Gadget?.Height ?? 0);
         return
         [
             new EntryProperty("Icon type", GetTypeName(diskObject.Type)),
-            new EntryProperty("Icon position", hasPosition ? $"{diskObject.CurrentX}, {diskObject.CurrentY}" : "None")
+            new EntryProperty("Icon position", hasPosition ? $"{diskObject.CurrentX}, {diskObject.CurrentY}" : "None"),
+            new EntryProperty("Icon size", $"{width} x {height} pixels")
         ];
     }
 
