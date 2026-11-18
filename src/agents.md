@@ -297,7 +297,7 @@ dotnet test src/Hst.Commander.Core.Tests/Hst.Commander.Core.Tests.csproj --logge
 | `System.Linq.Async` | 6.0.1 | `Hst.Commander.Core` — async LINQ |
 | `Hst.Compression` | 0.4.96 | `Hst.Commander.Plugins.LhaLzx` — lha and lzx archive reading |
 | `SharpCompress` | 0.50.8 | `Hst.Commander.Plugins.RarSevenZip` — rar and 7z archive reading |
-| `Hst.Amiga` | 0.6.245 | `Hst.Commander.Plugins.Amiga` — Amiga rigid disk block, Fast File System and PFS3 reading and writing, .info icons; `Hst.Commander.Core` — UAE metadata (UAEFSDB and metafiles) |
+| `Hst.Amiga` | 1.0.289 | `Hst.Commander.Plugins.Amiga` — Amiga rigid disk block, Fast File System and PFS3 reading and writing, .info icons; `Hst.Commander.Core` — UAE metadata (UAEFSDB and metafiles) |
 | `LTRData.DiscUtils.Vhd` | 1.0.90 | `Hst.Commander.Plugins.Amiga`, `Hst.Commander.Plugins.Disk` — vhd images |
 | `LTRData.DiscUtils.Core`, `.Fat`, `.ExFat`, `.Ntfs`, `.Ext` | 1.0.90 | `Hst.Commander.Plugins.Disk` — MBR/GPT partition tables, FAT, exFAT and NTFS reading and writing, ext2/3/4 reading |
 | `FluentFTP` | 55.1.0 | `Hst.Commander.Plugins.Ftp` — FTP and FTPS client |

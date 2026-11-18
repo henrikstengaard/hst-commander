@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using Hst.Amiga.FileSystems.FastFileSystem;
 using Hst.Amiga.FileSystems.Pfs3;
 using Hst.Amiga.RigidDiskBlocks;
@@ -50,14 +51,51 @@ public static class AmigaFileSystems
 
         if (IsPfs3(partitionBlock.DosType))
         {
+            var fileNameSize = await ReadPfs3FileNameSize(stream, partitionBlock);
             var pfs3Volume = await Pfs3Volume.Mount(stream, partitionBlock);
 
             // the file name size includes the length of the name
-            return new AmigaFileSystemVolume(name, pfs3Volume, stream.CanWrite, pfs3Volume.g.fnsize - 1);
+            return new AmigaFileSystemVolume(name, pfs3Volume, stream.CanWrite, fileNameSize - 1);
         }
 
         throw new IOException(
             $"Partition '{name}' has the file system '{partitionBlock.DosTypeFormatted}', which is not supported");
+    }
+
+    /// <summary>
+    /// Size of file names of a PFS3 partition including their length byte, read from the root block extension (as
+    /// Hst.Amiga doesn't make it public): <c>fnsize</c> when the root block has an extension (MODE_EXTENSION) with it
+    /// set, otherwise PFS3's default of 32. The layout is PFS3's (pfs3aio blocks.h): the root block is the third block of
+    /// the partition with the options at offset 4 and the extension's block at 88, and the extension has the id "EX" at
+    /// offset 0 and fnsize at 56.
+    /// </summary>
+    private static async Task<int> ReadPfs3FileNameSize(Stream stream, PartitionBlock partitionBlock)
+    {
+        const int defaultFileNameSize = 32;
+        const uint modeExtension = 64;
+        const int sectorSize = 512;
+
+        var partitionOffset = (long)partitionBlock.LowCyl * partitionBlock.Surfaces * partitionBlock.BlocksPerTrack *
+                              partitionBlock.BlockSize;
+        var block = new byte[sectorSize];
+        stream.Position = partitionOffset + 2L * sectorSize;
+        await stream.ReadExactlyAsync(block);
+        var options = BinaryPrimitives.ReadUInt32BigEndian(block.AsSpan(4));
+        var extension = BinaryPrimitives.ReadUInt32BigEndian(block.AsSpan(88));
+        if ((options & modeExtension) == 0 || extension == 0)
+        {
+            return defaultFileNameSize;
+        }
+
+        stream.Position = partitionOffset + (long)extension * sectorSize;
+        await stream.ReadExactlyAsync(block);
+        if (block[0] != 'E' || block[1] != 'X')
+        {
+            return defaultFileNameSize;
+        }
+
+        var fileNameSize = BinaryPrimitives.ReadUInt16BigEndian(block.AsSpan(56));
+        return fileNameSize > 1 ? fileNameSize : defaultFileNameSize;
     }
 
     /// <summary>

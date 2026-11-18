@@ -158,11 +158,9 @@ SECTIONS = [
           pkg('runtime.win-x64.runtime.native.System.Data.SqlClient.sni', 'ThirdPartyNotices.txt'))),
     ('.NET libraries', 'https://github.com/dotnet', 'MIT', None, ['Microsoft.*', 'System.*', 'runtime.*'],
      join(MIT_DOTNET,
-          'These libraries are part of .NET (https://github.com/dotnet/runtime, https://github.com/dotnet/roslyn,\n'
-          'https://github.com/dotnet/wcf and https://github.com/dotnet/maintenance-packages). The third-party\n'
-          'material they include is listed in THIRD-PARTY-NOTICES-DOTNET.txt (dotnet/runtime) and below\n'
-          '(dotnet/wcf).',
-          pkg('System.ServiceModel.Primitives', 'THIRD-PARTY-NOTICES.TXT'))),
+          'These libraries are part of .NET (https://github.com/dotnet/runtime, https://github.com/dotnet/roslyn\n'
+          'and https://github.com/dotnet/maintenance-packages). The third-party material they include is listed\n'
+          'in THIRD-PARTY-NOTICES-DOTNET.txt (dotnet/runtime).')),
 ]
 
 HEADER = """THIRD-PARTY SOFTWARE NOTICES AND INFORMATION
