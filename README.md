@@ -24,7 +24,7 @@ Hst Commander comes with two front-ends that have the same functionality:
   - ISO 9660 images.
   - Zip, lha, lzx, rar and 7z archives.
   - MBR and GPT disk images (raw or vhd) with FAT and NTFS partitions, PiStorm disks and hybrid MBR/RDB disks.
-  - Amiga disk files (adf) and hard disk images with a rigid disk block (RDB), with Fast File System and PFS3 partitions.
+  - Amiga disk files (adf) and hard disk images with a rigid disk block (RDB), with Fast File System, PFS3 and SFS partitions.
 - Writing to Amiga adf and RDB images and FAT and NTFS partitions of disk images, shared safely by both panes.
 - Reading and writing physical disks, internal and external (e.g. USB), opened like MBR, GPT and RDB disk images and shown with their model (as administrator or root).
 - Browsing, reading and writing Windows file shares and other SMB 2/3 servers with the SMB plugin (installed separately), entered as `\\server\share` or `smb://server/share`, asking for a user name and password when needed.
@@ -126,7 +126,7 @@ Hst Commander is in early development. Not implemented yet:
 - Edit (F4); changing the viewer's encoding, word wrapping and going to an offset.
 - Writing to ISO images and zip, lha, lzx, rar and 7z archives, and to Amiga images inside other images.
 - Changing RDB, MBR and GPT partitions.
-- Other Amiga file systems (e.g. SFS), other PC file systems (e.g. exFAT, ext) and vhdx/vmdk images.
+- Other Amiga file systems (e.g. SFS\2), other PC file systems (e.g. exFAT, ext) and vhdx/vmdk images.
 - Unloading or reloading plugins while running.
 
 ## License

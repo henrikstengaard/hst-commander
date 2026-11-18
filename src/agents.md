@@ -159,7 +159,7 @@ These apply across features and aren't obvious from a single file:
 - SMB 1, SMB ports other than 445 and browsing the network for servers (SMB credentials are only saved with bookmarks).
 - Implicit FTPS, SFTP private keys, confirming new server keys and writable images on FTP/SFTP servers.
 - Writing to images other than Amiga adf and RDB images; ISO images and zip, lha, lzx, rar and 7z archives are read-only, as are Amiga images inside other images.
-- Changing RDB, MBR and GPT partitions, other Amiga file systems (e.g. SFS), writing ext2/3/4, other PC file systems (btrfs, XFS, ...) and vhdx/vmdk images.
+- Changing RDB, MBR and GPT partitions, other Amiga file systems (e.g. SFS\2), writing ext2/3/4, other PC file systems (btrfs, XFS, ...) and vhdx/vmdk images.
 - Unloading or reloading plugins while running, and a list of loaded plugins in the UI.
 
 ---
@@ -297,7 +297,7 @@ dotnet test src/Hst.Commander.Core.Tests/Hst.Commander.Core.Tests.csproj --logge
 | `System.Linq.Async` | 6.0.1 | `Hst.Commander.Core` — async LINQ |
 | `Hst.Compression` | 0.4.96 | `Hst.Commander.Plugins.LhaLzx` — lha and lzx archive reading |
 | `SharpCompress` | 0.50.8 | `Hst.Commander.Plugins.RarSevenZip` — rar and 7z archive reading |
-| `Hst.Amiga` | 1.0.289 | `Hst.Commander.Plugins.Amiga` — Amiga rigid disk block, Fast File System and PFS3 reading and writing, .info icons; `Hst.Commander.Core` — UAE metadata (UAEFSDB and metafiles) |
+| `Hst.Amiga` | 1.0.289 | `Hst.Commander.Plugins.Amiga` — Amiga rigid disk block, Fast File System, PFS3 and Smart File System reading and writing, .info icons; `Hst.Commander.Core` — UAE metadata (UAEFSDB and metafiles) |
 | `LTRData.DiscUtils.Vhd` | 1.0.90 | `Hst.Commander.Plugins.Amiga`, `Hst.Commander.Plugins.Disk` — vhd images |
 | `LTRData.DiscUtils.Core`, `.Fat`, `.ExFat`, `.Ntfs`, `.Ext` | 1.0.90 | `Hst.Commander.Plugins.Disk` — MBR/GPT partition tables, FAT, exFAT and NTFS reading and writing, ext2/3/4 reading |
 | `FluentFTP` | 55.1.0 | `Hst.Commander.Plugins.Ftp` — FTP and FTPS client |

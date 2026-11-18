@@ -10,7 +10,7 @@ namespace Hst.Commander.Plugins.Amiga;
 /// table as the directory "rdb" (shown as "RDB"), listing the partitions as directories named by their partition
 /// number (1, 2, ...), in the order of the rigid disk block, so paths show the partition table, e.g. "rdb\1". The partitions are shown with
 /// their number, drive name and volume name (e.g. "1 - DH0 - Workbench", see <see cref="IEntry.DisplayName" />) and
-/// their partition details in the properties dialog (<see cref="IEntry.Details" />). A partition is mounted (Fast File System or PFS3) when listed or
+/// their partition details in the properties dialog (<see cref="IEntry.Details" />). A partition is mounted (Fast File System, PFS3 or SFS) when listed or
 /// opened and stays mounted until the volume is disposed. The partitions can't be changed,
 /// their file systems are writable when the stream is.
 /// </summary>
@@ -107,7 +107,7 @@ public class RdbVolume : IVolume, IDisposable
 
     /// <summary>
     /// Creates the entry of a partition, mounting its file system the first time for the volume name and space;
-    /// a partition that can't be mounted (e.g. SFS) is shown without them.
+    /// a partition that can't be mounted (e.g. SFS\2) is shown without them.
     /// </summary>
     private async Task<IEntry> CreatePartitionEntry(int partitionIndex)
     {

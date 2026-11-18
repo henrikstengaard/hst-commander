@@ -1,18 +1,20 @@
 using System.Buffers.Binary;
 using Hst.Amiga.FileSystems.FastFileSystem;
 using Hst.Amiga.FileSystems.Pfs3;
+using Hst.Amiga.FileSystems.SmartFileSystem;
 using Hst.Amiga.RigidDiskBlocks;
 
 namespace Hst.Commander.Plugins.Amiga;
 
 /// <summary>
 /// Mounts the Amiga file systems supported: Fast File System (DOS\0 to DOS\7, long file names with DOS\6 and DOS\7)
-/// and PFS3 (PFS\3 and PDS\3).
+/// PFS3 (PFS\3 and PDS\3) and Smart File System (SFS\0; SFS\2 isn't supported by Hst.Amiga).
 /// </summary>
 public static class AmigaFileSystems
 {
     private const int MaxNameLength = 30;
     private const int MaxLongNameLength = 107;
+    private const int SmartFileSystemMaxNameLength = 100;
 
     /// <summary>Mounts the Fast File System of an adf, detected by <see cref="AdfFileVolumeProvider" />.</summary>
     public static async Task<AmigaFileSystemVolume> MountAdf(Stream stream)
@@ -31,7 +33,7 @@ public static class AmigaFileSystems
 
     /// <summary>
     /// Mounts the file system of a partition in a rigid disk block. Throws <see cref="IOException" /> when the file
-    /// system isn't supported, e.g. SFS.
+    /// system isn't supported, e.g. SFS\2.
     /// </summary>
     /// <param name="stream">Stream of the disk with the rigid disk block.</param>
     /// <param name="partitionBlock">Partition to mount.</param>
@@ -56,6 +58,13 @@ public static class AmigaFileSystems
 
             // the file name size includes the length of the name
             return new AmigaFileSystemVolume(name, pfs3Volume, stream.CanWrite, fileNameSize - 1);
+        }
+
+        if (IsSmartFileSystem(partitionBlock.DosType))
+        {
+            var smartFileSystemVolume = await SmartFileSystemVolume.Mount(stream, partitionBlock);
+            return new AmigaFileSystemVolume(name, smartFileSystemVolume, stream.CanWrite,
+                SmartFileSystemMaxNameLength);
         }
 
         throw new IOException(
@@ -137,6 +146,9 @@ public static class AmigaFileSystems
     private static bool IsPfs3(byte[] dosType) =>
         dosType.Length == 4 && (dosType[0] == 'P' && dosType[1] is (byte)'F' or (byte)'D') && dosType[2] == 'S' &&
         dosType[3] == 3;
+
+    private static bool IsSmartFileSystem(byte[] dosType) =>
+        dosType.Length == 4 && dosType[0] == 'S' && dosType[1] == 'F' && dosType[2] == 'S' && dosType[3] == 0;
 
     private static int GetFastFileSystemMaxNameLength(byte[] dosType) =>
         dosType[3] is 6 or 7 ? MaxLongNameLength : MaxNameLength;
