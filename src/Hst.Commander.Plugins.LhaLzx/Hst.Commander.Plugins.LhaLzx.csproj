@@ -11,7 +11,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="Hst.Compression" Version="0.4.96" />
+      <PackageReference Include="Hst.Compression" Version="1.0.104" />
     </ItemGroup>
 
 </Project>

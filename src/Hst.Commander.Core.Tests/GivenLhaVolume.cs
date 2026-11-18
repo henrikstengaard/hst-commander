@@ -56,6 +56,22 @@ public class GivenLhaVolume
     }
 
     [Fact]
+    public async Task When_ListEntries_Then_ModifiedDatesAreTheDatesOfTheHeaders()
+    {
+        // arrange
+        var lhaVolume = await CreateLhaVolumeAsync("amiga.lha");
+
+        // act
+        var entries = await lhaVolume.ListEntries().ToListAsync();
+
+        // assert - MS-DOS dates of level 0 headers, as they are without a time zone
+        Assert.Equal(new DateTime(1980, 3, 28, 9, 28, 56, DateTimeKind.Utc),
+            entries.Single(entry => entry.Name == "test.txt").ModifiedDate);
+        Assert.Equal(new DateTime(1980, 3, 28, 9, 27, 44, DateTimeKind.Utc),
+            entries.Single(entry => entry.Name == "test1.info").ModifiedDate);
+    }
+
+    [Fact]
     public async Task When_ChangeDirectory_Then_EntriesInDirectoryAreListed()
     {
         // arrange

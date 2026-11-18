@@ -21,10 +21,10 @@ public class LzxVolume : ArchiveVolume<LzxEntry>
     {
         ArgumentNullException.ThrowIfNull(stream);
 
-        // the archive isn't disposed by the volume, as it would dispose the stream owned by Hst Commander
-        var lzxArchive = new LzxArchive(stream, LzxOptions.AmigaLzxOptions);
+        // the stream is left open, as it's owned by Hst Commander
+        var lzxArchive = new LzxArchive(stream, LzxOptions.AmigaLzxOptions, leaveOpen: true);
         var lzxVolume = new LzxVolume(lzxArchive);
-        foreach (var lzxEntry in await lzxArchive.Entries())
+        foreach (var lzxEntry in await lzxArchive.EntriesAsync())
         {
             // dates are stored in local time without a time zone
             lzxVolume.AddEntry(lzxEntry.Name, lzxEntry.UnpackedSize, lzxEntry.Date.ToUniversalTime(), lzxEntry,
@@ -62,5 +62,5 @@ public class LzxVolume : ArchiveVolume<LzxEntry>
 
     protected override async Task<Stream> OpenArchiveEntry(string name, LzxEntry archiveEntry,
         CancellationToken cancellationToken) =>
-        await _lzxArchive.OpenEntry(archiveEntry);
+        await _lzxArchive.OpenEntryAsync(archiveEntry, cancellationToken);
 }
