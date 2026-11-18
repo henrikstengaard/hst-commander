@@ -19,7 +19,7 @@ public sealed record PropertyFlag(string Label, string Description, bool IsSet)
 
 /// <summary>
 ///     A line of check boxes of the properties dialog, e.g. the "Attributes" of a file or the "Protection bits" of an
-///     Amiga file, which can be changed with <see cref="NavigationContext.ChangeFlagsAsync" /> when
+///     Amiga file, which can be changed with <see cref="NavigationContext.ChangePropertiesAsync" /> when
 ///     <see cref="CanChange" /> is true.
 /// </summary>
 public sealed record PropertyFlagGroup(string Label, IReadOnlyList<PropertyFlag> Flags, bool CanChange)
@@ -80,6 +80,25 @@ public sealed class EntryProperties
         FlagGroups = flagGroups ?? [];
         Entry = entry;
         UaeMetadata = uaeMetadata;
+    }
+
+    /// <summary>
+    ///     Tabs of the plugins shown after the General tab (see <see cref="IPropertiesTabProvider" />), e.g. the comment
+    ///     and tooltypes of an Amiga entry. Empty for several entries and drives.
+    /// </summary>
+    public IReadOnlyList<PropertiesTab> Tabs { get; private set; } = [];
+
+    /// <summary>True when check boxes of <see cref="FlagGroups" /> or texts of <see cref="Tabs" /> can be changed.</summary>
+    public bool CanChange => CanChangeFlags || Tabs.Any(tab => tab.CanChange);
+
+    /// <summary>The entry given to the tab providers, null for several entries and drives.</summary>
+    internal EntryPropertiesContext? Context { get; private set; }
+
+    private EntryProperties WithTabs(IReadOnlyList<PropertiesTab> tabs, EntryPropertiesContext? context)
+    {
+        Tabs = tabs;
+        Context = context;
+        return this;
     }
 
     /// <summary>Name shown at the top, e.g. "a.txt" or "3 Files, 2 Folders".</summary>
@@ -155,9 +174,12 @@ public sealed class EntryProperties
     /// <param name="iconProperties">
     ///     Properties of the icon file of a single entry read by its icon provider, e.g. the position of an Amiga icon.
     /// </param>
+    /// <param name="tabs">Tabs of the plugins of a single entry.</param>
+    /// <param name="context">The single entry given to the tab providers.</param>
     internal static EntryProperties Create(IReadOnlyList<IEntry> entries, string location, string? localDirectory,
         bool isDriveList, UaeMetadataNode? uaeMetadata = null, PropertyChanges? changes = null,
-        IReadOnlyList<EntryProperty>? iconProperties = null)
+        IReadOnlyList<EntryProperty>? iconProperties = null, IReadOnlyList<PropertiesTab>? tabs = null,
+        EntryPropertiesContext? context = null)
     {
         ArgumentNullException.ThrowIfNull(entries);
         if (entries.Count == 0)
@@ -172,7 +194,7 @@ public sealed class EntryProperties
 
         return entries.Count == 1
             ? CreateForEntry(entries[0], location, localDirectory, uaeMetadata, changes ?? PropertyChanges.None,
-                iconProperties ?? [])
+                iconProperties ?? []).WithTabs(tabs ?? [], context)
             : CreateForEntries(entries, location, localDirectory);
     }
 
@@ -305,9 +327,9 @@ public sealed class EntryProperties
             amigaSection.Add(new Field("Amiga name", uaeMetadata.AmigaName));
         }
 
+        // the comment is shown in a tab of the Amiga plugin
         if ((entry.AmigaMetadata ?? uaeMetadata?.Metadata) is { } amigaMetadata)
         {
-            amigaSection.Add(new Field("Comment", amigaMetadata.Comment));
             flagGroups.Add(CreateProtectionBitsGroup(amigaMetadata.ProtectionBits, changes.ProtectionBits));
         }
 

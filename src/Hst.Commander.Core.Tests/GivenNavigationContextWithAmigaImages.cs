@@ -607,7 +607,7 @@ public class GivenNavigationContextWithAmigaImages : IDisposable
         var lines = GetLines(properties);
         Assert.Equal("-s--rwed", FormatFlags(GetProtectionBits(properties)));
         Assert.True(GetProtectionBits(properties).CanChange);
-        Assert.Equal("Comment", lines["Comment"]);
+        Assert.Equal("Comment", GetTabText(properties, "Comment"));
         Assert.DoesNotContain("Amiga name", lines.Keys);
         Assert.DoesNotContain(properties.FlagGroups, group => group.Label == "Attributes");
     }
@@ -623,7 +623,7 @@ public class GivenNavigationContextWithAmigaImages : IDisposable
         var properties = await navigationContext.GetPropertiesAsync([entry]);
 
         // act
-        var changed = await navigationContext.ChangeFlagsAsync(properties, CheckProtectionBits(properties, "-sp-rwe-"));
+        var changed = await navigationContext.ChangePropertiesAsync(properties, CheckProtectionBits(properties, "-sp-rwe-"));
 
         // assert
         Assert.True(changed);
@@ -680,7 +680,7 @@ public class GivenNavigationContextWithAmigaImages : IDisposable
         Assert.Equal("file*1", lines["Amiga name"]);
         Assert.Equal("-s--rwed", FormatFlags(GetProtectionBits(properties)));
         Assert.True(GetProtectionBits(properties).CanChange);
-        Assert.Equal("Comment", lines["Comment"]);
+        Assert.Equal("Comment", GetTabText(properties, "Comment"));
         Assert.Contains(properties.FlagGroups, group => group.Label == "Attributes");
         Assert.DoesNotContain(plainProperties.FlagGroups, group => group.Label == "Protection bits");
     }
@@ -705,7 +705,7 @@ public class GivenNavigationContextWithAmigaImages : IDisposable
         var properties = await localContext.GetPropertiesAsync([localEntry]);
 
         // act
-        var changed = await localContext.ChangeFlagsAsync(properties, CheckProtectionBits(properties, "-sp-rwe-"));
+        var changed = await localContext.ChangePropertiesAsync(properties, CheckProtectionBits(properties, "-sp-rwe-"));
 
         // assert - the metadata is changed in the same metadata file
         Assert.True(changed);
@@ -714,7 +714,7 @@ public class GivenNavigationContextWithAmigaImages : IDisposable
             [(await localContext.ListEntriesAsync()).Single(entry => entry.Name == localEntry.Name)]);
         var lines = GetLines(changedProperties);
         Assert.Equal("file*1", lines["Amiga name"]);
-        Assert.Equal("Comment", lines["Comment"]);
+        Assert.Equal("Comment", GetTabText(changedProperties, "Comment"));
         Assert.Equal("-sp-rwe-", FormatFlags(GetProtectionBits(changedProperties)));
     }
 
@@ -753,9 +753,432 @@ public class GivenNavigationContextWithAmigaImages : IDisposable
         var localEntries = await localContext.ListEntriesAsync();
         Assert.Contains(localEntries, entry => entry.Name == "_UAEFSDB.___");
         Assert.DoesNotContain(localEntries, entry => entry.Name.IndexOfAny(['*', '<']) >= 0);
-        var lines = GetLines(await localContext.GetPropertiesAsync(
-            [localEntries.First(entry => entry.Name.StartsWith("__uae___file2"))]));
+        var file2Properties = await localContext.GetPropertiesAsync(
+            [localEntries.First(entry => entry.Name.StartsWith("__uae___file2"))]);
+        var lines = GetLines(file2Properties);
         Assert.Equal("file2<", lines["Amiga name"]);
-        Assert.Equal("comment on file2", lines["Comment"]);
+        Assert.Equal("comment on file2", GetTabText(file2Properties, "Comment"));
+    }
+
+    private static PropertiesTab GetTab(EntryProperties properties, string title) =>
+        Assert.Single(properties.Tabs, tab => tab.Title == title);
+
+    private static string? GetTabText(EntryProperties properties, string title) => GetTab(properties, title).Text;
+
+    /// <summary>Texts of the tabs of properties, with the text of one tab changed.</summary>
+    private static IReadOnlyList<string?> ChangeTabText(EntryProperties properties, string title, string? text) =>
+        properties.Tabs.Select(tab => tab.Title == title ? text : tab.Text).ToList();
+
+    /// <summary>Check boxes of properties as they are.</summary>
+    private static IReadOnlyList<IReadOnlyList<bool>> GetFlags(EntryProperties properties) =>
+        properties.FlagGroups.Select(group => (IReadOnlyList<bool>)group.Flags.Select(flag => flag.IsSet).ToList())
+            .ToList();
+
+    private async Task<(NavigationContext NavigationContext, EntryProperties Properties)> GetAdfItemPropertiesAsync()
+    {
+        await CreateAdfWithItemAsync(Path.Combine(_rootPath, "disk.adf"));
+        var navigationContext = new NavigationContext(_rootPath);
+        await OpenAsync(navigationContext, "disk.adf");
+        var entry = (await navigationContext.ListEntriesAsync()).First(entry => entry.Name == "file*1");
+        return (navigationContext, await navigationContext.GetPropertiesAsync([entry]));
+    }
+
+    private static async Task<IEntry> GetEntryAsync(NavigationContext navigationContext, string name) =>
+        (await navigationContext.ListEntriesAsync()).First(entry => entry.Name == name);
+
+    [Fact]
+    public async Task When_PropertiesOfAdfEntryAreShown_Then_CommentTabCanBeChanged()
+    {
+        // arrange
+        var (navigationContext, properties) = await GetAdfItemPropertiesAsync();
+        using var _ = navigationContext;
+
+        // act
+        var tab = GetTab(properties, "Comment");
+
+        // assert
+        Assert.Equal("Comment", tab.Text);
+        Assert.True(tab.CanChange);
+        Assert.True(properties.CanChange);
+        Assert.False(tab.IsMultiline);
+        Assert.Equal(79, tab.MaxLength);
+        Assert.DoesNotContain("Comment", GetLines(properties).Keys);
+    }
+
+    [Fact]
+    public async Task When_CommentIsChanged_Then_ItIsWrittenWhenSaved()
+    {
+        // arrange
+        var (navigationContext, properties) = await GetAdfItemPropertiesAsync();
+        using var _ = navigationContext;
+
+        // act
+        var changed = await navigationContext.ChangePropertiesAsync(properties, GetFlags(properties),
+            ChangeTabText(properties, "Comment", "New comment"));
+
+        // assert - the protection bits are kept
+        Assert.True(changed);
+        Assert.Equal(new AmigaMetadata(0x40, "New comment"),
+            (await GetEntryAsync(navigationContext, "file*1")).AmigaMetadata);
+    }
+
+    [Fact]
+    public async Task When_CommentIsDeleted_Then_EntryHasNoCommentAndTabShowsNone()
+    {
+        // arrange
+        var (navigationContext, properties) = await GetAdfItemPropertiesAsync();
+        using var _ = navigationContext;
+
+        // act
+        var changed = await navigationContext.ChangePropertiesAsync(properties, GetFlags(properties),
+            ChangeTabText(properties, "Comment", null));
+
+        // assert
+        Assert.True(changed);
+        var entry = await GetEntryAsync(navigationContext, "file*1");
+        Assert.Equal(new AmigaMetadata(0x40, ""), entry.AmigaMetadata);
+        var tab = GetTab(await navigationContext.GetPropertiesAsync([entry]), "Comment");
+        Assert.Null(tab.Text);
+        Assert.Equal("No comment", tab.NoTextMessage);
+    }
+
+    [Fact]
+    public async Task When_ProtectionBitsAndCommentAreChanged_Then_BothAreWritten()
+    {
+        // arrange
+        var (navigationContext, properties) = await GetAdfItemPropertiesAsync();
+        using var _ = navigationContext;
+
+        // act
+        var changed = await navigationContext.ChangePropertiesAsync(properties,
+            CheckProtectionBits(properties, "-sp-rwe-"), ChangeTabText(properties, "Comment", "New comment"));
+
+        // assert
+        Assert.True(changed);
+        Assert.Equal(new AmigaMetadata(0x61, "New comment"),
+            (await GetEntryAsync(navigationContext, "file*1")).AmigaMetadata);
+    }
+
+    [Fact]
+    public async Task When_NothingIsChanged_Then_NothingIsWritten()
+    {
+        // arrange
+        var (navigationContext, properties) = await GetAdfItemPropertiesAsync();
+        using var _ = navigationContext;
+
+        // act - an empty text is no text, so the unchanged comment isn't saved
+        var changed = await navigationContext.ChangePropertiesAsync(properties, GetFlags(properties),
+            properties.Tabs.Select(tab => tab.Text).ToList());
+
+        // assert
+        Assert.False(changed);
+    }
+
+    [Fact]
+    public async Task When_CommentIsTooLong_Then_SavingFails()
+    {
+        // arrange
+        var (navigationContext, properties) = await GetAdfItemPropertiesAsync();
+        using var _ = navigationContext;
+
+        // act & assert
+        await Assert.ThrowsAsync<IOException>(() => navigationContext.ChangePropertiesAsync(properties,
+            GetFlags(properties), ChangeTabText(properties, "Comment", new string('a', 80))));
+    }
+
+    [Fact]
+    public async Task When_PropertiesOfLhaEntryAreShown_Then_CommentTabCantBeChanged()
+    {
+        // arrange
+        File.Copy(ArchiveTestData.GetPath("special_chars.lha"), Path.Combine(_rootPath, "special_chars.lha"));
+        using var navigationContext = new NavigationContext(_rootPath);
+        await OpenAsync(navigationContext, "special_chars.lha");
+
+        // act
+        var properties = await navigationContext.GetPropertiesAsync([await GetEntryAsync(navigationContext, "file2<")]);
+
+        // assert
+        var tab = GetTab(properties, "Comment");
+        Assert.Equal("comment on file2", tab.Text);
+        Assert.False(tab.CanChange);
+        Assert.False(properties.CanChange);
+    }
+
+    [Fact]
+    public async Task When_LocalFileHasNoAmigaMetadata_Then_CommentTabHasNoCommentAndCanBeChanged()
+    {
+        // arrange
+        await File.WriteAllTextAsync(Path.Combine(_rootPath, "file.txt"), "text");
+        using var navigationContext = new NavigationContext(_rootPath);
+
+        // act
+        var properties = await navigationContext.GetPropertiesAsync([await GetEntryAsync(navigationContext, "file.txt")]);
+
+        // assert
+        var tab = GetTab(properties, "Comment");
+        Assert.Null(tab.Text);
+        Assert.True(tab.CanChange);
+        Assert.DoesNotContain(properties.FlagGroups, group => group.Label == "Protection bits");
+    }
+
+    [Fact]
+    public async Task When_UaeMetadataFormatIsNone_Then_CommentOfLocalFileCantBeChanged()
+    {
+        // arrange
+        await File.WriteAllTextAsync(Path.Combine(_rootPath, "file.txt"), "text");
+        using var navigationContext = new NavigationContext(_rootPath) { UaeMetadata = UaeMetadataFormat.None };
+
+        // act
+        var properties = await navigationContext.GetPropertiesAsync([await GetEntryAsync(navigationContext, "file.txt")]);
+
+        // assert
+        Assert.False(GetTab(properties, "Comment").CanChange);
+    }
+
+    [Theory]
+    [InlineData(UaeMetadataFormat.UaeFsDb, "_UAEFSDB.___")]
+    [InlineData(UaeMetadataFormat.UaeMetafile, "file.txt.uaem")]
+    public async Task When_CommentIsAddedToLocalFileAndDeleted_Then_UaeMetadataIsCreatedAndDeleted(
+        UaeMetadataFormat format, string metadataFileName)
+    {
+        // arrange
+        await File.WriteAllTextAsync(Path.Combine(_rootPath, "file.txt"), "text");
+        using var navigationContext = new NavigationContext(_rootPath) { UaeMetadata = format };
+        var properties = await navigationContext.GetPropertiesAsync([await GetEntryAsync(navigationContext, "file.txt")]);
+
+        // act - add a comment
+        var added = await navigationContext.ChangePropertiesAsync(properties, GetFlags(properties),
+            ChangeTabText(properties, "Comment", "New comment"));
+
+        // assert - the metadata file is created with the comment and the default protection bits
+        Assert.True(added);
+        Assert.True(File.Exists(Path.Combine(_rootPath, metadataFileName)));
+        var addedProperties = await navigationContext.GetPropertiesAsync(
+            [await GetEntryAsync(navigationContext, "file.txt")]);
+        Assert.Equal("New comment", GetTabText(addedProperties, "Comment"));
+        Assert.Equal("----rwed", FormatFlags(GetProtectionBits(addedProperties)));
+
+        // act - change the comment
+        await navigationContext.ChangePropertiesAsync(addedProperties, GetFlags(addedProperties),
+            ChangeTabText(addedProperties, "Comment", "Changed comment"));
+        var changedProperties = await navigationContext.GetPropertiesAsync(
+            [await GetEntryAsync(navigationContext, "file.txt")]);
+
+        // assert
+        Assert.Equal("Changed comment", GetTabText(changedProperties, "Comment"));
+
+        // act - delete the comment
+        var deleted = await navigationContext.ChangePropertiesAsync(changedProperties, GetFlags(changedProperties),
+            ChangeTabText(changedProperties, "Comment", null));
+
+        // assert - the metadata isn't needed anymore, so its file is deleted
+        Assert.True(deleted);
+        Assert.False(File.Exists(Path.Combine(_rootPath, metadataFileName)));
+        Assert.Null(GetTabText(await navigationContext.GetPropertiesAsync(
+            [await GetEntryAsync(navigationContext, "file.txt")]), "Comment"));
+    }
+
+    [Fact]
+    public async Task When_CommentOfOneOfSeveralEntriesInUaeFsDbIsDeleted_Then_OtherEntriesKeepTheirMetadata()
+    {
+        // arrange
+        await File.WriteAllTextAsync(Path.Combine(_rootPath, "file1.txt"), "text");
+        await File.WriteAllTextAsync(Path.Combine(_rootPath, "file2.txt"), "text");
+        using var navigationContext = new NavigationContext(_rootPath) { UaeMetadata = UaeMetadataFormat.UaeFsDb };
+        foreach (var name in new[] { "file1.txt", "file2.txt" })
+        {
+            var entryProperties = await navigationContext.GetPropertiesAsync(
+                [await GetEntryAsync(navigationContext, name)]);
+            await navigationContext.ChangePropertiesAsync(entryProperties, GetFlags(entryProperties),
+                ChangeTabText(entryProperties, "Comment", $"Comment of {name}"));
+        }
+
+        var properties = await navigationContext.GetPropertiesAsync(
+            [await GetEntryAsync(navigationContext, "file1.txt")]);
+
+        // act
+        await navigationContext.ChangePropertiesAsync(properties, GetFlags(properties),
+            ChangeTabText(properties, "Comment", null));
+
+        // assert
+        Assert.True(File.Exists(Path.Combine(_rootPath, "_UAEFSDB.___")));
+        Assert.Null(GetTabText(await navigationContext.GetPropertiesAsync(
+            [await GetEntryAsync(navigationContext, "file1.txt")]), "Comment"));
+        Assert.Equal("Comment of file2.txt", GetTabText(await navigationContext.GetPropertiesAsync(
+            [await GetEntryAsync(navigationContext, "file2.txt")]), "Comment"));
+    }
+
+    [Fact]
+    public async Task When_CommentIsAddedInRdbImage_Then_ItIsWrittenToTheAmigaFileSystem()
+    {
+        // arrange - a file in the first partition of an RDB image
+        var imagePath = Path.Combine(_rootPath, "disk.hdf");
+        await AmigaTestData.CreateRdbImage(imagePath, AmigaTestData.Dos3DosType, AmigaTestData.Pfs3DosType);
+        using var navigationContext = new NavigationContext(_rootPath);
+        await OpenAsync(navigationContext, "disk.hdf");
+        await OpenAsync(navigationContext, "rdb");
+        await navigationContext.OpenEntryAsync((await navigationContext.ListEntriesAsync())
+            .First(entry => entry.Name != Paths.Parent));
+        var localFile = Path.Combine(_rootPath, "file.txt");
+        await File.WriteAllTextAsync(localFile, "text");
+        using var localContext = new NavigationContext(_rootPath);
+        await localContext.CopyAsync([await GetEntryAsync(localContext, "file.txt")], navigationContext,
+            navigationContext.CurrentPath, "*");
+        var entry = await GetEntryAsync(navigationContext, "file.txt");
+        var properties = await navigationContext.GetPropertiesAsync([entry]);
+
+        // act
+        var changed = await navigationContext.ChangePropertiesAsync(properties, GetFlags(properties),
+            ChangeTabText(properties, "Comment", "New comment"));
+
+        // assert - no UAE metadata, the comment is in the file system
+        Assert.True(changed);
+        Assert.Equal("New comment", (await GetEntryAsync(navigationContext, "file.txt")).AmigaMetadata?.Comment);
+        Assert.DoesNotContain(await ListNamesAsync(navigationContext), name => name.StartsWith("_UAEFSDB"));
+    }
+
+    [Theory]
+    [InlineData(UaeMetadataFormat.UaeFsDb)]
+    [InlineData(UaeMetadataFormat.UaeMetafile)]
+    public async Task When_CommentOfLocalEntryWithUaeMetadataIsChanged_Then_MetadataIsWritten(
+        UaeMetadataFormat format)
+    {
+        // arrange - an Amiga item copied to a local directory with UAE metadata
+        await CreateAdfWithItemAsync(Path.Combine(_rootPath, "disk.adf"));
+        var localPath = Directory.CreateDirectory(Path.Combine(_rootPath, "local")).FullName;
+        using var adfContext = new NavigationContext(_rootPath) { UaeMetadata = format };
+        using var localContext = new NavigationContext(localPath) { UaeMetadata = format };
+        await OpenAsync(adfContext, "disk.adf");
+        await adfContext.CopyAsync([await GetEntryAsync(adfContext, "file*1")], localContext,
+            localContext.CurrentPath, "*");
+        var localEntry = (await localContext.ListEntriesAsync()).Single(entry => entry.Name != Paths.Parent &&
+            entry.Name != "_UAEFSDB.___" && !entry.Name.EndsWith(".uaem"));
+        var properties = await localContext.GetPropertiesAsync([localEntry]);
+
+        // act
+        var changed = await localContext.ChangePropertiesAsync(properties, CheckProtectionBits(properties, "-sp-rwe-"),
+            ChangeTabText(properties, "Comment", "New comment"));
+
+        // assert
+        Assert.True(changed);
+        var changedProperties = await localContext.GetPropertiesAsync(
+            [await GetEntryAsync(localContext, localEntry.Name)]);
+        Assert.Equal("New comment", GetTabText(changedProperties, "Comment"));
+        Assert.Equal("-sp-rwe-", FormatFlags(GetProtectionBits(changedProperties)));
+    }
+
+    [Fact]
+    public async Task When_IconHasNoTooltypes_Then_TooltypesCanBeAdded()
+    {
+        // arrange
+        await File.WriteAllTextAsync(Path.Combine(_rootPath, "file"), "text");
+        await File.WriteAllBytesAsync(Path.Combine(_rootPath, "file.info"), await AmigaIconTestData.CreatePlanarIcon());
+        using var navigationContext = new NavigationContext(_rootPath);
+        var properties = await navigationContext.GetPropertiesAsync([await GetEntryAsync(navigationContext, "file")]);
+        var tab = GetTab(properties, "Tooltypes");
+
+        // act
+        var changed = await navigationContext.ChangePropertiesAsync(properties, GetFlags(properties),
+            ChangeTabText(properties, "Tooltypes", "DONOTWAIT\r\nTOOLPRI=5"));
+
+        // assert - the icon is kept
+        Assert.Null(tab.Text);
+        Assert.True(tab.CanChange);
+        Assert.True(tab.IsMultiline);
+        Assert.True(changed);
+        var changedProperties = await navigationContext.GetPropertiesAsync(
+            [await GetEntryAsync(navigationContext, "file")]);
+        Assert.Equal("DONOTWAIT\nTOOLPRI=5", GetTabText(changedProperties, "Tooltypes"));
+        Assert.NotNull(await navigationContext.ReadIconAsync(await GetEntryAsync(navigationContext, "file"), 32));
+    }
+
+    [Fact]
+    public async Task When_TooltypesOfNewIconAreChanged_Then_NewIconImageIsKept()
+    {
+        // arrange - the NewIcon image is stored in tooltypes, which aren't shown
+        await File.WriteAllTextAsync(Path.Combine(_rootPath, "file"), "text");
+        await File.WriteAllBytesAsync(Path.Combine(_rootPath, "file.info"), await AmigaIconTestData.CreateNewIcon());
+        using var navigationContext = new NavigationContext(_rootPath);
+        var entry = await GetEntryAsync(navigationContext, "file");
+        var icons = await navigationContext.ReadIconsAsync(entry);
+        var properties = await navigationContext.GetPropertiesAsync([entry]);
+        var tab = GetTab(properties, "Tooltypes");
+
+        // act
+        await navigationContext.ChangePropertiesAsync(properties, GetFlags(properties),
+            ChangeTabText(properties, "Tooltypes", "TOOLPRI=5"));
+
+        // assert
+        Assert.Null(tab.Text);
+        var changedEntry = await GetEntryAsync(navigationContext, "file");
+        Assert.Equal("TOOLPRI=5", GetTabText(await navigationContext.GetPropertiesAsync([changedEntry]), "Tooltypes"));
+        Assert.Equal(icons.Select(icon => icon.Name), (await navigationContext.ReadIconsAsync(changedEntry))
+            .Select(icon => icon.Name));
+    }
+
+    [Fact]
+    public async Task When_TooltypesAreDeleted_Then_IconHasNoTooltypes()
+    {
+        // arrange
+        await File.WriteAllTextAsync(Path.Combine(_rootPath, "file"), "text");
+        await File.WriteAllBytesAsync(Path.Combine(_rootPath, "file.info"), await AmigaIconTestData.CreatePlanarIcon());
+        using var navigationContext = new NavigationContext(_rootPath);
+        var properties = await navigationContext.GetPropertiesAsync([await GetEntryAsync(navigationContext, "file")]);
+        await navigationContext.ChangePropertiesAsync(properties, GetFlags(properties),
+            ChangeTabText(properties, "Tooltypes", "TOOLPRI=5"));
+        var changedProperties = await navigationContext.GetPropertiesAsync(
+            [await GetEntryAsync(navigationContext, "file")]);
+
+        // act
+        var changed = await navigationContext.ChangePropertiesAsync(changedProperties, GetFlags(changedProperties),
+            ChangeTabText(changedProperties, "Tooltypes", null));
+
+        // assert
+        Assert.True(changed);
+        Assert.Null(GetTabText(await navigationContext.GetPropertiesAsync(
+            [await GetEntryAsync(navigationContext, "file")]), "Tooltypes"));
+    }
+
+    [Fact]
+    public async Task When_TooltypesOfIconInAdfAreChanged_Then_TheyAreWrittenToTheAdf()
+    {
+        // arrange - an adf with "file*1" and its icon
+        var adfPath = Path.Combine(_rootPath, "disk.adf");
+        await CreateAdfWithItemAsync(adfPath);
+        await using (var stream = File.Open(adfPath, FileMode.Open, FileAccess.ReadWrite))
+        {
+            using var volume = await Hst.Commander.Plugins.Amiga.AmigaFileSystems.MountAdf(stream);
+            await using var iconStream = await volume.OpenWrite("file*1.info");
+            await iconStream.WriteAsync(await AmigaIconTestData.CreatePlanarIcon());
+        }
+
+        using var navigationContext = new NavigationContext(_rootPath);
+        await OpenAsync(navigationContext, "disk.adf");
+        var properties = await navigationContext.GetPropertiesAsync([await GetEntryAsync(navigationContext, "file*1")]);
+
+        // act
+        var changed = await navigationContext.ChangePropertiesAsync(properties, GetFlags(properties),
+            ChangeTabText(properties, "Tooltypes", "TOOLPRI=5"));
+
+        // assert - also after opening the adf again
+        Assert.True(changed);
+        using var reopenedContext = new NavigationContext(_rootPath);
+        await OpenAsync(reopenedContext, "disk.adf");
+        Assert.Equal("TOOLPRI=5", GetTabText(await reopenedContext.GetPropertiesAsync(
+            [await GetEntryAsync(reopenedContext, "file*1")]), "Tooltypes"));
+    }
+
+    [Fact]
+    public async Task When_EntryHasNoIcon_Then_ItHasNoTooltypesTab()
+    {
+        // arrange
+        await File.WriteAllTextAsync(Path.Combine(_rootPath, "file"), "text");
+        using var navigationContext = new NavigationContext(_rootPath);
+
+        // act
+        var properties = await navigationContext.GetPropertiesAsync([await GetEntryAsync(navigationContext, "file")]);
+
+        // assert
+        Assert.DoesNotContain(properties.Tabs, tab => tab.Title == "Tooltypes");
     }
 }

@@ -67,6 +67,12 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - `ReadIcon(name, stream, size)` checks the signature and returns null for other files; `ReadIcons` returns all icons for the icon viewer; `ReadIconProperties` returns lines for the properties dialog.
 - `IconImage` is PNG data or 32-bit BGRA pixels (not premultiplied, top-down) with an optional `BitsPerPixel`; `EntryIcon(Name, Images)` is one icon with its images. See [Entry icons](icons-and-navigation-modes.md#entry-icons).
 
+### IPropertiesTabProvider
+
+- `GetTabs(context)` returns `PropertiesTab`s shown after the General tab of the properties dialog of a single entry, in plugin order (`IPlugin.PropertiesTabProviders`, `VolumeProviders.PropertiesTabs`). It's called on the thread using the pane's volume; exceptions leave the provider's tabs out.
+- `IPropertiesContext` gives the pane's volume (`Volume`, at the entry's directory), the `Entry`, its `IconFile` found by an icon provider, `CanWrite` (files in the location can be written), and the Amiga metadata of the entry or its UAE metadata (`AmigaMetadata`, null when it has none; `CanSetAmigaMetadata`, also true without metadata when UAE metadata can be created; `SetAmigaMetadata`, which updates `AmigaMetadata` and creates or removes UAE metadata as needed).
+- `PropertiesTab(Title, Text)` is a text that can be added, edited and deleted: `IsMultiline`, `MaxLength`, `NoTextMessage`, `AddText`, `DeleteText` and `Save(text)`, called with the new text (null when deleted or empty) when the user clicks Save and the text changed; null when it can't be changed. See [Tabs of plugins](file-operations.md#tabs-of-plugins).
+
 ### IImageProvider
 
 - `ReadImages(name, stream)` gets the whole file in memory (seekable) and returns `EntryImage(Name, Image)`s, empty when the file isn't one of its formats. The plugins' providers are asked before the built-in ones. See [Images in the viewer](viewer.md#images).

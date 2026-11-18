@@ -653,30 +653,52 @@ internal static class UaeMetadataUpdater
     }
 
     /// <summary>
-    ///     Sets the protection bits and comment of an entry with UAE metadata in the current directory, keeping its
+    ///     Sets the protection bits and comment of an entry in the current directory as UAE metadata, keeping its
     ///     Amiga name. Entries with metadata in the "_UAEFSDB.___" file or a metafile keep using it, other entries get
-    ///     metadata in <paramref name="format" /> (WinUAE's alternate data streams are replaced). Throws
-    ///     <see cref="IOException" /> when the entry has no UAE metadata.
+    ///     metadata in <paramref name="format" /> (WinUAE's alternate data streams are replaced), created for entries
+    ///     without metadata with their name as Amiga name. Metadata that is no longer needed (the protection bits are
+    ///     "----rwed", there is no comment and the Amiga name is the name) is removed: its "_UAEFSDB.___" node (the
+    ///     file is deleted when no nodes are left) or its metafile. Throws <see cref="IOException" /> when the entry has
+    ///     no UAE metadata and <paramref name="format" /> is <see cref="UaeMetadataFormat.None" />.
     /// </summary>
     public static async Task SetMetadataAsync(IVolume volume, IEntry entry, AmigaMetadata amigaMetadata,
         UaeMetadataFormat format, string? localDirectory, CancellationToken cancellationToken)
     {
         var metadata = await ReadAsync(volume, format, true, localDirectory, cancellationToken);
-        if (metadata.Find(entry.Name) is not { } node || !node.NormalName.Equals(entry.Name, StringComparison.Ordinal))
+        var node = metadata.Find(entry.Name) is { } foundNode &&
+                   foundNode.NormalName.Equals(entry.Name, StringComparison.Ordinal)
+            ? foundNode
+            : null;
+        if (node == null && format == UaeMetadataFormat.None)
         {
             throw new IOException($"'{entry.Name}' has no UAE metadata");
         }
 
-        var writerFormat = metadata.IsFsDbNode(node)
+        var amigaName = node?.AmigaName ?? entry.Name;
+        var metafileName = metadata.MetafileNames.GetValueOrDefault(entry.Name);
+        var writerFormat = node != null && metadata.IsFsDbNode(node)
             ? UaeMetadataFormat.UaeFsDb
-            : metadata.MetafileNames.ContainsKey(entry.Name)
+            : metafileName != null
                 ? UaeMetadataFormat.UaeMetafile
                 : format;
         var writer = await UaeMetadataWriter.CreateAsync(volume, writerFormat, cancellationToken);
-        await writer.SetAsync(volume, node.AmigaName, entry.Name, amigaMetadata, entry.ModifiedDate,
-            cancellationToken);
-        await writer.FlushAsync(volume, cancellationToken);
-        if (metadata.IsAlternateDataStreamNode(node) && localDirectory != null)
+        if (amigaMetadata.IsDefault && amigaName.Equals(entry.Name, StringComparison.Ordinal))
+        {
+            writer.Remove(entry.Name);
+            await writer.FlushAsync(volume, cancellationToken);
+            if (metafileName != null)
+            {
+                await volume.Delete(metafileName, cancellationToken);
+            }
+        }
+        else
+        {
+            await writer.SetAsync(volume, amigaName, entry.Name, amigaMetadata, entry.ModifiedDate,
+                cancellationToken);
+            await writer.FlushAsync(volume, cancellationToken);
+        }
+
+        if (node != null && metadata.IsAlternateDataStreamNode(node) && localDirectory != null)
         {
             DeleteAlternateDataStream(Path.Combine(localDirectory, entry.Name));
         }

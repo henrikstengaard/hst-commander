@@ -85,7 +85,7 @@ public class GivenNavigationContextWithDiskImages : IDisposable
         var attributes = Assert.Single(properties.FlagGroups);
 
         // act
-        var changed = await navigationContext.ChangeFlagsAsync(properties,
+        var changed = await navigationContext.ChangePropertiesAsync(properties,
             [attributes.Flags.Select(flag => flag.Label is "Read-only" or "Hidden").ToList()]);
 
         // assert

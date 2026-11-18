@@ -64,10 +64,66 @@
                     <SolidColorBrush x:Key="ViewerSelectionForeground" Color="#FFFFFF" />
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
+            <!-- tabs of dialogs (settings, properties) drawn as tabs on a panel, like the TUI's: the selected tab is joined
+                 to the panel showing its contents; used with TabControl.dialogTabs -->
+            <ControlTheme x:Key="DialogTabItem" TargetType="TabItem">
+                <Setter Property="FontSize" Value="13" />
+                <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseMediumLowBrush}" />
+                <Setter Property="BorderThickness" Value="1,1,1,0" />
+                <Setter Property="Padding" Value="14,6" />
+                <Setter Property="Margin" Value="0,4,2,0" />
+                <Setter Property="Template">
+                    <ControlTemplate>
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4,4,0,0">
+                            <DockPanel>
+                                <!-- accent line on top of the selected tab -->
+                                <Border Name="PART_Accent" DockPanel.Dock="Top" Height="2" CornerRadius="4,4,0,0"
+                                        Background="{DynamicResource SystemAccentColor}" IsVisible="False" />
+                                <ContentPresenter Name="PART_ContentPresenter"
+                                                  Content="{TemplateBinding Header}"
+                                                  ContentTemplate="{TemplateBinding HeaderTemplate}"
+                                                  Padding="{TemplateBinding Padding}" />
+                            </DockPanel>
+                        </Border>
+                    </ControlTemplate>
+                </Setter>
+                <Style Selector="^:pointerover">
+                    <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
+                    <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+                </Style>
+                <!-- the selected tab and its panel have the dialog's background, so only the borders mark them -->
+                <Style Selector="^:selected">
+                    <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundAltHighBrush}" />
+                    <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+                    <Setter Property="FontWeight" Value="SemiBold" />
+                    <!-- covers the panel's top border below the tab -->
+                    <Setter Property="Margin" Value="0,0,2,-1" />
+                    <Setter Property="Padding" Value="14,8,14,7" />
+                </Style>
+                <Style Selector="^:selected /template/ Border#PART_Accent">
+                    <Setter Property="IsVisible" Value="True" />
+                </Style>
+            </ControlTheme>
         </ResourceDictionary>
     </Application.Resources>
 
     <Application.Styles>
         <FluentTheme />
+        <Style Selector="TabControl.dialogTabs /template/ ContentPresenter#PART_SelectedContentHost">
+            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundAltHighBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseMediumLowBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="0,4,4,4" />
+            <Setter Property="Padding" Value="16" />
+        </Style>
+        <!-- the tabs are drawn over the panel, so the selected tab covers its border -->
+        <Style Selector="TabControl.dialogTabs /template/ ItemsPresenter">
+            <Setter Property="ZIndex" Value="1" />
+        </Style>
     </Application.Styles>
 </Application>
