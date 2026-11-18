@@ -363,7 +363,7 @@ public class GivenNavigationContextWithAmigaImages : IDisposable
     {
         // arrange
         var imagePath = Path.Combine(_rootPath, "disk.hdf");
-        await AmigaTestData.CreateRdbImage(imagePath, AmigaTestData.Dos3DosType, AmigaTestData.SfsDosType);
+        await AmigaTestData.CreateRdbImage(imagePath, AmigaTestData.Dos3DosType, AmigaTestData.Sfs2DosType);
         using var navigationContext = new NavigationContext(_rootPath);
         await OpenAsync(navigationContext, "disk.hdf");
         await OpenAsync(navigationContext, "rdb");
@@ -377,10 +377,48 @@ public class GivenNavigationContextWithAmigaImages : IDisposable
         var lines = properties.GetSections().SelectMany(section => section)
             .ToDictionary(line => line.Label, line => line.Value);
         Assert.Equal("DH1", lines["Drive name"]);
-        Assert.Equal("Smart File System (SFS\\0)", lines["File system"]);
+        Assert.Equal("Smart File System 2 (SFS\\2)", lines["File system"]);
         Assert.False(lines.ContainsKey("Volume name"));
         Assert.False(lines.ContainsKey("Free space"));
         Assert.Null(properties.UsedFraction);
+    }
+
+    [Fact]
+    public async Task When_RdbPartitionHasSmartFileSystem_Then_ItIsMountedAndWritable()
+    {
+        // arrange
+        var imagePath = Path.Combine(_rootPath, "disk.hdf");
+        await AmigaTestData.CreateRdbImage(imagePath, AmigaTestData.Dos3DosType, AmigaTestData.SfsDosType);
+        var longName = new string('a', 100);
+        using (var navigationContext = new NavigationContext(_rootPath))
+        {
+            await OpenAsync(navigationContext, "disk.hdf");
+            await OpenAsync(navigationContext, "rdb");
+
+            // act
+            var partitions = await navigationContext.ListEntriesAsync();
+            var properties = navigationContext.GetProperties([partitions.First(entry => entry.Name == "2")]);
+            await OpenAsync(navigationContext, "2");
+            await navigationContext.CreateDirectoryAsync("sfs");
+            await navigationContext.CreateDirectoryAsync(longName);
+            var tooLong = await Record.ExceptionAsync(() => navigationContext.CreateDirectoryAsync(longName + "a"));
+
+            // assert
+            Assert.Equal(["1 - DH0 - Workbench", "2 - DH1 - Work"],
+                partitions.Skip(1).Select(entry => entry.DisplayName));
+            var lines = properties.GetSections().SelectMany(section => section)
+                .ToDictionary(line => line.Label, line => line.Value);
+            Assert.Equal("Smart File System (SFS\\0)", lines["File system"]);
+            Assert.Equal("Work", lines["Volume name"]);
+            Assert.IsType<IOException>(tooLong);
+        }
+
+        // the changes are read again from the file
+        using var reopenedContext = new NavigationContext(_rootPath);
+        await OpenAsync(reopenedContext, "disk.hdf");
+        await OpenAsync(reopenedContext, "rdb");
+        await OpenAsync(reopenedContext, "2");
+        Assert.Equal([Paths.Parent, longName, "sfs"], await ListNamesAsync(reopenedContext));
     }
 
     [Fact]

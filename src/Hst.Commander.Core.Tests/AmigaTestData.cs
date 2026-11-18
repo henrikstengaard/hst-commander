@@ -3,6 +3,7 @@ using Hst.Amiga;
 using Hst.Amiga.Extensions;
 using Hst.Amiga.FileSystems.FastFileSystem;
 using Hst.Amiga.FileSystems.Pfs3;
+using Hst.Amiga.FileSystems.SmartFileSystem;
 using Hst.Amiga.RigidDiskBlocks;
 using File = System.IO.File;
 
@@ -18,6 +19,7 @@ public static class AmigaTestData
     public static readonly byte[] Dos3DosType = [0x44, 0x4f, 0x53, 0x3];
     public static readonly byte[] Pfs3DosType = [0x50, 0x46, 0x53, 0x3];
     public static readonly byte[] SfsDosType = [0x53, 0x46, 0x53, 0x0];
+    public static readonly byte[] Sfs2DosType = [0x53, 0x46, 0x53, 0x2];
 
     /// <summary>Creates a double density adf formatted with the Fast File System.</summary>
     public static async Task CreateAdf(string path)
@@ -88,6 +90,10 @@ public static class AmigaTestData
             else if (partitionBlock.DosType.SequenceEqual(Dos3DosType))
             {
                 await FastFileSystemFormatter.FormatPartition(stream, partitionBlock, GetVolumeName(index));
+            }
+            else if (partitionBlock.DosType.SequenceEqual(SfsDosType))
+            {
+                await SmartFileSystemFormatter.FormatPartition(stream, partitionBlock, GetVolumeName(index));
             }
         }
     }

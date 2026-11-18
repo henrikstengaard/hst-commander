@@ -10,7 +10,7 @@ using EntryType = Hst.Commander.Abstractions.EntryType;
 namespace Hst.Commander.Plugins.Amiga;
 
 /// <summary>
-/// Volume browsing an Amiga file system (Fast File System or PFS3) of an adf or a partition of a rigid disk block,
+/// Volume browsing an Amiga file system (Fast File System, PFS3 or Smart File System) of an adf or a partition of a rigid disk block,
 /// writable when mounted from a writable stream. Changes are flushed after each operation. Amiga dates are in local
 /// time and names are case-insensitive. Errors of the file system are thrown as <see cref="IOException" />.
 /// </summary>
