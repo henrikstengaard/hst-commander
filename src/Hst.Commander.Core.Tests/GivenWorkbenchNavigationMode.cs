@@ -141,7 +141,7 @@ public class GivenWorkbenchNavigationMode : IDisposable
         Assert.Equal((4, 2), (icons[0].Images[0].Width, icons[0].Images[0].Height));
         stream.Position = 0;
         var properties = await new AmigaIconProvider().ReadIconProperties("dir1.info", stream);
-        Assert.Equal("5, 6", properties.Last().Value);
+        Assert.Equal("5, 6", properties.Single(property => property.Label == "Icon position").Value);
     }
 
     [Fact]
@@ -209,7 +209,7 @@ public class GivenWorkbenchNavigationMode : IDisposable
         Assert.Equal(255, icons[1].Images[0].BgraPixels![leftOfPage]);
         stream.Position = 0;
         var properties = await new AmigaIconProvider().ReadIconProperties("file2.info", stream);
-        Assert.Equal(["Project", "3, 4"], properties.Select(property => property.Value));
+        Assert.Equal(["Project", "3, 4", "26 x 30 pixels"], properties.Select(property => property.Value));
     }
 
     [Fact]
@@ -280,7 +280,7 @@ public class GivenWorkbenchNavigationMode : IDisposable
     [Theory]
     [InlineData("file1")]
     [InlineData("file1.info")]
-    public async Task When_PropertiesOfEntryWithIconAreShown_Then_IconTypeAndPositionAreShown(string name)
+    public async Task When_PropertiesOfEntryWithIconAreShown_Then_IconTypePositionAndSizeAreShown(string name)
     {
         // arrange
         await CreateEntriesAsync();
@@ -297,6 +297,10 @@ public class GivenWorkbenchNavigationMode : IDisposable
         Assert.Equal("file1.info", lines["Icon file"]);
         Assert.Equal("Project", lines["Icon type"]);
         Assert.Equal("10, 20", lines["Icon position"]);
+        Assert.Equal("4 x 2 pixels", lines["Icon size"]);
+        // the size is shown below the position
+        var labels = properties.GetSections().SelectMany(section => section).Select(line => line.Label).ToList();
+        Assert.Equal(labels.IndexOf("Icon position") + 1, labels.IndexOf("Icon size"));
         Assert.DoesNotContain(file2Properties.GetSections().SelectMany(section => section),
             line => line.Label == "Icon position");
     }

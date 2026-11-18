@@ -18,6 +18,7 @@ The Amiga plugin adds Amiga disk images, file systems, icons and pictures to Hst
 ## Icons
 
 - `.info` files (disk objects) are shown as the icons of their entries in the GUI, e.g. `file.info` for `file` and the drawer `dir.info` for the directory `dir`, and `Disk.info` as the icon of a partition. Supported images: true color (AmigaOS 4 PNG icons), color icons (GlowIcons), NewIcons and planar images drawn with the AmigaOS palette.
+- The properties dialog shows the icon file, the icon type (e.g. `Project`), its position on the Workbench (or `None`) and its size, e.g. `46 x 23 pixels` (the size of the image shown).
 - The Tooltypes tab of the properties dialog shows the tooltypes of an entry's icon, one per line, which can be added, edited and deleted (except for PNG icons). The tooltypes holding a NewIcon image are hidden and kept.
 - The properties dialog shows the icon type and its Workbench position; clicking the icon shows all images of the icon (normal and selected of each kind).
 
