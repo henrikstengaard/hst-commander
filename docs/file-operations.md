@@ -85,9 +85,9 @@ Ctrl+C, Ctrl+X and Ctrl+V (Alt+V in the TUI too, as Windows Terminal and the cla
 
 ## Creating Volumes
 
-- F9 shows the list of `VolumeProviders.Creators`, then a dialog with the file name and the creator's fields (text/number fields as text, booleans as check boxes, required fields marked with `*` by `VolumeCreation.GetLabel`). When creating fails, the error is shown and the fields dialog is shown again with the input kept.
+- F9 shows the list of `VolumeProviders.Creators`, then a dialog with the file name and the creator's fields (text/number fields as text, booleans as check boxes, choices as drop-down lists, required fields marked with `*` by `VolumeCreation.GetLabel`). A field with `EnabledByField` is disabled while that check box is unchecked (`VolumeCreation.IsEnabled`), and a disabled required field doesn't have to be entered. When creating fails, the error is shown and the fields dialog is shown again with the input kept.
 - `CreateVolumeAsync(creator, fileName, input)` adds the extension when missing, validates the name like making a directory and converts the input with `VolumeCreation.GetValues` (trimmed, required fields checked, numbers parsed, defaults for missing input; `IOException` otherwise). Local files are created with `FileMode.CreateNew` and written on the thread pool; elsewhere the volume is created in a temporary file and copied with `OpenWrite`. A partly created file is deleted on failure. The other pane is refreshed too.
-- `AdfVolumeCreator` (Amiga plugin) creates an 880 KB adf: `Volume name` (required, default `Empty`), `Format` (checked: Fast File System `DOS\3`; unchecked: all zeros, other fields ignored) and `Bootable` (writes the standard boot code with its checksum).
+- `AdfVolumeCreator` (Amiga plugin) creates an adf: `Volume name` (required, default `Empty`), `High density (1.76 MB)` (unchecked: 880 KB double density), `Format` (unchecked: all zeros, and the volume name, `Bootable` and `File system` are disabled and ignored), `Bootable` (writes the standard boot code with its checksum) and `File system` (`DOS0` to `DOS7`, default `DOS3`, FFS international).
 
 ## Selecting Groups
 

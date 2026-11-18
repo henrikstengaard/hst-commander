@@ -3,7 +3,7 @@
         xmlns:abstractions="using:Hst.Commander.Abstractions"
         x:Class="Hst.Commander.Gui.CreateVolumeDialog"
         Title="Create"
-        Width="420"
+        Width="600"
         SizeToContent="Height"
         CanResize="False"
         ShowInTaskbar="False"
@@ -14,7 +14,7 @@
                 <DataTemplate x:DataType="abstractions:IVolumeCreator">
                     <StackPanel>
                         <TextBlock Text="{Binding Name}" FontWeight="Bold" />
-                        <TextBlock Text="{Binding Description}" Opacity="0.7" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding Description}" Opacity="0.7" TextWrapping="Wrap" />
                     </StackPanel>
                 </DataTemplate>
             </ListBox.ItemTemplate>

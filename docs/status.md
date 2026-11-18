@@ -32,7 +32,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - Renaming the entry under the cursor (Shift+F6) with a dialog.
 - A context menu on the entries (right-click) with Copy, Cut, Paste, Rename, Delete and Properties in both front-ends, and copying, cutting and pasting with Ctrl+C, Ctrl+X and Ctrl+V, also to and from Explorer through the Windows clipboard (local files and entries of images as virtual files, cut ones moved, in both front-ends) and other applications in the GUI on macOS and Linux (see [Clipboard](file-operations.md#clipboard)).
 - Making a directory (F7) in the active pane, with a dialog for the directory name.
-- Creating volumes (F9) with the volume creators of plugins, e.g. empty, formatted or bootable Amiga disk files with the Amiga plugin.
+- Creating volumes (F9) with the volume creators of plugins, e.g. empty, formatted (DOS0-DOS7) or bootable double or high density Amiga disk files with the Amiga plugin.
 - Deleting (F8 or Delete) the marked entries or the entry under the cursor, with a confirm dialog and a progress dialog.
 - Showing the properties of entries and drives (Ctrl+P, Alt+Enter or File > Properties), with the size and contents counted in the background, and changing attributes (local files, FAT/exFAT/NTFS partitions) and Amiga protection bits (Amiga volumes, UAE metadata) with check boxes, plus tabs of plugins: the Amiga comment of any entry (in Amiga file systems or as UAE metadata, created and deleted as needed) and the tooltypes of Amiga icons, added, edited and deleted, saved with Save.
 - Loading plugins at startup from `~/.hst-commander/plugins` and `plugins` next to the executable in both front-ends, showing load errors.

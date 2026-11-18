@@ -6,8 +6,9 @@ namespace Hst.Commander.Tui;
 
 /// <summary>
 ///     Modal dialog asking for the file name and the input fields of a volume creator chosen in the create dialog (F9),
-///     titled e.g. "Create Amiga disk file": a text field for text and number fields and a check box for boolean fields,
-///     required fields marked with "*". <see cref="Result" /> holds the input on OK or null on cancel.
+///     titled e.g. "Create Amiga disk file": a text field for text and number fields, a check box for boolean fields and
+///     a drop-down list for choices, required fields marked with "*" and fields enabled by a check box disabled while
+///     it's unchecked. <see cref="Result" /> holds the input on OK or null on cancel.
 /// </summary>
 public sealed class CreateVolumeFieldsDialog : Dialog
 {
@@ -23,46 +24,105 @@ public sealed class CreateVolumeFieldsDialog : Dialog
         _fileNameField = new TextField { X = 1, Y = 2, Width = Dim.Fill(1), Text = previousInput?.FileName ?? string.Empty };
         Add(fileNameLabel, _fileNameField);
 
-        // each field gets a text field or check box, its input read on OK
+        // each field gets a text field, check box or drop-down list, its input read on OK
         var inputs = new List<(VolumeCreatorField Field, Func<object?> GetInput)>();
+        var checkBoxes = new Dictionary<string, CheckBox>();
+        var dependents = new List<(VolumeCreatorField Field, View[] Views)>();
         var y = 4;
+        var lastIsCheckBox = false;
         foreach (var field in creator.Fields)
         {
             var hasPrevious = previousInput != null && previousInput.Values.ContainsKey(field.Name);
             var previous = hasPrevious ? previousInput!.Values[field.Name] : field.DefaultValue;
-            if (field.Type == VolumeCreatorFieldType.Boolean)
+            View[] views;
+            switch (field.Type)
             {
-                var checkBox = new CheckBox
+                case VolumeCreatorFieldType.Boolean:
                 {
-                    X = 1,
-                    Y = y,
-                    Text = VolumeCreation.GetLabel(field),
-                    CheckedState = previous is true ? CheckState.Checked : CheckState.UnChecked
-                };
-                Add(checkBox);
-                inputs.Add((field, () => checkBox.CheckedState == CheckState.Checked));
-                y += 1;
+                    var checkBox = new CheckBox
+                    {
+                        X = 1,
+                        Y = y,
+                        Text = VolumeCreation.GetLabel(field),
+                        CheckedState = previous is true ? CheckState.Checked : CheckState.UnChecked
+                    };
+                    checkBoxes[field.Name] = checkBox;
+                    inputs.Add((field, () => checkBox.CheckedState == CheckState.Checked));
+                    views = [checkBox];
+                    y += 1;
+                    lastIsCheckBox = true;
+                    break;
+                }
+                case VolumeCreatorFieldType.Choice:
+                {
+                    var choices = field.Choices ?? [];
+                    var label = new Label { X = 1, Y = y, Text = VolumeCreation.GetLabel(field) + ":" };
+                    var choiceField = new ChoiceField(choices.Select(choice => choice.Label).ToList(),
+                        VolumeCreation.GetChoiceIndex(field, previous), palette.DialogColorScheme)
+                    {
+                        X = 1,
+                        Y = y + 1,
+                        Width = Dim.Fill(1)
+                    };
+                    inputs.Add((field, () => choiceField.SelectedIndex >= 0 && choiceField.SelectedIndex < choices.Count
+                        ? choices[choiceField.SelectedIndex].Value
+                        : null));
+                    views = [label, choiceField];
+                    y += 3;
+                    lastIsCheckBox = false;
+                    break;
+                }
+                default:
+                {
+                    var label = new Label { X = 1, Y = y, Text = VolumeCreation.GetLabel(field) + ":" };
+                    var textField = new TextField
+                    {
+                        X = 1,
+                        Y = y + 1,
+                        Width = Dim.Fill(1),
+                        Text = hasPrevious
+                            ? previous?.ToString() ?? string.Empty
+                            : VolumeCreation.GetDefaultText(field)
+                    };
+                    inputs.Add((field, () => textField.Text));
+                    views = [label, textField];
+                    y += 3;
+                    lastIsCheckBox = false;
+                    break;
+                }
             }
-            else
+
+            Add(views);
+            if (field.EnabledByField != null)
             {
-                var label = new Label { X = 1, Y = y, Text = VolumeCreation.GetLabel(field) + ":" };
-                var textField = new TextField
-                {
-                    X = 1,
-                    Y = y + 1,
-                    Width = Dim.Fill(1),
-                    Text = hasPrevious
-                        ? previous?.ToString() ?? string.Empty
-                        : VolumeCreation.GetDefaultText(field)
-                };
-                Add(label, textField);
-                inputs.Add((field, () => textField.Text));
-                y += 3;
+                dependents.Add((field, views));
             }
         }
 
+        // fields enabled by a check box follow it
+        void UpdateEnabled()
+        {
+            foreach (var (field, views) in dependents)
+            {
+                var isEnabled = VolumeCreation.IsEnabled(field,
+                    name => !checkBoxes.TryGetValue(name, out var checkBox) ||
+                            checkBox.CheckedState == CheckState.Checked);
+                foreach (var view in views)
+                {
+                    view.Enabled = isEnabled;
+                }
+            }
+        }
+
+        foreach (var checkBox in checkBoxes.Values)
+        {
+            checkBox.CheckedStateChanged += (_, _) => UpdateEnabled();
+        }
+
+        UpdateEnabled();
+
         // an empty line below check boxes like below text fields, then the dialog's border and the buttons
-        if (creator.Fields.Count > 0 && creator.Fields[^1].Type == VolumeCreatorFieldType.Boolean)
+        if (lastIsCheckBox)
         {
             y++;
         }
