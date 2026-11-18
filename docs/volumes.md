@@ -37,7 +37,7 @@ ISO images and zip, lha, lzx, rar and 7z archives are read-only. `LocalVolume.Cr
 ### Amiga file systems
 
 - Writable when the stream is. Changes are flushed after each operation and when a written stream is closed (PFS3 caches).
-- Names are case-insensitive and can't contain `/` or `:`. Names longer than the file system allows throw `IOException`, because Hst.Amiga would silently truncate them. Case-only renames go through a temporary name.
+- Names are case-insensitive and can't contain `/` or `:`. Names longer than the file system allows throw `IOException`, because Hst.Amiga would silently truncate them. The maximum is 30 characters (107 for `DOS`/`DOS`), and for PFS3 the file name size of the root block extension minus one (31 by default), read by `AmigaFileSystems` as Hst.Amiga doesn't make it public. Case-only renames go through a temporary name.
 - Amiga dates are local time; dates before 1978 become 1978-01-01. Delete and overwrite ignore protection bits. Comments are cut to 79 characters.
 - `OpenRead` returns Hst.Amiga's seekable stream, so e.g. the viewer reads it directly.
 - Free/total space of an adf or an RDB partition is shown in the path panel (`GetSpace`, forwarded by `RdbVolume` inside a partition).
