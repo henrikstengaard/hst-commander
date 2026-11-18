@@ -129,6 +129,180 @@ public class GivenNavigationContextCreatingVolume
     }
 
     [Theory]
+    [InlineData("DOS0", false)]
+    [InlineData("DOS1", false)]
+    [InlineData("DOS2", false)]
+    [InlineData("DOS3", false)]
+    [InlineData("DOS4", false)]
+    [InlineData("DOS5", false)]
+    [InlineData("DOS6", false)]
+    [InlineData("DOS7", false)]
+    [InlineData("DOS0", true)]
+    [InlineData("DOS1", true)]
+    [InlineData("DOS3", true)]
+    [InlineData("DOS5", true)]
+    [InlineData("DOS7", true)]
+    public async Task When_CreateAdfWithFileSystemAndDensity_Then_AdfHasDosTypeAndSizeAndFilesCanBeWritten(
+        string fileSystem, bool highDensity)
+    {
+        // arrange
+        var rootPath = CreateTempDirectory();
+        try
+        {
+            using var navigationContext = new NavigationContext(rootPath);
+            var input = AdfInput("Disk", format: true, bootable: true);
+            input[AdfVolumeCreator.FileSystemField] = fileSystem;
+            input[AdfVolumeCreator.HighDensityField] = highDensity;
+
+            // act
+            await navigationContext.CreateVolumeAsync(adfVolumeCreator, "disk", input);
+
+            // assert
+            var path = Path.Combine(rootPath, "disk.adf");
+            var data = await File.ReadAllBytesAsync(path);
+            Assert.Equal(highDensity ? Hst.Amiga.FloppyDiskConstants.HighDensity.Size : AmigaTestData.AdfSize,
+                data.Length);
+            Assert.Equal(new[] { (byte)'D', (byte)'O', (byte)'S', (byte)(fileSystem[3] - '0') }, data[..4]);
+            using (var volume = await AmigaFileSystems.MountAdf(new MemoryStream(data, true)))
+            {
+                await using (var stream = await volume.OpenWrite("file.txt"))
+                {
+                    await stream.WriteAsync("hello"u8.ToArray());
+                }
+
+                var entries = await volume.ListEntries().ToListAsync();
+                Assert.Equal("file.txt", Assert.Single(entries).Name);
+                await using var readStream = await volume.OpenRead("file.txt");
+                var buffer = new byte[5];
+                await readStream.ReadExactlyAsync(buffer);
+                Assert.Equal("hello"u8.ToArray(), buffer);
+            }
+        }
+        finally
+        {
+            Directory.Delete(rootPath, true);
+        }
+    }
+
+    [Theory]
+    [InlineData("DOS4")]
+    [InlineData("DOS5")]
+    public async Task When_WritingFilesToAdfWithDirCache_Then_FilesAreReadAfterMountingAgain(string fileSystem)
+    {
+        // arrange
+        var stream = new MemoryStream();
+        var input = AdfInput("Cache", format: true, bootable: false);
+        input[AdfVolumeCreator.FileSystemField] = fileSystem;
+        await adfVolumeCreator.Create(stream, VolumeCreation.GetValues(adfVolumeCreator, input));
+        // files written after the root block don't overwrite the directory cache block allocated there; at most 8 files,
+        // as Hst.Amiga doesn't add a directory cache block when the first is full
+        var names = Enumerable.Range(1, 8).Select(i => $"file with a longer name {i}.txt").ToList();
+
+        // act
+        using (var volume = await AmigaFileSystems.MountAdf(stream))
+        {
+            foreach (var name in names)
+            {
+                await using var writeStream = await volume.OpenWrite(name);
+                await writeStream.WriteAsync(System.Text.Encoding.ASCII.GetBytes(name + new string('x', 1000)));
+            }
+        }
+
+        // assert
+        using var mountedVolume = await AmigaFileSystems.MountAdf(new MemoryStream(stream.ToArray(), true));
+        var entries = await mountedVolume.ListEntries().ToListAsync();
+        Assert.Equal(names.Order(), entries.Select(entry => entry.Name).Order());
+        foreach (var name in names)
+        {
+            await using var readStream = await mountedVolume.OpenRead(name);
+            using var reader = new StreamReader(readStream, System.Text.Encoding.ASCII);
+            Assert.Equal(name + new string('x', 1000), await reader.ReadToEndAsync());
+        }
+    }
+
+    [Fact]
+    public async Task When_CreateUnformattedHighDensityAdf_Then_AdfIsEmptyWithHighDensitySize()
+    {
+        // arrange
+        var rootPath = CreateTempDirectory();
+        try
+        {
+            using var navigationContext = new NavigationContext(rootPath);
+            var input = AdfInput("", format: false, bootable: false);
+            input[AdfVolumeCreator.HighDensityField] = true;
+
+            // act
+            await navigationContext.CreateVolumeAsync(adfVolumeCreator, "blank", input);
+
+            // assert
+            var data = await File.ReadAllBytesAsync(Path.Combine(rootPath, "blank.adf"));
+            Assert.Equal(Hst.Amiga.FloppyDiskConstants.HighDensity.Size, data.Length);
+            Assert.All(data, value => Assert.Equal(0, value));
+        }
+        finally
+        {
+            Directory.Delete(rootPath, true);
+        }
+    }
+
+    [Fact]
+    public void When_FormatIsUnchecked_Then_FileSystemAndBootableAreDisabled()
+    {
+        // arrange
+        var fileSystemField = adfVolumeCreator.Fields.Single(field => field.Name == AdfVolumeCreator.FileSystemField);
+        var bootableField = adfVolumeCreator.Fields.Single(field => field.Name == AdfVolumeCreator.BootableField);
+
+        // act & assert
+        Assert.Equal(VolumeCreatorFieldType.Choice, fileSystemField.Type);
+        Assert.Equal(8, fileSystemField.Choices!.Count);
+        Assert.Equal(3, VolumeCreation.GetChoiceIndex(fileSystemField, null));
+        Assert.False(VolumeCreation.IsEnabled(fileSystemField, _ => false));
+        Assert.True(VolumeCreation.IsEnabled(fileSystemField, name => name == AdfVolumeCreator.FormatField));
+        Assert.False(VolumeCreation.IsEnabled(bootableField, _ => false));
+    }
+
+    [Fact]
+    public void When_GetValuesWithoutChoice_Then_DefaultChoiceIsUsed()
+    {
+        // act
+        var values = VolumeCreation.GetValues(adfVolumeCreator,
+            new Dictionary<string, object?> { [AdfVolumeCreator.VolumeNameField] = "Disk" });
+
+        // assert
+        Assert.Equal("DOS3", values.GetText(AdfVolumeCreator.FileSystemField));
+    }
+
+    [Fact]
+    public void When_GetValuesWithInvalidChoice_Then_IOExceptionIsThrown()
+    {
+        // act & assert
+        Assert.Throws<IOException>(() => VolumeCreation.GetValues(adfVolumeCreator,
+            new Dictionary<string, object?>
+            {
+                [AdfVolumeCreator.VolumeNameField] = "Disk", [AdfVolumeCreator.FileSystemField] = "DOS8"
+            }));
+    }
+
+    [Fact]
+    public void When_GetValuesWithDisabledRequiredFieldNotEntered_Then_NoExceptionIsThrown()
+    {
+        // arrange
+        var creator = new FieldsVolumeCreator(
+        [
+            new("Enable", "Enable", VolumeCreatorFieldType.Boolean),
+            new("Text", "Text", VolumeCreatorFieldType.Text, true, EnabledByField: "Enable")
+        ]);
+
+        // act
+        var values = VolumeCreation.GetValues(creator, new Dictionary<string, object?> { ["Enable"] = false });
+
+        // assert
+        Assert.Equal(string.Empty, values.GetText("Text"));
+        Assert.Throws<IOException>(() =>
+            VolumeCreation.GetValues(creator, new Dictionary<string, object?> { ["Enable"] = true }));
+    }
+
+    [Theory]
     [InlineData("")]
     [InlineData("   ")]
     [InlineData("a:b")]
@@ -341,5 +515,19 @@ public class GivenNavigationContextCreatingVolume
                 throw new IOException("Creating failed");
             }
         }
+    }
+
+    private sealed class FieldsVolumeCreator(IReadOnlyList<VolumeCreatorField> fields) : IVolumeCreator
+    {
+        public string Name => "Fields";
+
+        public string Description => "Fields";
+
+        public string FileExtension => ".fields";
+
+        public IReadOnlyList<VolumeCreatorField> Fields { get; } = fields;
+
+        public Task Create(Stream stream, VolumeCreatorValues values, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
     }
 }

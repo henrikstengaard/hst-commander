@@ -13,8 +13,21 @@ public enum VolumeCreatorFieldType
     Number,
 
     /// <summary>Check box, a <see cref="bool" /> value.</summary>
-    Boolean
+    Boolean,
+
+    /// <summary>
+    /// Drop-down list of <see cref="VolumeCreatorField.Choices" />, the <see cref="string" />
+    /// <see cref="VolumeCreatorChoice.Value" /> of the chosen one.
+    /// </summary>
+    Choice
 }
+
+/// <summary>
+/// Choice of a <see cref="VolumeCreatorFieldType.Choice" /> field.
+/// </summary>
+/// <param name="Value">Value of the field when chosen, e.g. "DOS3".</param>
+/// <param name="Label">Label shown to the user, e.g. "DOS3 (FFS, international)".</param>
+public sealed record VolumeCreatorChoice(string Value, string Label);
 
 /// <summary>
 /// Input field the user enters when creating a volume with a <see cref="IVolumeCreator" />.
@@ -23,15 +36,25 @@ public enum VolumeCreatorFieldType
 /// <param name="Label">Label shown to the user, e.g. "Volume name".</param>
 /// <param name="Type">Type of the field.</param>
 /// <param name="IsRequired">
-/// True when the user must enter a value: text that isn't empty or a number. Check boxes always have a value.
+/// True when the user must enter a value: text that isn't empty or a number. Check boxes and choices always have a
+/// value.
 /// </param>
 /// <param name="DefaultValue">
-/// Value shown initially: a <see cref="string" /> for text, a <see cref="long" /> for numbers and a <see cref="bool" />
-/// for check boxes. Null for an empty field or an unchecked check box.
+/// Value shown initially: a <see cref="string" /> for text, a <see cref="long" /> for numbers, a <see cref="bool" />
+/// for check boxes and the <see cref="VolumeCreatorChoice.Value" /> for choices. Null for an empty field, an unchecked
+/// check box or the first choice.
+/// </param>
+/// <param name="Choices">Choices of a <see cref="VolumeCreatorFieldType.Choice" /> field, in the order shown.</param>
+/// <param name="EnabledByField">
+/// Name of a <see cref="VolumeCreatorFieldType.Boolean" /> field enabling this field when checked, e.g. a file system
+/// only chosen when formatting. Null when the field is always enabled. A disabled required field doesn't have to be
+/// entered.
 /// </param>
 public sealed record VolumeCreatorField(
     string Name,
     string Label,
     VolumeCreatorFieldType Type,
     bool IsRequired = false,
-    object? DefaultValue = null);
+    object? DefaultValue = null,
+    IReadOnlyList<VolumeCreatorChoice>? Choices = null,
+    string? EnabledByField = null);
