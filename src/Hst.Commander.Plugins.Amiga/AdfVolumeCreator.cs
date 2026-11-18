@@ -74,23 +74,16 @@ public class AdfVolumeCreator : IVolumeCreator
             await FastFileSystemFormatter.Format(stream, FloppyDiskConstants.HighDensity.LowCyl,
                 FloppyDiskConstants.HighDensity.HighCyl, FloppyDiskConstants.HighDensity.ReservedBlocks,
                 FloppyDiskConstants.HighDensity.Heads, FloppyDiskConstants.HighDensity.Sectors,
-                FloppyDiskConstants.BlockSize, FloppyDiskConstants.FileSystemBlockSize, dosType, volumeName);
+                FloppyDiskConstants.BlockSize, FloppyDiskConstants.FileSystemBlockSize, dosType, volumeName,
+                cancellationToken);
         }
         else
         {
             await FastFileSystemFormatter.Format(stream, FloppyDiskConstants.DoubleDensity.LowCyl,
                 FloppyDiskConstants.DoubleDensity.HighCyl, FloppyDiskConstants.DoubleDensity.ReservedBlocks,
                 FloppyDiskConstants.DoubleDensity.Heads, FloppyDiskConstants.DoubleDensity.Sectors,
-                FloppyDiskConstants.BlockSize, FloppyDiskConstants.FileSystemBlockSize, dosType, volumeName);
-        }
-        cancellationToken.ThrowIfCancellationRequested();
-
-        if (dosType[3] is 4 or 5)
-        {
-            var sectors = highDensity ? FloppyDiskConstants.HighDensity.Sectors : FloppyDiskConstants.DoubleDensity.Sectors;
-            var blocks = (int)(FloppyDiskConstants.DoubleDensity.Cylinders * FloppyDiskConstants.DoubleDensity.Heads *
-                               sectors);
-            await CreateRootDirCacheBlock(stream, blocks, cancellationToken);
+                FloppyDiskConstants.BlockSize, FloppyDiskConstants.FileSystemBlockSize, dosType, volumeName,
+                cancellationToken);
         }
 
         if (values.GetBoolean(BootableField))
@@ -102,92 +95,6 @@ public class AdfVolumeCreator : IVolumeCreator
         }
 
         await stream.FlushAsync(cancellationToken);
-    }
-
-    /// <summary>
-    /// Adds an empty directory cache block to the root block of a disk formatted with directory cache (DOS and
-    /// DOS), as the formatter of Hst.Amiga points the root block's directory cache to the root block itself: the first
-    /// free block after the root block is marked used in the bitmap and the root block points to it.
-    /// </summary>
-    private static async Task CreateRootDirCacheBlock(Stream stream, int blocks, CancellationToken cancellationToken)
-    {
-        const int blockSize = FloppyDiskConstants.BlockSize;
-        const int reservedBlocks = 2;
-        const int dirCacheType = 33;
-        const int rootBitmapPagesOffset = blockSize - 49 * 4;
-        const int rootExtensionOffset = blockSize - 2 * 4;
-        var rootSector = blocks / 2;
-
-        var root = await ReadBlock(stream, rootSector, cancellationToken);
-        var bitmapSector = (int)ReadUInt32(root, rootBitmapPagesOffset);
-        var bitmap = await ReadBlock(stream, bitmapSector, cancellationToken);
-
-        // bits set for free blocks, the first long is the checksum
-        bool IsFree(int sector)
-        {
-            var index = sector - reservedBlocks;
-            return (ReadUInt32(bitmap, 4 + index / 32 * 4) & (1u << (index % 32))) != 0;
-        }
-
-        var dirCacheSector = Enumerable.Range(rootSector + 1, blocks - rootSector - 1)
-            .Concat(Enumerable.Range(reservedBlocks, rootSector - reservedBlocks))
-            .FirstOrDefault(IsFree);
-        if (dirCacheSector == 0)
-        {
-            throw new IOException("No free block for the directory cache");
-        }
-
-        var dirCacheIndex = dirCacheSector - reservedBlocks;
-        var mapOffset = 4 + dirCacheIndex / 32 * 4;
-        WriteUInt32(bitmap, mapOffset, ReadUInt32(bitmap, mapOffset) & ~(1u << (dirCacheIndex % 32)));
-        UpdateChecksum(bitmap, 0);
-
-        // empty directory cache block: type, header key, parent, number of records and next directory cache block
-        var dirCache = new byte[blockSize];
-        WriteUInt32(dirCache, 0, dirCacheType);
-        WriteUInt32(dirCache, 4, (uint)dirCacheSector);
-        WriteUInt32(dirCache, 8, (uint)rootSector);
-        UpdateChecksum(dirCache, 20);
-
-        WriteUInt32(root, rootExtensionOffset, (uint)dirCacheSector);
-        UpdateChecksum(root, 20);
-
-        await WriteBlock(stream, dirCacheSector, dirCache, cancellationToken);
-        await WriteBlock(stream, bitmapSector, bitmap, cancellationToken);
-        await WriteBlock(stream, rootSector, root, cancellationToken);
-    }
-
-    private static async Task<byte[]> ReadBlock(Stream stream, int sector, CancellationToken cancellationToken)
-    {
-        var block = new byte[FloppyDiskConstants.BlockSize];
-        stream.Position = (long)sector * FloppyDiskConstants.BlockSize;
-        await stream.ReadExactlyAsync(block, cancellationToken);
-        return block;
-    }
-
-    private static async Task WriteBlock(Stream stream, int sector, byte[] block, CancellationToken cancellationToken)
-    {
-        stream.Position = (long)sector * FloppyDiskConstants.BlockSize;
-        await stream.WriteAsync(block, cancellationToken);
-    }
-
-    private static uint ReadUInt32(byte[] block, int offset) =>
-        System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(block.AsSpan(offset));
-
-    private static void WriteUInt32(byte[] block, int offset, uint value) =>
-        System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(block.AsSpan(offset), value);
-
-    /// <summary>Sets the checksum at an offset, so the sum of all longs of the block is zero.</summary>
-    private static void UpdateChecksum(byte[] block, int offset)
-    {
-        WriteUInt32(block, offset, 0);
-        uint sum = 0;
-        for (var i = 0; i < block.Length; i += 4)
-        {
-            sum += ReadUInt32(block, i);
-        }
-
-        WriteUInt32(block, offset, unchecked(0u - sum));
     }
 
     private static byte[] GetDosType(string fileSystem)

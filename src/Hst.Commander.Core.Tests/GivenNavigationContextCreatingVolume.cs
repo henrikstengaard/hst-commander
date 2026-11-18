@@ -187,16 +187,15 @@ public class GivenNavigationContextCreatingVolume
     [Theory]
     [InlineData("DOS4")]
     [InlineData("DOS5")]
-    public async Task When_WritingFilesToAdfWithDirCache_Then_FilesAreReadAfterMountingAgain(string fileSystem)
+    public async Task When_WritingManyFilesToAdfWithDirCache_Then_AllFilesAreReadAfterMountingAgain(string fileSystem)
     {
         // arrange
         var stream = new MemoryStream();
         var input = AdfInput("Cache", format: true, bootable: false);
         input[AdfVolumeCreator.FileSystemField] = fileSystem;
         await adfVolumeCreator.Create(stream, VolumeCreation.GetValues(adfVolumeCreator, input));
-        // files written after the root block don't overwrite the directory cache block allocated there; at most 8 files,
-        // as Hst.Amiga doesn't add a directory cache block when the first is full
-        var names = Enumerable.Range(1, 8).Select(i => $"file with a longer name {i}.txt").ToList();
+        // more files than fit in one directory cache block
+        var names = Enumerable.Range(1, 60).Select(i => $"file with a longer name {i}.txt").ToList();
 
         // act
         using (var volume = await AmigaFileSystems.MountAdf(stream))
