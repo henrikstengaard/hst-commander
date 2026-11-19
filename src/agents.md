@@ -51,8 +51,8 @@ src/
   Hst.Commander.Plugins.Zip/    Zip archives (default plugin)
   Hst.Commander.Plugins.LhaLzx/ Lha and lzx archives (default plugin)
   Hst.Commander.Plugins.RarSevenZip/ Rar and 7z archives (default plugin)
-  Hst.Commander.Plugins.Disk/   MBR/GPT disk images with FAT/exFAT/NTFS/ext partitions, hybrid MBR/RDB disks, unpartitioned exFAT and its F9 creator (default plugin)
-  Hst.Commander.Plugins.Amiga/  Writable adf and RDB images, .info icons, Workbench navigation mode, Amiga images, comment and tooltypes properties tabs (default plugin)
+  Hst.Commander.Plugins.Disk/   MBR/GPT disk images with FAT/exFAT/NTFS/ext partitions, hybrid MBR/RDB disks, unpartitioned FAT/exFAT/NTFS/ext and the exFAT F9 creator (default plugin)
+  Hst.Commander.Plugins.Amiga/  Writable adf, RDB and partition images, .info icons, Workbench navigation mode, Amiga images, comment and tooltypes properties tabs (default plugin)
   Hst.Commander.Plugins.PhysicalDisk/ Internal and external physical disks on Windows, Linux and macOS (default plugin)
   Hst.Commander.Plugins.Ftp/    FTP, FTPS and SFTP servers (default plugin)
   Hst.Commander.Plugins.DirectoryOpus/ Directory Opus 4 theme with a customizable button bank (default plugin)
@@ -78,11 +78,12 @@ src/
         |                          [RarSevenZipPlugin, Rar/SevenZipFileVolumeProvider,
         |                           SharpCompressVolume]  <- Hst.Commander.Plugins.RarSevenZip
         |                          [DiskPlugin, DiskFileVolumeProvider,
-        |                           ExFatFileVolumeProvider, ExFatVolumeCreator,
+        |                           FileSystemFileVolumeProvider, ExFatVolumeCreator,
         |                           ExFatFormatter,
         |                           PartitionTableVolume, HybridDiskVolume,
         |                           DiscFileSystemVolume]  <- Hst.Commander.Plugins.Disk
         |                          [AmigaPlugin, Adf/RdbFileVolumeProvider,
+        |                           AmigaPartitionFileVolumeProvider,
         |                           AmigaFileSystemVolume, RdbVolume]  <- Hst.Commander.Plugins.Amiga
         |                          [PhysicalDiskPlugin, PhysicalDiskVolumeProvider,
         |                           PhysicalDiskVolume, DiskStream,
@@ -161,7 +162,7 @@ These apply across features and aren't obvious from a single file:
 - Other file-management operations (e.g. creating a new file with Shift+F4); changing the viewer's encoding and going to an offset; changing the editor's encoding and line breaks.
 - SMB 1, SMB ports other than 445 and browsing the network for servers (SMB credentials are only saved with bookmarks).
 - Implicit FTPS, SFTP private keys, confirming new server keys and writable images on FTP/SFTP servers.
-- Writing to images other than Amiga adf and RDB images; ISO images and zip, lha, lzx, rar and 7z archives are read-only, as are Amiga images inside other images.
+- Writing to images other than Amiga adf, RDB and partition images and FAT, exFAT and NTFS images; ISO images and zip, lha, lzx, rar and 7z archives are read-only, as are Amiga images inside other images.
 - Changing RDB, MBR and GPT partitions, other Amiga file systems (e.g. SFS\2), writing ext2/3/4, other PC file systems (btrfs, XFS, ...) and vhdx/vmdk images.
 - Unloading or reloading plugins while running, and a list of loaded plugins in the UI.
 

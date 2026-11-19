@@ -242,6 +242,46 @@ public static class DiskTestData
         await stream.CopyToAsync(fileStream);
     }
 
+    /// <summary>
+    /// Creates a FAT file system without a partition table of 16 MB labelled <see cref="FatLabel" />, like an image
+    /// of a partition.
+    /// </summary>
+    public static Stream CreateFatImage()
+    {
+        var stream = CreateStream(FatSectorCount * (long)SectorSize);
+        FatFileSystem.FormatPartition(stream, FatLabel, Geometry.FromCapacity(stream.Length), 0, FatSectorCount, 0)
+            .Dispose();
+        stream.Position = 0;
+        return stream;
+    }
+
+    /// <summary>Creates an NTFS file system without a partition table of 16 MB labelled <see cref="NtfsLabel" />.</summary>
+    public static Stream CreateNtfsImage()
+    {
+        var stream = CreateStream(FatSectorCount * (long)SectorSize);
+        NtfsFileSystem.Format(stream, NtfsLabel, Geometry.FromCapacity(stream.Length), 0, FatSectorCount).Dispose();
+        stream.Position = 0;
+        return stream;
+    }
+
+    /// <summary>
+    /// Creates the ext4 file system of TestData/Disks/ext4.img.gz (see <see cref="ExtLabel" />) without a partition
+    /// table.
+    /// </summary>
+    public static async Task<Stream> CreateExtImage()
+    {
+        var stream = new MemoryStream();
+        await using (var imageStream = new GZipStream(
+                         File.OpenRead(Path.Combine(AppContext.BaseDirectory, "TestData", "Disks", "ext4.img.gz")),
+                         CompressionMode.Decompress))
+        {
+            await imageStream.CopyToAsync(stream);
+        }
+
+        stream.Position = 0;
+        return stream;
+    }
+
     /// <summary>Formats a partition with FAT and the label <see cref="FatLabel" />.</summary>
     private static void FormatFat(Stream stream, Geometry geometry, int firstSector, int sectorCount)
     {

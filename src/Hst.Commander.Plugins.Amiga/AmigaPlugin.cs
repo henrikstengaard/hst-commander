@@ -3,7 +3,8 @@
 namespace Hst.Commander.Plugins.Amiga;
 
 /// <summary>
-/// Plugin opening Amiga disk files (adf) and hard disk images with a rigid disk block (RDB) as writable volumes and
+/// Plugin opening Amiga disk files (adf), hard disk images with a rigid disk block (RDB) and partition images without
+/// one (e.g. UAE hardfiles) as writable volumes and
 /// creating new adfs (F9), showing the icons of .info files, showing directories like the Workbench in the GUI and
 /// viewing Amiga icons and IFF ILBM pictures (F3) and adding the Comment and Tooltypes tabs to the properties
 /// dialog, included with Hst Commander by default. The Workbench shows def
@@ -23,7 +24,7 @@ public class AmigaPlugin : IPlugin
     public string Name => PluginName;
 
     public IEnumerable<IFileVolumeProvider> FileVolumeProviders { get; } =
-        [new AdfFileVolumeProvider(), new RdbFileVolumeProvider()];
+        [new AdfFileVolumeProvider(), new RdbFileVolumeProvider(), new AmigaPartitionFileVolumeProvider()];
 
     public bool CanCreateVolumes => true;
 

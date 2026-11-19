@@ -1,8 +1,4 @@
 using System.Globalization;
-using DiscUtils.ExFat;
-using DiscUtils.Ext;
-using DiscUtils.Fat;
-using DiscUtils.Ntfs;
 using DiscUtils.Partitions;
 using Hst.Commander.Abstractions;
 
@@ -104,7 +100,7 @@ public sealed class PartitionTableVolume : VolumeListVolume
 
         try
         {
-            var volume = MountFileSystem(name, stream) ??
+            var volume = FileSystems.MountFileSystem(name, stream) ??
                          (_host != null ? await _host.OpenVolume(name, stream, null, cancellationToken) : null) ??
                          throw new IOException(
                              $"Partition '{name}' ({GetTypeName(partition)}) can't be mounted, its file system is not supported");
@@ -121,63 +117,6 @@ public sealed class PartitionTableVolume : VolumeListVolume
 
             throw new IOException($"Partition '{name}' can't be mounted: {exception.Message}", exception);
         }
-    }
-
-    /// <summary>
-    /// Mounts the file systems read by DiscUtils, FAT, exFAT, NTFS and ext2/3/4 (read-only); null for other file
-    /// systems.
-    /// </summary>
-    private static DiscFileSystemVolume? MountFileSystem(string name, Stream stream)
-    {
-        stream.Position = 0;
-        if (FatFileSystem.Detect(stream))
-        {
-            stream.Position = 0;
-            return new DiscFileSystemVolume(name, new FatFileSystem(stream));
-        }
-
-        stream.Position = 0;
-        if (ExFatFileSystem.Detect(stream))
-        {
-            return ExFatFileVolumeProvider.Mount(name, stream);
-        }
-
-        stream.Position = 0;
-        if (NtfsFileSystem.Detect(stream))
-        {
-            stream.Position = 0;
-            return new DiscFileSystemVolume(name, new NtfsFileSystem(stream));
-        }
-
-        stream.Position = 0;
-        if (IsExtFileSystem(stream))
-        {
-            stream.Position = 0;
-            return new DiscFileSystemVolume(name, new ExtFileSystem(stream), caseSensitive: true);
-        }
-
-        stream.Position = 0;
-        return null;
-    }
-
-    /// <summary>Offset of the ext2/3/4 superblock in a partition.</summary>
-    private const int ExtSuperblockOffset = 1024;
-
-    /// <summary>Offset of the magic number (0xEF53, little-endian) in the ext2/3/4 superblock.</summary>
-    private const int ExtMagicOffset = 0x38;
-
-    /// <summary>True when the stream has an ext2/3/4 superblock, detected by its magic number.</summary>
-    private static bool IsExtFileSystem(Stream stream)
-    {
-        if (stream.Length < ExtSuperblockOffset + 1024)
-        {
-            return false;
-        }
-
-        stream.Position = ExtSuperblockOffset + ExtMagicOffset;
-        Span<byte> magic = stackalloc byte[2];
-        stream.ReadExactly(magic);
-        return magic[0] == 0x53 && magic[1] == 0xEF;
     }
 
     protected override IEntry CreateEntry(int index, IVolume? volume)

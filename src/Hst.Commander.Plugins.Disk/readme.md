@@ -21,5 +21,5 @@ Partition tables can't be changed, ext2/3/4 can't be written, and other file sys
 
 - `DiskFileVolumeProvider` detects and opens the disk images. Partitions that aren't FAT, exFAT, NTFS or ext2/3/4 are opened with the other plugins' file volume providers through `IPluginHost.OpenVolume`.
 - `PartitionTableVolume` lists the partitions of an MBR or GPT partition table, `VolumeListVolume` the partition tables of a disk and `HybridDiskVolume` the partition tables of a hybrid disk.
-- `ExFatFileVolumeProvider` opens exFAT file systems without a partition table, `ExFatVolumeCreator` creates them with `ExFatFormatter` (ported from Hst Imager, as DiscUtils' exFAT formatter writes an incomplete up-case table and too small a FAT above 2 TB).
+- `FileSystemFileVolumeProvider` opens FAT, exFAT, NTFS and ext2/3/4 file systems without a partition table, `ExFatVolumeCreator` creates exFAT ones with `ExFatFormatter` (ported from Hst Imager, as DiscUtils' exFAT formatter writes an incomplete up-case table and too small a FAT above 2 TB).
 - `DiscFileSystemVolume` is a FAT, exFAT, NTFS or ext2/3/4 partition; `ExFatVolumeLabel` reads the exFAT volume label, which DiscUtils doesn't.

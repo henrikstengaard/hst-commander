@@ -72,6 +72,104 @@ public static class AmigaFileSystems
     }
 
     /// <summary>
+    /// Mounts the file system of a partition image without a rigid disk block (e.g. a UAE hardfile), detected by
+    /// <see cref="GetPartitionImageDosType" />, as a partition covering the whole stream with blocks of 512 bytes and 2
+    /// reserved blocks. The Fast File System doesn't store its block size, so it's mounted with the first file system
+    /// block size of 512 to 32768 bytes that works; PFS3 and Smart File System read theirs from their root blocks.
+    /// Throws <see cref="IOException" /> when the file system isn't supported or can't be mounted.
+    /// </summary>
+    public static async Task<AmigaFileSystemVolume> MountPartitionImage(Stream stream, string name)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+        ArgumentNullException.ThrowIfNull(name);
+
+        var firstBlock = new byte[4];
+        stream.Position = 0;
+        var length = await stream.ReadAtLeastAsync(firstBlock, firstBlock.Length, false);
+        var dosType = GetPartitionImageDosType(firstBlock.AsSpan(0, length)) ??
+                      throw new IOException("No Amiga file system found");
+
+        var blocks = stream.Length / PartitionImageBlockSize;
+        if (blocks < 2 * PartitionImageReserved || blocks > uint.MaxValue)
+        {
+            throw new IOException("The size of the Amiga partition image is not supported");
+        }
+
+        if (!IsFastFileSystem(dosType))
+        {
+            return await MountPartitionImage(stream, name, dosType, blocks, PartitionImageBlockSize);
+        }
+
+        IOException? lastException = null;
+        for (var fileSystemBlockSize = PartitionImageBlockSize;
+             fileSystemBlockSize <= MaxFileSystemBlockSize;
+             fileSystemBlockSize *= 2)
+        {
+            try
+            {
+                return await MountPartitionImage(stream, name, dosType, blocks, fileSystemBlockSize);
+            }
+            catch (Exception exception)
+            {
+                lastException = exception as IOException ??
+                                new IOException($"The Amiga file system can't be mounted: {exception.Message}",
+                                    exception);
+            }
+        }
+
+        throw lastException!;
+    }
+
+    private static async Task<AmigaFileSystemVolume> MountPartitionImage(Stream stream, string name, byte[] dosType,
+        long blocks, int fileSystemBlockSize)
+    {
+        var partitionBlock = new PartitionBlock
+        {
+            DriveName = name,
+            DosType = dosType,
+            LowCyl = 0,
+            HighCyl = (uint)(blocks - 1),
+            Surfaces = 1,
+            BlocksPerTrack = 1,
+            Sectors = 1,
+            Reserved = PartitionImageReserved,
+            BlockSize = PartitionImageBlockSize,
+            FileSystemBlockSize = (uint)fileSystemBlockSize,
+            SizeBlock = PartitionImageBlockSize / 4,
+            PartitionSize = blocks * PartitionImageBlockSize
+        };
+        stream.Position = 0;
+        return await MountPartition(stream, partitionBlock, name);
+    }
+
+    /// <summary>
+    /// DOS type of a partition image without a rigid disk block by the id at the start of its first block: DOS\0 to
+    /// DOS\7 (Fast File System), PFS\1, PFS\2 (the boot block ids of PFS3), PFS\3 and PDS\3 (returned as PFS\3) and
+    /// SFS\0 (Smart File System); null when the first block has none of them.
+    /// </summary>
+    public static byte[]? GetPartitionImageDosType(ReadOnlySpan<byte> firstBlock)
+    {
+        if (firstBlock.Length < 4)
+        {
+            return null;
+        }
+
+        var dosType = firstBlock[..4].ToArray();
+        if (IsFastFileSystem(dosType) || IsSmartFileSystem(dosType))
+        {
+            return dosType;
+        }
+
+        return IsPfs3(dosType) || (dosType[0] == 'P' && dosType[1] == 'F' && dosType[2] == 'S' && dosType[3] is 1 or 2)
+            ? [(byte)'P', (byte)'F', (byte)'S', 3]
+            : null;
+    }
+
+    private const int PartitionImageBlockSize = 512;
+    private const int PartitionImageReserved = 2;
+    private const int MaxFileSystemBlockSize = 32768;
+
+    /// <summary>
     /// Size of file names of a PFS3 partition including their length byte, read from the root block extension (as
     /// Hst.Amiga doesn't make it public): <c>fnsize</c> when the root block has an extension (MODE_EXTENSION) with it
     /// set, otherwise PFS3's default of 32. The layout is PFS3's (pfs3aio blocks.h): the root block is the third block of

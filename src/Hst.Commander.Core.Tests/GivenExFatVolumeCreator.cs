@@ -48,7 +48,7 @@ public class GivenExFatVolumeCreator : IDisposable
     {
         // act & assert
         Assert.Contains(VolumeProviders.Creators, creator => creator is ExFatVolumeCreator);
-        Assert.Contains(VolumeProviders.Files, provider => provider is ExFatFileVolumeProvider);
+        Assert.Contains(VolumeProviders.Files, provider => provider is FileSystemFileVolumeProvider);
     }
 
     [Fact]
@@ -79,7 +79,7 @@ public class GivenExFatVolumeCreator : IDisposable
 
         // opened again by the provider, the directory is in the file system
         await using var stream = new FileStream(path, FileMode.Open, FileAccess.ReadWrite);
-        var provider = new ExFatFileVolumeProvider();
+        var provider = new FileSystemFileVolumeProvider();
         Assert.True(await provider.IsMatch("usb.img", stream));
         stream.Position = 0;
         using var volume = (DiscFileSystemVolume)await provider.CreateVolume(stream);
@@ -94,7 +94,7 @@ public class GivenExFatVolumeCreator : IDisposable
         await using var stream = new MemoryStream();
         await _creator.Create(stream, VolumeCreation.GetValues(_creator, Input("4", "MB")));
         stream.Position = 0;
-        var provider = new ExFatFileVolumeProvider();
+        var provider = new FileSystemFileVolumeProvider();
 
         // act
         using (var volume = (IDisposable)await provider.CreateVolume(stream))
@@ -156,7 +156,7 @@ public class GivenExFatVolumeCreator : IDisposable
         stream.Position = 0;
         var validator = ExFatValidator.Validate(stream, size);
         stream.Position = 0;
-        using (var volume = (DiscFileSystemVolume)await new ExFatFileVolumeProvider().CreateVolume(stream))
+        using (var volume = (DiscFileSystemVolume)await new FileSystemFileVolumeProvider().CreateVolume(stream))
         {
             await volume.CreateContainer("dir1");
             await using var writeStream = await volume.OpenWrite("file1.txt");
@@ -165,7 +165,7 @@ public class GivenExFatVolumeCreator : IDisposable
 
         // the validator only validates empty file systems, the entries are read when mounted again
         stream.Position = 0;
-        using var reopenedVolume = (DiscFileSystemVolume)await new ExFatFileVolumeProvider().CreateVolume(stream);
+        using var reopenedVolume = (DiscFileSystemVolume)await new FileSystemFileVolumeProvider().CreateVolume(stream);
         var names = await reopenedVolume.ListEntries().Select(entry => entry.Name).ToListAsync();
 
         // assert
@@ -216,7 +216,7 @@ public class GivenExFatVolumeCreator : IDisposable
         exFat.Position = 0;
 
         // act
-        var exFatMatchesDisk = await new ExFatFileVolumeProvider().IsMatch("disk.img", mbrDisk);
+        var exFatMatchesDisk = await new FileSystemFileVolumeProvider().IsMatch("disk.img", mbrDisk);
         var diskMatchesExFat = await new DiskFileVolumeProvider().IsMatch("disk.img", exFat);
 
         // assert
