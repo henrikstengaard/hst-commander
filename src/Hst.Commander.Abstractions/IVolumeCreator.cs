@@ -30,6 +30,13 @@ public interface IVolumeCreator
     IReadOnlyList<VolumeCreatorField> Fields { get; }
 
     /// <summary>
+    /// True to create the file as a sparse file, e.g. a large disk image that is mostly empty, so the parts never
+    /// written take no disk space. The file is a regular file where sparse files aren't supported (e.g. on FAT).
+    /// <see cref="Create" /> then sets the length of the stream and only writes the parts that aren't zeros.
+    /// </summary>
+    bool CreatesSparseFile => false;
+
+    /// <summary>
     /// Writes the new volume to a stream. Throw <see cref="IOException" /> with a message for the user when a value is
     /// invalid; the partially created file is deleted.
     /// </summary>

@@ -57,8 +57,9 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 
 ### IVolumeCreator
 
-- Creates a new volume file with F9. `FileExtension` is added to the file name when missing. `Fields` are `VolumeCreatorField`s (`Text`, `Number` as long, `Boolean`, `Choice` of `VolumeCreatorChoice` values and labels; required, default value, `EnabledByField` naming a check box that enables the field), read from `VolumeCreatorValues`.
+- Creates a new volume file with F9. `FileExtension` is added to the file name when missing. `Fields` are `VolumeCreatorField`s (`Text`, `Number` as long, `Size` as long bytes entered with a unit, `Boolean`, `Choice` of `VolumeCreatorChoice` values and labels; required, default value, `EnabledByField` naming a check box that enables the field), read from `VolumeCreatorValues`.
 - `Create(stream, values)` writes to an empty seekable, readable and writable stream and throws `IOException` for invalid values.
+- `CreatesSparseFile` true asks for a sparse file (e.g. a large disk image that is mostly empty); `Create` then sets the stream's length and only writes what isn't zeros.
 - Only plugins with `CanCreateVolumes` are listed in `VolumeProviders.Creators`. See [Creating volumes](file-operations.md#creating-volumes).
 
 ### IIconProvider

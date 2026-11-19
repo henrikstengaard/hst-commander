@@ -51,7 +51,7 @@ src/
   Hst.Commander.Plugins.Zip/    Zip archives (default plugin)
   Hst.Commander.Plugins.LhaLzx/ Lha and lzx archives (default plugin)
   Hst.Commander.Plugins.RarSevenZip/ Rar and 7z archives (default plugin)
-  Hst.Commander.Plugins.Disk/   MBR/GPT disk images with FAT/exFAT/NTFS/ext partitions, hybrid MBR/RDB disks (default plugin)
+  Hst.Commander.Plugins.Disk/   MBR/GPT disk images with FAT/exFAT/NTFS/ext partitions, hybrid MBR/RDB disks, unpartitioned exFAT and its F9 creator (default plugin)
   Hst.Commander.Plugins.Amiga/  Writable adf and RDB images, .info icons, Workbench navigation mode, Amiga images, comment and tooltypes properties tabs (default plugin)
   Hst.Commander.Plugins.PhysicalDisk/ Internal and external physical disks on Windows, Linux and macOS (default plugin)
   Hst.Commander.Plugins.Ftp/    FTP, FTPS and SFTP servers (default plugin)
@@ -78,6 +78,8 @@ src/
         |                          [RarSevenZipPlugin, Rar/SevenZipFileVolumeProvider,
         |                           SharpCompressVolume]  <- Hst.Commander.Plugins.RarSevenZip
         |                          [DiskPlugin, DiskFileVolumeProvider,
+        |                           ExFatFileVolumeProvider, ExFatVolumeCreator,
+        |                           ExFatFormatter,
         |                           PartitionTableVolume, HybridDiskVolume,
         |                           DiscFileSystemVolume]  <- Hst.Commander.Plugins.Disk
         |                          [AmigaPlugin, Adf/RdbFileVolumeProvider,
@@ -190,7 +192,7 @@ These apply across features and aren't obvious from a single file:
 - FTP plugin: `Hst.Commander.Plugins.Ftp`
 - Directory Opus plugin: `Hst.Commander.Plugins.DirectoryOpus`
 - SMB plugin: `Hst.Commander.Plugins.Smb`
-- Core: `Hst.Commander.Core` (`AppInfo`, `EditorDocument`, `EditorKind`, `EditorSearch`, `EditorSession`, `EmbeddedIconReader`, `EnterFileAction`, `ExternalEditFile`, `ExternalEditor`, `Elevation`, `DroppedEntries`, `EntryProperties`, `FileSystemDetails`, `IconImage`, `ListingProgress`, `NavigationContext`, `NameFilter`, `PluginHost`, `PluginLoader`, `Plugins`, `IProgressIndicator`, `ITaskbarProgress`, `TaskbarProgressReporter`, `TaskbarProgressState`, `TerminalProgress`, `SelectGroupOptions`, `FileStarter`, `ImagePixels`, `SettingsPaths`, `SizeFormatter`, `StandardImageProvider`, `StartupOptions`, `PaneStartup`, `UaeMetadataFormat`, `ViewerDocument`, `ViewerSession`, `WindowsIconImageProvider`, `VolumeConnector`, `VolumeDragSource`, `CredentialsRequest`, `ConnectionRequest`, `LocationConnection`, `Bookmark`, `BookmarkStore`, `BookmarkOpener`, `VolumeChoice`, `ICredentialStore`, `CredentialStores`, `Licenses`, `LicenseNotice`, `VolumeCreation`, `VolumeCreatorInput`, `Themes`, `ThemeChoice`, `FunctionKeyBar`, `ButtonPanelEditor`, `FontDownloader`, `EntryClipboard`, `PasteSource`, `WindowsFileClipboard`, `WindowsVirtualFileDrag`, `CommandLine`, `ShellCommand`), `Hst.Commander.Core.Volumes` (volumes, copying, UAE metadata)
+- Core: `Hst.Commander.Core` (`AppInfo`, `EditorDocument`, `EditorKind`, `EditorSearch`, `EditorSession`, `EmbeddedIconReader`, `EnterFileAction`, `ExternalEditFile`, `ExternalEditor`, `Elevation`, `DroppedEntries`, `EntryProperties`, `FileSystemDetails`, `IconImage`, `ListingProgress`, `NavigationContext`, `NameFilter`, `PluginHost`, `PluginLoader`, `Plugins`, `IProgressIndicator`, `ITaskbarProgress`, `TaskbarProgressReporter`, `TaskbarProgressState`, `TerminalProgress`, `SelectGroupOptions`, `FileStarter`, `ImagePixels`, `SettingsPaths`, `SizeFormatter`, `StandardImageProvider`, `StartupOptions`, `PaneStartup`, `UaeMetadataFormat`, `ViewerDocument`, `ViewerSession`, `WindowsIconImageProvider`, `VolumeConnector`, `VolumeDragSource`, `CredentialsRequest`, `ConnectionRequest`, `LocationConnection`, `Bookmark`, `BookmarkStore`, `BookmarkOpener`, `VolumeChoice`, `ICredentialStore`, `CredentialStores`, `Licenses`, `LicenseNotice`, `VolumeCreation`, `VolumeCreatorInput`, `VolumeCreatorSizeInput`, `SizeUnit`, `SparseFile`, `Themes`, `ThemeChoice`, `FunctionKeyBar`, `ButtonPanelEditor`, `FontDownloader`, `EntryClipboard`, `PasteSource`, `WindowsFileClipboard`, `WindowsVirtualFileDrag`, `CommandLine`, `ShellCommand`), `Hst.Commander.Core.Volumes` (volumes, copying, UAE metadata)
 - Tui: `Hst.Commander.Tui`
 - Gui: `Hst.Commander.Gui`, `Hst.Commander.Gui.Icons` (entry icons)
 - Tests: `Hst.Commander.Core.Tests`

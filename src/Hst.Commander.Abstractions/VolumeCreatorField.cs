@@ -16,6 +16,13 @@ public enum VolumeCreatorFieldType
     Boolean,
 
     /// <summary>
+    /// Size entered as a number with a unit chosen next to it (B, KB, MB or GB, multiples of 1024), a
+    /// <see cref="long" /> value in bytes. The default value is in bytes too and is shown in the largest unit it is a
+    /// whole number of (GB when there is no default value).
+    /// </summary>
+    Size,
+
+    /// <summary>
     /// Drop-down list of <see cref="VolumeCreatorField.Choices" />, the <see cref="string" />
     /// <see cref="VolumeCreatorChoice.Value" /> of the chosen one.
     /// </summary>
@@ -36,11 +43,11 @@ public sealed record VolumeCreatorChoice(string Value, string Label);
 /// <param name="Label">Label shown to the user, e.g. "Volume name".</param>
 /// <param name="Type">Type of the field.</param>
 /// <param name="IsRequired">
-/// True when the user must enter a value: text that isn't empty or a number. Check boxes and choices always have a
+/// True when the user must enter a value: text that isn't empty, a number or a size. Check boxes and choices always have a
 /// value.
 /// </param>
 /// <param name="DefaultValue">
-/// Value shown initially: a <see cref="string" /> for text, a <see cref="long" /> for numbers, a <see cref="bool" />
+/// Value shown initially: a <see cref="string" /> for text, a <see cref="long" /> for numbers and sizes (in bytes), a <see cref="bool" />
 /// for check boxes and the <see cref="VolumeCreatorChoice.Value" /> for choices. Null for an empty field, an unchecked
 /// check box or the first choice.
 /// </param>

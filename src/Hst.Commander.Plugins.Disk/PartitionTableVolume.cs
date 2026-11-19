@@ -139,11 +139,7 @@ public sealed class PartitionTableVolume : VolumeListVolume
         stream.Position = 0;
         if (ExFatFileSystem.Detect(stream))
         {
-            var volumeLabel = ExFatVolumeLabel.Read(stream);
-            stream.Position = 0;
-            // the separators default to the OS's (only '/' on macOS and Linux), DiscFileSystemVolume joins paths with '\'
-            return new DiscFileSystemVolume(name, new ExFatFileSystem(stream, ExFatPathSeparators),
-                volumeLabel: volumeLabel);
+            return ExFatFileVolumeProvider.Mount(name, stream);
         }
 
         stream.Position = 0;
@@ -163,9 +159,6 @@ public sealed class PartitionTableVolume : VolumeListVolume
         stream.Position = 0;
         return null;
     }
-
-    /// <summary>Path separators of exFAT paths, '\' first as it's used to join paths.</summary>
-    private static readonly char[] ExFatPathSeparators = ['\\', '/'];
 
     /// <summary>Offset of the ext2/3/4 superblock in a partition.</summary>
     private const int ExtSuperblockOffset = 1024;
