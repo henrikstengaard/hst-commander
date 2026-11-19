@@ -527,7 +527,8 @@ public partial class PaneView : UserControl
                 e.Handled = true;
                 MoveSelection(e.Key == Key.Right ? 1 : -1);
                 break;
-            case Key.Enter:
+            // Ctrl+Enter and Ctrl+Shift+Enter insert the entry in the command line (see MainWindow)
+            case Key.Enter when !e.KeyModifiers.HasFlag(KeyModifiers.Control):
                 e.Handled = true;
                 await ActivateSelectedEntryAsync();
                 break;

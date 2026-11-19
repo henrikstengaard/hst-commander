@@ -18,6 +18,7 @@ public partial class MainWindow : Window
     private string _selectGroupFilter = SelectGroupOptions.Default.Filter;
     private bool _quitConfirmed;
     private GuiSettings _editorSettings = new();
+    private readonly CommandLine _commandLine = new();
 
     public MainWindow() : this(Environment.CurrentDirectory)
     {
@@ -79,6 +80,7 @@ public partial class MainWindow : Window
         AddBookmarkMenuItem.Click += async (_, _) => await AddBookmarkAsync(_activePane);
         RefreshMenuItem.Click += async (_, _) => await RefreshAsync(_activePane);
         SwapPanesMenuItem.Click += async (_, _) => await SwapPanesAsync();
+        CommandLineMenuItem.Click += (_, _) => FocusCommandLine();
         LeftPane.PathClicked += async (_, _) => await ShowLocationAsync(LeftPane);
         RightPane.PathClicked += async (_, _) => await ShowLocationAsync(RightPane);
         SettingsMenuItem.Click += async (_, _) => await ShowSettingsAsync();
@@ -226,8 +228,137 @@ public partial class MainWindow : Window
         RightPane.IsActive = pane == RightPane;
     }
 
+    /// <summary>Focuses the command line (Ctrl+T), keeping the command typed.</summary>
+    private void FocusCommandLine()
+    {
+        CommandBox.Focus();
+        CommandBox.CaretIndex = CommandBox.Text?.Length ?? 0;
+    }
+
+    private bool IsCommandLineFocused() => FocusManager?.GetFocusedElement() == CommandBox;
+
+    /// <summary>
+    ///     Inserts the name or full path of the entry under the cursor of the active pane in the command line
+    ///     (Ctrl+Enter, Ctrl+Shift+Enter): at its caret when typing in it, otherwise at the end.
+    /// </summary>
+    private void InsertSelectedEntryInCommandLine(bool fullPath, bool atCaret)
+    {
+        if (_activePane.SelectedEntry is not { } entry ||
+            _activePane.NavigationContext.GetCommandLineText(entry, fullPath) is not { } text)
+        {
+            return;
+        }
+
+        _commandLine.Text = CommandBox.Text ?? string.Empty;
+        var position = _commandLine.Insert(text, atCaret ? CommandBox.CaretIndex : _commandLine.Text.Length);
+        CommandBox.Text = _commandLine.Text;
+        CommandBox.CaretIndex = position;
+    }
+
+    /// <summary>
+    ///     Keys of the command line: Enter runs the command, Esc and Tab go back to the active pane keeping the command,
+    ///     Up and Down go through the commands run. True when the key was handled.
+    /// </summary>
+    private async Task<bool> HandleCommandLineKeyAsync(KeyEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case Key.Enter when e.KeyModifiers == KeyModifiers.None:
+                e.Handled = true;
+                await RunCommandLineAsync();
+                return true;
+            case Key.Escape:
+            case Key.Tab:
+                e.Handled = true;
+                _activePane.FocusEntries();
+                return true;
+            case Key.Up or Key.Down when e.KeyModifiers == KeyModifiers.None:
+                e.Handled = true;
+                _commandLine.Text = CommandBox.Text ?? string.Empty;
+                if (e.Key == Key.Up ? _commandLine.Previous() : _commandLine.Next())
+                {
+                    CommandBox.Text = _commandLine.Text;
+                    CommandBox.CaretIndex = _commandLine.Text.Length;
+                }
+
+                return true;
+            // typed in the command line, not selecting entries or deleting them
+            case Key.Delete or Key.Add or Key.Subtract or Key.Multiply:
+                return true;
+            default:
+                return e.KeySymbol is "+" or "-" or "*";
+        }
+    }
+
+    /// <summary>
+    ///     Runs the command typed in the command line in the active pane's directory with the shell, without waiting for
+    ///     it, as the GUI has no terminal to show its output; both panes are listed again when it has exited.
+    /// </summary>
+    private async Task RunCommandLineAsync()
+    {
+        if ((CommandBox.Text ?? string.Empty).Trim().Length == 0)
+        {
+            return;
+        }
+
+        if (_activePane.NavigationContext.CurrentHostDirectory is not { } directory)
+        {
+            await new ErrorDialog(CommandLine.NotLocalMessage).ShowDialog(this);
+            CommandBox.Focus();
+            return;
+        }
+
+        _commandLine.Text = CommandBox.Text ?? string.Empty;
+        if (_commandLine.TakeCommand() is not { } command)
+        {
+            return;
+        }
+
+        CommandBox.Text = string.Empty;
+        _activePane.FocusEntries();
+        Process process;
+        try
+        {
+            process = Process.Start(ShellCommand.CreateStartInfo(command, directory)) ??
+                      throw new InvalidOperationException($"The command '{command}' couldn't be run");
+        }
+        catch (Exception exception) when (exception is Win32Exception or IOException or InvalidOperationException)
+        {
+            await new ErrorDialog(exception.Message).ShowDialog(this);
+            _activePane.FocusEntries();
+            return;
+        }
+
+        using (process)
+        {
+            await process.WaitForExitAsync();
+        }
+
+        await RefreshPanesAsync(LeftPane, RightPane);
+    }
+
     private async void OnWindowKeyDown(object? sender, KeyEventArgs e)
     {
+        if (e.Key == Key.Enter && e.KeyModifiers.HasFlag(KeyModifiers.Control) &&
+            (IsPaneFocused() || IsCommandLineFocused()))
+        {
+            e.Handled = true;
+            InsertSelectedEntryInCommandLine(e.KeyModifiers.HasFlag(KeyModifiers.Shift), IsCommandLineFocused());
+            return;
+        }
+
+        if (e.Key == Key.T && e.KeyModifiers == KeyModifiers.Control)
+        {
+            e.Handled = true;
+            FocusCommandLine();
+            return;
+        }
+
+        if (IsCommandLineFocused() && await HandleCommandLineKeyAsync(e))
+        {
+            return;
+        }
+
         // +, - and * depend on the keyboard layout, e.g. shift+= for + on US keyboards, so match the typed symbol
         if (e.KeySymbol == "+" || e.Key == Key.Add)
         {

@@ -38,6 +38,7 @@
                     <MenuItem x:Name="AddBookmarkMenuItem" Header="Add _bookmark..." InputGesture="Ctrl+B" />
                     <MenuItem x:Name="RefreshMenuItem" Header="Re_fresh" InputGesture="Ctrl+R" />
                     <MenuItem x:Name="SwapPanesMenuItem" Header="Sw_ap panes" InputGesture="Ctrl+U" />
+                    <MenuItem x:Name="CommandLineMenuItem" Header="Command _line" InputGesture="Ctrl+T" />
                     <Separator />
                     <MenuItem x:Name="SettingsMenuItem" Header="_Settings..." />
                     <Separator />
@@ -53,6 +54,13 @@
         <!-- bottom area with the buttons of the theme, e.g. the function key bar; the buttons aren't focusable so the
              active pane keeps the focus -->
         <local:ButtonPanelView x:Name="BottomPanel" DockPanel.Dock="Bottom" />
+        <!-- the command line, like Midnight Commander's; the prompt doesn't show the directory, which the path panel
+             of the active pane shows, to leave room for the command -->
+        <DockPanel DockPanel.Dock="Bottom" Background="{DynamicResource PaneBackground}">
+            <TextBlock x:Name="CommandPrompt" Text=">" DockPanel.Dock="Left" VerticalAlignment="Center" Margin="6,0,4,0"
+                       Foreground="{DynamicResource ItemForeground}" />
+            <TextBox x:Name="CommandBox" Margin="0,2,2,2" MinHeight="0" Padding="4,2" />
+        </DockPanel>
         <Grid ColumnDefinitions="*,*">
             <local:PaneView x:Name="LeftPane" Grid.Column="0" />
             <local:PaneView x:Name="RightPane" Grid.Column="1" />

@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using Hst.Commander.Core;
@@ -15,6 +16,9 @@ public abstract record TerminalAction
     /// <summary>Shows the output screen (Ctrl+O) until a key is pressed.</summary>
     public sealed record ShowOutput : TerminalAction;
 
+    /// <summary>Runs a command typed in the command line with the shell in a directory.</summary>
+    public sealed record RunCommand(string Command, string WorkingDirectory) : TerminalAction;
+
     /// <summary>Runs an external editor (F4) with a file, e.g. nano, until it exits.</summary>
     public sealed record RunEditor(ExternalEditorCommand Command, string Path) : TerminalAction;
 
@@ -28,6 +32,7 @@ public abstract record TerminalAction
 /// </summary>
 public static class TerminalScreen
 {
+    private const int StdInputHandle = -10;
     private const int StdOutputHandle = -11;
     private const uint GenericRead = 0x80000000;
     private const uint GenericWrite = 0x40000000;
@@ -37,6 +42,9 @@ public static class TerminalScreen
 
     private static IntPtr _outputHandle;
     private static IntPtr _tuiHandle;
+
+    /// <summary>True when the TUI was shut down without switching the active screen buffer, see <see cref="BeforeShutdown" />.</summary>
+    private static bool _screenBufferKept;
 
     /// <summary>
     ///     Whether the terminal says it shows 24-bit colors, with <c>COLORTERM</c> set to <c>truecolor</c> or
@@ -76,13 +84,83 @@ public static class TerminalScreen
     }
 
     /// <summary>
+    ///     Called before <c>Application.Shutdown</c>. In Windows Terminal, Terminal.Gui's Windows driver switches to a
+    ///     new, empty screen buffer when shut down (<c>WindowsConsole.Cleanup</c>), and each switch of the active screen
+    ///     buffer makes the pseudo console repaint the screen, which Windows Terminal scrolls into its scrollback: a
+    ///     screen of empty lines above the output screen each time the TUI was shut down, e.g. for Ctrl+O. So the
+    ///     driver's console is cleaned up here without switching (restoring the console mode and cursor and stopping
+    ///     reading input), and removed from the driver, which then only leaves the alternate screen. When Terminal.Gui's
+    ///     internals differ, nothing is done and the driver cleans up itself.
+    /// </summary>
+    public static void BeforeShutdown()
+    {
+        if (!OperatingSystem.IsWindows() || !IsWindowsTerminal)
+        {
+            return;
+        }
+
+        try
+        {
+            var driver = Terminal.Gui.Application.Driver;
+            var winConsoleProperty = driver?.GetType().GetProperty("WinConsole",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            var winConsole = winConsoleProperty?.GetValue(driver);
+            var setWinConsole = winConsoleProperty?.GetSetMethod(true);
+            if (winConsole == null || setWinConsole == null)
+            {
+                return;
+            }
+
+            var consoleType = winConsole.GetType();
+            const BindingFlags fieldFlags = BindingFlags.Instance | BindingFlags.NonPublic;
+            var originalModeField = consoleType.GetField("_originalConsoleMode", fieldFlags);
+            var cursorField = consoleType.GetField("_initialCursorVisibility", fieldFlags);
+            var cancellationField = consoleType.GetField("_inputReadyCancellationTokenSource", fieldFlags);
+            var setCursorVisibility = consoleType.GetMethod("SetCursorVisibility");
+            if (originalModeField?.GetValue(winConsole) is not uint originalMode || cursorField == null ||
+                cancellationField == null || setCursorVisibility == null)
+            {
+                return;
+            }
+
+            if (cursorField.GetValue(winConsole) is { } cursorVisibility)
+            {
+                setCursorVisibility.Invoke(winConsole, [cursorVisibility]);
+            }
+
+            SetConsoleMode(GetStdHandle(StdInputHandle), originalMode);
+            if (cancellationField.GetValue(winConsole) is CancellationTokenSource cancellation)
+            {
+                cancellation.Cancel();
+                cancellation.Dispose();
+                cancellationField.SetValue(winConsole, null);
+            }
+
+            setWinConsole.Invoke(driver, [null]);
+            _screenBufferKept = true;
+        }
+        catch (Exception exception) when (exception is TargetInvocationException or ArgumentException
+                                              or MemberAccessException or InvalidOperationException)
+        {
+            // the driver cleans up itself
+        }
+    }
+
+    /// <summary>
     ///     Called after the TUI is shut down to show the output screen again. Terminal.Gui's Windows driver activates a
-    ///     new, empty screen buffer when shut down, so the standard output's screen buffer is activated again.
+    ///     new, empty screen buffer when shut down, so the standard output's screen buffer is activated again, unless
+    ///     it's still active (see <see cref="BeforeShutdown" />), as activating it repaints the screen.
     /// </summary>
     public static void LeaveTui()
     {
         if (!OperatingSystem.IsWindows())
         {
+            return;
+        }
+
+        if (_screenBufferKept)
+        {
+            _screenBufferKept = false;
             return;
         }
 
@@ -108,6 +186,14 @@ public static class TerminalScreen
         UseShellExecute = false,
         WorkingDirectory = Path.GetDirectoryName(path) ?? string.Empty
     }, path);
+
+    /// <summary>
+    ///     Runs a command typed in the command line with the shell (<see cref="ShellCommand" />) in a directory and
+    ///     waits for it to exit, like <see cref="Run(string)" />.
+    /// </summary>
+    /// <returns>The error message when the shell couldn't be started, otherwise null.</returns>
+    public static string? RunCommand(string command, string workingDirectory) =>
+        Run(ShellCommand.CreateStartInfo(command, workingDirectory), $"{workingDirectory}> {command}");
 
     /// <summary>
     ///     Runs an external editor with a file and waits for it to exit, like <see cref="Run(string)" />. An editor
@@ -192,6 +278,10 @@ public static class TerminalScreen
 
     [DllImport("kernel32.dll")]
     private static extern IntPtr GetConsoleWindow();
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetConsoleMode(IntPtr consoleHandle, uint mode);
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern int GetClassName(IntPtr window, StringBuilder className, int maxCount);
