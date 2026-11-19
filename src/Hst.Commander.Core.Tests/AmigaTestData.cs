@@ -51,6 +51,52 @@ public static class AmigaTestData
     }
 
     /// <summary>
+    /// Creates a partition image without a rigid disk block (like a UAE hardfile) of <see cref="PartitionSize" />
+    /// formatted with the Fast File System, PFS3 or Smart File System of the dos type and the volume name "Work", with a
+    /// geometry of 16 heads and 32 blocks per track.
+    /// </summary>
+    public static async Task CreatePartitionImage(string path, byte[] dosType, uint fileSystemBlockSize = 512)
+    {
+        await using var stream = File.Create(path);
+        await WritePartitionImage(stream, dosType, fileSystemBlockSize);
+    }
+
+    /// <summary>Writes a partition image like <see cref="CreatePartitionImage" /> to a stream.</summary>
+    public static async Task WritePartitionImage(Stream stream, byte[] dosType, uint fileSystemBlockSize = 512)
+    {
+        const uint surfaces = 16;
+        const uint blocksPerTrack = 32;
+        stream.SetLength(PartitionSize);
+        var partitionBlock = new PartitionBlock
+        {
+            DriveName = "DH0",
+            DosType = dosType,
+            LowCyl = 0,
+            HighCyl = (uint)(PartitionSize / 512 / (surfaces * blocksPerTrack)) - 1,
+            Surfaces = surfaces,
+            BlocksPerTrack = blocksPerTrack,
+            Sectors = blocksPerTrack,
+            Reserved = 2,
+            BlockSize = 512,
+            FileSystemBlockSize = fileSystemBlockSize,
+            SizeBlock = 128,
+            PartitionSize = PartitionSize
+        };
+        if (dosType.SequenceEqual(Pfs3DosType))
+        {
+            await Pfs3Formatter.FormatPartition(stream, partitionBlock, "Work");
+        }
+        else if (dosType.SequenceEqual(SfsDosType))
+        {
+            await SmartFileSystemFormatter.FormatPartition(stream, partitionBlock, "Work");
+        }
+        else
+        {
+            await FastFileSystemFormatter.FormatPartition(stream, partitionBlock, "Work");
+        }
+    }
+
+    /// <summary>
     /// Writes a rigid disk block like <see cref="CreateRdbImage" /> to a stream of a fixed size, e.g. a partition of
     /// a PiStorm disk.
     /// </summary>

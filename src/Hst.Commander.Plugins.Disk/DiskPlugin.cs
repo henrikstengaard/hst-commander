@@ -7,7 +7,7 @@ namespace Hst.Commander.Plugins.Disk;
 /// listing their partitions, included with Hst Commander by default. Partitions with FAT, exFAT, NTFS or ext2/3/4
 /// (read-only) are mounted by the plugin, other partitions are opened by the file volume providers of Hst Commander and other plugins
 /// (<see cref="IPluginHost.OpenVolume" />), e.g. PiStorm partitions with a rigid disk block by the Amiga plugin.
-/// exFAT file systems without a partition table are opened as writable volumes too, and created with F9.
+/// FAT, exFAT, NTFS and ext2/3/4 file systems without a partition table are opened too, and exFAT ones created with F9.
 /// </summary>
 public class DiskPlugin : IPlugin
 {
@@ -23,7 +23,7 @@ public class DiskPlugin : IPlugin
 
     public DiskPlugin()
     {
-        FileVolumeProviders = [_diskFileVolumeProvider, new ExFatFileVolumeProvider()];
+        FileVolumeProviders = [_diskFileVolumeProvider, new FileSystemFileVolumeProvider()];
     }
 
     public void Initialize(IPluginHost host) => _diskFileVolumeProvider.Host = host;

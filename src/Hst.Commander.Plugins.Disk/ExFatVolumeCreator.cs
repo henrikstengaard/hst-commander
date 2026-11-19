@@ -5,7 +5,7 @@ namespace Hst.Commander.Plugins.Disk;
 
 /// <summary>
 /// Volume creator creating an exFAT file system without a partition table as a file, opened by
-/// <see cref="ExFatFileVolumeProvider" />, formatted by <see cref="ExFatFormatter" />. The file is a sparse file where
+/// <see cref="FileSystemFileVolumeProvider" />, formatted by <see cref="ExFatFormatter" />. The file is a sparse file where
 /// supported, as only the parts of the boot regions, the allocation table, the allocation bitmap, the up-case table and
 /// the root directory that aren't zeros are written, so a large volume takes little disk space until files are added.
 /// </summary>
