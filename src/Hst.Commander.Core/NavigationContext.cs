@@ -2342,7 +2342,10 @@ public sealed class NavigationContext : IDisposable
         _newEntryName = name;
     }
 
-    /// <summary>Creates a volume in a new local file, on the thread pool as creating may take a while.</summary>
+    /// <summary>
+    ///     Creates a volume in a new local file, on the thread pool as creating may take a while. The file is sparse when
+    ///     the creator asks for it and the file system supports it, otherwise a regular file.
+    /// </summary>
     private static async Task CreateLocalVolumeAsync(IVolumeCreator creator, string path, VolumeCreatorValues values,
         CancellationToken cancellationToken)
     {
@@ -2353,6 +2356,11 @@ public sealed class NavigationContext : IDisposable
             {
                 await using (stream)
                 {
+                    if (creator.CreatesSparseFile)
+                    {
+                        SparseFile.TryMakeSparse(stream);
+                    }
+
                     await creator.Create(stream, values, cancellationToken);
                 }
             }
@@ -2366,13 +2374,19 @@ public sealed class NavigationContext : IDisposable
 
     /// <summary>
     ///     Creates a volume in a temporary file and copies it to the current volume, e.g. a writable image, as the
-    ///     volume's streams may not be seekable.
+    ///     volume's streams may not be seekable. The temporary file is sparse when the creator asks for it, but the copy
+    ///     is written in full.
     /// </summary>
     private async Task CreateVolumeInVolumeAsync(IVolumeCreator creator, string name, VolumeCreatorValues values,
         CancellationToken cancellationToken)
     {
         await using var temporaryStream = new FileStream(Path.GetTempFileName(), FileMode.Create,
             FileAccess.ReadWrite, FileShare.None, 4096, FileOptions.DeleteOnClose);
+        if (creator.CreatesSparseFile)
+        {
+            SparseFile.TryMakeSparse(temporaryStream);
+        }
+
         await Task.Run(() => creator.Create(temporaryStream, values, cancellationToken), cancellationToken);
         temporaryStream.Position = 0;
 

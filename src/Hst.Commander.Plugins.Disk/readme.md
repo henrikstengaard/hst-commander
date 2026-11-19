@@ -7,6 +7,8 @@ The Disk plugin adds PC disk images with MBR and GPT partition tables to Hst Com
 - **MBR and GPT disk images**: raw images (e.g. `.img`) and vhd images (fixed, dynamic and differencing) are opened as volumes with Enter, detected by their contents regardless of the extension.
 - The root lists the partition table as `MBR` or `GPT` and its partitions as directories, shown with their number, e.g. `1`, so paths look like `disk.img\mbr\1\dir`.
 - **FAT** (with long names), **exFAT** and **NTFS** partitions are opened as volumes. They can be written to when the image is: copying, moving, renaming, deleting and making directories work like in local directories, and the attributes can be changed in the properties dialog.
+- **exFAT file systems without a partition table** (e.g. an image of a partition) are opened as writable volumes too.
+- **F9** creates an exFAT file system without a partition table as a sparse file, with its size (a number with a B, KB, MB or GB unit), volume label and cluster size.
 - **ext2, ext3 and ext4** partitions are opened as read-only volumes (DiscUtils can't write them), with case-sensitive names.
 - **PiStorm disks**: an MBR partition of type `0x76` or a GPT partition of type `3F82EEBC-87C9-4097-8165-89D6540557C0` holding a rigid disk block is opened with the Amiga plugin, e.g. `pistorm.img\mbr\2\rdb\1`.
 - **Hybrid MBR/RDB disks**: a disk with both an MBR and a rigid disk block lists both partition tables in its root, e.g. `hybrid.img\rdb\1`.
@@ -19,4 +21,5 @@ Partition tables can't be changed, ext2/3/4 can't be written, and other file sys
 
 - `DiskFileVolumeProvider` detects and opens the disk images. Partitions that aren't FAT, exFAT, NTFS or ext2/3/4 are opened with the other plugins' file volume providers through `IPluginHost.OpenVolume`.
 - `PartitionTableVolume` lists the partitions of an MBR or GPT partition table, `VolumeListVolume` the partition tables of a disk and `HybridDiskVolume` the partition tables of a hybrid disk.
+- `ExFatFileVolumeProvider` opens exFAT file systems without a partition table, `ExFatVolumeCreator` creates them with `ExFatFormatter` (ported from Hst Imager, as DiscUtils' exFAT formatter writes an incomplete up-case table and too small a FAT above 2 TB).
 - `DiscFileSystemVolume` is a FAT, exFAT, NTFS or ext2/3/4 partition; `ExFatVolumeLabel` reads the exFAT volume label, which DiscUtils doesn't.

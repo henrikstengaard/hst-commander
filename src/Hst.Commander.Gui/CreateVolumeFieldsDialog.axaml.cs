@@ -6,8 +6,8 @@ namespace Hst.Commander.Gui;
 
 /// <summary>
 ///     Modal dialog asking for the file name and the input fields of a volume creator chosen in the create dialog (F9),
-///     titled e.g. "Create Amiga disk file": a text box for text and number fields, a check box for boolean fields and
-///     a drop-down list for choices, required fields marked with "*" and fields enabled by a check box disabled while
+///     titled e.g. "Create Amiga disk file": a text box for text and number fields, a text box with a drop-down list of
+///     units for sizes, a check box for boolean fields and a drop-down list for choices, required fields marked with "*" and fields enabled by a check box disabled while
 ///     it's unchecked. The dialog returns the <see cref="VolumeCreatorInput" /> on OK or null on cancel.
 /// </summary>
 public partial class CreateVolumeFieldsDialog : Window
@@ -58,6 +58,29 @@ public partial class CreateVolumeFieldsDialog : Window
                         ? choices[comboBox.SelectedIndex].Value
                         : null));
                     controls = [new TextBlock { Text = VolumeCreation.GetLabel(field) + ":" }, comboBox];
+                    break;
+                }
+                case VolumeCreatorFieldType.Size:
+                {
+                    // the number with the unit chosen next to it
+                    var sizeInput = VolumeCreation.GetSizeInput(field, previous);
+                    var units = VolumeCreation.SizeUnits;
+                    var numberTextBox = new TextBox { Text = sizeInput.Number };
+                    var unitComboBox = new ComboBox
+                    {
+                        ItemsSource = units.Select(unit => unit.Label).ToList(),
+                        SelectedIndex = VolumeCreation.GetSizeUnitIndex(sizeInput.Unit),
+                        MinWidth = 80,
+                        Margin = new Avalonia.Thickness(8, 0, 0, 0),
+                        VerticalAlignment = Avalonia.Layout.VerticalAlignment.Stretch
+                    };
+                    var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
+                    Grid.SetColumn(unitComboBox, 1);
+                    grid.Children.Add(numberTextBox);
+                    grid.Children.Add(unitComboBox);
+                    inputs.Add((field, () => new VolumeCreatorSizeInput(numberTextBox.Text ?? string.Empty,
+                        units[Math.Clamp(unitComboBox.SelectedIndex, 0, units.Count - 1)].Label)));
+                    controls = [new TextBlock { Text = VolumeCreation.GetLabel(field) + ":" }, grid];
                     break;
                 }
                 default:

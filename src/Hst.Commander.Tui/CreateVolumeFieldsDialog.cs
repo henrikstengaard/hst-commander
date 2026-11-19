@@ -6,8 +6,8 @@ namespace Hst.Commander.Tui;
 
 /// <summary>
 ///     Modal dialog asking for the file name and the input fields of a volume creator chosen in the create dialog (F9),
-///     titled e.g. "Create Amiga disk file": a text field for text and number fields, a check box for boolean fields and
-///     a drop-down list for choices, required fields marked with "*" and fields enabled by a check box disabled while
+///     titled e.g. "Create Amiga disk file": a text field for text and number fields, a text field with a drop-down
+///     list of units for sizes, a check box for boolean fields and a drop-down list for choices, required fields marked with "*" and fields enabled by a check box disabled while
 ///     it's unchecked. <see cref="Result" /> holds the input on OK or null on cancel.
 /// </summary>
 public sealed class CreateVolumeFieldsDialog : Dialog
@@ -68,6 +68,34 @@ public sealed class CreateVolumeFieldsDialog : Dialog
                         ? choices[choiceField.SelectedIndex].Value
                         : null));
                     views = [label, choiceField];
+                    y += 3;
+                    lastIsCheckBox = false;
+                    break;
+                }
+                case VolumeCreatorFieldType.Size:
+                {
+                    // the number with the unit chosen next to it
+                    const int unitWidth = 6;
+                    var sizeInput = VolumeCreation.GetSizeInput(field, previous);
+                    var units = VolumeCreation.SizeUnits;
+                    var label = new Label { X = 1, Y = y, Text = VolumeCreation.GetLabel(field) + ":" };
+                    var numberField = new TextField
+                    {
+                        X = 1,
+                        Y = y + 1,
+                        Width = Dim.Fill(unitWidth + 2),
+                        Text = sizeInput.Number
+                    };
+                    var unitField = new ChoiceField(units.Select(unit => unit.Label).ToList(),
+                        VolumeCreation.GetSizeUnitIndex(sizeInput.Unit), palette.DialogColorScheme)
+                    {
+                        X = Pos.AnchorEnd(unitWidth + 1),
+                        Y = y + 1,
+                        Width = unitWidth
+                    };
+                    inputs.Add((field, () => new VolumeCreatorSizeInput(numberField.Text,
+                        units[Math.Clamp(unitField.SelectedIndex, 0, units.Count - 1)].Label)));
+                    views = [label, numberField, unitField];
                     y += 3;
                     lastIsCheckBox = false;
                     break;

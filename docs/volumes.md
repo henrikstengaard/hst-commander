@@ -52,6 +52,7 @@ ISO images and zip, lha, lzx, rar and 7z archives are read-only. `LocalVolume.Cr
 - ext2/3/4 is read-only (`LTRData.DiscUtils.Ext` only reads). Names are case-sensitive (`file1.txt` and `File1.txt` are different files); DiscUtils lists names with characters Windows doesn't allow (e.g. `:` or `?`) with them replaced by `_` and opens them by those names. Its size is the block count times the block size, as DiscUtils' `Size` is too small.
 - Sector sizes of 512 and 4096 bytes are supported. GPT tells by the header offset. MBR doesn't store it, so 4096 is used only when the partitions only fit with 4096-byte sectors, or also fit and more of them start with a recognizable volume there.
 - `DiskFileVolumeProvider` doesn't match the boot sector of an unpartitioned FAT/exFAT/NTFS volume, which also ends with `0x55 0xAA`.
+- `ExFatFileVolumeProvider` (Disk plugin) opens an exFAT file system without a partition table (e.g. created with F9, see [Creating volumes](file-operations.md#creating-volumes), or an image of a partition) as a writable image, detected by `EXFAT   ` in a boot sector ending with `0x55 0xAA`, and mounted like an exFAT partition (`DiscFileSystemVolume` with the label from `ExFatVolumeLabel`). Unpartitioned FAT and NTFS volumes aren't opened.
 
 ### Physical disks
 
