@@ -16,6 +16,9 @@ public sealed class MainWindow : Window
     private readonly MenuBar _menuBar;
     private readonly Label? _administratorLabel;
     private readonly ButtonPanelView _bottomPanel;
+    private readonly CommandLine _commandLine = new();
+    private readonly Label _commandPrompt;
+    private readonly TextField _commandField;
     private Pane _leftPane;
     private Pane _rightPane;
     private readonly MenuItem _leftVolumeMenuItem;
@@ -69,6 +72,7 @@ public sealed class MainWindow : Window
                     new("Add _bookmark...", "Ctrl+B", AddBookmarkInActivePane),
                     new("Re_fresh", "Ctrl+R", RefreshActivePane),
                     new("Sw_ap panes", "Ctrl+U", SwapPanes),
+                    new("Command _line", "Ctrl+T", FocusCommandLine),
                     null!,
                     new("_Settings...", string.Empty, ShowSettings),
                     null!,
@@ -89,13 +93,18 @@ public sealed class MainWindow : Window
             Height = 1
         };
         _bottomPanel.ActionInvoked += (_, action) => RunAction(action);
+        // the command line above the bottom area, like Midnight Commander's; its row is set by ApplyTheme. The prompt
+        // doesn't show the directory, which the path panel of the active pane shows, to leave room for the command
+        _commandPrompt = new Label { X = 0, Y = Pos.AnchorEnd(2), Width = 2, Height = 1, Text = "> " };
+        _commandField = new TextField { X = Pos.Right(_commandPrompt), Y = Pos.AnchorEnd(2), Width = Dim.Fill() };
+        _commandField.KeyDown += OnCommandFieldKeyDown;
         // the panes handle f9 (create volume) and f10 (quit) before the menu bar's key, so alt+f opens the menu
         Closing += (_, e) => e.Cancel = !ConfirmClosing();
         _leftPane = CreatePane(new NavigationContext(initialPath, StartFile), 0, true);
         _rightPane = CreatePane(new NavigationContext(initialPath, StartFile), 50, false);
         _activePane = _leftPane;
 
-        Add(_menuBar, _leftPane.View, _rightPane.View, _bottomPanel);
+        Add(_menuBar, _leftPane.View, _rightPane.View, _commandPrompt, _commandField, _bottomPanel);
 
         // running as administrator or root is shown at the right of the menu bar
         if (Elevation.IsElevated)
@@ -270,9 +279,11 @@ public sealed class MainWindow : Window
         _bottomPanel.CenterLabels = theme.Plugin != null;
         _bottomPanel.Height = bottomHeight;
         _bottomPanel.Y = Pos.AnchorEnd(bottomHeight);
+        _commandPrompt.Y = Pos.AnchorEnd(bottomHeight + 1);
+        _commandField.Y = Pos.AnchorEnd(bottomHeight + 1);
         foreach (var pane in new[] { _leftPane, _rightPane })
         {
-            pane.View.Height = Dim.Fill(bottomHeight);
+            pane.View.Height = Dim.Fill(bottomHeight + 1);
             ShowParentStrip(pane, theme.ShowParentButtons);
             pane.PathPanel.HighlightWhenActive = theme.HighlightActivePathPanel;
         }
@@ -287,6 +298,9 @@ public sealed class MainWindow : Window
         _bottomPanel.KeyAttribute = _palette.ButtonKey;
         _bottomPanel.TitleAttribute = _palette.ButtonTitle;
         _bottomPanel.NeedsDraw = true;
+        var commandAttribute = new TuiAttribute(_palette.Item, _palette.PaneBackground);
+        _commandPrompt.ColorScheme = CreateColorScheme(_palette.PaneNormal, _palette.PaneNormal);
+        _commandField.ColorScheme = CreateColorScheme(commandAttribute, commandAttribute);
         foreach (var pane in new[] { _leftPane, _rightPane })
         {
             ApplyPaneColors(pane);
@@ -687,6 +701,16 @@ public sealed class MainWindow : Window
                 key.Handled = true;
                 RequestTerminalAction(new TerminalAction.ShowOutput());
             }
+            else if (key == Key.T.WithCtrl)
+            {
+                key.Handled = true;
+                FocusCommandLine();
+            }
+            else if (IsInsertEntryKey(key, out var fullPath))
+            {
+                key.Handled = true;
+                InsertSelectedEntryInCommandLine(pane, fullPath, false);
+            }
             else if (key == Key.L.WithCtrl)
             {
                 key.Handled = true;
@@ -778,6 +802,107 @@ public sealed class MainWindow : Window
                 Quit();
             }
         };
+    }
+
+    /// <summary>
+    ///     Ctrl+Enter inserts the name of the entry under the cursor in the command line, Ctrl+Shift+Enter its full path.
+    ///     Ctrl+J too, as terminals sending Ctrl+Enter as a line feed (e.g. on Linux and macOS) send it for Ctrl+J.
+    /// </summary>
+    private static bool IsInsertEntryKey(Key key, out bool fullPath)
+    {
+        fullPath = key == Key.Enter.WithCtrl.WithShift;
+        return fullPath || key == Key.Enter.WithCtrl || key == Key.J.WithCtrl;
+    }
+
+    /// <summary>Focuses the command line (Ctrl+T), keeping the command typed.</summary>
+    private void FocusCommandLine()
+    {
+        _commandField.SetFocus();
+        _commandField.CursorPosition = _commandField.Text.Length;
+    }
+
+    /// <summary>
+    ///     Inserts the name or full path of the entry under the cursor of a pane in the command line (Ctrl+Enter,
+    ///     Ctrl+Shift+Enter): at its cursor when typing in it, otherwise at the end.
+    /// </summary>
+    private void InsertSelectedEntryInCommandLine(Pane pane, bool fullPath, bool atCursor)
+    {
+        var row = pane.TableView.SelectedRow;
+        if (row < 0 || row >= pane.Entries.Count ||
+            pane.NavigationContext.GetCommandLineText(pane.Entries[row], fullPath) is not { } text)
+        {
+            return;
+        }
+
+        _commandLine.Text = _commandField.Text;
+        var position = atCursor ? _commandField.CursorPosition : _commandField.Text.Length;
+        position = _commandLine.Insert(text, position);
+        _commandField.Text = _commandLine.Text;
+        _commandField.CursorPosition = position;
+        _commandField.NeedsDraw = true;
+    }
+
+    /// <summary>
+    ///     Keys of the command line: Enter runs the command, Esc and Tab go back to the active pane keeping the command,
+    ///     Ctrl+Enter and Ctrl+Shift+Enter insert the active pane's entry and Up and Down go through the commands run.
+    /// </summary>
+    private void OnCommandFieldKeyDown(object? sender, Key key)
+    {
+        if (key.KeyCode == KeyCode.Enter)
+        {
+            key.Handled = true;
+            RunCommandLine();
+        }
+        else if (key.KeyCode == KeyCode.Esc || key.KeyCode == KeyCode.Tab)
+        {
+            key.Handled = true;
+            _activePane.TableView.SetFocus();
+        }
+        else if (IsInsertEntryKey(key, out var fullPath))
+        {
+            key.Handled = true;
+            InsertSelectedEntryInCommandLine(_activePane, fullPath, true);
+        }
+        else if (key.KeyCode == KeyCode.CursorUp || key.KeyCode == KeyCode.CursorDown)
+        {
+            // Key equality includes Handled, so the key code is read before it's handled
+            var previous = key.KeyCode == KeyCode.CursorUp;
+            key.Handled = true;
+            _commandLine.Text = _commandField.Text;
+            if (previous ? _commandLine.Previous() : _commandLine.Next())
+            {
+                _commandField.Text = _commandLine.Text;
+                _commandField.CursorPosition = _commandField.Text.Length;
+            }
+        }
+    }
+
+    /// <summary>
+    ///     Runs the command typed in the command line in the active pane's directory, in the terminal while the TUI is
+    ///     shut down like a program opened in a pane, then the panes are listed again.
+    /// </summary>
+    private void RunCommandLine()
+    {
+        if (_commandField.Text.Trim().Length == 0)
+        {
+            return;
+        }
+
+        if (_activePane.NavigationContext.CurrentHostDirectory is not { } directory)
+        {
+            MessageBox.ErrorQuery("Error", CommandLine.NotLocalMessage, "OK");
+            return;
+        }
+
+        _commandLine.Text = _commandField.Text;
+        if (_commandLine.TakeCommand() is not { } command)
+        {
+            return;
+        }
+
+        _commandField.Text = string.Empty;
+        _activePane.TableView.SetFocus();
+        RequestTerminalAction(new TerminalAction.RunCommand(command, directory));
     }
 
     private void ViewInActivePane() => _ = ViewAsync(_activePane);

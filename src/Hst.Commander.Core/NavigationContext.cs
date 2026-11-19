@@ -753,6 +753,26 @@ public sealed class NavigationContext : IDisposable
     }
 
     /// <summary>
+    ///     Local directory of the current path, where commands typed in the command line run. Null in the drive list,
+    ///     inside images and in other volume providers, e.g. FTP, where the shell can't run.
+    /// </summary>
+    public string? CurrentHostDirectory => !IsInImage ? LocalPath : null;
+
+    /// <summary>
+    ///     Text inserted in the command line for a listed entry: its name (Ctrl+Enter), or its full path in
+    ///     <see cref="CurrentHostDirectory" /> (Ctrl+Shift+Enter, the name when there is none). Null for "..".
+    /// </summary>
+    public string? GetCommandLineText(IEntry entry, bool fullPath)
+    {
+        if (entry.Name.Equals(Paths.Parent, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        return fullPath && CurrentHostDirectory is { } directory ? Path.Combine(directory, entry.Name) : entry.Name;
+    }
+
+    /// <summary>
     ///     Opens a listed item in the current location for reading, e.g. to read its icon. Uses the pane's own volume,
     ///     so it must not run concurrently with navigation.
     /// </summary>
