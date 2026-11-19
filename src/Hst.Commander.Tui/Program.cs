@@ -31,6 +31,7 @@ try
             Application.Force16Colors = true;
         }
         Application.Run(mainWindow);
+        TerminalScreen.BeforeShutdown();
         Application.Shutdown();
         TerminalScreen.LeaveTui();
 
@@ -49,6 +50,13 @@ try
                 if (TerminalScreen.RunEditor(runEditor.Command, runEditor.Path) is { } editorError)
                 {
                     mainWindow.ShowErrorWhenLoaded(editorError);
+                }
+
+                break;
+            case TerminalAction.RunCommand runCommand:
+                if (TerminalScreen.RunCommand(runCommand.Command, runCommand.WorkingDirectory) is { } commandError)
+                {
+                    mainWindow.ShowErrorWhenLoaded(commandError);
                 }
 
                 break;
@@ -74,6 +82,7 @@ finally
     mainWindow.DisposeNavigationContexts();
     if (Application.Initialized)
     {
+        TerminalScreen.BeforeShutdown();
         Application.Shutdown();
         TerminalScreen.LeaveTui();
     }
