@@ -20,11 +20,14 @@ public sealed class NameFilter
     private readonly EntryFilter? _wildcardFilter;
     private readonly Regex? _regex;
 
+    /// <param name="filter">Wildcard patterns or a regular expression.</param>
+    /// <param name="caseSensitive">True to match case-sensitively.</param>
+    /// <param name="isRegex">True to use the filter as a regular expression, also without regex characters.</param>
     /// <exception cref="IOException">The filter is an invalid regular expression.</exception>
-    public NameFilter(string? filter, bool caseSensitive = false)
+    public NameFilter(string? filter, bool caseSensitive = false, bool isRegex = false)
     {
         filter = (filter ?? string.Empty).Trim();
-        if (!IsRegex(filter))
+        if ((!isRegex && !IsRegex(filter)) || filter.Length == 0)
         {
             _wildcardFilter = new EntryFilter(filter, caseSensitive);
             return;

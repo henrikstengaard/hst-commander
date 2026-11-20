@@ -21,6 +21,7 @@ try
     {
         TerminalScreen.EnterTui();
         Application.Init();
+        TerminalScreen.DisableLineInput();
         TuiTrueColors.Apply();
         // Terminal.Gui writes 24-bit colors on Linux and macOS, which terminals without true color (e.g. Terminal.app
         // before macOS 26) ignore, showing the TUI in monochrome. The palette only uses the 16 standard colors, so

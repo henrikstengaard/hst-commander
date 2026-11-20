@@ -2269,6 +2269,215 @@ public sealed class NavigationContext : IDisposable
     }
 
     /// <summary>
+    ///     Searches for entries (Ctrl+S) from <see cref="SearchOptions.StartPath" />, resolved like
+    ///     <see cref="ChangeLocationAsync(string, CancellationToken)" /> from the current location, in a context of its
+    ///     own so it can run on a background thread. Entries are found by their names and, when searching contents,
+    ///     files by their contents (<see cref="ContentMatcher" />); subdirectories are searched as deep as
+    ///     <see cref="SearchOptions.Depth" /> and images and archives as levels too with
+    ///     <see cref="SearchOptions.SearchInImages" />. Directories and files that can't be read are counted and
+    ///     skipped. Linked local directories are found but not searched, as they may link to a parent.
+    /// </summary>
+    /// <exception cref="IOException">Invalid name pattern, contents or start path.</exception>
+    public async Task SearchAsync(SearchOptions options, IProgress<SearchResult>? results,
+        IProgress<SearchProgress>? progress = null, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        var nameFilter = new NameFilter(options.NamePattern, options.CaseSensitive, options.NameIsRegex);
+        var contentMatcher = options.SearchesContent
+            ? ContentMatcher.Create(options.ContentType, options.Content, options.CaseSensitive)
+            : null;
+        var counter = new SearchCounter(progress);
+        using var context = await CloneAsync(cancellationToken);
+        // a temporary copy of an image inside an image isn't shown by the pane searched from
+        context.ProgressIndicator = null;
+        await context.ChangeLocationAsync(options.StartPath, cancellationToken);
+        await context.SearchDirectoryAsync(new EntrySearch(nameFilter, contentMatcher, options, results, counter), 0,
+            cancellationToken);
+        counter.Complete();
+    }
+
+    private sealed record EntrySearch(
+        NameFilter NameFilter,
+        ContentMatcher? ContentMatcher,
+        SearchOptions Options,
+        IProgress<SearchResult>? Results,
+        SearchCounter Counter);
+
+    /// <summary>Searches the current directory, at a level below the start directory, and its subdirectories.</summary>
+    private async Task SearchDirectoryAsync(EntrySearch search, int level, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var directoryPath = CurrentPath;
+        search.Counter.AddDirectory(directoryPath);
+        List<IEntry> entries;
+        try
+        {
+            entries = await _nestedVolume.ListEntries(cancellationToken).ToListAsync(cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            search.Counter.AddError();
+            return;
+        }
+
+        var searchDeeper = search.Options.MaxLevels is not { } maxLevels || level < maxLevels;
+        foreach (var entry in entries.Where(entry => !entry.Name.Equals(Paths.Parent, StringComparison.Ordinal)))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (entry.Type == EntryType.Container)
+            {
+                if (search.ContentMatcher == null && search.NameFilter.IsMatch(entry.Name))
+                {
+                    AddSearchResult(search, directoryPath, entry);
+                }
+
+                if (searchDeeper && !IsLinkedDirectory(entry))
+                {
+                    await SearchSubdirectoryAsync(search, entry, level, cancellationToken);
+                }
+
+                continue;
+            }
+
+            search.Counter.AddFile();
+            if (search.NameFilter.IsMatch(entry.Name) &&
+                (search.ContentMatcher == null ||
+                 await MatchesContentAsync(search, entry, cancellationToken)))
+            {
+                AddSearchResult(search, directoryPath, entry);
+            }
+
+            if (searchDeeper && search.Options.SearchInImages)
+            {
+                await SearchImageAsync(search, entry, level, cancellationToken);
+            }
+        }
+    }
+
+    private void AddSearchResult(EntrySearch search, string directoryPath, IEntry entry)
+    {
+        search.Counter.AddFound();
+        search.Results?.Report(new SearchResult(directoryPath, entry, _volumeProvider, _connectedLocation));
+    }
+
+    private async Task SearchSubdirectoryAsync(EntrySearch search, IEntry entry, int level,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _nestedVolume.ChangeDirectory([entry.Name], cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            search.Counter.AddError();
+            return;
+        }
+
+        try
+        {
+            await SearchDirectoryAsync(search, level + 1, cancellationToken);
+        }
+        finally
+        {
+            // change back also when cancelled or failed, so the search goes on in this directory
+            await _nestedVolume.ChangeDirectory([Paths.Parent], CancellationToken.None);
+        }
+    }
+
+    private async Task SearchImageAsync(EntrySearch search, IEntry entry, int level,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (!await OpenImageAsync(entry, _fileVolumeProviders, true, cancellationToken))
+            {
+                return;
+            }
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            search.Counter.AddError();
+            return;
+        }
+
+        try
+        {
+            await SearchDirectoryAsync(search, level + 1, cancellationToken);
+        }
+        finally
+        {
+            // at the root of the image again, so going to the parent closes it
+            await GoParentAsync(CancellationToken.None);
+        }
+    }
+
+    private async Task<bool> MatchesContentAsync(EntrySearch search, IEntry entry,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var stream = await _nestedVolume.OpenRead(entry.Name, cancellationToken);
+            return await search.ContentMatcher!.IsMatchAsync(stream, cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            search.Counter.AddError();
+            return false;
+        }
+    }
+
+    /// <summary>True for a local directory that is a link (symbolic link or junction), which may link to a parent.</summary>
+    private bool IsLinkedDirectory(IEntry entry)
+    {
+        if (GetLocalPath(entry) is not { } localPath || IsDriveList)
+        {
+            return false;
+        }
+
+        try
+        {
+            return new DirectoryInfo(localPath).LinkTarget != null;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    ///     Goes to an entry found by <see cref="SearchAsync" />: changes to the directory it was found in, in the volume
+    ///     provider it was found in, and selects it when the entries are listed.
+    /// </summary>
+    public async Task GoToSearchResultAsync(SearchResult result, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+
+        var previousPath = CurrentPath;
+        if (result.VolumeProvider == _volumeProvider)
+        {
+            await ChangeLocationAsync(result.DirectoryPath, cancellationToken);
+        }
+        else if (result.Connection is { } connection)
+        {
+            await ChangeVolumeProviderAsync(connection, result.DirectoryPath, cancellationToken);
+        }
+        else
+        {
+            await ChangeLocationAsync(result.VolumeProvider, result.DirectoryPath, cancellationToken);
+        }
+
+        if (CurrentPath.Equals(previousPath, StringComparison.Ordinal))
+        {
+            _newEntryName = result.Name;
+        }
+        else
+        {
+            PreviousEntryName = result.Name;
+        }
+    }
+
+    /// <summary>
     ///     Why a directory can't be created in the current location, e.g. in the local drive list or inside a read-only
     ///     image (images are writable when their file volume provider can write and their local file can be written).
     ///     Null when creating a directory is supported, front-ends then ask for its name.

@@ -438,6 +438,10 @@ public partial class PaneView : UserControl
     public Task ChangeLocationAsync(string path) =>
         RunNavigationAsync(() => NavigationContext.ChangeLocationAsync(path));
 
+    /// <summary>Goes to an entry found in the search dialog and selects it, see <see cref="NavigationContext.GoToSearchResultAsync" />.</summary>
+    public Task GoToSearchResultAsync(SearchResult result) =>
+        RunNavigationAsync(() => NavigationContext.GoToSearchResultAsync(result));
+
     /// <summary>Goes to the user's home directory (Home in the location dialog), see <see cref="NavigationContext.GoHomeAsync" />.</summary>
     public Task GoHomeAsync() => RunNavigationAsync(() => NavigationContext.GoHomeAsync());
 

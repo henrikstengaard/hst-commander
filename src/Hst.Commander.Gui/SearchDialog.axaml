@@ -1,0 +1,95 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:core="using:Hst.Commander.Core"
+        x:Class="Hst.Commander.Gui.SearchDialog"
+        Title="Search"
+        Width="760"
+        Height="620"
+        MinWidth="480"
+        MinHeight="420"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner">
+    <Window.Styles>
+        <Style Selector="Button.columnHeader">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0,0,1,1" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+            <Setter Property="CornerRadius" Value="0" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="Padding" Value="12,4" />
+            <Setter Property="Focusable" Value="False" />
+        </Style>
+    </Window.Styles>
+    <Grid Margin="16" RowDefinitions="Auto,Auto,*,Auto" RowSpacing="8">
+        <StackPanel Grid.Row="0" Spacing="8">
+            <TextBlock Text="Search for (wildcards or regular expression):" />
+            <TextBox x:Name="NameTextBox" />
+            <TextBlock Text="Start in:" />
+            <TextBox x:Name="StartTextBox" />
+            <WrapPanel Orientation="Horizontal" ItemSpacing="16">
+                <CheckBox x:Name="RegexCheckBox" Content="_Regular expression" />
+                <CheckBox x:Name="CaseSensitiveCheckBox" Content="C_ase sensitive" />
+                <CheckBox x:Name="ImagesCheckBox" Content="Search in _images and archives" />
+            </WrapPanel>
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="4">
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="Contents:" VerticalAlignment="Center" />
+                <WrapPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" ItemSpacing="16">
+                    <RadioButton x:Name="ContentNoneRadioButton" GroupName="Content" Content="None" />
+                    <RadioButton x:Name="ContentTextRadioButton" GroupName="Content" Content="Text" />
+                    <RadioButton x:Name="ContentRegexRadioButton" GroupName="Content" Content="Regular expression" />
+                    <RadioButton x:Name="ContentHexRadioButton" GroupName="Content" Content="Hex" />
+                </WrapPanel>
+                <TextBox Grid.Row="1" Grid.Column="1" x:Name="ContentTextBox"
+                         PlaceholderText="Text, regular expression or hex values, e.g. DE AD BE EF" />
+                <TextBlock Grid.Row="2" Grid.Column="0" Text="Depth:" VerticalAlignment="Center" />
+                <WrapPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" ItemSpacing="16">
+                    <RadioButton x:Name="DepthAllRadioButton" GroupName="Depth" Content="All subdirectories"
+                                 VerticalAlignment="Center" />
+                    <RadioButton x:Name="DepthCurrentRadioButton" GroupName="Depth" Content="Current directory only"
+                                 VerticalAlignment="Center" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <RadioButton x:Name="DepthLevelsRadioButton" GroupName="Depth" Content="Levels:"
+                                     VerticalAlignment="Center" />
+                        <NumericUpDown x:Name="LevelsUpDown" Minimum="0" Maximum="1000" Increment="1"
+                                       FormatString="0" Width="120" />
+                    </StackPanel>
+                </WrapPanel>
+            </Grid>
+        </StackPanel>
+        <TextBlock Grid.Row="1" x:Name="StatusText" TextTrimming="CharacterEllipsis" Opacity="0.8" />
+        <!-- results as a table: clicking a column header sorts by it, again in descending order -->
+        <Border Grid.Row="2" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                BorderThickness="1">
+            <Grid RowDefinitions="Auto,*">
+                <Grid Grid.Row="0" ColumnDefinitions="*,90,140">
+                    <Button Grid.Column="0" x:Name="PathHeaderButton" Classes="columnHeader" Content="Path" />
+                    <Button Grid.Column="1" x:Name="SizeHeaderButton" Classes="columnHeader" Content="Size"
+                            HorizontalContentAlignment="Right" />
+                    <Button Grid.Column="2" x:Name="ModifiedHeaderButton" Classes="columnHeader" Content="Modified" />
+                </Grid>
+                <ListBox Grid.Row="1" x:Name="ResultsList" SelectionMode="Single">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="core:SearchResult">
+                            <Grid ColumnDefinitions="*,90,140">
+                                <TextBlock Grid.Column="0" Text="{Binding FullPath}" TextTrimming="CharacterEllipsis"
+                                           ToolTip.Tip="{Binding FullPath}" />
+                                <TextBlock Grid.Column="1" Text="{Binding SizeText}" TextAlignment="Right"
+                                           Padding="0,0,8,0" />
+                                <TextBlock Grid.Column="2" Text="{Binding ModifiedText}" Padding="8,0,0,0" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Grid>
+        </Border>
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+            <Button x:Name="SearchButton" Content="Searc_h" MinWidth="80" HorizontalContentAlignment="Center"
+                    IsDefault="True" />
+            <Button x:Name="GoToButton" Content="_Go to" MinWidth="80" HorizontalContentAlignment="Center"
+                    ToolTip.Tip="Go to the entry in the pane (Enter or double-click)" />
+            <Button x:Name="CloseButton" Content="Close" MinWidth="80" HorizontalContentAlignment="Center"
+                    IsCancel="True" />
+        </StackPanel>
+    </Grid>
+</Window>
