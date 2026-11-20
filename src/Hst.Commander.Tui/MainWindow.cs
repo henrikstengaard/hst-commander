@@ -72,6 +72,7 @@ public sealed class MainWindow : Window
                     _leftVolumeMenuItem,
                     _rightVolumeMenuItem,
                     new("L_ocation...", "Ctrl+L", ShowLocationOfActivePane),
+                    new("Home director_y", "Ctrl+H", GoHomeInActivePane),
                     new("Add _bookmark...", "Ctrl+B", AddBookmarkInActivePane),
                     new("Re_fresh", "Ctrl+R", RefreshActivePane),
                     new("Sw_ap panes", "Ctrl+U", SwapPanes),
@@ -729,6 +730,12 @@ public sealed class MainWindow : Window
                 key.Handled = true;
                 _ = ShowLocationAsync(pane);
             }
+            // terminals sending Backspace as Ctrl+H (0x08) may decode it as Backspace, which goes to the parent instead
+            else if (key == Key.H.WithCtrl)
+            {
+                key.Handled = true;
+                GoHome(pane);
+            }
             else if (key == Key.B.WithCtrl)
             {
                 key.Handled = true;
@@ -951,6 +958,14 @@ public sealed class MainWindow : Window
     private void ChooseRightVolumeProvider() => _ = ChooseVolumeProviderAsync(_rightPane);
 
     private void ShowLocationOfActivePane() => _ = ShowLocationAsync(_activePane);
+
+    private void GoHomeInActivePane() => GoHome(_activePane);
+
+    /// <summary>
+    ///     Goes to the user's home directory in a pane (Ctrl+H, Home in the location dialog), switching to the Local
+    ///     volume provider, see <see cref="NavigationContext.GoHomeAsync" />.
+    /// </summary>
+    private void GoHome(Pane pane) => _ = RunNavigationAsync(pane, () => pane.NavigationContext.GoHomeAsync());
 
     private void SearchInActivePane() => _ = SearchAsync(_activePane);
 
@@ -1318,7 +1333,7 @@ public sealed class MainWindow : Window
         }
         else if (result?.IsHome == true)
         {
-            await RunNavigationAsync(pane, () => pane.NavigationContext.GoHomeAsync());
+            GoHome(pane);
         }
         else if (result?.Path is { } path)
         {

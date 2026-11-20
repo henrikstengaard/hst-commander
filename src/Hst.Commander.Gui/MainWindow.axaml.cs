@@ -80,6 +80,7 @@ public partial class MainWindow : Window
         LeftVolumeMenuItem.Click += async (_, _) => await ChooseVolumeProviderAsync(LeftPane);
         RightVolumeMenuItem.Click += async (_, _) => await ChooseVolumeProviderAsync(RightPane);
         LocationMenuItem.Click += async (_, _) => await ShowLocationAsync(_activePane);
+        HomeMenuItem.Click += async (_, _) => await GoHomeAsync(_activePane);
         AddBookmarkMenuItem.Click += async (_, _) => await AddBookmarkAsync(_activePane);
         RefreshMenuItem.Click += async (_, _) => await RefreshAsync(_activePane);
         SwapPanesMenuItem.Click += async (_, _) => await SwapPanesAsync();
@@ -188,6 +189,16 @@ public partial class MainWindow : Window
             await ShowErrorAsync(new IOException(
                 $"Failed to save settings to '{GuiSettings.FilePath}': {exception.Message}", exception));
         }
+    }
+
+    /// <summary>
+    ///     Goes to the user's home directory in a pane (Ctrl+H, Home in the location dialog), switching to the Local
+    ///     volume provider. The pane gets the focus.
+    /// </summary>
+    private static async Task GoHomeAsync(PaneView pane)
+    {
+        await pane.GoHomeAsync();
+        pane.FocusEntries();
     }
 
     /// <summary>Lists the entries of a pane again (Ctrl+R), e.g. after files were changed outside.</summary>
@@ -435,6 +446,10 @@ public partial class MainWindow : Window
             case Key.L when e.KeyModifiers == KeyModifiers.Control:
                 e.Handled = true;
                 await ShowLocationAsync(_activePane);
+                break;
+            case Key.H when e.KeyModifiers == KeyModifiers.Control:
+                e.Handled = true;
+                await GoHomeAsync(_activePane);
                 break;
             case Key.B when e.KeyModifiers == KeyModifiers.Control:
                 e.Handled = true;
