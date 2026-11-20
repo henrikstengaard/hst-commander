@@ -3,8 +3,8 @@ using Avalonia.Controls;
 namespace Hst.Commander.Gui;
 
 /// <summary>
-///     Modal dialog asking for the description of a bookmark, when adding one (Ctrl+B) or renaming one (F2 in the bookmark
-///     list), showing the bookmarked location. The dialog returns the description on OK or null on cancel.
+///     Modal dialog asking for the description of a bookmark when adding one (Ctrl+B), showing the bookmarked location.
+///     Bookmarks are changed with <see cref="EditBookmarkDialog" />. The dialog returns the description on OK or null on cancel.
 /// </summary>
 public partial class BookmarkDialog : Window
 {

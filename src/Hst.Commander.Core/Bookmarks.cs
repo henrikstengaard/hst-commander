@@ -27,7 +27,79 @@ public sealed record Bookmark(
     string? Location,
     string Path,
     string? UserName,
-    bool HasPassword);
+    bool HasPassword)
+{
+    /// <summary>
+    ///     Path of the bookmark in another location, e.g. "\server2\share\dir" for "\server2\share" when the
+    ///     path is "\server\share\dir" in the location "\server\share"; null when the bookmark has no location or
+    ///     its path isn't in it. Used by the edit bookmark dialog to change the path along with the location.
+    /// </summary>
+    public string? GetPathInLocation(string location)
+    {
+        ArgumentNullException.ThrowIfNull(location);
+
+        return Location is { Length: > 0 } current && Path.StartsWith(current, StringComparison.OrdinalIgnoreCase)
+            ? location.Trim() + Path[current.Length..]
+            : null;
+    }
+}
+
+/// <summary>
+///     Changes made to a bookmark in the edit bookmark dialog (F4 in the bookmark list), saved with
+///     <see cref="BookmarkStore.Edit" />.
+/// </summary>
+/// <param name="Description">Description shown in the bookmark list.</param>
+/// <param name="Location">
+///     Location connected to, for a bookmark of a volume provider asking for one (with a
+///     <see cref="Bookmark.Location" />); ignored for other bookmarks.
+/// </param>
+/// <param name="Path">Path changed to.</param>
+/// <param name="UserName">User name connected with, empty for none; ignored for bookmarks without a location.</param>
+/// <param name="Password">New password to store, empty to keep the stored one.</param>
+/// <param name="StorePassword">
+///     True to store the password in the credential store, false to delete a stored password (the bookmark then asks
+///     for it when opened).
+/// </param>
+public sealed record BookmarkChanges(
+    string Description,
+    string? Location,
+    string Path,
+    string? UserName,
+    string? Password,
+    bool StorePassword)
+{
+    /// <summary>
+    ///     Message for input that can't be saved for a bookmark, e.g. an empty description or path, or storing the
+    ///     password without one entered or stored; null when the changes can be saved.
+    /// </summary>
+    public string? GetError(Bookmark bookmark)
+    {
+        ArgumentNullException.ThrowIfNull(bookmark);
+
+        if (string.IsNullOrWhiteSpace(Description))
+        {
+            return "Enter a description.";
+        }
+
+        if (bookmark.Location != null && string.IsNullOrWhiteSpace(Location))
+        {
+            return "Enter a location.";
+        }
+
+        if (string.IsNullOrWhiteSpace(Path))
+        {
+            return "Enter a path.";
+        }
+
+        if (bookmark.Location != null && StorePassword && !string.IsNullOrWhiteSpace(UserName) &&
+            !bookmark.HasPassword && string.IsNullOrEmpty(Password))
+        {
+            return "Enter the password to store.";
+        }
+
+        return null;
+    }
+}
 
 /// <summary>
 ///     Bookmarks stored in a JSON file shared by both front-ends (<see cref="Default" />,
@@ -92,20 +164,62 @@ public sealed class BookmarkStore(string filePath, ICredentialStore credentialSt
         });
     }
 
-    /// <summary>Changes the description of a bookmark.</summary>
-    public void Rename(string id, string description)
+    /// <summary>
+    ///     Changes a bookmark (see <see cref="BookmarkChanges" />): its description and path, and for a bookmark with a
+    ///     location, the location, user name and stored password. The password is deleted from the credential store when
+    ///     it's no longer to be stored or there is no user name, and replaced when a new one is entered. Throws
+    ///     <see cref="IOException" /> when the bookmark no longer exists, the file can't be written or the new password
+    ///     can't be stored (the other changes are then saved, keeping the password stored before, if any).
+    /// </summary>
+    public void Edit(string id, BookmarkChanges changes)
     {
         ArgumentNullException.ThrowIfNull(id);
-        ArgumentNullException.ThrowIfNull(description);
+        ArgumentNullException.ThrowIfNull(changes);
 
+        Bookmark? edited = null;
+        var hadPassword = false;
         Update(bookmarks =>
         {
             var index = bookmarks.FindIndex(existing => existing.Id == id);
-            if (index >= 0)
+            if (index < 0)
             {
-                bookmarks[index] = bookmarks[index] with { Description = description.Trim() };
+                return;
             }
+
+            var existing = bookmarks[index];
+            var hasLocation = existing.Location != null;
+            var userName = hasLocation
+                ? string.IsNullOrWhiteSpace(changes.UserName) ? null : changes.UserName.Trim()
+                : existing.UserName;
+            hadPassword = existing.HasPassword;
+            edited = existing with
+            {
+                Description = changes.Description.Trim(),
+                Location = hasLocation && !string.IsNullOrWhiteSpace(changes.Location)
+                    ? changes.Location.Trim()
+                    : existing.Location,
+                Path = changes.Path.Trim(),
+                UserName = userName,
+                HasPassword = existing.HasPassword && (!hasLocation || userName != null && changes.StorePassword)
+            };
+            bookmarks[index] = edited;
         });
+
+        if (edited == null)
+        {
+            throw new IOException($"The bookmark '{changes.Description.Trim()}' no longer exists.");
+        }
+
+        if (hadPassword && !edited.HasPassword)
+        {
+            DeletePassword(id);
+        }
+
+        if (edited is { Location: not null, UserName: not null } && changes is
+                { StorePassword: true, Password.Length: > 0 })
+        {
+            StorePassword(edited, changes.Password);
+        }
     }
 
     /// <summary>Deletes a bookmark and its password from the credential store.</summary>
@@ -120,7 +234,15 @@ public sealed class BookmarkStore(string filePath, ICredentialStore credentialSt
             bookmarks.RemoveAll(bookmark => bookmark.Id == id);
         });
 
-        if (!hasPassword || !credentialStore.IsAvailable)
+        if (hasPassword)
+        {
+            DeletePassword(id);
+        }
+    }
+
+    private void DeletePassword(string id)
+    {
+        if (!credentialStore.IsAvailable)
         {
             return;
         }
@@ -131,7 +253,7 @@ public sealed class BookmarkStore(string filePath, ICredentialStore credentialSt
         }
         catch (IOException)
         {
-            // the bookmark is gone; a password left behind can't be used by Hst Commander
+            // the bookmark no longer uses it; a password left behind can't be used by Hst Commander
         }
     }
 
