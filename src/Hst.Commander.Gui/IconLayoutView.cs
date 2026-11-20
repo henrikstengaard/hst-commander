@@ -3,6 +3,7 @@ using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Documents;
+using Avalonia.Controls.Shapes;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
@@ -26,6 +27,9 @@ internal sealed class IconLayoutView : UserControl
 {
     /// <summary>Margin around the icons, so icons at position 0 aren't drawn on the edge.</summary>
     private const double IconMargin = 8;
+
+    /// <summary>Margin of the glow of marked icons around the image and name.</summary>
+    private const double GlowMargin = 6;
 
     /// <summary>Distance in pixels the pointer moves before an icon is dragged instead of clicked.</summary>
     private const double DragDistance = 4;
@@ -402,13 +406,30 @@ internal sealed class IconLayoutView : UserControl
             label.FontSize = fontSize;
         }
 
+        // a yellow glow behind marked icons, so they stand out from the current icon showing its selected image too
+        var glow = new Ellipse
+        {
+            Fill = new RadialGradientBrush
+            {
+                GradientStops =
+                {
+                    new GradientStop(Color.FromArgb(0xd0, 0xff, 0xe0, 0x00), 0),
+                    new GradientStop(Color.FromArgb(0x90, 0xff, 0xe0, 0x00), 0.6),
+                    new GradientStop(Color.FromArgb(0x00, 0xff, 0xe0, 0x00), 1)
+                }
+            },
+            IsHitTestVisible = false,
+            IsVisible = false
+        };
+
         // the label is measured once added, so it has the pane's font when the mode has none
+        _canvas.Children.Add(glow);
         _canvas.Children.Add(image);
         _canvas.Children.Add(label);
         var layoutPosition = navigationIcon.X is { } x && navigationIcon.Y is { } y
             ? new PixelPoint(x, y)
             : (PixelPoint?)null;
-        var icon = new IconVisual(item, image, label, normalImage, FileIcons.CreateBitmap(navigationIcon.SelectedImage),
+        var icon = new IconVisual(item, glow, image, label, normalImage, FileIcons.CreateBitmap(navigationIcon.SelectedImage),
             layoutPosition, MeasureLabel(label), navigationIcon.IsMovable);
         _icons.Add(icon);
         UpdateImage(icon);
@@ -444,6 +465,7 @@ internal sealed class IconLayoutView : UserControl
                 ? icon.SelectedImage
                 : icon.NormalImage;
         icon.Image.Opacity = isSelected && (icon.SelectedImage == null || icon.NormalImage == null) ? 0.5 : 1;
+        icon.Glow.IsVisible = icon.Item.IsMarked;
     }
 
     private void OnIconPressed(IconVisual icon, PointerPressedEventArgs e)
@@ -646,6 +668,12 @@ internal sealed class IconLayoutView : UserControl
         icon.Label.Width = icon.LabelSize.Width;
         Canvas.SetLeft(icon.Label, IconMargin + position.X + icon.Image.Width / 2 - icon.LabelSize.Width / 2);
         Canvas.SetTop(icon.Label, IconMargin + position.Y + icon.Image.Height + 1);
+        // the glow covers the image and its name with a margin fading out
+        var bounds = GetBounds(icon).Inflate(GlowMargin);
+        icon.Glow.Width = bounds.Width;
+        icon.Glow.Height = bounds.Height;
+        Canvas.SetLeft(icon.Glow, IconMargin + bounds.X);
+        Canvas.SetTop(icon.Glow, IconMargin + bounds.Y);
     }
 
     private void UpdateCanvasSize()
@@ -755,10 +783,14 @@ internal sealed class IconLayoutView : UserControl
     }
 
     /// <summary>An icon shown: its image and label controls, images, position and the size of its label.</summary>
-    private sealed class IconVisual(EntryItem item, Image image, TextBlock label, Bitmap? normalImage,
+    private sealed class IconVisual(EntryItem item, Ellipse glow, Image image, TextBlock label, Bitmap? normalImage,
         Bitmap? selectedImage, PixelPoint? layoutPosition, Size labelSize, bool isMovable)
     {
         public EntryItem Item { get; } = item;
+
+        /// <summary>Yellow glow behind the icon, shown while it's marked.</summary>
+        public Ellipse Glow { get; } = glow;
+
         public Image Image { get; } = image;
         public TextBlock Label { get; } = label;
         public Bitmap? NormalImage { get; } = normalImage;
