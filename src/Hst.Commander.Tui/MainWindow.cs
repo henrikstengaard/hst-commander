@@ -644,6 +644,13 @@ public sealed class MainWindow : Window
                 MoveSelection(pane, key.KeyCode == KeyCode.CursorUp ? -1 : 1);
                 key.Handled = true;
             }
+            else if (key == Key.CursorUp.WithShift || key == Key.CursorDown.WithShift)
+            {
+                // Key equality includes Handled, so the key is compared before it's handled
+                var offset = key == Key.CursorUp.WithShift ? -1 : 1;
+                key.Handled = true;
+                ToggleMarkAndMove(pane, offset);
+            }
             else if (key == Key.PageDown.WithCtrl)
             {
                 key.Handled = true;
@@ -662,7 +669,7 @@ public sealed class MainWindow : Window
             }
             else if (key.KeyCode == KeyCode.Insert || key.KeyCode == KeyCode.Space)
             {
-                ToggleMarkAndMoveDown(pane);
+                ToggleMarkAndMove(pane, 1);
                 key.Handled = true;
             }
             else if (key.AsRune.Value == '+')
@@ -2178,8 +2185,11 @@ public sealed class MainWindow : Window
         pane.TableView.NeedsDraw = true;
     }
 
-    /// <summary>Toggles the mark of the entry under the cursor and moves the cursor to the next entry.</summary>
-    private static void ToggleMarkAndMoveDown(Pane pane)
+    /// <summary>
+    ///     Toggles the mark of the entry under the cursor and moves the cursor by an offset: to the next entry with
+    ///     Insert, Space and Shift+Down, to the previous one with Shift+Up.
+    /// </summary>
+    private static void ToggleMarkAndMove(Pane pane, int offset)
     {
         var selectedRow = pane.TableView.SelectedRow;
         if (selectedRow < 0 || selectedRow >= pane.Entries.Count)
@@ -2190,7 +2200,7 @@ public sealed class MainWindow : Window
         pane.NavigationContext.ToggleMark(pane.Entries[selectedRow]);
         pane.PathPanel.Summary = pane.NavigationContext.MarkedSummary;
         pane.PathPanel.NeedsDraw = true;
-        MoveSelection(pane, 1);
+        MoveSelection(pane, offset);
     }
 
     private ColorScheme GetRowColorScheme(Pane pane, int rowIndex)
