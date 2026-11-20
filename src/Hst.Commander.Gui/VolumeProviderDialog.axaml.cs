@@ -8,7 +8,7 @@ using Hst.Commander.Core;
 namespace Hst.Commander.Gui;
 
 /// <summary>
-///     Modal list of the volume providers a pane can show, followed by Bookmarks, opened with Alt+F1 (left pane) or
+///     Modal list of Bookmarks followed by the volume providers a pane can show, opened with Alt+F1 (left pane) or
 ///     Alt+F2 (right pane) and centered over the pane. The dialog returns the chosen volume provider or bookmark on OK,
 ///     Enter or double-click, or null when cancelled. Choosing Bookmarks opens the bookmark list
 ///     (<see cref="BookmarksDialog" />), or says there are no bookmarks; cancelling it goes back to this list.

@@ -208,7 +208,7 @@ public class GivenBookmarkStore : IDisposable
     }
 
     [Fact]
-    public void When_VolumeChoicesAreListed_Then_BookmarksItemFollowsTheVolumeProviders()
+    public void When_VolumeChoicesAreListed_Then_BookmarksItemIsFirst()
     {
         // arrange
         var bookmark = CreateBookmark("1", "temp");
@@ -219,9 +219,9 @@ public class GivenBookmarkStore : IDisposable
 
         // assert
         Assert.Equal(2, choices.Count);
-        Assert.Same(Core.VolumeProviders.Local, choices[0].VolumeProvider);
-        Assert.True(choices[1].IsBookmarks);
-        Assert.Equal("Bookmarks", choices[1].Name);
+        Assert.True(choices[0].IsBookmarks);
+        Assert.Equal("Bookmarks", choices[0].Name);
+        Assert.Same(Core.VolumeProviders.Local, choices[1].VolumeProvider);
         Assert.False(bookmarkChoice.IsBookmarks);
         Assert.Equal("temp", bookmarkChoice.Name);
         Assert.Equal(@"c:\temp", bookmarkChoice.Description);

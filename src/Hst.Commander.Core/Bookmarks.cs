@@ -452,9 +452,9 @@ public sealed record VolumeChoice(IVolumeProvider? VolumeProvider, Bookmark? Boo
     /// <summary>True for the bookmarks item opening the bookmark list.</summary>
     public bool IsBookmarks => VolumeProvider == null && Bookmark == null;
 
-    /// <summary>The volume providers followed by the bookmarks item.</summary>
+    /// <summary>The bookmarks item followed by the volume providers.</summary>
     public static IReadOnlyList<VolumeChoice> List(IEnumerable<IVolumeProvider> volumeProviders) =>
-        [..volumeProviders.Select(volumeProvider => new VolumeChoice(volumeProvider, null)), Bookmarks];
+        [Bookmarks, ..volumeProviders.Select(volumeProvider => new VolumeChoice(volumeProvider, null))];
 
     /// <summary>The bookmarks of the bookmark list.</summary>
     public static IReadOnlyList<VolumeChoice> List(IEnumerable<Bookmark> bookmarks) =>

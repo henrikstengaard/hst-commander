@@ -146,7 +146,7 @@ The location dialog (Ctrl+L, clicking the path, File > Location), titled "Left l
 
 ## Bookmarks
 
-Ctrl+B or File > Add bookmark bookmarks the location of the active pane with a description (`BookmarkDialog`, the last path component by default). The volume provider list (F1/F2 and `Volumes...` of the location dialog) has a `Bookmarks` item after the volume providers (`VolumeChoice.Bookmarks`); choosing it opens the bookmark list (`BookmarksDialog`), or says there are no bookmarks when none have been added. Choosing a bookmark in the list opens it in the pane, and cancelling goes back to the volume provider list. Del or `Delete` deletes the selected bookmark after confirming and F4, F2 or `Edit` edits it (`EditBookmarkDialog`); the list closes when the last bookmark is deleted.
+Ctrl+B or File > Add bookmark bookmarks the location of the active pane with a description (`BookmarkDialog`, the last path component by default). The volume provider list (F1/F2 and `Volumes...` of the location dialog) has a `Bookmarks` item first, before the volume providers (`VolumeChoice.Bookmarks`); choosing it opens the bookmark list (`BookmarksDialog`), or says there are no bookmarks when none have been added. Choosing a bookmark in the list opens it in the pane, and cancelling goes back to the volume provider list. Del or `Delete` deletes the selected bookmark after confirming and F4, F2 or `Edit` edits it (`EditBookmarkDialog`); the list closes when the last bookmark is deleted.
 
 ### Editing bookmarks
 
