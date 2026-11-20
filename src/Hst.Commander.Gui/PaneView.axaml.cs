@@ -508,6 +508,15 @@ public partial class PaneView : UserControl
 
         switch (e.Key)
         {
+            // Shift+arrows toggle the mark of the current entry and move like the arrow key, Shift+Left and
+            // Shift+Right only where Left and Right move (thumbnails and plugin navigation modes)
+            case Key.Up or Key.Down when e.KeyModifiers == KeyModifiers.Shift:
+            case Key.Left or Key.Right when e.KeyModifiers == KeyModifiers.Shift &&
+                                            (NavigationMode.PluginMode != null ||
+                                             NavigationMode == PaneNavigationMode.Thumbnail):
+                e.Handled = true;
+                ToggleMarkAndMove(e.Key);
+                break;
             // icons of a plugin's navigation mode are moved through by their positions
             case Key.Left or Key.Up or Key.Right or Key.Down when NavigationMode.PluginMode != null &&
                                                                  e.KeyModifiers == KeyModifiers.None:
@@ -641,14 +650,55 @@ public partial class PaneView : UserControl
     /// <summary>Toggles the mark of the entry under the cursor and moves the cursor to the next entry.</summary>
     private void ToggleMarkAndMoveDown()
     {
-        if (EntriesList.SelectedItem is not EntryItem item)
+        if (ToggleSelectedMark())
+        {
+            MoveSelection(1);
+        }
+    }
+
+    /// <summary>
+    ///     Toggles the mark of the entry under the cursor and moves the cursor like the arrow key: to the next or
+    ///     previous entry in the list, a row or an entry of thumbnails, or the nearest icon of a plugin's navigation
+    ///     mode in that direction.
+    /// </summary>
+    private void ToggleMarkAndMove(Key arrowKey)
+    {
+        if (!ToggleSelectedMark())
         {
             return;
         }
 
+        if (NavigationMode.PluginMode != null)
+        {
+            EntriesList.SelectedItem = IconLayout.GetItem(EntriesList.SelectedItem as EntryItem, arrowKey switch
+            {
+                Key.Left => NavigationDirection.Left,
+                Key.Up => NavigationDirection.Up,
+                Key.Right => NavigationDirection.Right,
+                _ => NavigationDirection.Down
+            }) ?? EntriesList.SelectedItem;
+        }
+        else if (NavigationMode == PaneNavigationMode.Thumbnail && arrowKey is Key.Up or Key.Down)
+        {
+            MoveThumbnailRow(arrowKey == Key.Down);
+        }
+        else
+        {
+            MoveSelection(arrowKey is Key.Down or Key.Right ? 1 : -1);
+        }
+    }
+
+    /// <summary>Toggles the mark of the entry under the cursor. Returns false when there's no entry under it.</summary>
+    private bool ToggleSelectedMark()
+    {
+        if (EntriesList.SelectedItem is not EntryItem item)
+        {
+            return false;
+        }
+
         item.IsMarked = NavigationContext.ToggleMark(item.Entry);
         UpdateSummary();
-        MoveSelection(1);
+        return true;
     }
 
     /// <summary>

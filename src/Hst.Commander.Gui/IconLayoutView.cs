@@ -444,6 +444,8 @@ internal sealed class IconLayoutView : UserControl
                 ? icon.SelectedImage
                 : icon.NormalImage;
         icon.Image.Opacity = isSelected && (icon.SelectedImage == null || icon.NormalImage == null) ? 0.5 : 1;
+        // marked icons get a yellow name, so they stand out from the current icon showing its selected image too
+        icon.Label.Foreground = icon.Item.IsMarked ? Brushes.Yellow : ParseBrush(_style.Foreground, Brushes.Black);
     }
 
     private void OnIconPressed(IconVisual icon, PointerPressedEventArgs e)

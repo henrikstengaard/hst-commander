@@ -92,6 +92,7 @@ Ctrl+C, Ctrl+X and Ctrl+V (Alt+V in the TUI too, as Windows Terminal and the cla
 
 ## Selecting Groups
 
+- Insert and Space toggle the mark of the entry under the cursor and move to the next entry; Shift+Down does the same and Shift+Up toggles and moves to the previous entry, so holding Shift with the arrows marks (or unmarks) a run of entries, like Norton and Total Commander. In the GUI's thumbnails and plugin navigation modes Shift+arrows, Shift+Left and Shift+Right too, move like the arrows (a row or an entry, the nearest icon).
 - `MarkGroup`/`UnmarkGroup(entries, SelectGroupOptions)` add or remove marks of entries matching a filter (`CaseSensitive`, `FilesOnly`), keeping other marks; `InvertMarks` toggles every entry. `..` is never marked.
 - `NameFilter`: a filter containing a regex character (`NameFilter.RegexCharacters`) is a regular expression matching any part of the name; otherwise wildcard patterns like `EntryFilter`, matching whole names. Empty matches everything; an invalid regex throws `IOException`.
 - `+` selects, `-` unselects, `*` inverts. The keys are matched by the typed character so they work on any keyboard layout (plus the keypad keys). The filter starts as `*` and is remembered for the session, shared by select and unselect.
