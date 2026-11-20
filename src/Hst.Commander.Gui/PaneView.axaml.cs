@@ -504,10 +504,14 @@ public partial class PaneView : UserControl
 
         switch (e.Key)
         {
-            // Shift+Up and Shift+Down toggle the mark of the current entry and move like the arrow key
+            // Shift+arrows toggle the mark of the current entry and move like the arrow key, Shift+Left and
+            // Shift+Right only where Left and Right move (thumbnails and plugin navigation modes)
             case Key.Up or Key.Down when e.KeyModifiers == KeyModifiers.Shift:
+            case Key.Left or Key.Right when e.KeyModifiers == KeyModifiers.Shift &&
+                                            (NavigationMode.PluginMode != null ||
+                                             NavigationMode == PaneNavigationMode.Thumbnail):
                 e.Handled = true;
-                ToggleMarkAndMove(e.Key == Key.Down);
+                ToggleMarkAndMove(e.Key);
                 break;
             // icons of a plugin's navigation mode are moved through by their positions
             case Key.Left or Key.Up or Key.Right or Key.Down when NavigationMode.PluginMode != null &&
@@ -649,10 +653,11 @@ public partial class PaneView : UserControl
     }
 
     /// <summary>
-    ///     Toggles the mark of the entry under the cursor and moves the cursor down or up like the arrow keys: to the
-    ///     next or previous entry in the list, a row of thumbnails, or the nearest icon of a plugin's navigation mode.
+    ///     Toggles the mark of the entry under the cursor and moves the cursor like the arrow key: to the next or
+    ///     previous entry in the list, a row or an entry of thumbnails, or the nearest icon of a plugin's navigation
+    ///     mode in that direction.
     /// </summary>
-    private void ToggleMarkAndMove(bool down)
+    private void ToggleMarkAndMove(Key arrowKey)
     {
         if (!ToggleSelectedMark())
         {
@@ -661,16 +666,21 @@ public partial class PaneView : UserControl
 
         if (NavigationMode.PluginMode != null)
         {
-            EntriesList.SelectedItem = IconLayout.GetItem(EntriesList.SelectedItem as EntryItem,
-                down ? NavigationDirection.Down : NavigationDirection.Up) ?? EntriesList.SelectedItem;
+            EntriesList.SelectedItem = IconLayout.GetItem(EntriesList.SelectedItem as EntryItem, arrowKey switch
+            {
+                Key.Left => NavigationDirection.Left,
+                Key.Up => NavigationDirection.Up,
+                Key.Right => NavigationDirection.Right,
+                _ => NavigationDirection.Down
+            }) ?? EntriesList.SelectedItem;
         }
-        else if (NavigationMode == PaneNavigationMode.Thumbnail)
+        else if (NavigationMode == PaneNavigationMode.Thumbnail && arrowKey is Key.Up or Key.Down)
         {
-            MoveThumbnailRow(down);
+            MoveThumbnailRow(arrowKey == Key.Down);
         }
         else
         {
-            MoveSelection(down ? 1 : -1);
+            MoveSelection(arrowKey is Key.Down or Key.Right ? 1 : -1);
         }
     }
 
