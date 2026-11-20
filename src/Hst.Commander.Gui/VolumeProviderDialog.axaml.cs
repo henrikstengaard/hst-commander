@@ -9,7 +9,7 @@ namespace Hst.Commander.Gui;
 
 /// <summary>
 ///     Modal list of Bookmarks followed by the volume providers a pane can show, opened with Alt+F1 (left pane) or
-///     Alt+F2 (right pane) and centered over the pane. The dialog returns the chosen volume provider or bookmark on OK,
+///     Alt+F2 (right pane) and centered over the pane with Bookmarks selected. The dialog returns the chosen volume provider or bookmark on OK,
 ///     Enter or double-click, or null when cancelled. Choosing Bookmarks opens the bookmark list
 ///     (<see cref="BookmarksDialog" />), or says there are no bookmarks; cancelling it goes back to this list.
 /// </summary>
@@ -18,27 +18,26 @@ public partial class VolumeProviderDialog : Window
     private readonly BookmarkStore? _bookmarkStore;
     private readonly Control? _pane;
 
-    public VolumeProviderDialog() : this("Volume", [], null, null, null)
+    public VolumeProviderDialog() : this("Volume", [], null, null)
     {
     }
 
     /// <param name="title">Title of the dialog, e.g. "Left".</param>
     /// <param name="volumeProviders">Volume providers to choose from.</param>
     /// <param name="bookmarkStore">Bookmarks listed when choosing Bookmarks, null for none.</param>
-    /// <param name="currentVolumeProvider">Volume provider selected initially, the one the pane shows.</param>
     /// <param name="pane">Pane the dialog is centered over, null to center it over the owner.</param>
     public VolumeProviderDialog(string title, IReadOnlyList<IVolumeProvider> volumeProviders,
-        BookmarkStore? bookmarkStore, IVolumeProvider? currentVolumeProvider, Control? pane)
+        BookmarkStore? bookmarkStore, Control? pane)
     {
         InitializeComponent();
         _bookmarkStore = bookmarkStore;
         _pane = pane;
         Title = title;
         WindowStartupLocation = pane == null ? WindowStartupLocation.CenterOwner : WindowStartupLocation.Manual;
-        var choices = VolumeChoice.List(volumeProviders).ToList();
+        var choices = VolumeChoice.List(volumeProviders);
         VolumeProvidersList.ItemsSource = choices;
-        VolumeProvidersList.SelectedIndex =
-            Math.Max(0, choices.FindIndex(choice => choice.VolumeProvider == currentVolumeProvider));
+        // Bookmarks, the first item, is selected
+        VolumeProvidersList.SelectedIndex = 0;
         VolumeProvidersList.DoubleTapped += async (_, _) => await ChooseSelectedAsync();
         // tunnelling, as the focused list item takes Enter before the default OK button sees it
         VolumeProvidersList.AddHandler(KeyDownEvent, async (_, e) =>
