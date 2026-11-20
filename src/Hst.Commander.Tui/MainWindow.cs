@@ -107,6 +107,8 @@ public sealed class MainWindow : Window
         _leftPane = CreatePane(new NavigationContext(initialPath, StartFile), 0, true);
         _rightPane = CreatePane(new NavigationContext(initialPath, StartFile), 50, false);
         _activePane = _leftPane;
+        _leftPane.NavigationContext.Sort = settings.LeftSort ?? EntrySort.Default;
+        _rightPane.NavigationContext.Sort = settings.RightSort ?? EntrySort.Default;
 
         Add(_menuBar, _leftPane.View, _rightPane.View, _commandPrompt, _commandField, _bottomPanel);
 
@@ -639,6 +641,7 @@ public sealed class MainWindow : Window
         };
         pane.TableView.SelectedCellChanged += (_, _) => pane.TableView.NeedsDraw = true;
         pane.TableView.RightClicked += (_, click) => ShowEntryMenu(pane, click.Row, click.ScreenPosition);
+        pane.TableView.HeaderClicked += (_, column) => SortPane(pane, column);
         pane.TableView.KeyDown += (_, key) =>
         {
             if (key.KeyCode == KeyCode.Tab)
@@ -984,6 +987,24 @@ public sealed class MainWindow : Window
         _activePane.TableView.SetFocus();
         SetNeedsLayout();
         NeedsDraw = true;
+        SaveSorts();
+    }
+
+    /// <summary>Remembers the order of the entries of both panes in the settings, for their sides.</summary>
+    private void SaveSorts()
+    {
+        try
+        {
+            (TuiSettings.Load() with
+            {
+                LeftSort = _leftPane.NavigationContext.Sort,
+                RightSort = _rightPane.NavigationContext.Sort
+            }).Save();
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            MessageBox.ErrorQuery("Error", $"Failed to save settings to '{TuiSettings.FilePath}': {exception.Message}", "OK");
+        }
     }
 
     private void AddBookmarkInActivePane() => AddBookmark(_activePane);
@@ -2043,10 +2064,38 @@ public sealed class MainWindow : Window
         pane.PathPanel.Summary = pane.NavigationContext.MarkedSummary;
         pane.PathPanel.NeedsDraw = true;
 
+        ShowEntries(pane, pane.NavigationContext.GetSelectedIndex(pane.Entries, previousPath,
+            pane.TableView.SelectedRow));
+    }
+
+    /// <summary>
+    ///     Sorts the entries of a pane by a column whose header was clicked (ascending, or reversed when already sorted
+    ///     by it), keeping the entry under the cursor. The order is remembered in the settings.
+    /// </summary>
+    private void SortPane(Pane pane, int column)
+    {
+        if (column < 0 || column >= EntrySort.Columns.Count)
+        {
+            return;
+        }
+
+        var selectedRow = pane.TableView.SelectedRow;
+        var selectedEntry = selectedRow >= 0 && selectedRow < pane.Entries.Count ? pane.Entries[selectedRow] : null;
+        pane.VolumeDetection?.Cancel();
+        pane.Entries = pane.NavigationContext.ToggleSort(EntrySort.Columns[column]);
+        ShowEntries(pane, selectedEntry == null ? 0 : Math.Max(0, IndexOfEntry(pane.Entries, selectedEntry)));
+        SaveSorts();
+    }
+
+    /// <summary>Shows the entries of a pane in its table, with the sorting in the column headers.</summary>
+    private static void ShowEntries(Pane pane, int selectedRow)
+    {
         var table = new DataTable();
-        table.Columns.Add("Name", typeof(string));
-        table.Columns.Add("Size", typeof(string));
-        table.Columns.Add("Modified", typeof(string));
+        var sort = pane.NavigationContext.Sort;
+        foreach (var column in EntrySort.Columns)
+        {
+            table.Columns.Add(sort.GetHeader(column), typeof(string));
+        }
 
         foreach (var entry in pane.Entries)
         {
@@ -2059,8 +2108,7 @@ public sealed class MainWindow : Window
         pane.DataTable = table;
         if (pane.Entries.Count > 0)
         {
-            pane.TableView.SelectedRow = pane.NavigationContext.GetSelectedIndex(
-                pane.Entries, previousPath, pane.TableView.SelectedRow);
+            pane.TableView.SelectedRow = selectedRow;
             pane.TableView.EnsureSelectedCellIsVisible();
         }
 

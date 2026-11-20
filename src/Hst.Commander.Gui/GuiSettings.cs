@@ -68,6 +68,12 @@ public sealed record GuiSettings
     /// <summary>Name of the navigation mode of the right pane (see <see cref="PaneNavigationMode" />), null for list.</summary>
     public string? RightNavigationMode { get; init; }
 
+    /// <summary>Order of the entries of the left pane (see <see cref="EntrySort" />), null for by name ascending.</summary>
+    public EntrySort? LeftSort { get; init; }
+
+    /// <summary>Order of the entries of the right pane (see <see cref="EntrySort" />), null for by name ascending.</summary>
+    public EntrySort? RightSort { get; init; }
+
     /// <summary>Keys opening the volume provider lists, the chosen ones or the default of the host operating system.</summary>
     [JsonIgnore]
     public VolumeProviderKeys EffectiveVolumeProviderKeys => VolumeProviderKeys ?? VolumeProviderKeyBindings.Default;

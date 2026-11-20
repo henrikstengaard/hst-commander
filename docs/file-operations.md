@@ -1,6 +1,6 @@
 # File Operations
 
-Copying, UAE metadata, moving, renaming, deleting, making directories, creating volumes, selecting groups, searching and properties. Read this when working on any of them.
+Copying, UAE metadata, moving, renaming, deleting, making directories, creating volumes, sorting the panes, selecting groups, searching and properties. Read this when working on any of them.
 
 Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../src/agents.md).
 
@@ -89,6 +89,13 @@ Ctrl+C, Ctrl+X and Ctrl+V (Alt+V in the TUI too, as Windows Terminal and the cla
 - `CreateVolumeAsync(creator, fileName, input)` adds the extension when missing, validates the name like making a directory and converts the input with `VolumeCreation.GetValues` (trimmed, required fields checked, numbers parsed, sizes converted to bytes and may have decimals, defaults for missing input; `IOException` otherwise). Local files are created with `FileMode.CreateNew` and written on the thread pool, as sparse files when the creator has `CreatesSparseFile` (`SparseFile.TryMakeSparse`: marked sparse on Windows, which NTFS and ReFS support; on Linux and macOS setting the length leaves a hole where the file system supports it), otherwise, e.g. on FAT or exFAT, as regular files; elsewhere the volume is created in a temporary file and copied with `OpenWrite`. A partly created file is deleted on failure. The other pane is refreshed too.
 - `AdfVolumeCreator` (Amiga plugin) creates an adf: `Volume name` (required, default `Empty`), `High density (1.76 MB)` (unchecked: 880 KB double density), `Format` (unchecked: all zeros, and the volume name, `Bootable` and `File system` are disabled and ignored), `Bootable` (writes the standard boot code with its checksum) and `File system` (`DOS0` to `DOS7`, default `DOS3`, FFS international).
 - `ExFatVolumeCreator` (Disk plugin) creates an exFAT file system without a partition table (`.img`, opened by `FileSystemFileVolumeProvider`) as a sparse file: `Size` (required, default 1 GB, at least 1 MB, rounded down to whole 512-byte sectors), `Volume label` (up to 11 characters, empty by default) and `Cluster size` (`Default`: 4 KB up to 256 MB, 32 KB up to 32 GB, 128 KB above, like Windows; or 4 KB to 32 MB). It sets the length and formats with `ExFatFormatter`, ported from Hst Imager because DiscUtils' exFAT formatter writes an incomplete up-case table (e.g. `{` upper-cased to `Z`) and too small a FAT above 2 TB. Blocks of zeros aren't written, as the new file is all zeros, so only the parts of the boot regions, FAT, allocation bitmap, up-case table and root directory that aren't zeros take disk space. Tests check created volumes up to 4 TB with `ExFatValidator` (also from Hst Imager).
+
+## Sorting the Panes
+
+- Clicking a column header of a pane (Name, Size, Modified) sorts its entries by that column ascending, clicking it again descending (`EntrySort.Toggle`), with ▲ or ▼ after the sorted column's header (`GetHeader`), like the [search results](#searching). The panes are sorted by name ascending at first.
+- `NavigationContext.Sort` is applied by `ListEntriesAsync`, so the order stays when navigating and refreshing. Each side's order is saved in the settings (`LeftSort` and `RightSort` in `tui-settings.json` and `gui-settings.json`, null for by name ascending) when a header is clicked, restored at startup, and moves with the pane's location when swapping panes (saved for the new sides). `ToggleSort` sorts the entries last listed again without listing them; the front-ends keep the entry under the cursor (and the GUI the icons already read).
+- `..` stays first and directories stay before files. By name, the order the volume lists the entries in is kept (each volume sorts by name with its own comparison, and e.g. disks and partitions in their own order), reversed when descending. Equal sizes and dates (and directories without a size) are ordered by name.
+- In the GUI the headers are only shown, and clickable, in the list navigation mode; the thumbnails and plugin modes use the same order.
 
 ## Selecting Groups
 

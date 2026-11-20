@@ -5,7 +5,8 @@ namespace Hst.Commander.Tui;
 
 /// <summary>
 ///     TableView that continues the column dividers below the last entry, shows the scroll position on its right border
-///     and raises <see cref="RightClicked" /> for the context menu of the entries.
+///     and raises <see cref="RightClicked" /> for the context menu of the entries and <see cref="HeaderClicked" /> for
+///     sorting by a column.
 /// </summary>
 public sealed class EntryTableView : TableView
 {
@@ -17,8 +18,19 @@ public sealed class EntryTableView : TableView
     /// </summary>
     public event EventHandler<(int? Row, System.Drawing.Point ScreenPosition)>? RightClicked;
 
+    /// <summary>Raised when a column header is clicked with the left mouse button: the column clicked.</summary>
+    public event EventHandler<int>? HeaderClicked;
+
     protected override bool OnMouseEvent(MouseEventArgs mouseEvent)
     {
+        if (mouseEvent.Flags.HasFlag(MouseFlags.Button1Clicked) && Table != null &&
+            ScreenToCell(mouseEvent.Position, out int? headerColumn) == null &&
+            headerColumn is { } column && column >= 0 && column < Table.Columns)
+        {
+            HeaderClicked?.Invoke(this, column);
+            return true;
+        }
+
         if (!mouseEvent.Flags.HasFlag(MouseFlags.Button3Clicked))
         {
             return base.OnMouseEvent(mouseEvent);

@@ -50,6 +50,8 @@ public partial class MainWindow : Window
         _editorSettings = settings;
         LeftPane.NavigationFailed += async (_, exception) => await ShowErrorAsync(exception);
         RightPane.NavigationFailed += async (_, exception) => await ShowErrorAsync(exception);
+        LeftPane.SortChanged += async (_, _) => await SaveSortsAsync();
+        RightPane.SortChanged += async (_, _) => await SaveSortsAsync();
         // e.g. icon files written when saving icon positions, which the other pane may show
         LeftPane.EntriesChanged += async (_, _) => await RightPane.RefreshEntriesAsync();
         RightPane.EntriesChanged += async (_, _) => await LeftPane.RefreshEntriesAsync();
@@ -98,6 +100,8 @@ public partial class MainWindow : Window
             await StartupOptions.Left.ApplyAsync(LeftPane.NavigationContext);
             await StartupOptions.Right.ApplyAsync(RightPane.NavigationContext);
             var startPane = StartupOptions.IsRightActive ? RightPane : LeftPane;
+            LeftPane.NavigationContext.Sort = settings.LeftSort ?? EntrySort.Default;
+            RightPane.NavigationContext.Sort = settings.RightSort ?? EntrySort.Default;
 
             // setting the navigation modes lists the entries, at the same time so a pane listing slowly, e.g. a
             // sleeping physical disk waking up, doesn't keep the other empty
@@ -211,7 +215,7 @@ public partial class MainWindow : Window
     /// <summary>
     ///     Swaps the left and right panes (Ctrl+U), like Midnight Commander: each pane's location, entries, marks,
     ///     cursor and navigation mode move to the other side, and the focus moves with the active pane to the other
-    ///     side. The navigation modes are remembered for their new sides.
+    ///     side. The navigation modes and the orders of the entries are remembered for their new sides.
     /// </summary>
     private async Task SwapPanesAsync()
     {
@@ -224,7 +228,27 @@ public partial class MainWindow : Window
             (GuiSettings.Load() with
             {
                 LeftNavigationMode = LeftPane.NavigationMode.Name,
-                RightNavigationMode = RightPane.NavigationMode.Name
+                RightNavigationMode = RightPane.NavigationMode.Name,
+                LeftSort = LeftPane.NavigationContext.Sort,
+                RightSort = RightPane.NavigationContext.Sort
+            }).Save();
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            await ShowErrorAsync(new IOException(
+                $"Failed to save settings to '{GuiSettings.FilePath}': {exception.Message}", exception));
+        }
+    }
+
+    /// <summary>Remembers the order of the entries of both panes in the settings, after a column header was clicked.</summary>
+    private async Task SaveSortsAsync()
+    {
+        try
+        {
+            (GuiSettings.Load() with
+            {
+                LeftSort = LeftPane.NavigationContext.Sort,
+                RightSort = RightPane.NavigationContext.Sort
             }).Save();
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
