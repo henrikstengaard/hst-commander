@@ -31,6 +31,8 @@ public sealed class MainWindow : Window
     private string? _pendingError;
     private bool _restarting;
     private string _selectGroupFilter = SelectGroupOptions.Default.Filter;
+    private SearchOptions _searchOptions = SearchOptions.Default;
+    private SearchResultSort _searchSort = SearchResultSort.Default;
     private TuiSettings _editorSettings;
     private ExternalEditFile? _pendingExternalEdit;
 
@@ -65,6 +67,7 @@ public sealed class MainWindow : Window
                     new("Select _group...", "+", SelectGroupInActivePane),
                     new("_Unselect group...", "-", UnselectGroupInActivePane),
                     new("_Invert selection", "*", InvertSelectionInActivePane),
+                    new("Searc_h...", "Ctrl+S", SearchInActivePane),
                     null!,
                     _leftVolumeMenuItem,
                     _rightVolumeMenuItem,
@@ -485,6 +488,9 @@ public sealed class MainWindow : Window
             case CommanderActions.AddBookmark:
                 AddBookmarkInActivePane();
                 break;
+            case CommanderActions.Search:
+                SearchInActivePane();
+                break;
             case CommanderActions.Settings:
                 ShowSettings();
                 break;
@@ -721,6 +727,11 @@ public sealed class MainWindow : Window
                 key.Handled = true;
                 AddBookmark(pane);
             }
+            else if (key == Key.S.WithCtrl)
+            {
+                key.Handled = true;
+                _ = SearchAsync(pane);
+            }
             else if (key == Key.R.WithCtrl)
             {
                 key.Handled = true;
@@ -933,6 +944,8 @@ public sealed class MainWindow : Window
     private void ChooseRightVolumeProvider() => _ = ChooseVolumeProviderAsync(_rightPane);
 
     private void ShowLocationOfActivePane() => _ = ShowLocationAsync(_activePane);
+
+    private void SearchInActivePane() => _ = SearchAsync(_activePane);
 
     /// <summary>Lists the entries of the active pane again (Ctrl+R), e.g. after files were changed outside.</summary>
     private void RefreshActivePane() => _ = RunNavigationAsync(_activePane, () => Task.CompletedTask);
@@ -1303,6 +1316,28 @@ public sealed class MainWindow : Window
         else if (result?.Path is { } path)
         {
             await RunNavigationAsync(pane, () => pane.NavigationContext.ChangeLocationAsync(path));
+        }
+    }
+
+    /// <summary>
+    ///     Shows the search dialog (Ctrl+S) starting in the location of a pane, with the other options of the last
+    ///     search, and goes to the result chosen with Go to, selecting it. The pane gets the focus.
+    /// </summary>
+    private async Task SearchAsync(Pane pane)
+    {
+        var context = pane.NavigationContext;
+        var dialog = new SearchDialog(_searchOptions with { StartPath = context.CurrentPath }, _searchSort,
+            context.SearchAsync, _palette);
+        Application.Run(dialog);
+        var result = dialog.Result;
+        _searchOptions = dialog.Options;
+        _searchSort = dialog.Sort;
+        dialog.Dispose();
+
+        pane.TableView.SetFocus();
+        if (result != null)
+        {
+            await RunNavigationAsync(pane, () => pane.NavigationContext.GoToSearchResultAsync(result));
         }
     }
 

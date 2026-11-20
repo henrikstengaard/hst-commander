@@ -32,6 +32,7 @@ public static class CommanderActions
     public const string SwapPanes = "SwapPanes";
     public const string Location = "Location";
     public const string AddBookmark = "AddBookmark";
+    public const string Search = "Search";
     public const string Settings = "Settings";
     public const string Quit = "Quit";
 
@@ -64,6 +65,7 @@ public static class CommanderActions
         new(SwapPanes, "Swap panes"),
         new(Location, "Location"),
         new(AddBookmark, "Add bookmark"),
+        new(Search, "Search"),
         new(Settings, "Settings"),
         new(Quit, "Quit")
     ];

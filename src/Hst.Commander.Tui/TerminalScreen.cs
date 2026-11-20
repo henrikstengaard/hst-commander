@@ -247,6 +247,28 @@ public static class TerminalScreen
     public static void ShowOutput() => Console.ReadKey(true);
 
     /// <summary>
+    ///     Turns off line input of the Windows console after Terminal.Gui's Init, which keeps it on. With line input
+    ///     on, the console takes Ctrl+S as pausing the output instead of passing it on (the search dialog and saving in
+    ///     the editor). Terminal.Gui reads key events, so it doesn't need line input, and Shutdown restores the original
+    ///     mode.
+    /// </summary>
+    public static void DisableLineInput()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        const uint lineInput = 0x0002;
+        const uint echoInput = 0x0004;
+        var input = GetStdHandle(StdInputHandle);
+        if (IsValid(input) && GetConsoleMode(input, out var mode) && (mode & lineInput) != 0)
+        {
+            SetConsoleMode(input, mode & ~(lineInput | echoInput));
+        }
+    }
+
+    /// <summary>
     ///     True in Windows Terminal, Visual Studio's and VS Code's terminals, which show the console through a pseudo
     ///     console and not its screen buffers. The environment variables aren't enough: a program started as
     ///     administrator doesn't get them, but is still shown in Windows Terminal when it's the default terminal.
@@ -282,6 +304,10 @@ public static class TerminalScreen
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool SetConsoleMode(IntPtr consoleHandle, uint mode);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetConsoleMode(IntPtr consoleHandle, out uint mode);
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern int GetClassName(IntPtr window, StringBuilder className, int maxCount);

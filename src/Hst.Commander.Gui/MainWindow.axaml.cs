@@ -16,6 +16,8 @@ public partial class MainWindow : Window
     private PaneView _activePane;
     private VolumeProviderKeys _volumeProviderKeys;
     private string _selectGroupFilter = SelectGroupOptions.Default.Filter;
+    private SearchOptions _searchOptions = SearchOptions.Default;
+    private SearchResultSort _searchSort = SearchResultSort.Default;
     private bool _quitConfirmed;
     private GuiSettings _editorSettings = new();
     private readonly CommandLine _commandLine = new();
@@ -74,6 +76,7 @@ public partial class MainWindow : Window
         SelectGroupMenuItem.Click += async (_, _) => await SelectGroupAsync(_activePane, true);
         UnselectGroupMenuItem.Click += async (_, _) => await SelectGroupAsync(_activePane, false);
         InvertSelectionMenuItem.Click += (_, _) => InvertSelection(_activePane);
+        SearchMenuItem.Click += async (_, _) => await SearchAsync(_activePane);
         LeftVolumeMenuItem.Click += async (_, _) => await ChooseVolumeProviderAsync(LeftPane);
         RightVolumeMenuItem.Click += async (_, _) => await ChooseVolumeProviderAsync(RightPane);
         LocationMenuItem.Click += async (_, _) => await ShowLocationAsync(_activePane);
@@ -437,6 +440,10 @@ public partial class MainWindow : Window
                 e.Handled = true;
                 await AddBookmarkAsync(_activePane);
                 break;
+            case Key.S when e.KeyModifiers == KeyModifiers.Control:
+                e.Handled = true;
+                await SearchAsync(_activePane);
+                break;
             case Key.R when e.KeyModifiers == KeyModifiers.Control:
                 e.Handled = true;
                 await RefreshAsync(_activePane);
@@ -781,6 +788,26 @@ public partial class MainWindow : Window
         else if (result?.Path is { } path)
         {
             await pane.ChangeLocationAsync(path);
+        }
+
+        pane.FocusEntries();
+    }
+
+    /// <summary>
+    ///     Shows the search dialog (Ctrl+S) starting in the location of a pane, with the other options of the last
+    ///     search, and goes to the result chosen with Go to, selecting it. The pane gets the focus.
+    /// </summary>
+    private async Task SearchAsync(PaneView pane)
+    {
+        var context = pane.NavigationContext;
+        var dialog = new SearchDialog(_searchOptions with { StartPath = context.CurrentPath }, _searchSort,
+            context.SearchAsync);
+        var result = await dialog.ShowDialog<SearchResult?>(this);
+        _searchOptions = dialog.Options;
+        _searchSort = dialog.Sort;
+        if (result != null)
+        {
+            await pane.GoToSearchResultAsync(result);
         }
 
         pane.FocusEntries();
@@ -1619,6 +1646,9 @@ public partial class MainWindow : Window
                 break;
             case CommanderActions.AddBookmark:
                 await AddBookmarkAsync(pane);
+                break;
+            case CommanderActions.Search:
+                await SearchAsync(pane);
                 break;
             case CommanderActions.Settings:
                 await ShowSettingsAsync();
