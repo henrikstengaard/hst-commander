@@ -42,6 +42,9 @@ public partial class PaneView : UserControl
         EntriesList.DoubleTapped += async (_, _) => await ActivateSelectedEntryAsync();
         EntriesList.SelectionChanged += (_, _) => UpdateIconSelection();
         PathBadge.Tapped += (_, _) => PathClicked?.Invoke(this, EventArgs.Empty);
+        NameHeader.Tapped += (_, _) => SortBy(EntryColumn.Name);
+        SizeHeader.Tapped += (_, _) => SortBy(EntryColumn.Size);
+        ModifiedHeader.Tapped += (_, _) => SortBy(EntryColumn.Modified);
         EntriesList.PropertyChanged += (_, e) =>
         {
             if (e.Property == IsKeyboardFocusWithinProperty)
@@ -273,6 +276,9 @@ public partial class PaneView : UserControl
 
     /// <summary>Raised when the path is clicked, so the window can show the location dialog.</summary>
     public event EventHandler? PathClicked;
+
+    /// <summary>Raised when the entries were sorted by a clicked column header, so the window can save the order.</summary>
+    public event EventHandler? SortChanged;
 
     public NavigationContext NavigationContext
     {
@@ -791,6 +797,40 @@ public partial class PaneView : UserControl
         }
     }
 
+    /// <summary>
+    ///     Sorts the entries by a column whose header was clicked (ascending, or reversed when already sorted by it),
+    ///     keeping the entry under the cursor and the icons read.
+    /// </summary>
+    private void SortBy(EntryColumn column)
+    {
+        var items = (EntriesList.ItemsSource as IReadOnlyList<EntryItem> ?? [])
+            .ToDictionary<EntryItem, IEntry>(item => item.Entry, ReferenceEqualityComparer.Instance);
+        var selectedItem = EntriesList.SelectedItem;
+        var sorted = NavigationContext.ToggleSort(column)
+            .Select(entry => items.GetValueOrDefault(entry))
+            .OfType<EntryItem>()
+            .ToList();
+        UpdateHeaders();
+        EntriesList.ItemsSource = sorted;
+        EntriesList.SelectedItem = selectedItem;
+        if (EntriesList.SelectedItem != null)
+        {
+            EntriesList.ScrollIntoView(EntriesList.SelectedItem);
+        }
+
+        FocusEntries();
+        SortChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Shows the sorting of the entries in the column headers, e.g. "Name ▲".</summary>
+    private void UpdateHeaders()
+    {
+        var sort = NavigationContext.Sort;
+        NameHeaderText.Text = sort.GetHeader(EntryColumn.Name);
+        SizeHeaderText.Text = sort.GetHeader(EntryColumn.Size);
+        ModifiedHeaderText.Text = sort.GetHeader(EntryColumn.Modified);
+    }
+
     private async Task RefreshAsync()
     {
         var hadFocus = EntriesList.IsKeyboardFocusWithin || IconLayout.IsKeyboardFocusWithin;
@@ -807,6 +847,7 @@ public partial class PaneView : UserControl
         PathText.Text = NavigationContext.CurrentPath;
         DiskSpaceText.Text = NavigationContext.DiskSpace ?? string.Empty;
         UpdateSummary();
+        UpdateHeaders();
         EntriesList.ItemsSource = entries;
         EntriesList.SelectedIndex = NavigationContext.GetSelectedIndex(navigationEntries, previousPath, selectedIndex);
         if (EntriesList.SelectedItem != null && NavigationMode.PluginMode == null)

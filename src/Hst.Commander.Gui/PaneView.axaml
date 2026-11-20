@@ -156,9 +156,16 @@
                         <ColumnDefinition Width="{DynamicResource SizeColumnWidth}" />
                         <ColumnDefinition Width="{DynamicResource ModifiedColumnWidth}" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="Name" />
-                    <TextBlock Grid.Column="1" Text="Size" />
-                    <TextBlock Grid.Column="2" Text="Modified" />
+                    <!-- clicking a header sorts the entries by its column, clicking it again reverses the order -->
+                    <Border x:Name="NameHeader" Grid.Column="0" Background="Transparent" Cursor="Hand">
+                        <TextBlock x:Name="NameHeaderText" Text="Name" />
+                    </Border>
+                    <Border x:Name="SizeHeader" Grid.Column="1" Background="Transparent" Cursor="Hand">
+                        <TextBlock x:Name="SizeHeaderText" Text="Size" />
+                    </Border>
+                    <Border x:Name="ModifiedHeader" Grid.Column="2" Background="Transparent" Cursor="Hand">
+                        <TextBlock x:Name="ModifiedHeaderText" Text="Modified" />
+                    </Border>
                 </Grid>
 
                 <ListBox x:Name="EntriesList" Grid.Row="1" Classes="entries" SelectionMode="Single">

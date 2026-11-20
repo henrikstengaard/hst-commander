@@ -11,6 +11,7 @@ public sealed class NavigationContext : IDisposable
     private readonly Stack<OpenedImage> _images = new();
 
     private readonly Dictionary<string, IEntry> _markedEntries = new(StringComparer.Ordinal);
+    private IReadOnlyList<IEntry> _listedEntries = [];
     private readonly HashSet<string> _executableNames = new(StringComparer.Ordinal);
     private readonly HashSet<string> _volumeFileNames = new(StringComparer.Ordinal);
     private readonly Action<string> _startFile;
@@ -779,6 +780,20 @@ public sealed class NavigationContext : IDisposable
     public Task<Stream> OpenReadAsync(IEntry entry, CancellationToken cancellationToken = default) =>
         _nestedVolume.OpenRead(entry.Name, cancellationToken);
 
+    /// <summary>Order of the listed entries, see <see cref="ListEntriesAsync" /> and <see cref="ToggleSort" />.</summary>
+    public EntrySort Sort { get; set; } = EntrySort.Default;
+
+    /// <summary>
+    ///     Sorts the entries last listed by a column clicked in the header (<see cref="EntrySort.Toggle" />) and
+    ///     returns them in the new order, without listing them again.
+    /// </summary>
+    public IReadOnlyList<IEntry> ToggleSort(EntryColumn column)
+    {
+        Sort = Sort.Toggle(column);
+        return Sort.Sort(_listedEntries);
+    }
+
+    /// <summary>Lists the entries of the current location, with ".." first when it has a parent, in <see cref="Sort" /> order.</summary>
     public async Task<IReadOnlyList<IEntry>> ListEntriesAsync(CancellationToken cancellationToken = default)
     {
         var entries = new List<IEntry>();
@@ -806,7 +821,8 @@ public sealed class NavigationContext : IDisposable
             _markedEntries[entry.Name] = entry;
         }
 
-        return entries;
+        _listedEntries = entries;
+        return Sort.Sort(entries);
     }
 
     private void UpdateExecutableNames(IEnumerable<IEntry> entries)
