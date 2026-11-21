@@ -17,6 +17,23 @@ public sealed record GuiSettings
 
     public static string FilePath => Path.Combine(SettingsPaths.Directory, "gui-settings.json");
 
+    /// <summary>Version of the file format written by this version of Hst Commander.</summary>
+    public const int CurrentVersion = 1;
+
+    /// <summary>
+    ///     Version of the file format the settings were read from: 0 for a file written before gui-settings.json had a
+    ///     version (the same format as 1), higher than <see cref="CurrentVersion" /> for a file of a newer Hst
+    ///     Commander, read as far as this version knows it. <see cref="Save" /> writes <see cref="CurrentVersion" />.
+    /// </summary>
+    public int Version { get; init; }
+
+    /// <summary>
+    ///     Settings of the file this version doesn't know, e.g. added by a newer Hst Commander, written back unchanged
+    ///     by <see cref="Save" /> so running an older version doesn't lose them.
+    /// </summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; init; }
+
     /// <summary>
     ///     Identifier of the theme (see <see cref="Themes" />), e.g. "MidnightCommander" or the identifier of a theme of a
     ///     plugin; the names of the earlier theme enum are the identifiers of the built-in themes.
@@ -105,6 +122,6 @@ public sealed record GuiSettings
     public void Save()
     {
         Directory.CreateDirectory(SettingsPaths.Directory);
-        File.WriteAllText(FilePath, JsonSerializer.Serialize(this, JsonOptions));
+        File.WriteAllText(FilePath, JsonSerializer.Serialize(this with { Version = CurrentVersion }, JsonOptions));
     }
 }

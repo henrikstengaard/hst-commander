@@ -11,6 +11,15 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - `AppInfo` (Core) reads the name, author, version (`Major.Minor.Build`), description and build date of the entry assembly: `NameAndVersion` (e.g. `Hst Commander v0.1.29`, also the GUI window title), `Description` and `BuildDateText` (e.g. `Built 2026-11-01 21:15`, in local time). Help > About shows them in both front-ends (`AboutDialog`), with the Licenses section below.
 - The description is `ProductDescription` in `Directory.Build.props`, and `Directory.Build.targets` sets it as the `Description` of the apps and adds the build date (UTC, round-trip format, as the culture of the build would change `:` in a custom format) as the assembly metadata `BuildDate`. Only executables get them, as the date changes on every build and makes the project compile again; libraries have an empty description and no build date.
 
+## Settings Files
+
+Hst Commander keeps its files in `~/.hst-commander` (`SettingsPaths.Directory`): `tui-settings.json`, `gui-settings.json`, `bookmarks.json`, the plugins' files in `plugins/<name>` (e.g. `plugins/directoryopus/buttons.json`), `ftp-known-hosts.txt` of the FTP plugin and the error log in `logs`.
+
+- The JSON files Hst Commander writes have the version of their format, `Version` (`version` in `buttons.json`), written as the current version (`CurrentVersion`, 1) on every save. A file without it was written before the files had versions and has the same format as version 1. `bookmarks.json` was a list of bookmarks then; it's now an object with `Version` and `Bookmarks`, and a list is still read (and written as an object when the bookmarks change).
+- A file of a newer version (from a newer Hst Commander) is read as far as this version knows it. `TuiSettings`, `GuiSettings`, the bookmarks file and each `Bookmark` keep the fields they don't know in a `[JsonExtensionData]` dictionary and write them back unchanged, so running an older version after a newer one doesn't lose the newer settings. The settings are always changed with `with`, which keeps the dictionary. `buttons.json` is written from the layout, so it doesn't keep unknown fields.
+- When a later version changes the format in a way older files can't simply be read with (e.g. a setting changes its meaning), increase `CurrentVersion` and convert files of older versions when they're read. Adding a setting with a default doesn't need a new version.
+- A missing or invalid file gives the defaults. The plugin settings the user writes by hand (`plugins/physicaldisk/settings.json`) and `ftp-known-hosts.txt` (one key per line, only appended to) have no version.
+
 ## Licenses
 
 - Hst Commander is MIT licensed (`LICENSE`). `THIRD-PARTY-NOTICES.txt` at the root of the repository lists every third-party component the TUI and GUI include, each with a `Packages:` line of its NuGet packages, followed by its copyright notice and license text. `GivenLicenses` fails when a package with runtime or native files in the TUI's or GUI's `project.assets.json` isn't listed, so a new dependency needs its notice added (and the test checks SMBLibrary isn't included).

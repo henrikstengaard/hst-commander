@@ -26,7 +26,7 @@ The behavior of each feature is described in `docs/` at the repository root. Rea
 | [`docs/tui.md`](../docs/tui.md) | TUI files, key handling, dialogs, themes, terminal programs, supported terminals (PuTTY) |
 | [`docs/gui.md`](../docs/gui.md) | GUI files, key handling, dialogs, themes, icons |
 | [`docs/themes.md`](../docs/themes.md) | Built-in and plugin themes, the bottom area's buttons, parent buttons, the button editor, Directory Opus 4 |
-| [`docs/application.md`](../docs/application.md) | Versioning, release workflows, local publishing, About, licenses and third-party notices, error log and crash reports, quitting |
+| [`docs/application.md`](../docs/application.md) | Versioning, release workflows, local publishing, settings files and their versions, About, licenses and third-party notices, error log and crash reports, quitting |
 | [`docs/testing.md`](../docs/testing.md) | Test helpers |
 | [`docs/status.md`](../docs/status.md) | What works and what isn't implemented |
 
