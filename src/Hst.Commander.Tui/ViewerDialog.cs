@@ -1,6 +1,5 @@
 using Hst.Commander.Core;
-using Terminal.Gui;
-using TuiAttribute = Terminal.Gui.Attribute;
+using TuiAttribute = Terminal.Gui.Drawing.Attribute;
 
 namespace Hst.Commander.Tui;
 
@@ -13,7 +12,7 @@ namespace Hst.Commander.Tui;
 ///     extends, Ctrl+A selects all, a click clears it) and copied to the clipboard with Ctrl+C or Ctrl+Insert. Esc or F10
 ///     closes the viewer.
 /// </summary>
-public sealed class ViewerDialog : Dialog
+public sealed class ViewerDialog : TuiDialog
 {
     private readonly ViewerSession _session;
     private readonly TuiPalette _palette;
@@ -33,7 +32,7 @@ public sealed class ViewerDialog : Dialog
         Y = 0;
         Width = Dim.Fill();
         Height = Dim.Fill();
-        ColorScheme = palette.DialogColorScheme;
+        SetScheme(palette.DialogColorScheme);
 
         _statusLabel = new Label { X = 0, Y = 0, Width = Dim.Fill(), Height = 1 };
         _view = new ViewerView(session)
@@ -61,8 +60,13 @@ public sealed class ViewerDialog : Dialog
         _view.KeyDown += (_, key) => key.Handled = HandleKey(key);
         _view.ViewChanged += (_, _) => UpdateStatus();
         _view.FrameChanged += (_, _) => UpdateStatus();
-        Closing += (_, _) =>
+        IsRunningChanging += (_, e) =>
         {
+            if (e.NewValue)
+            {
+                return;
+            }
+
             _closed = true;
             _searchCancellation?.Cancel();
         };
@@ -252,7 +256,7 @@ public sealed class ViewerDialog : Dialog
         using var cancellation = new CancellationTokenSource();
         _searchCancellation = cancellation;
         _statusLabel.Text = "Searching... (Esc cancels)";
-        var progress = new UiProgress<double>(fraction => Application.Invoke(() =>
+        var progress = new UiProgress<double>(fraction => UiThread.Post(() =>
         {
             if (!_closed && !cancellation.IsCancellationRequested)
             {
@@ -291,7 +295,7 @@ public sealed class ViewerDialog : Dialog
 
     private void UpdateView()
     {
-        _view.NeedsDraw = true;
+        _view.SetNeedsDraw();
         UpdateStatus();
     }
 
@@ -319,7 +323,7 @@ public sealed class ViewerDialog : Dialog
             new FunctionKeyItem("F10", "Quit", CloseViewer),
             new FunctionKeyItem("C-C", "Copy", Copy)
         ];
-        _keyBar.NeedsDraw = true;
+        _keyBar.SetNeedsDraw();
     }
 
     /// <summary>Progress calling the handler on the reporting thread; the handler invokes the UI thread.</summary>

@@ -2,7 +2,6 @@ using System.Drawing;
 using System.Reflection;
 using System.Text;
 using Hst.Commander.Core;
-using Terminal.Gui;
 
 namespace Hst.Commander.Tui;
 
@@ -56,7 +55,7 @@ public sealed class EditorTextView : TextView
         RunUnwrapped(() =>
         {
             IsSelecting = false;
-            CursorPosition = new Point(endColumn, endRow);
+            InsertionPoint = new Point(endColumn, endRow);
             if (length > 0)
             {
                 SelectionStartRow = startRow;
@@ -64,7 +63,7 @@ public sealed class EditorTextView : TextView
             }
         });
         // scrolls the cursor into view in the wrapped lines
-        CursorPosition = CursorPosition;
+        InsertionPoint = InsertionPoint;
         SetNeedsDraw();
     }
 

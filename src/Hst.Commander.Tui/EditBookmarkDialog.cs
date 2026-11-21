@@ -1,5 +1,4 @@
 using Hst.Commander.Core;
-using Terminal.Gui;
 
 namespace Hst.Commander.Tui;
 
@@ -9,7 +8,7 @@ namespace Hst.Commander.Tui;
 ///     Changing the location changes the path along with it until the path is edited. Invalid input is shown below the
 ///     fields and keeps the dialog open. <see cref="Result" /> holds the changes on OK or null on cancel.
 /// </summary>
-public sealed class EditBookmarkDialog : Dialog
+public sealed class EditBookmarkDialog : TuiDialog
 {
     private const int FieldX = 14;
 
@@ -34,7 +33,7 @@ public sealed class EditBookmarkDialog : Dialog
         _locationPath = bookmark.Path;
         Title = "Edit bookmark";
         Width = Dim.Percent(60);
-        ColorScheme = palette.DialogColorScheme;
+        SetScheme(palette.DialogColorScheme);
 
         var y = 1;
         var volumeLabel = new Label { X = 1, Y = y, Text = "Volume:" };
@@ -87,7 +86,7 @@ public sealed class EditBookmarkDialog : Dialog
                 X = FieldX,
                 Y = y,
                 Text = $"_Store the password in {credentialStoreName}",
-                CheckedState = bookmark.HasPassword ? CheckState.Checked : CheckState.UnChecked
+                Value = bookmark.HasPassword ? CheckState.Checked : CheckState.UnChecked
             };
             Add(userNameLabel, _userNameField, passwordLabel, _passwordField, passwordHintLabel,
                 _storePasswordCheckBox);
@@ -104,10 +103,10 @@ public sealed class EditBookmarkDialog : Dialog
         var okButton = new Button { Text = "OK", IsDefault = true };
         okButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
+            e.Handled = true;
             var changes = new BookmarkChanges(_descriptionField.Text, _locationField?.Text, _pathField.Text,
                 _userNameField?.Text, _passwordField?.Text,
-                _storePasswordCheckBox?.CheckedState == CheckState.Checked);
+                _storePasswordCheckBox?.Value == CheckState.Checked);
             if (changes.GetError(_bookmark) is { } error)
             {
                 _errorLabel.Text = error;
@@ -120,7 +119,7 @@ public sealed class EditBookmarkDialog : Dialog
         var cancelButton = new Button { Text = "Cancel" };
         cancelButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
+            e.Handled = true;
             Application.RequestStop(this);
         };
 
@@ -130,7 +129,7 @@ public sealed class EditBookmarkDialog : Dialog
     }
 
     /// <summary>Changes entered on OK, otherwise null.</summary>
-    public BookmarkChanges? Result { get; private set; }
+    public new BookmarkChanges? Result { get; private set; }
 
     private void UpdatePathFromLocation()
     {

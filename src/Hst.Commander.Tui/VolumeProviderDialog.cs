@@ -2,7 +2,6 @@ using System.Collections.ObjectModel;
 using System.Drawing;
 using Hst.Commander.Abstractions;
 using Hst.Commander.Core;
-using Terminal.Gui;
 
 namespace Hst.Commander.Tui;
 
@@ -13,7 +12,7 @@ namespace Hst.Commander.Tui;
 ///     bookmarks; cancelling it goes back to this list. <see cref="Result" /> holds the chosen volume provider or
 ///     bookmark, or null on cancel.
 /// </summary>
-public sealed class VolumeProviderDialog : Dialog
+public sealed class VolumeProviderDialog : TuiDialog
 {
     // rows below the list taken by the OK and Cancel buttons and their shadow
     private const int ButtonsHeight = 2;
@@ -50,38 +49,43 @@ public sealed class VolumeProviderDialog : Dialog
         Y = paneFrame.Y + Math.Max(0, (paneFrame.Height - height) / 3);
         Width = width;
         Height = height;
-        ColorScheme = palette.DialogColorScheme;
+        SetScheme(palette.DialogColorScheme);
 
         var listView = new ListView
         {
             X = 0,
             Y = 0,
             Width = Dim.Fill(),
-            Height = Dim.Fill(ButtonsHeight)
+            // the buttons are below the content, in the dialog's padding
+            Height = Dim.Fill()
         };
         listView.SetSource(new ObservableCollection<string>(items));
         // Bookmarks, the first item, is selected
         listView.SelectedItem = 0;
-        listView.OpenSelectedItem += (_, e) => Choose(e.Item);
+        listView.Accepting += (_, e) =>
+        {
+            e.Handled = true;
+            Choose(listView.SelectedItem ?? 0);
+        };
         listView.KeyDown += (_, e) =>
         {
             if (e == Key.Enter)
             {
                 e.Handled = true;
-                Choose(listView.SelectedItem);
+                Choose(listView.SelectedItem ?? 0);
             }
         };
 
         var okButton = new Button { Text = "OK", IsDefault = true };
         okButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
-            Choose(listView.SelectedItem);
+            e.Handled = true;
+            Choose(listView.SelectedItem ?? 0);
         };
         var cancelButton = new Button { Text = "Cancel" };
         cancelButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
+            e.Handled = true;
             Application.RequestStop(this);
         };
 
@@ -92,7 +96,7 @@ public sealed class VolumeProviderDialog : Dialog
     }
 
     /// <summary>Chosen volume provider or bookmark, null when cancelled.</summary>
-    public VolumeChoice? Result { get; private set; }
+    public new VolumeChoice? Result { get; private set; }
 
     /// <summary>Closes with the volume provider of a row, or lets a bookmark be chosen for the Bookmarks row.</summary>
     private void Choose(int index)
@@ -123,7 +127,7 @@ public sealed class VolumeProviderDialog : Dialog
         var bookmarks = _bookmarkStore.Load();
         if (bookmarks.Count == 0)
         {
-            MessageBox.Query("Bookmarks", VolumeChoice.NoBookmarksMessage, "OK");
+            TuiMessageBox.Query("Bookmarks", VolumeChoice.NoBookmarksMessage, "OK");
             return null;
         }
 

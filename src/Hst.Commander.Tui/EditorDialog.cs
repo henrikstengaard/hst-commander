@@ -1,6 +1,5 @@
 using Hst.Commander.Core;
-using Terminal.Gui;
-using TuiAttribute = Terminal.Gui.Attribute;
+using TuiAttribute = Terminal.Gui.Drawing.Attribute;
 
 namespace Hst.Commander.Tui;
 
@@ -11,7 +10,7 @@ namespace Hst.Commander.Tui;
 ///     Ctrl+Y redoing like desktop editors (Ctrl+Z undoes, Ctrl+C copies, Ctrl+X cuts, Ctrl+A selects all). Esc or F10
 ///     closes the editor, asking to save changes.
 /// </summary>
-public sealed class EditorDialog : Dialog
+public sealed class EditorDialog : TuiDialog
 {
     private readonly EditorSession _session;
     private readonly TuiPalette _palette;
@@ -31,7 +30,7 @@ public sealed class EditorDialog : Dialog
         Y = 0;
         Width = Dim.Fill();
         Height = Dim.Fill();
-        ColorScheme = palette.DialogColorScheme;
+        SetScheme(palette.DialogColorScheme);
 
         var text = new TuiAttribute(palette.Item, palette.PaneBackground);
         _statusLabel = new Label { X = 0, Y = 0, Width = Dim.Fill(), Height = 1 };
@@ -42,16 +41,9 @@ public sealed class EditorDialog : Dialog
             Width = Dim.Fill(),
             Height = Dim.Fill(1),
             Text = session.Document.Text,
-            ReadOnly = session.IsReadOnly,
-            ColorScheme = new ColorScheme
-            {
-                Normal = text,
-                Focus = text,
-                HotNormal = text,
-                HotFocus = text,
-                Disabled = text
-            }
+            ReadOnly = session.IsReadOnly
         };
+        _textView.SetScheme(TuiPalette.CreateScheme(text, text));
         _keyBar = new FunctionKeyBarView
         {
             X = 0,
@@ -70,13 +62,13 @@ public sealed class EditorDialog : Dialog
             _modified = _session.IsModified(_textView.EditedText);
             UpdateStatus();
         };
-        _textView.UnwrappedCursorPosition += (_, position) =>
+        _textView.UnwrappedCursorPositionChanged += (_, position) =>
         {
             _cursor = (position.Y + 1, position.X + 1);
             UpdateStatus();
         };
         // esc closes the dialog without asking, so it's handled like f10
-        Closing += (_, e) => e.Cancel = !ConfirmClose();
+        IsRunningChanging += (_, e) => e.Cancel = !e.NewValue && !ConfirmClose();
 
         Add(_statusLabel, _textView, _keyBar);
         UpdateKeyBar();
@@ -169,7 +161,7 @@ public sealed class EditorDialog : Dialog
             return true;
         }
 
-        switch (MessageBox.Query("Edit", $"Save the changes to '{_session.Name}'?", "Save", "Discard", "Cancel"))
+        switch (TuiMessageBox.Query("Edit", $"Save the changes to '{_session.Name}'?", "Save", "Discard", "Cancel"))
         {
             case 0:
                 // saved synchronously, so the dialog only closes when saving worked
@@ -197,7 +189,7 @@ public sealed class EditorDialog : Dialog
     {
         if (_session.IsReadOnly)
         {
-            Application.Invoke(() => ErrorBox.ShowNotice(_session.ReadOnlyReason!));
+            UiThread.Post(() => ErrorBox.ShowNotice(_session.ReadOnlyReason!));
             return false;
         }
 
@@ -209,7 +201,7 @@ public sealed class EditorDialog : Dialog
         }
         catch (Exception exception)
         {
-            Application.Invoke(() => ErrorBox.Show(exception));
+            UiThread.Post(() => ErrorBox.Show(exception));
             return false;
         }
     }
@@ -367,7 +359,7 @@ public sealed class EditorDialog : Dialog
             new FunctionKeyItem("F10", "Quit", () => Application.RequestStop(this)),
             new FunctionKeyItem("C-G", "Line", GoToLine)
         ];
-        _keyBar.NeedsDraw = true;
+        _keyBar.SetNeedsDraw();
     }
 }
 
@@ -375,7 +367,7 @@ public sealed class EditorDialog : Dialog
 ///     Modal dialog asking for the line to go to in the editor (Ctrl+G). <see cref="Result" /> holds the one-based line on
 ///     OK or null on cancel.
 /// </summary>
-public sealed class GoToLineDialog : Dialog
+public sealed class GoToLineDialog : TuiDialog
 {
     private readonly TextField _lineField;
 
@@ -384,7 +376,7 @@ public sealed class GoToLineDialog : Dialog
         Title = "Go to line";
         Width = 36;
         Height = 8;
-        ColorScheme = palette.DialogColorScheme;
+        SetScheme(palette.DialogColorScheme);
 
         var lineLabel = new Label { X = 1, Y = 1, Text = "Line number:" };
         _lineField = new TextField { X = 1, Y = 2, Width = Dim.Fill(1), Text = line.ToString() };
@@ -392,7 +384,7 @@ public sealed class GoToLineDialog : Dialog
         var okButton = new Button { Text = "OK", IsDefault = true };
         okButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
+            e.Handled = true;
             if (!int.TryParse(_lineField.Text.Trim(), out var number) || number < 1)
             {
                 ErrorBox.ShowNotice("Enter a line number of 1 or more");
@@ -405,7 +397,7 @@ public sealed class GoToLineDialog : Dialog
         var cancelButton = new Button { Text = "Cancel" };
         cancelButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
+            e.Handled = true;
             Application.RequestStop(this);
         };
 
@@ -420,5 +412,5 @@ public sealed class GoToLineDialog : Dialog
     }
 
     /// <summary>The line to go to when OK was pressed, otherwise null.</summary>
-    public int? Result { get; private set; }
+    public new int? Result { get; private set; }
 }

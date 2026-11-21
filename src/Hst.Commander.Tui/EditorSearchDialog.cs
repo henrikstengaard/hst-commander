@@ -1,5 +1,4 @@
 using Hst.Commander.Core;
-using Terminal.Gui;
 
 namespace Hst.Commander.Tui;
 
@@ -8,7 +7,7 @@ namespace Hst.Commander.Tui;
 ///     expression, the replacement, case sensitive, whole words and backwards. Replacing has Replace and All buttons
 ///     (<see cref="ReplaceAll" />). <see cref="Result" /> holds the options on OK or null on cancel.
 /// </summary>
-public sealed class EditorSearchDialog : Dialog
+public sealed class EditorSearchDialog : TuiDialog
 {
     private readonly TextField _textField;
     private readonly TextField? _replacementField;
@@ -22,7 +21,7 @@ public sealed class EditorSearchDialog : Dialog
         Title = replace ? "Replace" : "Search";
         Width = Dim.Percent(60);
         Height = replace ? 13 : 11;
-        ColorScheme = palette.DialogColorScheme;
+        SetScheme(palette.DialogColorScheme);
 
         var textLabel = new Label { X = 1, Y = 1, Text = "Search for:" };
         _textField = new TextField { X = 1, Y = 2, Width = Dim.Fill(1), Text = options?.Text ?? string.Empty };
@@ -60,7 +59,7 @@ public sealed class EditorSearchDialog : Dialog
         var cancelButton = new Button { Text = "Cancel" };
         cancelButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
+            e.Handled = true;
             Application.RequestStop(this);
         };
         AddButton(cancelButton);
@@ -68,7 +67,7 @@ public sealed class EditorSearchDialog : Dialog
     }
 
     /// <summary>What to search for or replace when OK, Replace or All was pressed, otherwise null.</summary>
-    public EditorSearchOptions? Result { get; private set; }
+    public new EditorSearchOptions? Result { get; private set; }
 
     /// <summary>True when All was pressed, replacing every match.</summary>
     public bool ReplaceAll { get; private set; }
@@ -76,12 +75,12 @@ public sealed class EditorSearchDialog : Dialog
     private void Accept(CommandEventArgs e, bool replaceAll)
     {
         Result = new EditorSearchOptions(_textField.Text, _replacementField?.Text,
-            _regexCheckBox.CheckedState == CheckState.Checked,
-            _caseSensitiveCheckBox.CheckedState == CheckState.Checked,
-            _wholeWordsCheckBox.CheckedState == CheckState.Checked,
-            _backwardsCheckBox.CheckedState == CheckState.Checked);
+            _regexCheckBox.Value == CheckState.Checked,
+            _caseSensitiveCheckBox.Value == CheckState.Checked,
+            _wholeWordsCheckBox.Value == CheckState.Checked,
+            _backwardsCheckBox.Value == CheckState.Checked);
         ReplaceAll = replaceAll;
-        e.Cancel = true;
+        e.Handled = true;
         Application.RequestStop(this);
     }
 
@@ -90,6 +89,6 @@ public sealed class EditorSearchDialog : Dialog
         X = x,
         Y = y,
         Text = text,
-        CheckedState = isChecked ? CheckState.Checked : CheckState.UnChecked
+        Value = isChecked ? CheckState.Checked : CheckState.UnChecked
     };
 }

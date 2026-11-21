@@ -1,6 +1,5 @@
 using Hst.Commander.Abstractions;
-using Terminal.Gui;
-using TuiAttribute = Terminal.Gui.Attribute;
+using TuiAttribute = Terminal.Gui.Drawing.Attribute;
 
 namespace Hst.Commander.Tui;
 
@@ -21,7 +20,7 @@ public sealed class ButtonPanelView : View
         set
         {
             _panel = value ?? throw new ArgumentNullException(nameof(value));
-            NeedsDraw = true;
+            SetNeedsDraw();
         }
     }
 
@@ -40,7 +39,7 @@ public sealed class ButtonPanelView : View
     /// <summary>Raised with the command (<see cref="PanelButton.Action" />) of a clicked button.</summary>
     public event EventHandler<string>? ActionInvoked;
 
-    protected override bool OnDrawingContent()
+    protected override bool OnDrawingContent(DrawContext? context)
     {
         var width = Viewport.Width;
         var columns = _panel.Columns;
@@ -103,18 +102,23 @@ public sealed class ButtonPanelView : View
         AddStr(text[keyLength..]);
     }
 
-    protected override bool OnMouseClick(MouseEventArgs mouseEvent)
+    protected override bool OnMouseEvent(Mouse mouseEvent)
     {
+        if (!mouseEvent.Flags.HasFlag(MouseFlags.LeftButtonClicked))
+        {
+            return base.OnMouseEvent(mouseEvent);
+        }
+
         var columns = _panel.Columns;
         for (var column = 0; column < columns.Count; column++)
         {
             var (start, columnWidth) = GetColumnBounds(column, columns.Count, Viewport.Width);
-            if (mouseEvent.Position.X < start || mouseEvent.Position.X >= start + columnWidth)
+            if (mouseEvent.Position!.Value.X < start || mouseEvent.Position!.Value.X >= start + columnWidth)
             {
                 continue;
             }
 
-            var row = mouseEvent.Position.Y;
+            var row = mouseEvent.Position!.Value.Y;
             if (row >= 0 && row < columns[column].Buttons.Count)
             {
                 ActionInvoked?.Invoke(this, columns[column].Buttons[row].Action);

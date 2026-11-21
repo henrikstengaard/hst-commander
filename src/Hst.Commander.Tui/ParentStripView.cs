@@ -1,5 +1,4 @@
-using Terminal.Gui;
-using TuiAttribute = Terminal.Gui.Attribute;
+using TuiAttribute = Terminal.Gui.Drawing.Attribute;
 
 namespace Hst.Commander.Tui;
 
@@ -14,7 +13,7 @@ public sealed class ParentStripView : View
     /// <summary>Raised when clicked.</summary>
     public event EventHandler? Clicked;
 
-    protected override bool OnDrawingContent()
+    protected override bool OnDrawingContent(DrawContext? context)
     {
         var height = Viewport.Height;
         SetAttribute(Attribute);
@@ -27,8 +26,13 @@ public sealed class ParentStripView : View
         return true;
     }
 
-    protected override bool OnMouseClick(MouseEventArgs mouseEvent)
+    protected override bool OnMouseEvent(Mouse mouseEvent)
     {
+        if (!mouseEvent.Flags.HasFlag(MouseFlags.LeftButtonClicked))
+        {
+            return base.OnMouseEvent(mouseEvent);
+        }
+
         Clicked?.Invoke(this, EventArgs.Empty);
         return true;
     }

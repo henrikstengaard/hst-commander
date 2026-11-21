@@ -1,6 +1,5 @@
 using Hst.Commander.Abstractions;
 using Hst.Commander.Core;
-using Terminal.Gui;
 
 namespace Hst.Commander.Tui;
 
@@ -10,7 +9,7 @@ namespace Hst.Commander.Tui;
 ///     list of units for sizes, a check box for boolean fields and a drop-down list for choices, required fields marked with "*" and fields enabled by a check box disabled while
 ///     it's unchecked. <see cref="Result" /> holds the input on OK or null on cancel.
 /// </summary>
-public sealed class CreateVolumeFieldsDialog : Dialog
+public sealed class CreateVolumeFieldsDialog : TuiDialog
 {
     private readonly TextField _fileNameField;
 
@@ -18,7 +17,7 @@ public sealed class CreateVolumeFieldsDialog : Dialog
     {
         Title = $"Create {creator.Name}";
         Width = Dim.Percent(50);
-        ColorScheme = palette.DialogColorScheme;
+        SetScheme(palette.DialogColorScheme);
 
         var fileNameLabel = new Label { X = 1, Y = 1, Text = $"File name ({creator.FileExtension}) *:" };
         _fileNameField = new TextField { X = 1, Y = 2, Width = Dim.Fill(1), Text = previousInput?.FileName ?? string.Empty };
@@ -44,10 +43,10 @@ public sealed class CreateVolumeFieldsDialog : Dialog
                         X = 1,
                         Y = y,
                         Text = VolumeCreation.GetLabel(field),
-                        CheckedState = previous is true ? CheckState.Checked : CheckState.UnChecked
+                        Value = previous is true ? CheckState.Checked : CheckState.UnChecked
                     };
                     checkBoxes[field.Name] = checkBox;
-                    inputs.Add((field, () => checkBox.CheckedState == CheckState.Checked));
+                    inputs.Add((field, () => checkBox.Value == CheckState.Checked));
                     views = [checkBox];
                     y += 1;
                     lastIsCheckBox = true;
@@ -134,7 +133,7 @@ public sealed class CreateVolumeFieldsDialog : Dialog
             {
                 var isEnabled = VolumeCreation.IsEnabled(field,
                     name => !checkBoxes.TryGetValue(name, out var checkBox) ||
-                            checkBox.CheckedState == CheckState.Checked);
+                            checkBox.Value == CheckState.Checked);
                 foreach (var view in views)
                 {
                     view.Enabled = isEnabled;
@@ -144,7 +143,7 @@ public sealed class CreateVolumeFieldsDialog : Dialog
 
         foreach (var checkBox in checkBoxes.Values)
         {
-            checkBox.CheckedStateChanged += (_, _) => UpdateEnabled();
+            checkBox.ValueChanged += (_, _) => UpdateEnabled();
         }
 
         UpdateEnabled();
@@ -162,13 +161,13 @@ public sealed class CreateVolumeFieldsDialog : Dialog
         {
             Result = new VolumeCreatorInput(_fileNameField.Text,
                 inputs.ToDictionary(input => input.Field.Name, input => input.GetInput()));
-            e.Cancel = true;
+            e.Handled = true;
             Application.RequestStop(this);
         };
         var cancelButton = new Button { Text = "Cancel" };
         cancelButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
+            e.Handled = true;
             Application.RequestStop(this);
         };
 
@@ -178,5 +177,5 @@ public sealed class CreateVolumeFieldsDialog : Dialog
     }
 
     /// <summary>File name and input of the fields when OK was pressed, otherwise null.</summary>
-    public VolumeCreatorInput? Result { get; private set; }
+    public new VolumeCreatorInput? Result { get; private set; }
 }

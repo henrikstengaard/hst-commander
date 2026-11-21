@@ -1,6 +1,5 @@
 using System.Text;
-using Terminal.Gui;
-using TuiAttribute = Terminal.Gui.Attribute;
+using TuiAttribute = Terminal.Gui.Drawing.Attribute;
 
 namespace Hst.Commander.Tui;
 
@@ -47,10 +46,10 @@ public sealed class PathPanelView : View
     /// <summary>Raised when the path is clicked, opening the location dialog.</summary>
     public event EventHandler? PathClicked;
 
-    protected override bool OnMouseEvent(MouseEventArgs mouseEvent)
+    protected override bool OnMouseEvent(Mouse mouseEvent)
     {
         // the path is on the first line inside the border
-        if (mouseEvent.Flags.HasFlag(MouseFlags.Button1Clicked) && mouseEvent.Position.Y == 1)
+        if (mouseEvent.Flags.HasFlag(MouseFlags.LeftButtonClicked) && mouseEvent.Position!.Value.Y == 1)
         {
             PathClicked?.Invoke(this, EventArgs.Empty);
             return true;
@@ -59,7 +58,7 @@ public sealed class PathPanelView : View
         return base.OnMouseEvent(mouseEvent);
     }
 
-    protected override bool OnDrawingContent()
+    protected override bool OnDrawingContent(DrawContext? context)
     {
         var width = Viewport.Width;
         if (width <= 0)

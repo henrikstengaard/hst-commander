@@ -1,6 +1,5 @@
 using Hst.Commander.Core;
 using Hst.Commander.Core.Volumes;
-using Terminal.Gui;
 
 namespace Hst.Commander.Tui;
 
@@ -9,7 +8,7 @@ namespace Hst.Commander.Tui;
 ///     estimated time left. Cancel (or Esc) cancels the delete through <see cref="CancellationToken" />; the dialog
 ///     stays open until the delete has stopped and <see cref="Complete" /> is called.
 /// </summary>
-public sealed class DeleteProgressDialog : Dialog
+public sealed class DeleteProgressDialog : TuiDialog
 {
     private readonly CancellationTokenSource _cancellationTokenSource = new();
     private readonly Label _currentLabel;
@@ -27,7 +26,7 @@ public sealed class DeleteProgressDialog : Dialog
         Title = "Delete";
         Width = Dim.Percent(70);
         Height = 10;
-        ColorScheme = palette.DialogColorScheme;
+        SetScheme(palette.DialogColorScheme);
 
         _currentLabel = new Label { X = 1, Y = 1, Width = Dim.Fill(1), Text = "Preparing..." };
         _totalLabel = new Label { X = 1, Y = 2, Width = Dim.Fill(1), Text = "Total" };
@@ -45,12 +44,12 @@ public sealed class DeleteProgressDialog : Dialog
         _cancelButton = new Button { Text = "Cancel", IsDefault = true };
         _cancelButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
+            e.Handled = true;
             Cancel();
         };
-        Closing += (_, e) =>
+        IsRunningChanging += (_, e) =>
         {
-            if (_completed)
+            if (e.NewValue || _completed)
             {
                 return;
             }

@@ -1,6 +1,5 @@
 using Hst.Commander.Core;
-using Terminal.Gui;
-using TuiAttribute = Terminal.Gui.Attribute;
+using TuiAttribute = Terminal.Gui.Drawing.Attribute;
 
 namespace Hst.Commander.Tui;
 
@@ -19,7 +18,7 @@ public sealed class ViewerView : View
     public ViewerView(ViewerSession session)
     {
         _session = session;
-        WantMousePositionReports = true;
+        MousePositionTracking = true;
     }
 
     public TuiAttribute TextAttribute { get; set; }
@@ -39,7 +38,7 @@ public sealed class ViewerView : View
     /// <summary>Raised when the mouse scrolled the view or changed the selection.</summary>
     public event EventHandler? ViewChanged;
 
-    protected override bool OnMouseEvent(MouseEventArgs mouseEvent)
+    protected override bool OnMouseEvent(Mouse mouseEvent)
     {
         var flags = mouseEvent.Flags;
         if (flags.HasFlag(MouseFlags.WheeledDown) || flags.HasFlag(MouseFlags.WheeledUp))
@@ -49,10 +48,10 @@ public sealed class ViewerView : View
             return true;
         }
 
-        if (flags.HasFlag(MouseFlags.Button1Pressed))
+        if (flags.HasFlag(MouseFlags.LeftButtonPressed))
         {
             SetFocus();
-            var (row, column) = GetCell(mouseEvent.Position);
+            var (row, column) = GetCell(mouseEvent.Position ?? System.Drawing.Point.Empty);
             if (_selecting)
             {
                 _session.ExtendSelection(row, column, Rows);
@@ -61,8 +60,8 @@ public sealed class ViewerView : View
             {
                 // the mouse is grabbed while selecting, so dragging outside the view scrolls
                 _selecting = true;
-                Application.GrabMouse(this);
-                if (flags.HasFlag(MouseFlags.ButtonShift) && _session.Selection != null)
+                Application.Mouse.GrabMouse(this);
+                if (flags.HasFlag(MouseFlags.Shift) && _session.Selection != null)
                 {
                     _session.ExtendSelection(row, column, Rows);
                 }
@@ -76,12 +75,12 @@ public sealed class ViewerView : View
             return true;
         }
 
-        if (flags.HasFlag(MouseFlags.Button1Released) && _selecting)
+        if (flags.HasFlag(MouseFlags.LeftButtonReleased) && _selecting)
         {
             _selecting = false;
-            if (Application.MouseGrabView == this)
+            if (Application.Mouse.IsGrabbed(this))
             {
-                Application.UngrabMouse();
+                Application.Mouse.UngrabMouse();
             }
 
             return true;
@@ -112,11 +111,11 @@ public sealed class ViewerView : View
 
     private void Changed()
     {
-        NeedsDraw = true;
+        SetNeedsDraw();
         ViewChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    protected override bool OnDrawingContent()
+    protected override bool OnDrawingContent(DrawContext? context)
     {
         var width = Viewport.Width;
         var height = Viewport.Height;

@@ -1,5 +1,4 @@
 using Hst.Commander.Core;
-using Terminal.Gui;
 
 namespace Hst.Commander.Tui;
 
@@ -7,7 +6,7 @@ namespace Hst.Commander.Tui;
 ///     Modal dialog asking what to search for in the viewer (F7): the text or regular expression, case sensitive and
 ///     backwards. <see cref="Result" /> holds the options on OK or null on cancel.
 /// </summary>
-public sealed class ViewerSearchDialog : Dialog
+public sealed class ViewerSearchDialog : TuiDialog
 {
     private readonly TextField _textField;
     private readonly CheckBox _regexCheckBox;
@@ -19,7 +18,7 @@ public sealed class ViewerSearchDialog : Dialog
         Title = "Search";
         Width = Dim.Percent(50);
         Height = 10;
-        ColorScheme = palette.DialogColorScheme;
+        SetScheme(palette.DialogColorScheme);
 
         var textLabel = new Label { X = 1, Y = 1, Text = "Search for:" };
         _textField = new TextField { X = 1, Y = 2, Width = Dim.Fill(1), Text = options?.Text ?? string.Empty };
@@ -33,16 +32,16 @@ public sealed class ViewerSearchDialog : Dialog
         okButton.Accepting += (_, e) =>
         {
             Result = new ViewerSearchOptions(_textField.Text,
-                _regexCheckBox.CheckedState == CheckState.Checked,
-                _caseSensitiveCheckBox.CheckedState == CheckState.Checked,
-                _backwardsCheckBox.CheckedState == CheckState.Checked);
-            e.Cancel = true;
+                _regexCheckBox.Value == CheckState.Checked,
+                _caseSensitiveCheckBox.Value == CheckState.Checked,
+                _backwardsCheckBox.Value == CheckState.Checked);
+            e.Handled = true;
             Application.RequestStop(this);
         };
         var cancelButton = new Button { Text = "Cancel" };
         cancelButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
+            e.Handled = true;
             Application.RequestStop(this);
         };
 
@@ -53,13 +52,13 @@ public sealed class ViewerSearchDialog : Dialog
     }
 
     /// <summary>What to search for when OK was pressed, otherwise null.</summary>
-    public ViewerSearchOptions? Result { get; private set; }
+    public new ViewerSearchOptions? Result { get; private set; }
 
     private static CheckBox CreateCheckBox(Pos x, string text, bool isChecked) => new()
     {
         X = x,
         Y = 4,
         Text = text,
-        CheckedState = isChecked ? CheckState.Checked : CheckState.UnChecked
+        Value = isChecked ? CheckState.Checked : CheckState.UnChecked
     };
 }

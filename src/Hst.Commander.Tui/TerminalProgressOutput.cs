@@ -6,7 +6,7 @@ namespace Hst.Commander.Tui;
 /// <summary>
 ///     Shows the progress of a file operation in the terminal's tab or taskbar button by writing the
 ///     <see cref="TerminalProgress" /> escape sequence to the standard output, in terminals known to show it. Called on
-///     the UI thread (through <c>Application.Invoke</c>), where Terminal.Gui draws too, so the sequence isn't written
+///     the UI thread (through <see cref="UiThread.Post" />), where Terminal.Gui draws too, so the sequence isn't written
 ///     in the middle of its output. The standard output is opened for each write, as <see cref="TerminalScreen" />
 ///     swaps its handle on Windows.
 /// </summary>

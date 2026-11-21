@@ -1,7 +1,6 @@
 using Hst.Commander.Abstractions;
 using Hst.Commander.Core;
-using Terminal.Gui;
-using TuiAttribute = Terminal.Gui.Attribute;
+using TuiAttribute = Terminal.Gui.Drawing.Attribute;
 
 namespace Hst.Commander.Tui;
 
@@ -147,52 +146,57 @@ public sealed record TuiPalette(
     public static TuiAttribute Attribute(string? foreground, string? background) =>
         new(Closest(foreground), Closest(background));
 
-    public ColorScheme MenuColorScheme => new()
+    /// <summary>
+    ///     Creates a scheme with all the roles Terminal.Gui v2 draws with, so none are derived from the others. Like
+    ///     earlier versions, text fields (<see cref="Scheme.Editable" />) are drawn in the focus color and selected text
+    ///     and unfocused selected items of lists (<see cref="Scheme.Active" />) in the focus color inverted, unless
+    ///     <paramref name="active" /> is given.
+    /// </summary>
+    public static Scheme CreateScheme(TuiAttribute normal, TuiAttribute focus, TuiAttribute? hotNormal = null,
+        TuiAttribute? hotFocus = null, TuiAttribute? active = null)
     {
-        Normal = Menu,
-        Focus = MenuFocus,
-        HotNormal = MenuHot,
-        HotFocus = new TuiAttribute(MenuHot.Foreground, MenuFocus.Background),
-        Disabled = Menu
-    };
+        var selected = active ?? new TuiAttribute(focus.Background, focus.Foreground);
+        return new Scheme
+        {
+            Normal = normal,
+            Focus = focus,
+            HotNormal = hotNormal ?? normal,
+            HotFocus = hotFocus ?? focus,
+            Active = selected,
+            HotActive = selected,
+            Highlight = hotNormal ?? normal,
+            Editable = focus,
+            ReadOnly = focus,
+            Disabled = normal
+        };
+    }
+
+    public Scheme MenuColorScheme =>
+        CreateScheme(Menu, MenuFocus, MenuHot, new TuiAttribute(MenuHot.Foreground, MenuFocus.Background));
 
     /// <summary>
     ///     Indicator in the menu bar shown when running as administrator or root, white on red in every theme like a
     ///     warning.
     /// </summary>
-    public ColorScheme AdministratorColorScheme
+    public Scheme AdministratorColorScheme
     {
         get
         {
             var attribute = new TuiAttribute(ColorName16.White, ColorName16.Red);
-            return new ColorScheme
-            {
-                Normal = attribute, Focus = attribute, HotNormal = attribute, HotFocus = attribute,
-                Disabled = attribute
-            };
+            return CreateScheme(attribute, attribute);
         }
     }
 
-    public ColorScheme DialogColorScheme => new()
-    {
-        Normal = Dialog,
-        Focus = DialogFocus,
-        HotNormal = Dialog,
-        HotFocus = DialogFocus,
-        Disabled = Dialog
-    };
+    public Scheme DialogColorScheme => CreateScheme(Dialog, DialogFocus);
 
     /// <summary>Error message boxes, white on red with the focused button black on gray in every theme.</summary>
-    public ColorScheme ErrorColorScheme
+    public Scheme ErrorColorScheme
     {
         get
         {
             var normal = new TuiAttribute(ColorName16.White, ColorName16.Red);
             var focus = new TuiAttribute(ColorName16.Black, ColorName16.Gray);
-            return new ColorScheme
-            {
-                Normal = normal, Focus = focus, HotNormal = normal, HotFocus = focus, Disabled = normal
-            };
+            return CreateScheme(normal, focus);
         }
     }
 }

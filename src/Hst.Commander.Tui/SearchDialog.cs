@@ -1,6 +1,5 @@
 using System.Globalization;
 using Hst.Commander.Core;
-using Terminal.Gui;
 
 namespace Hst.Commander.Tui;
 
@@ -12,7 +11,7 @@ namespace Hst.Commander.Tui;
 ///     in descending order (<see cref="SearchResultSort" />). Enter on a result or Go to closes the dialog with the
 ///     result in <see cref="Result" />.
 /// </summary>
-public sealed class SearchDialog : Dialog
+public sealed class SearchDialog : TuiDialog
 {
     private const int SizeWidth = 9;
     private const int ModifiedWidth = 16;
@@ -28,9 +27,9 @@ public sealed class SearchDialog : Dialog
     private readonly CheckBox _regexCheckBox;
     private readonly CheckBox _caseSensitiveCheckBox;
     private readonly CheckBox _imagesCheckBox;
-    private readonly RadioGroup _contentRadioGroup;
+    private readonly OptionSelector _contentRadioGroup;
     private readonly TextField _contentField;
-    private readonly RadioGroup _depthRadioGroup;
+    private readonly OptionSelector _depthRadioGroup;
     private readonly TextField _levelsField;
     private readonly Label _statusLabel;
     private readonly ResultsTableView _resultsView;
@@ -53,7 +52,7 @@ public sealed class SearchDialog : Dialog
         Title = "Search";
         Width = Dim.Percent(80);
         Height = Dim.Percent(90);
-        ColorScheme = palette.DialogColorScheme;
+        SetScheme(palette.DialogColorScheme);
 
         var nameLabel = new Label { X = 1, Y = 1, Text = "Search for (wildcards or regular expression):" };
         _nameField = new TextField { X = 1, Y = 2, Width = Dim.Fill(1), Text = options.NamePattern };
@@ -66,24 +65,24 @@ public sealed class SearchDialog : Dialog
             options.SearchInImages);
 
         var contentLabel = new Label { X = 1, Y = 8, Text = "Contents:" };
-        _contentRadioGroup = new RadioGroup
+        _contentRadioGroup = new OptionSelector
         {
             X = 11,
             Y = 8,
             Orientation = Orientation.Horizontal,
-            RadioLabels = ContentLabels,
-            SelectedItem = (int)options.ContentType
+            Labels = ContentLabels,
+            Value = (int)options.ContentType
         };
         _contentField = new TextField { X = 11, Y = 9, Width = Dim.Fill(1), Text = options.Content };
 
         var depthLabel = new Label { X = 1, Y = 11, Text = "Depth:" };
-        _depthRadioGroup = new RadioGroup
+        _depthRadioGroup = new OptionSelector
         {
             X = 11,
             Y = 11,
             Orientation = Orientation.Horizontal,
-            RadioLabels = DepthLabels,
-            SelectedItem = (int)options.Depth
+            Labels = DepthLabels,
+            Value = (int)options.Depth
         };
         _levelsField = new TextField
         {
@@ -103,14 +102,15 @@ public sealed class SearchDialog : Dialog
             Height = Dim.Fill(2),
             FullRowSelect = true,
             MaxCellWidth = int.MaxValue,
-            CellActivationKey = KeyCode.Enter,
             Table = _resultsSource,
             Style = new TableStyle
             {
                 ShowVerticalCellLines = true,
                 ShowHorizontalHeaderOverline = false,
                 AlwaysShowHeaders = true,
-                ExpandLastColumn = false
+                ExpandLastColumn = false,
+                // the headers are drawn in the dialog's color, also while the results have focus
+                HeaderScheme = TuiPalette.CreateScheme(palette.Dialog, palette.Dialog)
             }
         };
         _resultsView.CellActivated += (_, _) => GoTo(_resultsView.SelectedRow);
@@ -120,7 +120,7 @@ public sealed class SearchDialog : Dialog
         _searchButton = new Button { Text = "Searc_h", IsDefault = true };
         _searchButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
+            e.Handled = true;
             if (_cancellation != null)
             {
                 _cancellation.Cancel();
@@ -133,13 +133,13 @@ public sealed class SearchDialog : Dialog
         var goToButton = new Button { Text = "_Go to" };
         goToButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
+            e.Handled = true;
             GoTo(_resultsView.SelectedRow);
         };
         var closeButton = new Button { Text = "Close" };
         closeButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
+            e.Handled = true;
             Application.RequestStop(this);
         };
 
@@ -149,7 +149,13 @@ public sealed class SearchDialog : Dialog
         AddButton(_searchButton);
         AddButton(goToButton);
         AddButton(closeButton);
-        Closing += (_, _) => _cancellation?.Cancel();
+        IsRunningChanging += (_, e) =>
+        {
+            if (!e.NewValue)
+            {
+                _cancellation?.Cancel();
+            }
+        };
         Initialized += (_, _) => _nameField.SetFocus();
     }
 
@@ -160,7 +166,7 @@ public sealed class SearchDialog : Dialog
     public SearchResultSort Sort { get; private set; }
 
     /// <summary>Result to go to when Go to or Enter was pressed on a result, otherwise null.</summary>
-    public SearchResult? Result { get; private set; }
+    public new SearchResult? Result { get; private set; }
 
     private SearchOptions ReadOptions()
     {
@@ -169,13 +175,13 @@ public sealed class SearchDialog : Dialog
             ? value
             : throw new IOException("The number of levels must be 0 or more");
         return new SearchOptions(_startField.Text, _nameField.Text,
-            _regexCheckBox.CheckedState == CheckState.Checked,
-            _caseSensitiveCheckBox.CheckedState == CheckState.Checked,
-            (SearchContentType)Math.Clamp(_contentRadioGroup.SelectedItem, 0, ContentLabels.Length - 1),
+            _regexCheckBox.Value == CheckState.Checked,
+            _caseSensitiveCheckBox.Value == CheckState.Checked,
+            (SearchContentType)Math.Clamp((_contentRadioGroup.Value ?? 0), 0, ContentLabels.Length - 1),
             _contentField.Text,
-            (SearchDepth)Math.Clamp(_depthRadioGroup.SelectedItem, 0, DepthLabels.Length - 1),
+            (SearchDepth)Math.Clamp((_depthRadioGroup.Value ?? 0), 0, DepthLabels.Length - 1),
             levels,
-            _imagesCheckBox.CheckedState == CheckState.Checked);
+            _imagesCheckBox.Value == CheckState.Checked);
     }
 
     private void StartSearch()
@@ -201,14 +207,14 @@ public sealed class SearchDialog : Dialog
         _statusLabel.Text = "Searching...";
 
         // results and progress are reported on the thread pool and shown on the UI thread
-        var results = new UiProgress<SearchResult>(result => Application.Invoke(() =>
+        var results = new UiProgress<SearchResult>(result => UiThread.Post(() =>
         {
             if (!token.IsCancellationRequested)
             {
                 AddResult(result);
             }
         }));
-        var progress = new UiProgress<SearchProgress>(value => Application.Invoke(() =>
+        var progress = new UiProgress<SearchProgress>(value => UiThread.Post(() =>
         {
             if (_cancellation == cancellation)
             {
@@ -216,7 +222,7 @@ public sealed class SearchDialog : Dialog
             }
         }));
         _ = Task.Run(() => _search(options, results, progress, token), token).ContinueWith(task =>
-            Application.Invoke(() =>
+            UiThread.Post(() =>
             {
                 if (_cancellation != cancellation)
                 {
@@ -311,7 +317,7 @@ public sealed class SearchDialog : Dialog
         X = x,
         Y = y,
         Text = text,
-        CheckedState = isChecked ? CheckState.Checked : CheckState.UnChecked
+        Value = isChecked ? CheckState.Checked : CheckState.UnChecked
     };
 
     /// <summary>
@@ -349,14 +355,14 @@ public sealed class SearchDialog : Dialog
     }
 
     /// <summary>TableView raising <see cref="HeaderClicked" /> with the column of a clicked header.</summary>
-    private sealed class ResultsTableView : TableView
+    private sealed class ResultsTableView : CursorTableView
     {
         public event EventHandler<int>? HeaderClicked;
 
-        protected override bool OnMouseEvent(MouseEventArgs mouseEvent)
+        protected override bool OnMouseEvent(Mouse mouseEvent)
         {
-            if (mouseEvent.Flags.HasFlag(MouseFlags.Button1Clicked) &&
-                ScreenToCell(mouseEvent.Position, out int? headerColumn) == null &&
+            if (mouseEvent.Flags.HasFlag(MouseFlags.LeftButtonClicked) &&
+                ScreenToCell(mouseEvent.Position ?? System.Drawing.Point.Empty, out int? headerColumn) == null &&
                 headerColumn is { } column && column >= 0 && column < SearchResultSort.Columns.Count)
             {
                 HeaderClicked?.Invoke(this, column);

@@ -1,7 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Text;
 using Hst.Commander.Core;
-using Terminal.Gui;
 
 namespace Hst.Commander.Tui;
 
@@ -10,7 +9,7 @@ namespace Hst.Commander.Tui;
 ///     the Licenses section listing the license notices (<see cref="Licenses.GetNotices" />) of Hst Commander, its
 ///     third-party components and the loaded plugins. Enter, double-clicking a notice or View license shows its text.
 /// </summary>
-public sealed class AboutDialog : Dialog
+public sealed class AboutDialog : TuiDialog
 {
     private const int MaximumWidth = 72;
     private const int MaximumListHeight = 8;
@@ -25,7 +24,7 @@ public sealed class AboutDialog : Dialog
         _notices = Licenses.GetNotices();
         var appInfo = AppInfo.Current;
         Title = "About";
-        ColorScheme = palette.DialogColorScheme;
+        SetScheme(palette.DialogColorScheme);
 
         // the texts are wrapped to the dialog's width, so the labels are as high as their lines
         var width = Math.Max(Math.Min(MaximumWidth, Application.Screen.Width - 2), 30);
@@ -56,8 +55,8 @@ public sealed class AboutDialog : Dialog
         // button (OK) and close it
         _listView.Accepting += (_, e) =>
         {
-            e.Cancel = true;
-            ShowNotice(_listView.SelectedItem);
+            e.Handled = true;
+            ShowNotice(_listView.SelectedItem ?? 0);
         };
         Add(_listView);
         Width = width;
@@ -66,13 +65,13 @@ public sealed class AboutDialog : Dialog
         var viewButton = new Button { Text = "_View license" };
         viewButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
-            ShowNotice(_listView.SelectedItem);
+            e.Handled = true;
+            ShowNotice(_listView.SelectedItem ?? 0);
         };
         var okButton = new Button { Text = "OK", IsDefault = true };
         okButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
+            e.Handled = true;
             Application.RequestStop(this);
         };
 
@@ -146,14 +145,14 @@ public sealed class AboutDialog : Dialog
 }
 
 /// <summary>Shows the text of a license notice from the About dialog in a read-only text view.</summary>
-public sealed class LicenseDialog : Dialog
+public sealed class LicenseDialog : TuiDialog
 {
     public LicenseDialog(LicenseNotice notice, TuiPalette palette)
     {
         Title = notice.Title;
         Width = Dim.Percent(90);
         Height = Dim.Percent(90);
-        ColorScheme = palette.DialogColorScheme;
+        SetScheme(palette.DialogColorScheme);
 
         var textView = new TextView
         {
@@ -168,7 +167,7 @@ public sealed class LicenseDialog : Dialog
         var closeButton = new Button { Text = "Close", IsDefault = true };
         closeButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
+            e.Handled = true;
             Application.RequestStop(this);
         };
 

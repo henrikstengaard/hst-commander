@@ -1,5 +1,4 @@
 using Hst.Commander.Abstractions;
-using Terminal.Gui;
 
 namespace Hst.Commander.Tui;
 
@@ -23,7 +22,6 @@ internal sealed class PropertiesTabView : View
     private readonly PropertiesTab _tab;
     private readonly Label _noTextLabel;
     private readonly TextView _textView;
-    private readonly ScrollBar _scrollBar;
     private readonly Button _addButton;
     private readonly Button _deleteButton;
     private string _validText;
@@ -45,56 +43,38 @@ internal sealed class PropertiesTabView : View
         {
             X = 0,
             Y = 0,
-            Width = Dim.Fill(1),
-            Height = Dim.Func(GetTextRows),
+            Width = Dim.Fill(),
+            Height = Dim.Func(_ => GetTextRows()),
             Text = _validText,
             ReadOnly = !tab.CanChange,
-            AllowsTab = false,
+            TabKeyAddsTab = false,
             // Enter saves a single-line text like other dialogs, but adds a line to multi-line texts
-            AllowsReturn = tab.IsMultiline,
+            EnterKeyAddsLine = tab.IsMultiline,
             WordWrap = !tab.IsMultiline
         };
+        // the built-in scroll bar shows itself while the text has more rows than shown
+        _textView.ViewportSettings |= ViewportSettingsFlags.HasVerticalScrollBar;
         _textView.KeyDown += (_, key) => key.Handled = IsTooLong(key);
         _textView.ContentsChanged += (_, _) => LimitText();
-        _textView.DrawComplete += (_, _) => UpdateScrollBar();
-
-        _scrollBar = new ScrollBar
-        {
-            X = Pos.AnchorEnd(1),
-            Y = 0,
-            Height = Dim.Func(GetTextRows),
-            Orientation = Orientation.Vertical,
-            AutoShow = true
-        };
-        _scrollBar.PositionChanged += (_, e) =>
-        {
-            if (_updating)
-            {
-                return;
-            }
-
-            _textView.TopRow = e.CurrentValue;
-            _textView.SetNeedsDraw();
-        };
 
         // the buttons are right below the message and the text view
         _addButton = new Button { X = 0, Y = 1, Text = tab.AddText, Enabled = tab.CanChange };
         _deleteButton = new Button { X = 0, Y = Pos.Bottom(_textView), Text = tab.DeleteText, Enabled = tab.CanChange };
         _addButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
+            e.Handled = true;
             SetText(string.Empty);
             ShowText(true);
             _textView.SetFocus();
         };
         _deleteButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
+            e.Handled = true;
             ShowText(false);
             _addButton.SetFocus();
         };
 
-        Add(_noTextLabel, _textView, _scrollBar, _addButton, _deleteButton);
+        Add(_noTextLabel, _textView, _addButton, _deleteButton);
         ShowText(tab.Text != null);
     }
 
@@ -146,10 +126,10 @@ internal sealed class PropertiesTabView : View
         var text = _textView.Text;
         if (text.Contains('\n') || text.Contains('\r') || (_tab.MaxLength > 0 && text.Length > _tab.MaxLength))
         {
-            var cursorPosition = _textView.CursorPosition;
+            var cursorPosition = _textView.InsertionPoint;
             var singleLine = text.ReplaceLineEndings(" ");
             SetText(_tab.MaxLength > 0 && singleLine.Length > _tab.MaxLength ? _validText : singleLine);
-            _textView.CursorPosition = cursorPosition;
+            _textView.InsertionPoint = cursorPosition;
             return;
         }
 
@@ -170,22 +150,6 @@ internal sealed class PropertiesTabView : View
         }
     }
 
-    /// <summary>Shows the scroll bar when the text has more rows than shown, at the first row shown.</summary>
-    private void UpdateScrollBar()
-    {
-        _updating = true;
-        try
-        {
-            _scrollBar.ScrollableContentSize = Math.Max(_textView.Lines, 1);
-            _scrollBar.VisibleContentSize = GetTextRows();
-            _scrollBar.Position = _textView.TopRow;
-        }
-        finally
-        {
-            _updating = false;
-        }
-    }
-
     private void ShowText(bool hasText)
     {
         _hasText = hasText;
@@ -193,12 +157,5 @@ internal sealed class PropertiesTabView : View
         _addButton.Visible = !hasText;
         _textView.Visible = hasText;
         _deleteButton.Visible = hasText;
-        if (!hasText)
-        {
-            // the scroll bar shows itself while its content is larger than shown
-            _updating = true;
-            _scrollBar.ScrollableContentSize = 0;
-            _updating = false;
-        }
     }
 }

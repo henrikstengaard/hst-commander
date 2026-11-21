@@ -1,5 +1,4 @@
 using System.Text;
-using Terminal.Gui;
 
 namespace Hst.Commander.Tui;
 
@@ -8,7 +7,7 @@ namespace Hst.Commander.Tui;
 ///     and raises <see cref="RightClicked" /> for the context menu of the entries and <see cref="HeaderClicked" /> for
 ///     sorting by a column.
 /// </summary>
-public sealed class EntryTableView : TableView
+public sealed class EntryTableView : CursorTableView
 {
     private static readonly Rune ScrollThumb = new('█');
 
@@ -24,28 +23,29 @@ public sealed class EntryTableView : TableView
     /// <summary>Raised when a mouse button is pressed or clicked in the table, e.g. to stop the quick search.</summary>
     public event EventHandler? MousePressed;
 
-    protected override bool OnMouseEvent(MouseEventArgs mouseEvent)
+    protected override bool OnMouseEvent(Mouse mouseEvent)
     {
-        if (mouseEvent.Flags.HasFlag(MouseFlags.Button1Pressed) || mouseEvent.Flags.HasFlag(MouseFlags.Button1Clicked) ||
-            mouseEvent.Flags.HasFlag(MouseFlags.Button3Pressed) || mouseEvent.Flags.HasFlag(MouseFlags.Button3Clicked))
+        if (mouseEvent.Flags.HasFlag(MouseFlags.LeftButtonPressed) || mouseEvent.Flags.HasFlag(MouseFlags.LeftButtonClicked) ||
+            mouseEvent.Flags.HasFlag(MouseFlags.RightButtonPressed) || mouseEvent.Flags.HasFlag(MouseFlags.RightButtonClicked))
         {
             MousePressed?.Invoke(this, EventArgs.Empty);
         }
 
-        if (mouseEvent.Flags.HasFlag(MouseFlags.Button1Clicked) && Table != null &&
-            ScreenToCell(mouseEvent.Position, out int? headerColumn) == null &&
+        if (mouseEvent.Flags.HasFlag(MouseFlags.LeftButtonClicked) && Table != null &&
+            ScreenToCell(mouseEvent.Position ?? System.Drawing.Point.Empty, out int? headerColumn) == null &&
             headerColumn is { } column && column >= 0 && column < Table.Columns)
         {
             HeaderClicked?.Invoke(this, column);
             return true;
         }
 
-        if (!mouseEvent.Flags.HasFlag(MouseFlags.Button3Clicked))
+        if (!mouseEvent.Flags.HasFlag(MouseFlags.RightButtonClicked))
         {
             return base.OnMouseEvent(mouseEvent);
         }
 
-        var cell = ScreenToCell(mouseEvent.Position);
+        var position = mouseEvent.Position ?? System.Drawing.Point.Empty;
+        var cell = ScreenToCell(position.X, position.Y);
         RightClicked?.Invoke(this, (cell?.Y, mouseEvent.ScreenPosition));
         return true;
     }
@@ -73,15 +73,15 @@ public sealed class EntryTableView : TableView
         return positions;
     }
 
-    protected override bool OnDrawingContent()
+    protected override bool OnDrawingContent(DrawContext? context)
     {
-        var result = base.OnDrawingContent();
+        var result = base.OnDrawingContent(context);
         if (Table == null || ColumnWidths.Count == 0 || Viewport.Width <= 0)
         {
             return result;
         }
 
-        SetAttribute(GetNormalColor());
+        SetAttribute(GetAttributeForRole(VisualRole.Normal));
         DrawEmptyRowDividers();
         DrawScrollThumb();
         return result;
@@ -90,7 +90,7 @@ public sealed class EntryTableView : TableView
     private void DrawEmptyRowDividers()
     {
         var dividers = GetDividerPositions();
-        var firstEmptyRow = HeaderHeight + Math.Max(0, Table.Rows - RowOffset);
+        var firstEmptyRow = HeaderHeight + Math.Max(0, (Table?.Rows ?? 0) - RowOffset);
         for (var row = firstEmptyRow; row < Viewport.Height; row++)
         {
             foreach (var x in dividers)
@@ -103,7 +103,7 @@ public sealed class EntryTableView : TableView
     private void DrawScrollThumb()
     {
         var trackHeight = VisibleRows;
-        if (Table.Rows <= trackHeight)
+        if (Table == null || Table.Rows <= trackHeight)
         {
             return;
         }

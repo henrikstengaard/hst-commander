@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using Terminal.Gui;
 
 namespace Hst.Commander.Tui;
 
@@ -12,13 +11,13 @@ namespace Hst.Commander.Tui;
 public sealed class ChoiceField : View
 {
     private readonly IReadOnlyList<string> _choices;
-    private readonly ColorScheme? _popupColorScheme;
+    private readonly Scheme? _popupColorScheme;
     private int _selectedIndex;
 
     /// <param name="choices">Choices shown.</param>
     /// <param name="selectedIndex">Index of the choice shown initially.</param>
     /// <param name="popupColorScheme">Color scheme of the popup with the list, null for the default.</param>
-    public ChoiceField(IReadOnlyList<string> choices, int selectedIndex, ColorScheme? popupColorScheme = null)
+    public ChoiceField(IReadOnlyList<string> choices, int selectedIndex, Scheme? popupColorScheme = null)
     {
         _choices = choices ?? throw new ArgumentNullException(nameof(choices));
         _popupColorScheme = popupColorScheme;
@@ -61,11 +60,16 @@ public sealed class ChoiceField : View
         return base.OnKeyDown(key);
     }
 
-    protected override bool OnMouseClick(MouseEventArgs mouseEvent)
+    protected override bool OnMouseEvent(Mouse mouseEvent)
     {
+        if (!mouseEvent.Flags.HasFlag(MouseFlags.LeftButtonClicked))
+        {
+            return base.OnMouseEvent(mouseEvent);
+        }
+
         if (!Enabled)
         {
-            return base.OnMouseClick(mouseEvent);
+            return base.OnMouseEvent(mouseEvent);
         }
 
         SetFocus();
@@ -73,13 +77,13 @@ public sealed class ChoiceField : View
         return true;
     }
 
-    protected override bool OnDrawingContent()
+    protected override bool OnDrawingContent(DrawContext? context)
     {
-        var attribute = !Enabled && ColorScheme != null
-            ? ColorScheme.Disabled
+        var attribute = !Enabled
+            ? GetAttributeForRole(VisualRole.Disabled)
             : HasFocus
-                ? GetFocusColor()
-                : ColorScheme?.Focus ?? GetNormalColor();
+                ? GetAttributeForRole(VisualRole.Focus)
+                : GetScheme().Focus;
         SetAttribute(attribute);
         Move(0, 0);
         var width = Viewport.Width;
@@ -114,13 +118,13 @@ public sealed class ChoiceField : View
             Y = screen.Y + 1,
             Width = screen.Width + 2,
             Height = _choices.Count + 2,
-            ShadowStyle = ShadowStyle.None,
+            ShadowStyle = ShadowStyles.None,
             BorderStyle = LineStyle.Single
         };
         popup.Padding!.Thickness = new Thickness(0);
         if (_popupColorScheme != null)
         {
-            popup.ColorScheme = _popupColorScheme;
+            popup.SetScheme(_popupColorScheme);
         }
 
         var chosen = -1;
@@ -130,7 +134,11 @@ public sealed class ChoiceField : View
             Application.RequestStop(popup);
         }
 
-        listView.OpenSelectedItem += (_, e) => Choose(e.Item);
+        listView.Accepting += (_, e) =>
+        {
+            e.Handled = true;
+            Choose(listView.SelectedItem ?? 0);
+        };
         listView.KeyDown += (_, e) =>
         {
             if (e != Key.Enter && e != Key.Space)
@@ -139,11 +147,16 @@ public sealed class ChoiceField : View
             }
 
             e.Handled = true;
-            Choose(listView.SelectedItem);
+            Choose(listView.SelectedItem ?? 0);
         };
-        listView.MouseClick += (_, e) =>
+        listView.MouseEvent += (_, e) =>
         {
-            var index = listView.TopItem + e.Position.Y;
+            if (!e.Flags.HasFlag(MouseFlags.LeftButtonClicked) || e.Position is not { } position)
+            {
+                return;
+            }
+
+            var index = listView.Viewport.Y + position.Y;
             if (index >= 0 && index < _choices.Count)
             {
                 e.Handled = true;

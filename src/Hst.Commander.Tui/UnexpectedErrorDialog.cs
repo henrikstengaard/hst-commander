@@ -1,6 +1,5 @@
 using System.Text;
 using Hst.Commander.Core;
-using Terminal.Gui;
 
 namespace Hst.Commander.Tui;
 
@@ -8,7 +7,7 @@ namespace Hst.Commander.Tui;
 ///     Shows an unhandled exception, or the crash of the last run, with its report and the log file, and offers to
 ///     report it as a new GitHub issue opened in the browser.
 /// </summary>
-public sealed class UnexpectedErrorDialog : Dialog
+public sealed class UnexpectedErrorDialog : TuiDialog
 {
     /// <param name="heading">E.g. <c>An unexpected error occurred</c>.</param>
     /// <param name="message">The exception's message, or empty.</param>
@@ -21,7 +20,7 @@ public sealed class UnexpectedErrorDialog : Dialog
         Title = "Unexpected error";
         Width = Dim.Percent(90);
         Height = Dim.Percent(90);
-        ColorScheme = palette.DialogColorScheme;
+        SetScheme(palette.DialogColorScheme);
 
         var y = 0;
         Add(CreateLabel(y++, heading));
@@ -50,18 +49,18 @@ public sealed class UnexpectedErrorDialog : Dialog
         var reportButton = new Button { Text = "Report on GitHub", IsDefault = true };
         reportButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
+            e.Handled = true;
             if (report.OpenGitHubIssue() is { } error)
             {
                 // e.g. no browser on a Linux system without a desktop: the log file has the same report
-                MessageBox.ErrorQuery("Error",
+                TuiMessageBox.ErrorQuery("Error",
                     logFile != null ? $"{error}\n\nThe report is in the log:\n{logFile}" : error, "OK");
             }
         };
         var closeButton = new Button { Text = "Close" };
         closeButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
+            e.Handled = true;
             Application.RequestStop(this);
         };
 

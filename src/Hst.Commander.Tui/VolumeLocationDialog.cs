@@ -1,5 +1,4 @@
 using Hst.Commander.Abstractions;
-using Terminal.Gui;
 
 namespace Hst.Commander.Tui;
 
@@ -8,7 +7,7 @@ namespace Hst.Commander.Tui;
 ///     path "\\server\share", titled by the volume provider with examples below the text field.
 ///     <see cref="Result" /> holds the location on OK or null on cancel.
 /// </summary>
-public sealed class VolumeLocationDialog : Dialog
+public sealed class VolumeLocationDialog : TuiDialog
 {
     private readonly TextField _locationField;
 
@@ -17,7 +16,7 @@ public sealed class VolumeLocationDialog : Dialog
         Title = volumeProvider.Name;
         Width = Dim.Percent(60);
         Height = 9;
-        ColorScheme = palette.DialogColorScheme;
+        SetScheme(palette.DialogColorScheme);
 
         var locationLabel = new Label { X = 1, Y = 1, Text = $"Enter {volumeProvider.LocationLabel}:" };
         _locationField = new TextField { X = 1, Y = 2, Width = Dim.Fill(1), Text = location };
@@ -26,7 +25,7 @@ public sealed class VolumeLocationDialog : Dialog
         var okButton = new Button { Text = "OK", IsDefault = true };
         okButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
+            e.Handled = true;
             if (string.IsNullOrWhiteSpace(_locationField.Text))
             {
                 return;
@@ -38,7 +37,7 @@ public sealed class VolumeLocationDialog : Dialog
         var cancelButton = new Button { Text = "Cancel" };
         cancelButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
+            e.Handled = true;
             Application.RequestStop(this);
         };
 
@@ -49,5 +48,5 @@ public sealed class VolumeLocationDialog : Dialog
     }
 
     /// <summary>Location entered when OK was pressed, otherwise null.</summary>
-    public string? Result { get; private set; }
+    public new string? Result { get; private set; }
 }
