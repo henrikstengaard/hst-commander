@@ -10,39 +10,60 @@
 
 ---
 
-Hst Commander is a dual-pane file manager written in C# for .NET 10. Its distinguishing feature is a **pluggable volume abstraction**: any container, such as a local directory, an ISO image, an archive, a disk image or an Amiga disk, can be browsed and used in the same dual-pane UI, and plugins can add new ones.
+Hst Commander is a dual-pane file manager written in C# for .NET 10. Its distinguishing feature is a **pluggable volume abstraction**: any container, such as a local directory, an ISO image, an archive, a disk image, an Amiga disk, a physical disk or a server, can be browsed and used in the same panes, and plugins can add new ones.
 
 Hst Commander comes with two front-ends that have the same functionality:
 
-- **Terminal UI (TUI)**: built with [Terminal.Gui](https://github.com/gui-cs/Terminal.Gui) v2. It runs in any terminal and suspends itself to run console programs, like Midnight Commander.
-- **Desktop GUI**: built with [Avalonia](https://avaloniaui.net/) 12. It adds entry icons, navigation modes (list, thumbnails, Amiga Workbench) and an image viewer.
+- **Terminal UI (TUI)**: built with [Terminal.Gui](https://github.com/gui-cs/Terminal.Gui) v2. It runs in any terminal (also over SSH and in PuTTY) and suspends itself to run console programs, like Midnight Commander.
+- **Desktop GUI**: built with [Avalonia](https://avaloniaui.net/) 12. It adds entry icons, navigation modes (list, thumbnails, Amiga Workbench), an image viewer and drag and drop.
 
 ## Features
 
-- Dual-pane browsing of local drives and directories.
-- Browsing images as if they were directories, detected by their contents regardless of the extension, also inside other images:
+### Locations
+
+- Local drives and directories, with the free and total space of the drive.
+- Images browsed like directories, detected by their contents regardless of the extension, also inside other images:
   - ISO 9660 images.
   - Zip, lha, lzx, rar and 7z archives.
-  - MBR and GPT disk images (raw or vhd) with FAT and NTFS partitions, PiStorm disks and hybrid MBR/RDB disks.
+  - MBR and GPT disk images (raw or vhd) with FAT, exFAT, NTFS and ext2/3/4 partitions, PiStorm disks and hybrid MBR/RDB disks, and file systems without a partition table.
   - Amiga disk files (adf) and hard disk images with a rigid disk block (RDB), with Fast File System, PFS3 and SFS partitions.
-- Writing to Amiga adf and RDB images and FAT and NTFS partitions of disk images, shared safely by both panes.
-- Reading and writing physical disks, internal and external (e.g. USB), opened like MBR, GPT and RDB disk images and shown with their model (as administrator or root).
-- Browsing, reading and writing Windows file shares and other SMB 2/3 servers with the SMB plugin (installed separately), entered as `\\server\share` or `smb://server/share`, asking for a user name and password when needed.
-- Copying, moving, renaming, making directories and deleting between any locations, with progress dialogs, speed and ETA, filters and overwrite confirmation.
+- Writing to Amiga adf, RDB and partition images and to FAT, exFAT and NTFS images, shared safely by both panes and file operations.
+- Physical disks, internal and external (e.g. USB), read and written like disk images through a block cache (as administrator or root; Hst Commander offers to restart elevated).
+- FTP, FTPS (explicit TLS) and SFTP servers, entered in a connection dialog.
+- Windows file shares and other SMB 2/3 servers with the SMB plugin, installed separately (see [Download](#download)), entered as `\\server\share` or `smb://server/share`.
+- Bookmarks of any location, with passwords stored in Windows Credential Manager, the macOS Keychain or the Linux Secret Service.
+- Changing location by typing a path, including paths into images, or clicking the path above a pane.
+
+### File operations
+
+- Copying, moving, renaming, making directories and deleting between any two locations, with progress, speed and time left (also on the taskbar or terminal tab), filters and overwrite confirmation.
+- The clipboard (Ctrl+C, Ctrl+X, Ctrl+V), also with Explorer and other applications, including entries inside images.
+- Drag and drop with other applications and between the panes (GUI).
 - Keeping Amiga names, protection bits and comments when copying between Amiga volumes, and storing them as UAE metadata (UAEFSDB or FS-UAE metafiles) on other volumes.
-- Creating volumes provided by plugins with F9, e.g. empty Amiga disk files (adf), formatted and bootable.
-- Viewing files of any size as text or hex with search, selection and copying, and viewing images in the GUI: PNG, JPEG, GIF, BMP, WebP, Windows icons, Amiga icons and IFF ILBM pictures.
-- Selecting entries one by one or as a group with wildcards or regular expressions, and inverting the selection.
-- Properties of files, directories, partitions and drives, with the contents counted in the background, and changing attributes and Amiga protection bits.
+- Creating volumes with F9: empty, formatted or bootable Amiga disk files and exFAT file systems as sparse files.
+- Searching by name (wildcards or regular expressions) and contents (text, regular expressions or hex values), optionally inside images and archives, and quick search in a pane by typing.
+- Selecting entries one by one, as a group with wildcards or regular expressions, or inverting the selection, and sorting by name, size or date.
+- Properties of files, directories, partitions and drives, with the contents counted in the background, and changing attributes, Amiga protection bits, comments and icon tooltypes.
+
+### Viewing and editing
+
+- Viewing files of any size as text (word wrapped or not) or hex, with search, selection and copying.
+- Viewing images in the GUI: PNG, JPEG, GIF, BMP, WebP, Windows icons, Amiga icons and IFF ILBM pictures.
+- Editing text files in the built-in editor with search and replace, also inside writable images, or in an external editor.
+
+### Interface
+
+- A command line above the bottom area running commands with the shell, inserting entry names and paths, and a context menu with Terminal, PowerShell and Command prompt here.
+- Starting files with their associated application.
 - Entry icons in the GUI: Amiga `.info` icons, icons contained in programs and `.ico` files, and the host OS icons.
 - GUI navigation modes: list, thumbnails and the Amiga Workbench with icons at their positions, which can be dragged and saved.
-- Starting files with their associated application and running programs.
-- Changing location by typing a path, including paths into images.
-- Choosing the volume provider of each pane.
-- Plugins loaded at startup from `~/.hst-commander/plugins`.
-- Three themes: Midnight Commander (default), Light and Dark.
+- Themes: Midnight Commander (default), Light, Dark and Directory Opus 4, whose button bank can be changed in the settings.
+- Plugins loaded at startup from `~/.hst-commander/plugins`, adding locations, image formats, volume creators, icons, navigation modes, properties tabs and themes (see the [plugin API](docs/plugin-api.md)).
+- An error log, and unexpected errors offered to be reported as a GitHub issue the user reviews first.
 
 ## Keys
+
+The keys are the same in both front-ends unless noted. The File menu lists them too.
 
 | Key | Action |
 |---|---|
@@ -51,30 +72,44 @@ Hst Commander comes with two front-ends that have the same functionality:
 | Backspace | Go to the parent directory |
 | Ctrl+\ | Go to the root of the volume |
 | Ctrl+PageDown | Open a file as a volume |
-| Insert / Space | Select (mark) the entry under the cursor |
-| + / - | Select / unselect a group of entries |
-| * | Invert the selection |
+| Insert / Space | Mark the entry under the cursor |
+| + / - / * | Mark / unmark a group of entries, invert the marks |
+| F1 / F2 | Choose the volume provider of the left / right pane (also Alt+F1 / Alt+F2 or Shift+F1 / Shift+F2, configurable in the settings) |
 | F3 | View |
+| F4 | Edit |
 | F5 | Copy |
 | F6 | Move or rename |
+| Shift+F6 | Rename |
 | F7 | Make directory |
 | F8 / Delete | Delete |
 | F9 | Create a volume, e.g. an Amiga disk file |
-| F10 | Quit |
+| F10 / Ctrl+Q | Quit |
+| Ctrl+C / Ctrl+X / Ctrl+V | Copy, cut and paste entries with the clipboard (also Alt+V in the TUI, as terminals paste text with Ctrl+V) |
 | Ctrl+P / Alt+Enter | Properties |
+| Ctrl+S | Search |
+| Ctrl+F | Quick search |
 | Ctrl+L | Change location |
 | Ctrl+H | Go to the home directory |
-| F1 / F2 | Choose the volume provider of the left / right pane (also Alt+F1 / Alt+F2 or Shift+F1 / Shift+F2, configurable in settings) |
+| Ctrl+B | Add a bookmark (bookmarks are listed with F1 / F2) |
+| Ctrl+R | Refresh the active pane |
+| Ctrl+U | Swap the panes |
+| Ctrl+T | Go to the command line |
+| Shift+F10 / menu key | Context menu |
 | Ctrl+1 to Ctrl+9 | Choose the navigation mode (GUI only) |
 | Ctrl+O | Show the terminal output (TUI only) |
 
+The viewer and the editor have their own keys; see the [viewer](docs/viewer.md) and the [editor](docs/editor.md).
+
 ## Download
 
-Releases are published on the [GitHub releases page](https://github.com/henrikstengaard/hst-commander/releases) as:
+Releases are published on the [GitHub releases page](https://github.com/henrikstengaard/hst-commander/releases), with the TUI and GUI packaged separately:
 
 - **Windows** (x64, x86, arm64): setup installer and portable zip.
-- **macOS** (x64, arm64): dmg for the GUI app and the TUI.
+- **macOS** (x64, arm64): dmg.
 - **Linux** (x64, arm, arm64): AppImage and deb package.
+- **SMB plugin** (all platforms): `smb-plugin.zip`, released separately as it uses the LGPL licensed [SMBLibrary](https://github.com/TalAloni/SMBLibrary). Copy its `Hst.Commander.Plugins.Smb` directory to `~/.hst-commander/plugins/` (see the [SMB plugin](src/Hst.Commander.Plugins.Smb/readme.md)).
+
+Settings, bookmarks and the error log are stored in `~/.hst-commander` (`%USERPROFILE%\.hst-commander` on Windows).
 
 ## Code signing
 
@@ -85,7 +120,7 @@ Releases of Hst Commander are built from the source code in this repository by G
 
 ## Building
 
-Hst Commander requires the [.NET 10 SDK](https://dotnet.microsoft.com/download) and `git` on the path (the build number is the git commit count).
+Hst Commander requires the [.NET 10 SDK](https://dotnet.microsoft.com/download) and `git` on the path (the last part of the version is the git commit count).
 
 ```shell
 # Build the solution
@@ -101,33 +136,37 @@ dotnet run --project src/Hst.Commander.Tui/Hst.Commander.Tui.csproj
 dotnet test src/Hst.Commander.Core.Tests/Hst.Commander.Core.Tests.csproj
 ```
 
+Local builds include the SMB plugin. See [docs/application.md](docs/application.md) for publishing and the release workflows.
+
 ## Project structure
 
 | Project | Description |
 |---|---|
-| [`Hst.Commander.Abstractions`](src/Hst.Commander.Abstractions/readme.md) | Plugin API: `IVolume`, `IEntry`, `IPlugin` and the provider interfaces |
-| [`Hst.Commander.Core`](src/Hst.Commander.Core/readme.md) | Built-in volumes (local, ISO 9660, nested), navigation, file operations, UAE metadata, viewer and plugin loading, shared by both front-ends |
+| [`Hst.Commander.Abstractions`](src/Hst.Commander.Abstractions/readme.md) | Plugin API: `IVolume`, `IEntry`, `IPlugin` and the provider interfaces, versioned separately (see [plugin API versions](docs/plugin-api.md#plugin-api-versions)) |
+| [`Hst.Commander.Core`](src/Hst.Commander.Core/readme.md) | Built-in volumes (local, ISO 9660, nested), navigation, file operations, UAE metadata, viewer, editor, search, bookmarks and plugin loading, shared by both front-ends |
 | [`Hst.Commander.Tui`](src/Hst.Commander.Tui/readme.md) | Terminal UI application |
 | [`Hst.Commander.Gui`](src/Hst.Commander.Gui/readme.md) | Desktop GUI application |
 | [`Hst.Commander.Plugins.Zip`](src/Hst.Commander.Plugins.Zip/readme.md) | Zip archives (default plugin) |
 | [`Hst.Commander.Plugins.LhaLzx`](src/Hst.Commander.Plugins.LhaLzx/readme.md) | Lha and lzx archives (default plugin) |
 | [`Hst.Commander.Plugins.RarSevenZip`](src/Hst.Commander.Plugins.RarSevenZip/readme.md) | Rar and 7z archives (default plugin) |
-| [`Hst.Commander.Plugins.Disk`](src/Hst.Commander.Plugins.Disk/readme.md) | MBR/GPT disk images with FAT and NTFS partitions, PiStorm and hybrid disks (default plugin) |
-| [`Hst.Commander.Plugins.Amiga`](src/Hst.Commander.Plugins.Amiga/readme.md) | Amiga adf and RDB images, `.info` icons, Workbench navigation mode and Amiga pictures (default plugin) |
-| [`Hst.Commander.Plugins.PhysicalDisk`](src/Hst.Commander.Plugins.PhysicalDisk/readme.md) | Internal and external physical disks, opened like MBR, GPT and RDB disk images (default plugin) |
-| [`Hst.Commander.Plugins.Smb`](src/Hst.Commander.Plugins.Smb/readme.md) | Windows file shares and other SMB 2/3 servers (external plugin, installed separately as it uses the LGPL licensed SMBLibrary) |
+| [`Hst.Commander.Plugins.Disk`](src/Hst.Commander.Plugins.Disk/readme.md) | MBR/GPT disk images with FAT, exFAT, NTFS and ext partitions, PiStorm and hybrid disks, and creating exFAT file systems (default plugin) |
+| [`Hst.Commander.Plugins.Amiga`](src/Hst.Commander.Plugins.Amiga/readme.md) | Amiga adf, RDB and partition images, `.info` icons, Workbench navigation mode, Amiga pictures, comment and tooltypes tabs (default plugin) |
+| [`Hst.Commander.Plugins.PhysicalDisk`](src/Hst.Commander.Plugins.PhysicalDisk/readme.md) | Internal and external physical disks, opened like disk images (default plugin) |
+| [`Hst.Commander.Plugins.Ftp`](src/Hst.Commander.Plugins.Ftp/readme.md) | FTP, FTPS and SFTP servers (default plugin) |
+| [`Hst.Commander.Plugins.DirectoryOpus`](docs/themes.md) | Directory Opus 4 theme with a customizable button bank (default plugin) |
+| [`Hst.Commander.Plugins.Smb`](src/Hst.Commander.Plugins.Smb/readme.md) | Windows file shares and other SMB 2/3 servers (external plugin, released separately) |
 | [`Hst.Commander.Core.Tests`](src/Hst.Commander.Core.Tests/readme.md) | Unit tests |
 
 See [src/agents.md](src/agents.md) for the architecture and coding conventions and [docs](docs) for how each feature works.
 
 ## Status
 
-Hst Commander is in early development. Not implemented yet:
+See [docs/status.md](docs/status.md) for what works. Not implemented yet, among others:
 
-- Edit (F4); changing the viewer's encoding, word wrapping and going to an offset.
-- Writing to ISO images and zip, lha, lzx, rar and 7z archives, and to Amiga images inside other images.
-- Changing RDB, MBR and GPT partitions.
-- Other Amiga file systems (e.g. SFS\2), other PC file systems (e.g. exFAT, ext) and vhdx/vmdk images.
+- Creating a new file (Shift+F4), and changing the encoding of the viewer and the editor.
+- Writing to ISO images and zip, lha, lzx, rar and 7z archives, to ext partitions and to Amiga images inside other images.
+- Changing RDB, MBR and GPT partitions, other Amiga file systems (e.g. SFS\2), other PC file systems (e.g. btrfs, XFS) and vhdx/vmdk images.
+- SMB 1, browsing the network for servers, implicit FTPS and SFTP private keys.
 - Unloading or reloading plugins while running.
 
 ## License
@@ -137,7 +176,3 @@ Hst Commander is licensed under the [MIT license](LICENSE). It includes third-pa
 ## Author
 
 Henrik Nørfjand Stengaard
-
-## License
-
-Hst Commander is licensed under the [MIT License](LICENSE).
