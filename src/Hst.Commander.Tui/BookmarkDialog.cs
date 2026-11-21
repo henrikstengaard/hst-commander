@@ -3,8 +3,8 @@ using Terminal.Gui;
 namespace Hst.Commander.Tui;
 
 /// <summary>
-///     Modal dialog asking for the description of a bookmark, when adding one (Ctrl+B) or renaming one (F2 in the bookmark
-///     list), showing the bookmarked location. <see cref="Result" /> holds the description on OK or null on
+///     Modal dialog asking for the description of a bookmark when adding one (Ctrl+B), showing the bookmarked location.
+///     Bookmarks are changed with <see cref="EditBookmarkDialog" />. <see cref="Result" /> holds the description on OK or null on
 ///     cancel or when empty.
 /// </summary>
 public sealed class BookmarkDialog : Dialog

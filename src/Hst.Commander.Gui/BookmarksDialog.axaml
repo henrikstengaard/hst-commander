@@ -21,8 +21,8 @@
         </ListBox>
         <DockPanel Margin="0,8,0,0">
             <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" Spacing="8">
-                <Button x:Name="RenameButton" Content="_Rename..." MinWidth="80" HorizontalContentAlignment="Center"
-                        ToolTip.Tip="Change the description of the bookmark (F2)" />
+                <Button x:Name="EditButton" Content="_Edit" MinWidth="80" HorizontalContentAlignment="Center"
+                        ToolTip.Tip="Change the description, location, path, user name or password of the bookmark (F4)" />
                 <Button x:Name="DeleteButton" Content="_Delete" MinWidth="80" HorizontalContentAlignment="Center"
                         ToolTip.Tip="Delete the bookmark (Del)" />
             </StackPanel>

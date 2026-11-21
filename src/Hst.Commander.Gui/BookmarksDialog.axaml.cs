@@ -8,7 +8,8 @@ namespace Hst.Commander.Gui;
 /// <summary>
 ///     Modal list of the bookmarks, opened by choosing Bookmarks in the volume provider list and centered over the pane.
 ///     The dialog returns the chosen bookmark on OK, Enter or double-click, or null when cancelled. Delete or Del
-///     deletes the selected bookmark after confirming and Rename or F2 changes its description; the dialog closes when
+///     deletes the selected bookmark after confirming and Edit, F4 or F2 edits it (<see cref="EditBookmarkDialog" />);
+///     the dialog closes when
 ///     the last bookmark is deleted.
 /// </summary>
 public partial class BookmarksDialog : Window
@@ -21,7 +22,7 @@ public partial class BookmarksDialog : Window
     }
 
     /// <param name="bookmarks">Bookmarks listed initially.</param>
-    /// <param name="bookmarkStore">Store the bookmarks are deleted from and renamed in, null for none.</param>
+    /// <param name="bookmarkStore">Store the bookmarks are deleted from and edited in, null for none.</param>
     /// <param name="pane">Pane the dialog is centered over, null to center it over the owner.</param>
     public BookmarksDialog(IReadOnlyList<Bookmark> bookmarks, BookmarkStore? bookmarkStore, Control? pane)
     {
@@ -46,13 +47,13 @@ public partial class BookmarksDialog : Window
                 e.Handled = true;
                 await DeleteSelectedBookmarkAsync();
             }
-            else if (e.Key == Key.F2 && e.KeyModifiers == KeyModifiers.None)
+            else if (e.Key is Key.F4 or Key.F2 && e.KeyModifiers == KeyModifiers.None)
             {
                 e.Handled = true;
-                await RenameSelectedBookmarkAsync();
+                await EditSelectedBookmarkAsync();
             }
         }, RoutingStrategies.Tunnel);
-        RenameButton.Click += async (_, _) => await RenameSelectedBookmarkAsync();
+        EditButton.Click += async (_, _) => await EditSelectedBookmarkAsync();
         DeleteButton.Click += async (_, _) => await DeleteSelectedBookmarkAsync();
         OkButton.Click += (_, _) => CloseWithSelected();
         CancelButton.Click += (_, _) => Close(null);
@@ -72,7 +73,7 @@ public partial class BookmarksDialog : Window
 
     private void UpdateButtons()
     {
-        RenameButton.IsEnabled = SelectedBookmark != null;
+        EditButton.IsEnabled = SelectedBookmark != null;
         DeleteButton.IsEnabled = SelectedBookmark != null;
         OkButton.IsEnabled = SelectedBookmark != null;
     }
@@ -94,22 +95,22 @@ public partial class BookmarksDialog : Window
         await ChangeAndReloadAsync(() => store.Delete(bookmark.Id), null);
     }
 
-    private async Task RenameSelectedBookmarkAsync()
+    private async Task EditSelectedBookmarkAsync()
     {
         if (_bookmarkStore is not { } store || SelectedBookmark is not { } bookmark)
         {
             return;
         }
 
-        var description = await new BookmarkDialog("Rename bookmark", bookmark.Path, bookmark.Description)
-            .ShowDialog<string?>(this);
-        if (description == null)
+        var changes = await new EditBookmarkDialog(bookmark, store.CredentialStore.Name)
+            .ShowDialog<BookmarkChanges?>(this);
+        if (changes == null)
         {
             VolumeProviderDialog.FocusSelected(BookmarksList);
             return;
         }
 
-        await ChangeAndReloadAsync(() => store.Rename(bookmark.Id, description), bookmark.Id);
+        await ChangeAndReloadAsync(() => store.Edit(bookmark.Id, changes), bookmark.Id);
     }
 
     /// <summary>

@@ -7,8 +7,8 @@ using Terminal.Gui;
 namespace Hst.Commander.Tui;
 
 /// <summary>
-///     Modal list of the volume providers a pane can show, followed by Bookmarks, opened with Alt+F1 (left pane) or
-///     Alt+F2 (right pane) and centered over the pane. OK, Enter or double-click chooses the selected item, Cancel or Esc
+///     Modal list of Bookmarks followed by the volume providers a pane can show, opened with Alt+F1 (left pane) or
+///     Alt+F2 (right pane) and centered over the pane with Bookmarks selected. OK, Enter or double-click chooses the selected item, Cancel or Esc
 ///     cancels. Choosing Bookmarks opens the bookmark list (<see cref="BookmarksDialog" />), or says there are no
 ///     bookmarks; cancelling it goes back to this list. <see cref="Result" /> holds the chosen volume provider or
 ///     bookmark, or null on cancel.
@@ -27,7 +27,7 @@ public sealed class VolumeProviderDialog : Dialog
     private readonly TuiPalette _palette;
 
     public VolumeProviderDialog(string title, IReadOnlyList<IVolumeProvider> volumeProviders,
-        BookmarkStore bookmarkStore, IVolumeProvider currentVolumeProvider, Rectangle paneFrame, TuiPalette palette)
+        BookmarkStore bookmarkStore, Rectangle paneFrame, TuiPalette palette)
     {
         _choices = VolumeChoice.List(volumeProviders);
         _bookmarkStore = bookmarkStore;
@@ -60,8 +60,8 @@ public sealed class VolumeProviderDialog : Dialog
             Height = Dim.Fill(ButtonsHeight)
         };
         listView.SetSource(new ObservableCollection<string>(items));
-        listView.SelectedItem = Math.Max(0,
-            _choices.ToList().FindIndex(choice => choice.VolumeProvider == currentVolumeProvider));
+        // Bookmarks, the first item, is selected
+        listView.SelectedItem = 0;
         listView.OpenSelectedItem += (_, e) => Choose(e.Item);
         listView.KeyDown += (_, e) =>
         {

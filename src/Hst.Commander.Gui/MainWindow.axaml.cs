@@ -806,7 +806,7 @@ public partial class MainWindow : Window
     /// </summary>
     private Task<VolumeChoice?> ChooseVolumeProviderAsync(Window owner, PaneView pane) =>
         new VolumeProviderDialog(pane == LeftPane ? "Left" : "Right", VolumeProviders.All, BookmarkStore.Default,
-            pane.NavigationContext.VolumeProvider, pane).ShowDialog<VolumeChoice?>(owner);
+            pane).ShowDialog<VolumeChoice?>(owner);
 
     /// <summary>
     ///     Shows the location dialog of a pane with its current path, changing to the entered path on OK, showing the

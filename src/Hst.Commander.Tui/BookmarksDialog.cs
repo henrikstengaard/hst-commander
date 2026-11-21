@@ -8,15 +8,15 @@ namespace Hst.Commander.Tui;
 /// <summary>
 ///     Modal list of the bookmarks, opened by choosing Bookmarks in the volume provider list and centered over the pane.
 ///     OK, Enter or double-click opens the selected bookmark, Cancel or Esc goes back to the volume provider list. Del
-///     or Delete deletes the selected bookmark after confirming and F2 or Rename changes its description; the dialog
-///     closes when the last bookmark is deleted. <see cref="Result" /> holds the chosen bookmark, or null on cancel.
+///     or Delete deletes the selected bookmark after confirming and F4, F2 or Edit edits it
+///     (<see cref="EditBookmarkDialog" />); the dialog closes when the last bookmark is deleted. <see cref="Result" /> holds the chosen bookmark, or null on cancel.
 /// </summary>
 public sealed class BookmarksDialog : Dialog
 {
     // rows below the list taken by the buttons and their shadow
     private const int ButtonsHeight = 2;
 
-    // the OK, Rename, Delete and Cancel buttons with their shadows and spacing
+    // the OK, Edit, Delete and Cancel buttons with their shadows and spacing
     private const int ButtonsWidth = 46;
 
     private readonly BookmarkStore _bookmarkStore;
@@ -25,7 +25,7 @@ public sealed class BookmarksDialog : Dialog
     private IReadOnlyList<Bookmark> _bookmarks;
 
     /// <param name="bookmarks">Bookmarks listed initially, at least one.</param>
-    /// <param name="bookmarkStore">Store the bookmarks are deleted from and renamed in.</param>
+    /// <param name="bookmarkStore">Store the bookmarks are deleted from and edited in.</param>
     /// <param name="paneFrame">Frame of the pane the dialog is centered over.</param>
     /// <param name="palette">Palette of the theme.</param>
     public BookmarksDialog(IReadOnlyList<Bookmark> bookmarks, BookmarkStore bookmarkStore, Rectangle paneFrame,
@@ -74,10 +74,10 @@ public sealed class BookmarksDialog : Dialog
                 e.Handled = true;
                 DeleteSelectedBookmark();
             }
-            else if (e.KeyCode == KeyCode.F2)
+            else if (e.KeyCode is KeyCode.F4 or KeyCode.F2)
             {
                 e.Handled = true;
-                RenameSelectedBookmark();
+                EditSelectedBookmark();
             }
         };
 
@@ -87,11 +87,11 @@ public sealed class BookmarksDialog : Dialog
             e.Cancel = true;
             CloseWith(_listView.SelectedItem);
         };
-        var renameButton = new Button { Text = "_Rename" };
-        renameButton.Accepting += (_, e) =>
+        var editButton = new Button { Text = "_Edit" };
+        editButton.Accepting += (_, e) =>
         {
             e.Cancel = true;
-            RenameSelectedBookmark();
+            EditSelectedBookmark();
         };
         var deleteButton = new Button { Text = "_Delete" };
         deleteButton.Accepting += (_, e) =>
@@ -108,7 +108,7 @@ public sealed class BookmarksDialog : Dialog
 
         Add(_listView);
         AddButton(okButton);
-        AddButton(renameButton);
+        AddButton(editButton);
         AddButton(deleteButton);
         AddButton(cancelButton);
         Initialized += (_, _) => _listView.SetFocus();
@@ -140,20 +140,20 @@ public sealed class BookmarksDialog : Dialog
         ChangeAndReload(() => _bookmarkStore.Delete(bookmark.Id), null);
     }
 
-    private void RenameSelectedBookmark()
+    private void EditSelectedBookmark()
     {
         if (SelectedBookmark is not { } bookmark)
         {
             return;
         }
 
-        var dialog = new BookmarkDialog("Rename bookmark", bookmark.Path, bookmark.Description, _palette);
+        var dialog = new EditBookmarkDialog(bookmark, _bookmarkStore.CredentialStore.Name, _palette);
         Application.Run(dialog);
-        var description = dialog.Result;
+        var changes = dialog.Result;
         dialog.Dispose();
-        if (description != null)
+        if (changes != null)
         {
-            ChangeAndReload(() => _bookmarkStore.Rename(bookmark.Id, description), bookmark.Id);
+            ChangeAndReload(() => _bookmarkStore.Edit(bookmark.Id, changes), bookmark.Id);
         }
     }
 

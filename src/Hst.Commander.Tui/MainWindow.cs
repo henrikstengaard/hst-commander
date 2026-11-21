@@ -1555,7 +1555,7 @@ public sealed class MainWindow : Window
     private VolumeChoice? ChooseVolumeProvider(Pane pane)
     {
         var dialog = new VolumeProviderDialog(pane == _leftPane ? "Left" : "Right", VolumeProviders.All,
-            BookmarkStore.Default, pane.NavigationContext.VolumeProvider, pane.View.Frame, _palette);
+            BookmarkStore.Default, pane.View.Frame, _palette);
         Application.Run(dialog);
         var volumeProvider = dialog.Result;
         dialog.Dispose();
