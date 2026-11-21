@@ -156,6 +156,16 @@ public sealed class MainWindow : Window
         {
             _activePane.TableView.SetFocus();
             ShowPendingError();
+            ShowPendingCrashReport();
+            if (!_loadedOnce)
+            {
+                _loadedOnce = true;
+                if (CrashHandler.TestCrash == "ui")
+                {
+                    Application.Invoke(() => throw CrashHandler.CreateTestUiException());
+                }
+            }
+
             await SavePendingExternalEditAsync();
             await InitializeAsync();
         };
@@ -193,7 +203,61 @@ public sealed class MainWindow : Window
         }
 
         _pendingError = null;
-        Application.Invoke(() => MessageBox.ErrorQuery("Error", message, "OK"));
+        Application.Invoke(() => ErrorBox.Show(message));
+    }
+
+    /// <summary>Report of the crash of the last run (<see cref="CrashMarker" />), offered to be reported when loaded.</summary>
+    private string? _pendingCrashReport;
+
+    /// <summary>True while an <see cref="UnexpectedErrorDialog" /> is shown, so further exceptions are only logged.</summary>
+    private bool _showingUnexpectedError;
+
+    /// <summary>True once the window was loaded the first time, to throw the test exception only once.</summary>
+    private bool _loadedOnce;
+
+    /// <summary>Offers to report the crash of the last run when the window is loaded.</summary>
+    public void ShowLastCrashWhenLoaded(string crashReport) => _pendingCrashReport = crashReport;
+
+    private void ShowPendingCrashReport()
+    {
+        if (_pendingCrashReport is not { } crashReport)
+        {
+            return;
+        }
+
+        _pendingCrashReport = null;
+        Application.Invoke(() => ShowUnexpectedError(UnexpectedErrorDialog.ForLastCrash(crashReport, _palette)));
+    }
+
+    /// <summary>
+    ///     Shows an unhandled exception caught by the main loop, already logged, unless one is shown already. Called
+    ///     through <see cref="Application.Invoke(Action)" />, not from the error handler of the main loop.
+    /// </summary>
+    public void ShowUnexpectedError(Exception exception) =>
+        ShowUnexpectedError(UnexpectedErrorDialog.ForException(exception, _palette));
+
+    private void ShowUnexpectedError(UnexpectedErrorDialog dialog)
+    {
+        if (_showingUnexpectedError || !Application.Initialized)
+        {
+            dialog.Dispose();
+            return;
+        }
+
+        _showingUnexpectedError = true;
+        try
+        {
+            Application.Run(dialog);
+        }
+        catch (Exception exception)
+        {
+            ErrorLog.Unhandled(exception, "showing an unexpected error");
+        }
+        finally
+        {
+            dialog.Dispose();
+            _showingUnexpectedError = false;
+        }
     }
 
     /// <summary>
@@ -540,7 +604,7 @@ public sealed class MainWindow : Window
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
             {
-                MessageBox.ErrorQuery("Error", $"Failed to save the buttons: {exception.Message}", "OK");
+                ErrorBox.Show($"Failed to save the buttons: {exception.Message}", exception);
             }
         }
 
@@ -556,7 +620,7 @@ public sealed class MainWindow : Window
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
-            MessageBox.ErrorQuery("Error", $"Failed to save settings to '{TuiSettings.FilePath}': {exception.Message}", "OK");
+            ErrorBox.Show($"Failed to save settings to '{TuiSettings.FilePath}': {exception.Message}", exception);
         }
     }
 
@@ -958,7 +1022,7 @@ public sealed class MainWindow : Window
 
         if (_activePane.NavigationContext.CurrentHostDirectory is not { } directory)
         {
-            MessageBox.ErrorQuery("Error", CommandLine.NotLocalMessage, "OK");
+            ErrorBox.ShowNotice(CommandLine.NotLocalMessage);
             return;
         }
 
@@ -1128,7 +1192,7 @@ public sealed class MainWindow : Window
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
-            MessageBox.ErrorQuery("Error", $"Failed to save settings to '{TuiSettings.FilePath}': {exception.Message}", "OK");
+            ErrorBox.Show($"Failed to save settings to '{TuiSettings.FilePath}': {exception.Message}", exception);
         }
     }
 
@@ -1161,7 +1225,7 @@ public sealed class MainWindow : Window
         }
         catch (IOException exception)
         {
-            MessageBox.ErrorQuery("Error", exception.Message, "OK");
+            ErrorBox.Show(exception);
             return;
         }
 
@@ -1188,7 +1252,7 @@ public sealed class MainWindow : Window
         }
         catch (IOException exception)
         {
-            MessageBox.ErrorQuery("Error", exception.Message, "OK");
+            ErrorBox.Show(exception);
         }
 
         pane.TableView.SetFocus();
@@ -1221,7 +1285,7 @@ public sealed class MainWindow : Window
         }
         catch (Exception exception)
         {
-            MessageBox.ErrorQuery("Error", exception.Message, "OK");
+            ErrorBox.Show(exception);
             pane.TableView.SetFocus();
             return;
         }
@@ -1258,9 +1322,9 @@ public sealed class MainWindow : Window
 
         if (ExternalEditor.Get(settings.Editor, settings.EditorCommand, true) is not { } command)
         {
-            MessageBox.ErrorQuery("Error", settings.Editor == EditorKind.Custom
+            ErrorBox.ShowNotice(settings.Editor == EditorKind.Custom
                 ? "Enter the command of the custom editor in the settings"
-                : "No text editor was found, choose another editor in the settings", "OK");
+                : "No text editor was found, choose another editor in the settings");
             return;
         }
 
@@ -1271,7 +1335,7 @@ public sealed class MainWindow : Window
         }
         catch (Exception exception)
         {
-            MessageBox.ErrorQuery("Error", exception.Message, "OK");
+            ErrorBox.Show(exception);
             return;
         }
 
@@ -1288,7 +1352,7 @@ public sealed class MainWindow : Window
         }
         catch (Exception exception)
         {
-            MessageBox.ErrorQuery("Error", exception.Message, "OK");
+            ErrorBox.Show(exception);
             pane.TableView.SetFocus();
             return;
         }
@@ -1329,8 +1393,7 @@ public sealed class MainWindow : Window
             }
             catch (Exception exception)
             {
-                MessageBox.ErrorQuery("Error", $"Failed to save the changes of '{file.Name}': {exception.Message}",
-                    "OK");
+                ErrorBox.Show($"Failed to save the changes of '{file.Name}': {exception.Message}", exception);
             }
         }
     }
@@ -1354,7 +1417,7 @@ public sealed class MainWindow : Window
         }
         catch (Exception exception)
         {
-            MessageBox.ErrorQuery("Error", exception.Message, "OK");
+            ErrorBox.Show(exception);
             return;
         }
 
@@ -1400,7 +1463,7 @@ public sealed class MainWindow : Window
         }
         catch (Exception exception)
         {
-            MessageBox.ErrorQuery("Error", exception.Message, "OK");
+            ErrorBox.Show(exception);
         }
 
         await RefreshPaneAsync(_leftPane);
@@ -1439,7 +1502,7 @@ public sealed class MainWindow : Window
         }
         catch (Exception exception)
         {
-            MessageBox.ErrorQuery("Error", exception.Message, "OK");
+            ErrorBox.Show(exception);
             return;
         }
 
@@ -1543,7 +1606,7 @@ public sealed class MainWindow : Window
         }
         catch (IOException exception)
         {
-            MessageBox.ErrorQuery("Error", exception.Message, "OK");
+            ErrorBox.Show(exception);
             return;
         }
 
@@ -1664,7 +1727,7 @@ public sealed class MainWindow : Window
         }
         catch (IOException exception)
         {
-            MessageBox.ErrorQuery("Error", exception.Message, "OK");
+            ErrorBox.Show(exception);
             return false;
         }
 
@@ -1725,7 +1788,7 @@ public sealed class MainWindow : Window
         }
         catch (Exception exception)
         {
-            MessageBox.ErrorQuery("Error", exception.Message, "OK");
+            ErrorBox.Show(exception);
         }
 
         await InitializePaneAsync(pane);
@@ -1741,7 +1804,7 @@ public sealed class MainWindow : Window
     {
         if (pane.NavigationContext.CreateDirectoryNotSupportedMessage is { } message)
         {
-            MessageBox.ErrorQuery("Error", message, "OK");
+            ErrorBox.ShowNotice(message);
             pane.TableView.SetFocus();
             return;
         }
@@ -1772,7 +1835,7 @@ public sealed class MainWindow : Window
         var creators = VolumeProviders.Creators;
         if (pane.NavigationContext.GetCreateVolumeNotSupportedMessage(creators) is { } message)
         {
-            MessageBox.ErrorQuery("Error", message, "OK");
+            ErrorBox.ShowNotice(message);
             pane.TableView.SetFocus();
             return;
         }
@@ -1800,7 +1863,7 @@ public sealed class MainWindow : Window
             }
             catch (Exception exception)
             {
-                MessageBox.ErrorQuery("Error", exception.Message, "OK");
+                ErrorBox.Show(exception);
                 continue;
             }
 
@@ -1860,7 +1923,7 @@ public sealed class MainWindow : Window
         }
         catch (Exception exception)
         {
-            MessageBox.ErrorQuery("Error", exception.Message, "OK");
+            ErrorBox.Show(exception);
         }
 
         await InitializePaneAsync(pane);
@@ -1883,7 +1946,7 @@ public sealed class MainWindow : Window
 
         if (pane.NavigationContext.MoveNotSupportedMessage is { } message)
         {
-            MessageBox.ErrorQuery("Error", message, "OK");
+            ErrorBox.ShowNotice(message);
             pane.TableView.SetFocus();
             return;
         }
@@ -1907,7 +1970,7 @@ public sealed class MainWindow : Window
         }
         catch (Exception exception)
         {
-            MessageBox.ErrorQuery("Error", exception.Message, "OK");
+            ErrorBox.Show(exception);
             return;
         }
 
@@ -1938,7 +2001,7 @@ public sealed class MainWindow : Window
         }
         catch (Exception exception)
         {
-            MessageBox.ErrorQuery("Error", exception.Message, "OK");
+            ErrorBox.Show(exception);
         }
 
         await InitializePaneAsync(pane);
@@ -2024,7 +2087,7 @@ public sealed class MainWindow : Window
         catch (Exception exception) when (exception is System.ComponentModel.Win32Exception or IOException
                                               or InvalidOperationException)
         {
-            MessageBox.ErrorQuery("Error", exception.Message, "OK");
+            ErrorBox.Show(exception);
         }
 
         pane.TableView.SetFocus();
@@ -2045,7 +2108,7 @@ public sealed class MainWindow : Window
 
         if (pane.NavigationContext.MoveNotSupportedMessage is { } message)
         {
-            MessageBox.ErrorQuery("Error", message, "OK");
+            ErrorBox.ShowNotice(message);
             pane.TableView.SetFocus();
             return;
         }
@@ -2085,13 +2148,13 @@ public sealed class MainWindow : Window
             if (OperatingSystem.IsWindows())
             {
                 clipboard.SetWindowsClipboard(IntPtr.Zero,
-                    exception => Application.Invoke(() => MessageBox.ErrorQuery("Error", exception.Message, "OK")),
+                    exception => Application.Invoke(() => ErrorBox.Show(exception)),
                     moved => Application.Invoke(() => _ = ClipboardEntriesMovedAsync(moved)));
             }
         }
         catch (Exception exception)
         {
-            MessageBox.ErrorQuery("Error", exception.Message, "OK");
+            ErrorBox.Show(exception);
         }
 
         pane.TableView.SetFocus();
@@ -2118,7 +2181,7 @@ public sealed class MainWindow : Window
         }
         catch (Exception exception)
         {
-            MessageBox.ErrorQuery("Error", exception.Message, "OK");
+            ErrorBox.Show(exception);
             return;
         }
 
@@ -2161,7 +2224,7 @@ public sealed class MainWindow : Window
             }
             catch (Exception exception)
             {
-                MessageBox.ErrorQuery("Error", exception.Message, "OK");
+                ErrorBox.Show(exception);
             }
         }
 
@@ -2210,7 +2273,7 @@ public sealed class MainWindow : Window
         }
         catch (Exception exception)
         {
-            MessageBox.ErrorQuery("Error", exception.Message, "OK");
+            ErrorBox.Show(exception);
         }
     }
 
@@ -2222,7 +2285,7 @@ public sealed class MainWindow : Window
         }
         catch (Exception exception)
         {
-            MessageBox.ErrorQuery("Error", exception.Message, "OK");
+            ErrorBox.Show(exception);
         }
     }
 

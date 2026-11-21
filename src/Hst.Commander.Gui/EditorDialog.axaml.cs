@@ -152,7 +152,7 @@ public partial class EditorDialog : Window
     {
         if (_session!.IsReadOnly)
         {
-            await new ErrorDialog(_session.ReadOnlyReason!).ShowDialog(this);
+            await ErrorDialog.Notice(_session.ReadOnlyReason!).ShowDialog(this);
             return false;
         }
 
@@ -183,7 +183,7 @@ public partial class EditorDialog : Window
     {
         if (_session!.IsReadOnly)
         {
-            await new ErrorDialog(_session.ReadOnlyReason!).ShowDialog(this);
+            await ErrorDialog.Notice(_session.ReadOnlyReason!).ShowDialog(this);
             return;
         }
 

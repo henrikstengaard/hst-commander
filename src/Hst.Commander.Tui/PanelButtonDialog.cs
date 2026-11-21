@@ -52,7 +52,7 @@ public sealed class PanelButtonDialog : Dialog
             if (!ButtonPanelEditor.TryParseColor(backgroundField.Text, out var background) ||
                 !ButtonPanelEditor.TryParseColor(foregroundField.Text, out var foreground))
             {
-                MessageBox.ErrorQuery("Error", "Enter the colors as #RRGGBB, or leave them empty", "OK");
+                ErrorBox.ShowNotice("Enter the colors as #RRGGBB, or leave them empty");
                 return;
             }
 

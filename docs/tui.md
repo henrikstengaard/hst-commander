@@ -24,7 +24,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - Pane keys are attached with `tableView.KeyDown += async (_, key) => { ... }`; there are no window-level key handlers. The panes handle F9 and F10 before the menu bar does.
 - Dialogs: `new Dialog { Buttons = [okButton] }`, run with `Application.Run(dialog)`.
 - Background work (copy, move, delete, counting, search) runs with `Task.Run` and reports with `Application.Invoke`. Questions from a background operation (e.g. overwrite) are asked with `MessageBox.Query` invoked on the UI thread through a `TaskCompletionSource`. Cancel or Esc in a progress dialog cancels, and the dialog stays open until the operation has stopped.
-- Errors are shown with `MessageBox.ErrorQuery("Error", e.Message, "OK")`.
+- Errors are shown with `ErrorBox.Show(exception)` or `ErrorBox.Show(message, exception)`, which logs them (see [Errors and crash reports](application.md#errors-and-crash-reports)) and shows `MessageBox.ErrorQuery`. Messages that aren't failures (invalid input, an action the location doesn't support) are shown with `ErrorBox.ShowNotice`, which isn't logged. Unhandled exceptions of the main loop are shown with `UnexpectedErrorDialog`.
 
 ## Panes
 

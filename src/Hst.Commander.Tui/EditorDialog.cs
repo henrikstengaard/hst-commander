@@ -197,7 +197,7 @@ public sealed class EditorDialog : Dialog
     {
         if (_session.IsReadOnly)
         {
-            Application.Invoke(() => MessageBox.ErrorQuery("Error", _session.ReadOnlyReason!, "OK"));
+            Application.Invoke(() => ErrorBox.ShowNotice(_session.ReadOnlyReason!));
             return false;
         }
 
@@ -209,7 +209,7 @@ public sealed class EditorDialog : Dialog
         }
         catch (Exception exception)
         {
-            Application.Invoke(() => MessageBox.ErrorQuery("Error", exception.Message, "OK"));
+            Application.Invoke(() => ErrorBox.Show(exception));
             return false;
         }
     }
@@ -226,7 +226,7 @@ public sealed class EditorDialog : Dialog
     {
         if (_session.IsReadOnly)
         {
-            MessageBox.ErrorQuery("Error", _session.ReadOnlyReason!, "OK");
+            ErrorBox.ShowNotice(_session.ReadOnlyReason!);
             return;
         }
 
@@ -256,7 +256,7 @@ public sealed class EditorDialog : Dialog
         }
         catch (Exception exception)
         {
-            MessageBox.ErrorQuery("Error", exception.Message, "OK");
+            ErrorBox.Show(exception);
         }
     }
 
@@ -317,7 +317,7 @@ public sealed class EditorDialog : Dialog
         }
         catch (Exception exception)
         {
-            MessageBox.ErrorQuery("Error", exception.Message, "OK");
+            ErrorBox.Show(exception);
         }
 
         UpdateStatus();
@@ -395,7 +395,7 @@ public sealed class GoToLineDialog : Dialog
             e.Cancel = true;
             if (!int.TryParse(_lineField.Text.Trim(), out var number) || number < 1)
             {
-                MessageBox.ErrorQuery("Error", "Enter a line number of 1 or more", "OK");
+                ErrorBox.ShowNotice("Enter a line number of 1 or more");
                 return;
             }
 

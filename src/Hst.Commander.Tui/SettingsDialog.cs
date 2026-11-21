@@ -138,13 +138,13 @@ public sealed class SettingsDialog : Dialog
             e.Cancel = true;
             if (SelectedEditor == EditorKind.Custom && ExternalEditor.ParseCommand(_editorCommandField.Text) == null)
             {
-                MessageBox.ErrorQuery("Error", "Enter the command of the custom editor", "OK");
+                ErrorBox.ShowNotice("Enter the command of the custom editor");
                 return;
             }
 
             if (!long.TryParse(_temporaryCopyLimitField.Text, out var temporaryCopyLimit) || temporaryCopyLimit < 0)
             {
-                MessageBox.ErrorQuery("Error", "Enter the copy limit in MB, 0 for no limit", "OK");
+                ErrorBox.ShowNotice("Enter the copy limit in MB, 0 for no limit");
                 return;
             }
 

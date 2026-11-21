@@ -1,6 +1,6 @@
 # Application
 
-Versioning, release workflows, local publishing, the About dialog and quitting.
+Versioning, release workflows, local publishing, the About dialog, errors and crash reports, and quitting.
 
 Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../src/agents.md).
 
@@ -59,6 +59,17 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 ## Command Line
 
 `StartupOptions.Parse` reads where the panes start, used by the restart above: `--left-volume`/`--right-volume` with a volume provider name, `--left-path`/`--right-path` with a location (as in the location dialog, e.g. `PhysicalDrive2\mbr\1` with a volume provider), and `--active right`. `PaneStartup.ApplyAsync` skips a volume provider or location that doesn't exist, so the pane still starts. The TUI applies them once before the window is first run (`MainWindow.ApplyStartupOptionsAsync`), the GUI when the window is opened (`MainWindow.StartupOptions`, from `desktop.Args`). Windows command lines are quoted with `Elevation.JoinWindowsArguments`.
+
+## Errors and Crash Reports
+
+- `ErrorLog` (Core) writes the errors shown to the user and the unhandled exceptions to `~/.hst-commander/logs/<front-end>-<yyyy-MM-dd>.log` (`tui` or `gui`), each entry with the time, level (`ERROR` or `UNHANDLED`), version, message and the exception with its stack trace. Each entry is appended and the file closed right away, so it's on disk even when the process ends next. Logging never throws. Log files older than 30 days (`ErrorLog.RetentionDays`) are deleted at startup.
+- Shown errors are logged where they're shown: the TUI's `ErrorBox.Show` (instead of calling `MessageBox.ErrorQuery` directly) and the GUI's `ErrorDialog`, given the exception where there is one (`MainWindow.ShowErrorAsync` passes it). Plugin load errors are logged as they're shown at startup. Messages about what the user tried that aren't failures aren't logged: invalid input in a dialog (e.g. a line number; the GUI shows these in the dialog itself), an action the location doesn't support (making a directory, creating a volume or moving there, a read-only file in the editor, the command line outside a local directory) and a missing editor setting. The TUI shows them with `ErrorBox.ShowNotice`, the GUI with `ErrorDialog.Notice`.
+- `CrashHandler.Install` (called first in both front-ends) initializes the log and hooks `AppDomain.UnhandledException` and `TaskScheduler.UnobservedTaskException` (logged and observed, so they don't end the process).
+- Unhandled exceptions on the UI thread are logged and shown with `UnexpectedErrorDialog`, and the app keeps running: in the GUI from `Dispatcher.UIThread.UnhandledException` (marked handled, the dialog shown over the topmost window), in the TUI from the error handler of `Application.Run(mainWindow, errorHandler)`, which returns true to resume the main loop and shows the dialog through `Application.Invoke` rather than inside the handler. While the dialog is shown, further exceptions are only logged, so an exception repeating on every redraw can't stack dialogs.
+- An exception ending the process (on another thread, or escaping `Main` or the TUI's run loop) can't be shown, so `CrashHandler.ReportCrash` logs it and saves its report as `last-crash-<front-end>.txt` in the log directory (`CrashMarker`). The next start of that front-end shows it in `UnexpectedErrorDialog` ("closed unexpectedly the last time it ran") and deletes it. The TUI restores the terminal (also from `AppDomain.UnhandledException`, as the `finally` of `Program.cs` doesn't run then) and prints the log file to stderr; it exits with 1.
+- `UnexpectedErrorDialog` shows the message, the report (an expander in the GUI, a text view in the TUI) and the log file, with **Report on GitHub**, **Copy details** (GUI only, as the TUI only has a clipboard on Windows) and **Close**. Nothing is sent automatically.
+- `ErrorReport` (Core) has the title (e.g. `Crash: NullReferenceException in the GUI`), the version, build date, front-end, OS, .NET runtime, loaded plugins and the exception. The user's home directory is replaced with `~`, also with the other kind of path separator, so the user name isn't in the report. `GitHubIssueUrl` is a new issue on `henrikstengaard/hst-commander` with the title and a Markdown body (what happened, the environment, the error in a code block), the error cut so the URL stays within 8000 characters (`MaxUrlLength`) with a note to attach the log file. `OpenGitHubIssue` opens it in the browser, where the user reviews it before submitting; when no browser can be started (e.g. Linux without a desktop) the error is shown with where the log is.
+- To test the handling, set `HST_COMMANDER_TEST_CRASH` (`CrashHandler.TestCrashVariable`): `ui` throws on the UI thread once the window is shown, `thread` throws on another thread after 2 seconds, ending the process.
 
 ## Quitting
 

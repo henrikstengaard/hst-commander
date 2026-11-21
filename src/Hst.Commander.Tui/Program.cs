@@ -2,6 +2,29 @@ using Hst.Commander.Core;
 using Hst.Commander.Tui;
 using Terminal.Gui;
 
+// unhandled exceptions are logged; one ending the process is offered to be reported on the next start
+CrashHandler.Install("tui");
+// an exception on another thread ends the process without running the finally below, so the terminal is restored
+// here (after the crash handler installed above has logged it)
+AppDomain.CurrentDomain.UnhandledException += (_, _) =>
+{
+    try
+    {
+        if (Application.Initialized)
+        {
+            TerminalScreen.BeforeShutdown();
+            Application.Shutdown();
+            TerminalScreen.LeaveTui();
+        }
+    }
+    catch (Exception)
+    {
+        // the process ends anyway
+    }
+
+    PrintCrashMessage();
+};
+
 // set before any palette is created, as attributes keep the RGB values of their colors
 TuiTrueColors.Apply();
 
@@ -14,6 +37,14 @@ if (pluginErrors != null)
 {
     mainWindow.ShowErrorWhenLoaded(pluginErrors);
 }
+
+if (CrashMarker.TakePending() is { } lastCrashReport)
+{
+    mainWindow.ShowLastCrashWhenLoaded(lastCrashReport);
+}
+
+CrashHandler.StartTestCrashThread();
+var crashed = false;
 
 try
 {
@@ -31,7 +62,13 @@ try
         {
             Application.Force16Colors = true;
         }
-        Application.Run(mainWindow);
+        // an exception escaping the main loop is logged and shown, and the loop resumes
+        Application.Run(mainWindow, exception =>
+        {
+            ErrorLog.Unhandled(exception, "main loop");
+            Application.Invoke(() => mainWindow.ShowUnexpectedError(exception));
+            return true;
+        });
         TerminalScreen.BeforeShutdown();
         Application.Shutdown();
         TerminalScreen.LeaveTui();
@@ -78,6 +115,11 @@ try
         }
     }
 }
+catch (Exception exception)
+{
+    crashed = true;
+    CrashHandler.ReportCrash(exception, "main");
+}
 finally
 {
     mainWindow.DisposeNavigationContexts();
@@ -88,3 +130,17 @@ finally
         TerminalScreen.LeaveTui();
     }
 }
+
+// printed once the terminal is restored
+if (crashed)
+{
+    PrintCrashMessage();
+    Environment.ExitCode = 1;
+}
+
+return;
+
+static void PrintCrashMessage() =>
+    Console.Error.WriteLine(ErrorLog.CurrentFile is { } logFile
+        ? $"{AppInfo.Current.Name} crashed, the error was logged to {logFile}"
+        : $"{AppInfo.Current.Name} crashed");

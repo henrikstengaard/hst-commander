@@ -119,6 +119,18 @@ public partial class MainWindow : Window
                 await new ErrorDialog(startupError).ShowDialog(this);
                 startPane.FocusEntries();
             }
+
+            if (LastCrashReport is { } lastCrashReport)
+            {
+                LastCrashReport = null;
+                await UnexpectedErrorDialog.ForLastCrash(lastCrashReport).ShowDialog(this);
+                startPane.FocusEntries();
+            }
+
+            if (CrashHandler.TestCrash == "ui")
+            {
+                throw CrashHandler.CreateTestUiException();
+            }
         };
         // cut files pasted in another application (e.g. Explorer) are moved by it, so the panes are listed again
         var cutMovedTimer = new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Background, async (_, _) =>
@@ -140,6 +152,9 @@ public partial class MainWindow : Window
 
     /// <summary>Error shown when the window is opened, e.g. plugins that failed to load.</summary>
     public string? StartupError { get; set; }
+
+    /// <summary>Report of the crash of the last run (<see cref="CrashMarker" />), offered to be reported when opened.</summary>
+    public string? LastCrashReport { get; set; }
 
     /// <summary>Where the panes start when the window is opened, e.g. given on the command line.</summary>
     public StartupOptions StartupOptions { get; init; } = new();
@@ -345,7 +360,7 @@ public partial class MainWindow : Window
 
         if (_activePane.NavigationContext.CurrentHostDirectory is not { } directory)
         {
-            await new ErrorDialog(CommandLine.NotLocalMessage).ShowDialog(this);
+            await ErrorDialog.Notice(CommandLine.NotLocalMessage).ShowDialog(this);
             CommandBox.Focus();
             return;
         }
@@ -981,9 +996,9 @@ public partial class MainWindow : Window
 
         if (ExternalEditor.Get(settings.Editor, settings.EditorCommand, false) is not { } command)
         {
-            await ShowErrorAsync(new IOException(settings.Editor == EditorKind.Custom
+            await ErrorDialog.Notice(settings.Editor == EditorKind.Custom
                 ? "Enter the command of the custom editor in the settings"
-                : "No text editor was found, choose another editor in the settings"));
+                : "No text editor was found, choose another editor in the settings").ShowDialog(this);
             return;
         }
 
@@ -1158,7 +1173,7 @@ public partial class MainWindow : Window
         var otherPane = pane == LeftPane ? RightPane : LeftPane;
         if (pane.NavigationContext.CreateDirectoryNotSupportedMessage is { } message)
         {
-            await new ErrorDialog(message).ShowDialog(this);
+            await ErrorDialog.Notice(message).ShowDialog(this);
             pane.FocusEntries();
             return;
         }
@@ -1185,7 +1200,7 @@ public partial class MainWindow : Window
         var creators = VolumeProviders.Creators;
         if (pane.NavigationContext.GetCreateVolumeNotSupportedMessage(creators) is { } message)
         {
-            await new ErrorDialog(message).ShowDialog(this);
+            await ErrorDialog.Notice(message).ShowDialog(this);
             pane.FocusEntries();
             return;
         }
@@ -1343,7 +1358,7 @@ public partial class MainWindow : Window
     {
         if (pane.NavigationContext.MoveNotSupportedMessage is { } message)
         {
-            await new ErrorDialog(message).ShowDialog(this);
+            await ErrorDialog.Notice(message).ShowDialog(this);
             pane.FocusEntries();
             return;
         }
@@ -1518,7 +1533,7 @@ public partial class MainWindow : Window
 
         if (pane.NavigationContext.MoveNotSupportedMessage is { } message)
         {
-            await new ErrorDialog(message).ShowDialog(this);
+            await ErrorDialog.Notice(message).ShowDialog(this);
             pane.FocusEntries();
             return;
         }
@@ -1776,5 +1791,5 @@ public partial class MainWindow : Window
         }
     }
 
-    private Task ShowErrorAsync(Exception exception) => new ErrorDialog(exception.Message).ShowDialog(this);
+    private Task ShowErrorAsync(Exception exception) => new ErrorDialog(exception.Message, exception).ShowDialog(this);
 }

@@ -26,7 +26,7 @@ The behavior of each feature is described in `docs/` at the repository root. Rea
 | [`docs/tui.md`](../docs/tui.md) | TUI files, key handling, dialogs, themes, terminal programs, supported terminals (PuTTY) |
 | [`docs/gui.md`](../docs/gui.md) | GUI files, key handling, dialogs, themes, icons |
 | [`docs/themes.md`](../docs/themes.md) | Built-in and plugin themes, the bottom area's buttons, parent buttons, the button editor, Directory Opus 4 |
-| [`docs/application.md`](../docs/application.md) | Versioning, release workflows, local publishing, About, licenses and third-party notices, quitting |
+| [`docs/application.md`](../docs/application.md) | Versioning, release workflows, local publishing, About, licenses and third-party notices, error log and crash reports, quitting |
 | [`docs/testing.md`](../docs/testing.md) | Test helpers |
 | [`docs/status.md`](../docs/status.md) | What works and what isn't implemented |
 
@@ -193,15 +193,16 @@ These apply across features and aren't obvious from a single file:
 - FTP plugin: `Hst.Commander.Plugins.Ftp`
 - Directory Opus plugin: `Hst.Commander.Plugins.DirectoryOpus`
 - SMB plugin: `Hst.Commander.Plugins.Smb`
-- Core: `Hst.Commander.Core` (`AppInfo`, `EditorDocument`, `EditorKind`, `EditorSearch`, `EditorSession`, `EmbeddedIconReader`, `EnterFileAction`, `ExternalEditFile`, `ExternalEditor`, `Elevation`, `DroppedEntries`, `EntryProperties`, `FileSystemDetails`, `IconImage`, `ListingProgress`, `NavigationContext`, `NameFilter`, `EntrySort`, `EntryColumn`, `PluginHost`, `PluginLoader`, `Plugins`, `IProgressIndicator`, `ITaskbarProgress`, `TaskbarProgressReporter`, `TaskbarProgressState`, `TerminalProgress`, `SelectGroupOptions`, `SearchOptions`, `SearchResult`, `SearchResultSort`, `SearchProgress`, `QuickSearch`, `ContentMatcher`, `FileStarter`, `ImagePixels`, `SettingsPaths`, `SizeFormatter`, `StandardImageProvider`, `StartupOptions`, `PaneStartup`, `UaeMetadataFormat`, `ViewerDocument`, `ViewerSession`, `WindowsIconImageProvider`, `VolumeConnector`, `VolumeDragSource`, `CredentialsRequest`, `ConnectionRequest`, `LocationConnection`, `Bookmark`, `BookmarkChanges`, `BookmarkStore`, `BookmarkOpener`, `VolumeChoice`, `ICredentialStore`, `CredentialStores`, `Licenses`, `LicenseNotice`, `VolumeCreation`, `VolumeCreatorInput`, `VolumeCreatorSizeInput`, `SizeUnit`, `SparseFile`, `Themes`, `ThemeChoice`, `FunctionKeyBar`, `ButtonPanelEditor`, `FontDownloader`, `EntryClipboard`, `PasteSource`, `WindowsFileClipboard`, `WindowsVirtualFileDrag`, `CommandLine`, `ShellCommand`, `ShellHere`, `ShellHereKind`), `Hst.Commander.Core.Volumes` (volumes, copying, UAE metadata)
+- Core: `Hst.Commander.Core` (`AppInfo`, `CrashHandler`, `CrashMarker`, `ErrorLog`, `ErrorReport`, `EditorDocument`, `EditorKind`, `EditorSearch`, `EditorSession`, `EmbeddedIconReader`, `EnterFileAction`, `ExternalEditFile`, `ExternalEditor`, `Elevation`, `DroppedEntries`, `EntryProperties`, `FileSystemDetails`, `IconImage`, `ListingProgress`, `NavigationContext`, `NameFilter`, `EntrySort`, `EntryColumn`, `PluginHost`, `PluginLoader`, `Plugins`, `IProgressIndicator`, `ITaskbarProgress`, `TaskbarProgressReporter`, `TaskbarProgressState`, `TerminalProgress`, `SelectGroupOptions`, `SearchOptions`, `SearchResult`, `SearchResultSort`, `SearchProgress`, `QuickSearch`, `ContentMatcher`, `FileStarter`, `ImagePixels`, `SettingsPaths`, `SizeFormatter`, `StandardImageProvider`, `StartupOptions`, `PaneStartup`, `UaeMetadataFormat`, `ViewerDocument`, `ViewerSession`, `WindowsIconImageProvider`, `VolumeConnector`, `VolumeDragSource`, `CredentialsRequest`, `ConnectionRequest`, `LocationConnection`, `Bookmark`, `BookmarkChanges`, `BookmarkStore`, `BookmarkOpener`, `VolumeChoice`, `ICredentialStore`, `CredentialStores`, `Licenses`, `LicenseNotice`, `VolumeCreation`, `VolumeCreatorInput`, `VolumeCreatorSizeInput`, `SizeUnit`, `SparseFile`, `Themes`, `ThemeChoice`, `FunctionKeyBar`, `ButtonPanelEditor`, `FontDownloader`, `EntryClipboard`, `PasteSource`, `WindowsFileClipboard`, `WindowsVirtualFileDrag`, `CommandLine`, `ShellCommand`, `ShellHere`, `ShellHereKind`), `Hst.Commander.Core.Volumes` (volumes, copying, UAE metadata)
 - Tui: `Hst.Commander.Tui`
 - Gui: `Hst.Commander.Gui`, `Hst.Commander.Gui.Icons` (entry icons)
 - Tests: `Hst.Commander.Core.Tests`
 
 ### Error Handling
 - Throw `ArgumentNullException.ThrowIfNull(arg)` for null guard checks.
-- Surface errors to the TUI via `MessageBox.ErrorQuery("Error", e.Message, "OK")`.
-- Surface errors to the GUI via `PaneView.NavigationFailed`, which `MainWindow` shows with `ErrorDialog`.
+- Surface errors to the TUI via `ErrorBox.Show(exception)` (or `ErrorBox.Show(message, exception)`), which logs them and shows `MessageBox.ErrorQuery`, or `ErrorBox.ShowNotice(message)` for messages that aren't failures, e.g. invalid input or an action the location doesn't support (not logged); don't call `MessageBox.ErrorQuery` directly.
+- Surface errors to the GUI via `PaneView.NavigationFailed`, which `MainWindow` shows with `ErrorDialog`; pass the exception to `ErrorDialog` so it's logged with its stack trace, or use `ErrorDialog.Notice(message)` for messages that aren't failures (not logged).
+- Unhandled exceptions are logged and shown with `UnexpectedErrorDialog` (with a GitHub issue report), and a crash is offered to be reported on the next start; see [Errors and crash reports](../docs/application.md#errors-and-crash-reports).
 
 ---
 
