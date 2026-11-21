@@ -81,6 +81,8 @@ public partial class MainWindow : Window
         UnselectGroupMenuItem.Click += async (_, _) => await SelectGroupAsync(_activePane, false);
         InvertSelectionMenuItem.Click += (_, _) => InvertSelection(_activePane);
         SearchMenuItem.Click += async (_, _) => await SearchAsync(_activePane);
+        // after the menu has closed and given the focus back
+        QuickSearchMenuItem.Click += (_, _) => Dispatcher.UIThread.Post(() => _activePane.StartQuickSearch());
         LeftVolumeMenuItem.Click += async (_, _) => await ChooseVolumeProviderAsync(LeftPane);
         RightVolumeMenuItem.Click += async (_, _) => await ChooseVolumeProviderAsync(RightPane);
         LocationMenuItem.Click += async (_, _) => await ShowLocationAsync(_activePane);
@@ -402,6 +404,12 @@ public partial class MainWindow : Window
 
     private async void OnWindowKeyDown(object? sender, KeyEventArgs e)
     {
+        // the quick search of the active pane takes its keys first, other keys stop it and are handled below
+        if (IsPaneFocused() && _activePane.HandleQuickSearchKey(e))
+        {
+            return;
+        }
+
         if (e.Key == Key.Enter && e.KeyModifiers.HasFlag(KeyModifiers.Control) &&
             (IsPaneFocused() || IsCommandLineFocused()))
         {
@@ -508,6 +516,10 @@ public partial class MainWindow : Window
             case Key.S when e.KeyModifiers == KeyModifiers.Control:
                 e.Handled = true;
                 await SearchAsync(_activePane);
+                break;
+            case Key.F when e.KeyModifiers == KeyModifiers.Control && IsPaneFocused():
+                e.Handled = true;
+                _activePane.StartQuickSearch();
                 break;
             case Key.R when e.KeyModifiers == KeyModifiers.Control:
                 e.Handled = true;
@@ -1714,6 +1726,9 @@ public partial class MainWindow : Window
                 break;
             case CommanderActions.Search:
                 await SearchAsync(pane);
+                break;
+            case CommanderActions.QuickSearch:
+                pane.StartQuickSearch();
                 break;
             case CommanderActions.Settings:
                 await ShowSettingsAsync();

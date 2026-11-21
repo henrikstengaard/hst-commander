@@ -32,6 +32,7 @@
                     <MenuItem x:Name="UnselectGroupMenuItem" Header="_Unselect group... (-)" />
                     <MenuItem x:Name="InvertSelectionMenuItem" Header="_Invert selection (*)" />
                     <MenuItem x:Name="SearchMenuItem" Header="Searc_h..." InputGesture="Ctrl+S" />
+                    <MenuItem x:Name="QuickSearchMenuItem" Header="Quic_k search" InputGesture="Ctrl+F" />
                     <Separator />
                     <MenuItem x:Name="LeftVolumeMenuItem" Header="_Left volume..." />
                     <MenuItem x:Name="RightVolumeMenuItem" Header="_Right volume..." />
