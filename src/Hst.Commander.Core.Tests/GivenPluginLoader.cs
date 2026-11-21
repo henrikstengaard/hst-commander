@@ -134,6 +134,81 @@ public class GivenPluginLoader
     }
 
     [Fact]
+    public void When_GettingApiVersion_Then_ItIsTheAbstractionsVersionIndependentOfTheAppVersion()
+    {
+        // the app version's last part is the commit count; the plugin API version is set in the Abstractions project
+        var abstractionsVersion = typeof(IPlugin).Assembly.GetName().Version!;
+        Assert.Equal(new Version(abstractionsVersion.Major, abstractionsVersion.Minor, 0, 0), abstractionsVersion);
+        Assert.Equal(new Version(abstractionsVersion.Major, abstractionsVersion.Minor), PluginLoader.ApiVersion);
+        Assert.True(PluginLoader.ApiVersion.Major >= 1);
+
+        // plugins record it in their reference to Abstractions
+        var reference = typeof(ZipPlugin).Assembly.GetReferencedAssemblies()
+            .Single(name => name.Name == typeof(IPlugin).Assembly.GetName().Name);
+        Assert.Equal(abstractionsVersion, reference.Version);
+    }
+
+    [Theory]
+    [InlineData("1.0", "1.0", true)]
+    [InlineData("1.0", "1.3", true)]
+    [InlineData("1.3", "1.3", true)]
+    [InlineData("1.3", "1.0", false)]
+    [InlineData("0.9", "1.0", false)]
+    [InlineData("1.0", "2.0", false)]
+    [InlineData("2.0", "1.0", false)]
+    public void When_CheckingPluginApiVersion_Then_SameMajorAndNoNewerMinorIsCompatible(string pluginApiVersion,
+        string apiVersion, bool expected) =>
+        Assert.Equal(expected, PluginLoader.IsCompatible(Version.Parse(pluginApiVersion), Version.Parse(apiVersion)));
+
+    [Theory]
+    [InlineData(2, 0, "was built for plugin API 1.0, this version of Hst Commander has plugin API 2.0")]
+    [InlineData(0, 9, "needs plugin API 1.0, this version of Hst Commander has plugin API 0.9")]
+    public void When_PluginIsBuiltForIncompatibleApiVersion_Then_ItIsNotLoadedAndErrorIsReported(int major, int minor,
+        string expectedMessage)
+    {
+        // arrange - the zip plugin is built for plugin API 1.0
+        var pluginsPath = CreateTempDirectory();
+        CopyZipPlugin(Path.Combine(pluginsPath, "Zip"), "Zip.dll");
+        try
+        {
+            // act
+            var result = PluginLoader.Load([pluginsPath], [], null, new Version(major, minor));
+
+            // assert
+            Assert.Empty(result.Plugins);
+            var error = Assert.Single(result.Errors);
+            Assert.Contains("Zip.dll' wasn't loaded", error);
+            Assert.Contains(expectedMessage, error);
+        }
+        finally
+        {
+            DeleteDirectory(pluginsPath);
+        }
+    }
+
+    [Fact]
+    public void When_PluginIsBuiltForOlderMinorApiVersion_Then_PluginIsLoaded()
+    {
+        // arrange
+        var pluginsPath = CreateTempDirectory();
+        CopyZipPlugin(Path.Combine(pluginsPath, "Zip"), "Zip.dll");
+        try
+        {
+            // act
+            var apiVersion = new Version(PluginLoader.ApiVersion.Major, PluginLoader.ApiVersion.Minor + 1);
+            var result = PluginLoader.Load([pluginsPath], [], null, apiVersion);
+
+            // assert
+            Assert.Empty(result.Errors);
+            Assert.Single(result.Plugins);
+        }
+        finally
+        {
+            DeleteDirectory(pluginsPath);
+        }
+    }
+
+    [Fact]
     public void When_PluginDirectoryIsMissing_Then_NoPluginsAreLoaded()
     {
         var result = PluginLoader.Load([Path.Combine(Path.GetTempPath(), $"hst-commander-{Guid.NewGuid()}")], []);

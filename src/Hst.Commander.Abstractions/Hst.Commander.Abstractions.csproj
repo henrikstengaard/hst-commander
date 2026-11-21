@@ -4,6 +4,14 @@
         <TargetFramework>net10.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <!--
+            The plugin API version, independent of the app version: plugins record it in their reference to this
+            assembly, and the plugin loader only loads plugins built for the same major version and the same or an
+            older minor version (see Plugin API versions in docs/plugin-api.md). Increase the minor version for
+            additions plugins built for an older version keep working with, and the major version (resetting the
+            minor version) for any other change.
+        -->
+        <AssemblyVersion>1.0.0.0</AssemblyVersion>
     </PropertyGroup>
 
 </Project>

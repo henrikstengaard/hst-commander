@@ -48,4 +48,6 @@ A plugin implements `IPlugin`, which returns the plugin's:
 2. Implement `IPlugin` with a public parameterless constructor and return the plugin's providers. See the Zip plugin, `Hst.Commander.Plugins.Zip`, for a small example.
 3. Copy the build output to `~/.hst-commander/plugins/<Name>/` or `plugins/<Name>/` next to the Hst Commander executable, with `<Name>.dll` as the plugin assembly. Plugins are loaded at startup.
 
+The assembly version of this library is the plugin API version, recorded in a plugin when it's built. Hst Commander loads plugins built for the same major version and the same or an older minor version; see [Plugin API versions](../../docs/plugin-api.md#plugin-api-versions).
+
 Copying, moving and deleting only use `IVolume`, so a new volume type gets them for free.
