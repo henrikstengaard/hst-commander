@@ -36,9 +36,12 @@ public class WorkbenchNavigationMode(DefIcons? defIcons = null) : INavigationMod
 
     public string Description => "Amiga Workbench 3.1 icons at their positions";
 
-    /// <summary>The gray background and black text of the Workbench 3.1 default palette.</summary>
+    /// <summary>
+    ///     The gray background and black text of the Workbench 3.1 default palette, with the current icon's name in
+    ///     the palette's white so it stands out.
+    /// </summary>
     public NavigationModeStyle Style { get; } = new("#AAAAAA", "#000000",
-        "Topaz New, Topaz, Courier New, Courier, monospace", 12);
+        "Topaz New, Topaz, Courier New, Courier, monospace", 12, "#FFFFFF");
 
     /// <summary>Shows only entries with a .info file, unchecked by default (all entries are shown).</summary>
     public static readonly NavigationModeOption IconsOnlyOption = new("IconsOnly", "Icons only",
