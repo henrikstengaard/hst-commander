@@ -59,6 +59,8 @@ public partial class MainWindow : Window
         RightPane.EntriesDropped += async (_, request) => await DropAsync(RightPane, request);
         LeftPane.ActionRequested += async (_, action) => await RunPaneActionAsync(LeftPane, action);
         RightPane.ActionRequested += async (_, action) => await RunPaneActionAsync(RightPane, action);
+        LeftPane.ShellHereRequested += async (_, kind) => await OpenShellHereAsync(LeftPane, kind);
+        RightPane.ShellHereRequested += async (_, kind) => await OpenShellHereAsync(RightPane, kind);
         BuildViewMenu();
         BottomPanel.ActionInvoked += async (_, action) => await RunActionAsync(action);
         ApplyAppearance(Themes.Find(settings.Theme), settings.FontFamily, settings.FontSize);
@@ -375,6 +377,29 @@ public partial class MainWindow : Window
         await RefreshPanesAsync(LeftPane, RightPane);
     }
 
+    /// <summary>
+    ///     Opens PowerShell, a terminal or the command prompt in a pane's directory from its context menu
+    ///     (<see cref="ShellHere" />), without waiting for it.
+    /// </summary>
+    private async Task OpenShellHereAsync(PaneView pane, ShellHereKind kind)
+    {
+        SetActivePane(pane);
+        if (pane.NavigationContext.CurrentHostDirectory is not { } directory)
+        {
+            return;
+        }
+
+        try
+        {
+            ShellHere.Start(kind, directory);
+        }
+        catch (Exception exception) when (exception is Win32Exception or IOException or InvalidOperationException)
+        {
+            await new ErrorDialog(exception.Message).ShowDialog(this);
+            pane.FocusEntries();
+        }
+    }
+
     private async void OnWindowKeyDown(object? sender, KeyEventArgs e)
     {
         if (e.Key == Key.Enter && e.KeyModifiers.HasFlag(KeyModifiers.Control) &&
@@ -431,10 +456,11 @@ public partial class MainWindow : Window
                     _ => CommanderActions.ClipboardPaste
                 });
                 break;
-            case Key.Apps when IsPaneFocused():
-            case Key.F10 when e.KeyModifiers == KeyModifiers.Shift && IsPaneFocused():
+            // Avalonia opens the context menu when the menu key or Shift+F10 is released (Control.OnKeyUp) and closes
+            // it on the next release, so opening it here when pressed made the release close it again; only F10's
+            // quitting is stopped
+            case Key.F10 when e.KeyModifiers == KeyModifiers.Shift:
                 e.Handled = true;
-                _activePane.OpenContextMenu();
                 break;
             case Key.F6 when e.KeyModifiers == KeyModifiers.Shift:
                 e.Handled = true;
