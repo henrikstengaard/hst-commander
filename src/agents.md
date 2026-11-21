@@ -27,7 +27,7 @@ The behavior of each feature is described in `docs/` at the repository root. Rea
 | [`docs/gui.md`](../docs/gui.md) | GUI files, key handling, dialogs, themes, icons |
 | [`docs/themes.md`](../docs/themes.md) | Built-in and plugin themes, the bottom area's buttons, parent buttons, the button editor, Directory Opus 4 |
 | [`docs/application.md`](../docs/application.md) | Versioning, release workflows, local publishing, settings files and their versions, About, licenses and third-party notices, error log and crash reports, quitting |
-| [`docs/testing.md`](../docs/testing.md) | Test helpers |
+| [`docs/testing.md`](../docs/testing.md) | Test helpers, the manual smoke test before a release |
 | [`docs/status.md`](../docs/status.md) | What works and what isn't implemented |
 
 The code is the source of truth for constants, key lists and colors; the docs describe behavior and the reasons for it.
