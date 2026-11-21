@@ -51,7 +51,7 @@ public sealed class SmbVolume : IVolume, IDisposable
     /// <summary>Root of the server's paths, e.g. "\\server".</summary>
     public string Name { get; }
 
-    public IEnumerable<string> CurrentPathComponents => _pathComponents.ToList();
+    public IReadOnlyList<string> CurrentPathComponents => _pathComponents.ToList();
 
     private bool IsShareList => _pathComponents.Count == 0;
 
@@ -153,22 +153,6 @@ public sealed class SmbVolume : IVolume, IDisposable
         var fileStore = GetShare(pathComponents[0]);
         fileStore.CloseFile(OpenDirectory(fileStore, GetSharePath(pathComponents, null)));
         return true;
-    }
-
-    public async Task<IEntry> OpenEntry(string name, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(name);
-
-        var pathComponents = _pathComponents.ToList();
-        var entry = await RunAsync(() => GetEntry(pathComponents, name) ??
-                                         throw new FileNotFoundException($"Entry '{name}' not found"),
-            cancellationToken);
-        if (entry.Type == EntryType.Container)
-        {
-            _pathComponents = [..pathComponents, entry.Name];
-        }
-
-        return entry;
     }
 
     /// <summary>Entry with a name in a directory, null when it doesn't exist.</summary>

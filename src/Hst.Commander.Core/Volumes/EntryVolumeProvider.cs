@@ -12,7 +12,7 @@ public class EntryVolumeProvider(IEntry entry, IVolume volumeProvider) : IVolume
     /// </summary>
     public string Name => volumeProvider.Name;
 
-    public IEnumerable<string> CurrentPathComponents => new []{entry.Name}.Concat(volumeProvider.CurrentPathComponents);
+    public IReadOnlyList<string> CurrentPathComponents => [entry.Name, ..volumeProvider.CurrentPathComponents];
 
     public bool IsAtRoot
     {
@@ -29,9 +29,6 @@ public class EntryVolumeProvider(IEntry entry, IVolume volumeProvider) : IVolume
 
     public Task ChangeDirectory(IEnumerable<string> pathComponents, CancellationToken cancellationToken = default) =>
         volumeProvider.ChangeDirectory(pathComponents, cancellationToken);
-
-    public Task<IEntry> OpenEntry(string name, CancellationToken cancellationToken = default) =>
-        volumeProvider.OpenEntry(name, cancellationToken);
 
     public Task<Stream> OpenRead(string name, CancellationToken cancellationToken = default) =>
         volumeProvider.OpenRead(name, cancellationToken);

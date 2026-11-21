@@ -273,7 +273,7 @@ internal sealed class SharedImageVolume : IVolume, IDisposable
 
     public string Name => _image.Volume.Name;
 
-    public IEnumerable<string> CurrentPathComponents => _currentPathComponents.ToList();
+    public IReadOnlyList<string> CurrentPathComponents => _currentPathComponents.ToList();
 
     /// <summary>
     ///     Reports the progress of committing cached writes after the operations of this view, e.g. to the progress
@@ -320,14 +320,6 @@ internal sealed class SharedImageVolume : IVolume, IDisposable
             return true;
         }, cancellationToken);
     }
-
-    public Task<IEntry> OpenEntry(string name, CancellationToken cancellationToken = default) =>
-        RunAsync(async volume =>
-        {
-            var entry = await volume.OpenEntry(name, cancellationToken);
-            _currentPathComponents = volume.CurrentPathComponents.ToList();
-            return entry;
-        }, cancellationToken);
 
     public Task<Stream> OpenRead(string name, CancellationToken cancellationToken = default) =>
         RunAsync(async volume =>

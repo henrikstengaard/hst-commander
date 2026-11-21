@@ -30,7 +30,7 @@ public abstract class ArchiveVolume<TArchiveEntry> : IVolume
 
     public string Name { get; }
 
-    public IEnumerable<string> CurrentPathComponents => _currentDirectories.Select(directory => directory.Name).ToList();
+    public IReadOnlyList<string> CurrentPathComponents => _currentDirectories.Select(directory => directory.Name).ToList();
 
     private ArchiveDirectory CurrentDirectory => _currentDirectories.Count > 0 ? _currentDirectories[^1] : _root;
 
@@ -149,20 +149,6 @@ public abstract class ArchiveVolume<TArchiveEntry> : IVolume
 
         _currentDirectories = directories;
         return Task.CompletedTask;
-    }
-
-    public Task<IEntry> OpenEntry(string name, CancellationToken cancellationToken = default)
-    {
-        var directory = CurrentDirectory;
-        if (directory.FindDirectory(name) is { } subDirectory)
-        {
-            _currentDirectories.Add(subDirectory);
-            return Task.FromResult(CreateEntry(subDirectory));
-        }
-
-        return directory.FindFile(name) is var (fileName, file)
-            ? Task.FromResult(CreateEntry(fileName, file))
-            : throw new IOException($"Entry '{name}' not found");
     }
 
     public Task<Stream> OpenRead(string name, CancellationToken cancellationToken = default) =>

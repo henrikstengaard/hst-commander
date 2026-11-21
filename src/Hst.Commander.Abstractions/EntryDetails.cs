@@ -19,8 +19,8 @@ public sealed record EntryProperty(string Label, string Value)
 /// </summary>
 /// <param name="TypeName">Type shown instead of the file type, e.g. "Amiga partition"; null for the file type.</param>
 /// <param name="Sections">Sections of lines shown after the type, separated by lines.</param>
-/// <param name="UsedFraction">Fraction of the space used between 0 and 1, shown as a bar like drives; null for none.</param>
-public sealed record EntryDetails(
-    string? TypeName,
-    IReadOnlyList<IReadOnlyList<EntryProperty>> Sections,
-    double? UsedFraction = null);
+public sealed record EntryDetails(string? TypeName, IReadOnlyList<IReadOnlyList<EntryProperty>> Sections)
+{
+    /// <summary>Fraction of the space used between 0 and 1, shown as a bar like drives; null for none.</summary>
+    public double? UsedFraction { get; init; }
+}

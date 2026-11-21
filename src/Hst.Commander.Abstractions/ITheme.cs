@@ -77,7 +77,10 @@ public sealed record ThemeFontDownload(
     string License,
     string SourceUrl);
 
-/// <summary>Colors of a <see cref="ITheme" />, each "#RRGGBB".</summary>
+/// <summary>
+/// Colors of a <see cref="ITheme" />, each "#RRGGBB". Colors added in later versions of the plugin API are optional
+/// init properties like <see cref="MarkedContainerBackground" />, so themes built for an earlier version keep working.
+/// </summary>
 /// <param name="PaneBackground">Background of the panes.</param>
 /// <param name="PaneBorder">Border of the panes.</param>
 /// <param name="Header">Column headers of the panes.</param>
@@ -97,10 +100,6 @@ public sealed record ThemeFontDownload(
 /// <param name="ButtonForeground">Text of buttons without their own colors.</param>
 /// <param name="DialogBackground">Background of dialogs in the TUI.</param>
 /// <param name="DialogForeground">Text of dialogs in the TUI.</param>
-/// <param name="MarkedContainerBackground">
-/// Background of marked directories and other containers, null for the pane background (only the text is colored).
-/// </param>
-/// <param name="MarkedItemBackground">Background of marked files, null for the pane background.</param>
 public sealed record ThemeColors(
     string PaneBackground,
     string PaneBorder,
@@ -120,6 +119,14 @@ public sealed record ThemeColors(
     string ButtonBackground,
     string ButtonForeground,
     string DialogBackground,
-    string DialogForeground,
-    string? MarkedContainerBackground = null,
-    string? MarkedItemBackground = null);
+    string DialogForeground)
+{
+    /// <summary>
+    /// Background of marked directories and other containers, null for the pane background (only the text is
+    /// colored).
+    /// </summary>
+    public string? MarkedContainerBackground { get; init; }
+
+    /// <summary>Background of marked files, null for the pane background.</summary>
+    public string? MarkedItemBackground { get; init; }
+}

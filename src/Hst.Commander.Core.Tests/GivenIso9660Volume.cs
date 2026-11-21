@@ -56,50 +56,6 @@ public class GivenIso9660Volume
     }
 
     [Fact]
-    public async Task When_OpenDirectoryEntry_Then_DirectoryIsChanged()
-    {
-        // arrange - create an iso9660 volume with entries
-        await using var iso9660Stream = CreateIso9660WithDirectoriesAndFiles();
-        var iso9660Volume = new Iso9660Volume(new CDReader(iso9660Stream, true));
-
-        // assert - current path components of the iso9660 volume is root
-        Assert.Equal([], iso9660Volume.CurrentPathComponents);
-
-        // act - open entry "dir1"
-        var entry = await iso9660Volume.OpenEntry("dir1");
-        
-        // assert - entry is a directory
-        Assert.NotNull(entry);
-        Assert.Equal("dir1", entry.Name);
-        Assert.Equal(EntryType.Container, entry.Type);
-        
-        // assert - current path components of the iso9660 volume is changed to "dir1"
-        Assert.Equal(["dir1"], iso9660Volume.CurrentPathComponents);
-    }
-
-    [Fact]
-    public async Task When_OpenFileEntry_Then_DirectoryIsNotChanged()
-    {
-        // arrange - create an iso9660 volume with entries
-        await using var iso9660Stream = CreateIso9660WithDirectoriesAndFiles();
-        var iso9660Volume = new Iso9660Volume(new CDReader(iso9660Stream, true));
-
-        // assert - current path components of the iso9660 volume is root
-        Assert.Equal([], iso9660Volume.CurrentPathComponents);
-
-        // act - open entry "file1.txt"
-        var entry = await iso9660Volume.OpenEntry("file1.txt");
-        
-        // assert - entry is a file
-        Assert.NotNull(entry);
-        Assert.Equal("file1.txt", entry.Name);
-        Assert.Equal(EntryType.Item, entry.Type);
-        
-        // assert - current path components of the iso9660 volume is root
-        Assert.Equal([], iso9660Volume.CurrentPathComponents);
-    }
-
-    [Fact]
     public async Task When_ListEntriesInDirectory_Then_Iso9660VolumeListsEntries()
     {
         // arrange - create an iso9660 volume with entries

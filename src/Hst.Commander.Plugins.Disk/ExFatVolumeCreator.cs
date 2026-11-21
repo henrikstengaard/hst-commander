@@ -42,9 +42,12 @@ public class ExFatVolumeCreator : IVolumeCreator
 
     public IReadOnlyList<VolumeCreatorField> Fields { get; } =
     [
-        new(SizeField, "Size", VolumeCreatorFieldType.Size, true, DefaultSize),
+        new(SizeField, "Size", VolumeCreatorFieldType.Size) { IsRequired = true, DefaultValue = DefaultSize },
         new(VolumeLabelField, "Volume label", VolumeCreatorFieldType.Text),
-        new(ClusterSizeField, "Cluster size", VolumeCreatorFieldType.Choice, false, DefaultClusterSize, ClusterSizes)
+        new(ClusterSizeField, "Cluster size", VolumeCreatorFieldType.Choice)
+        {
+            DefaultValue = DefaultClusterSize, Choices = ClusterSizes
+        }
     ];
 
     public async Task Create(Stream stream, VolumeCreatorValues values, CancellationToken cancellationToken = default)

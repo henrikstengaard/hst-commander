@@ -190,7 +190,7 @@ internal static class IlbmReader
             }
         }
 
-        return new IconImage(width, header.Height, null, pixels, header.Planes);
+        return new IconImage(width, header.Height, null, pixels) { BitsPerPixel = header.Planes };
     }
 
     private static IconImage DecodeChunky(Header header, byte[]? colorMap, ReadOnlySpan<byte> body)
@@ -211,7 +211,7 @@ internal static class IlbmReader
             }
         }
 
-        return new IconImage(width, header.Height, null, pixels, 8);
+        return new IconImage(width, header.Height, null, pixels) { BitsPerPixel = 8 };
     }
 
     /// <summary>

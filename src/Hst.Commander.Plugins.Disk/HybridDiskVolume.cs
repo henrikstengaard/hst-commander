@@ -26,7 +26,7 @@ public sealed class HybridDiskVolume : IVolume, IDisposable
 
     public string Name => "Disk";
 
-    public IEnumerable<string> CurrentPathComponents => _currentVolume?.CurrentPathComponents ?? [];
+    public IReadOnlyList<string> CurrentPathComponents => _currentVolume?.CurrentPathComponents ?? [];
 
     public async IAsyncEnumerable<IEntry> ListEntries(
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -117,19 +117,6 @@ public sealed class HybridDiskVolume : IVolume, IDisposable
 
             throw;
         }
-    }
-
-    public async Task<IEntry> OpenEntry(string name, CancellationToken cancellationToken = default)
-    {
-        if (_currentVolume is { } volume)
-        {
-            return await volume.OpenEntry(name, cancellationToken);
-        }
-
-        var partitionTable = await FindPartitionTable(name, cancellationToken);
-        var entry = await partitionTable.OpenEntry(name, cancellationToken);
-        _currentVolume = partitionTable;
-        return entry;
     }
 
     public Task<Stream> OpenRead(string name, CancellationToken cancellationToken = default) =>

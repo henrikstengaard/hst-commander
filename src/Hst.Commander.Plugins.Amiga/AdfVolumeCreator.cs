@@ -41,12 +41,20 @@ public class AdfVolumeCreator : IVolumeCreator
 
     public IReadOnlyList<VolumeCreatorField> Fields { get; } =
     [
-        new(VolumeNameField, "Volume name", VolumeCreatorFieldType.Text, true, "Empty", EnabledByField: FormatField),
-        new(HighDensityField, "High density (1.76 MB)", VolumeCreatorFieldType.Boolean, false, false),
-        new(FormatField, "Format", VolumeCreatorFieldType.Boolean, false, true),
-        new(BootableField, "Bootable", VolumeCreatorFieldType.Boolean, false, false, EnabledByField: FormatField),
-        new(FileSystemField, "File system", VolumeCreatorFieldType.Choice, false, DefaultFileSystem, FileSystems,
-            FormatField)
+        new(VolumeNameField, "Volume name", VolumeCreatorFieldType.Text)
+        {
+            IsRequired = true, DefaultValue = "Empty", EnabledByField = FormatField
+        },
+        new(HighDensityField, "High density (1.76 MB)", VolumeCreatorFieldType.Boolean) { DefaultValue = false },
+        new(FormatField, "Format", VolumeCreatorFieldType.Boolean) { DefaultValue = true },
+        new(BootableField, "Bootable", VolumeCreatorFieldType.Boolean)
+        {
+            DefaultValue = false, EnabledByField = FormatField
+        },
+        new(FileSystemField, "File system", VolumeCreatorFieldType.Choice)
+        {
+            DefaultValue = DefaultFileSystem, Choices = FileSystems, EnabledByField = FormatField
+        }
     ];
 
     public async Task Create(Stream stream, VolumeCreatorValues values, CancellationToken cancellationToken = default)

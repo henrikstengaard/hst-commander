@@ -2,7 +2,8 @@ namespace Hst.Commander.Abstractions;
 
 /// <summary>
 /// Interface for a plugin extending Hst Commander with volume providers, file volume providers, volume creators, icon
-/// providers, navigation modes and image providers.
+/// providers, navigation modes, image providers, properties tabs and themes. A plugin only implements the members of
+/// what it adds; the others default to none.
 /// </summary>
 public interface IPlugin
 {
@@ -22,14 +23,8 @@ public interface IPlugin
     IEnumerable<IFileVolumeProvider> FileVolumeProviders => [];
 
     /// <summary>
-    /// True when the plugin can create volumes with its <see cref="VolumeCreators" />, listed in the create dialog
-    /// (F9). Defaults to false: the volume creators aren't used.
-    /// </summary>
-    bool CanCreateVolumes => false;
-
-    /// <summary>
     /// Volume creators creating new volumes as files, e.g. an empty Amiga disk file, listed in the create dialog (F9)
-    /// when <see cref="CanCreateVolumes" /> is true. A plugin can create several kinds of volumes.
+    /// in plugin order. A plugin can create several kinds of volumes.
     /// </summary>
     IEnumerable<IVolumeCreator> VolumeCreators => [];
 

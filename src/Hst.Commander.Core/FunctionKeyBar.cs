@@ -23,5 +23,5 @@ public static class FunctionKeyBar
     ]);
 
     private static ButtonColumn Column(string key, string label, string action) =>
-        new([new PanelButton(label, action, key)]);
+        new([new PanelButton(label, action) { Key = key }]);
 }

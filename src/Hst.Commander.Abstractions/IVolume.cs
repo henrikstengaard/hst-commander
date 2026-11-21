@@ -11,25 +11,25 @@ public interface IVolume
     string Name { get; }
 
     /// <summary>
-    /// Path components of current directory.
+    /// Path components of current directory from the root of the volume, e.g. ["dir1", "dir2"], empty at the root.
     /// </summary>
-    public IEnumerable<string> CurrentPathComponents { get; }
+    IReadOnlyList<string> CurrentPathComponents { get; }
 
     /// <summary>
-    /// List entries in current directory.
+    /// List entries in current directory, without the parent entry "..", which Hst Commander adds.
     /// </summary>
-    /// <returns></returns>
+    /// <param name="cancellationToken"></param>
     IAsyncEnumerable<IEntry> ListEntries(CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Change directory with absolute or relative path components.
+    /// Change directory with absolute or relative path components: path components starting with
+    /// <see cref="Paths.Root" /> are from the root, others from the current directory, and <see cref="Paths.Parent" />
+    /// goes to the parent (both compared case-insensitively). Throws <see cref="DirectoryNotFoundException" /> or
+    /// another <see cref="IOException" /> when a directory doesn't exist, keeping the current directory.
     /// </summary>
     /// <param name="pathComponents">Path components to change to.</param>
     /// <param name="cancellationToken"></param>
-    /// <returns></returns>
     Task ChangeDirectory(IEnumerable<string> pathComponents, CancellationToken cancellationToken = default);
-    
-    Task<IEntry> OpenEntry(string name, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Open an item in current directory for reading.

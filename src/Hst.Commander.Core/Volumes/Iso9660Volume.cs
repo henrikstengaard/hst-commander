@@ -12,7 +12,7 @@ public partial class Iso9660Volume(CDReader cdReader) : IVolume
 
     public string Name => "Iso9660";
 
-    public IEnumerable<string> CurrentPathComponents => _currentPathComponents;
+    public IReadOnlyList<string> CurrentPathComponents => _currentPathComponents.ToList();
 
     public async IAsyncEnumerable<IEntry> ListEntries([EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
@@ -94,36 +94,6 @@ public partial class Iso9660Volume(CDReader cdReader) : IVolume
         _currentPathComponents = changedPathComponents;
         
         return Task.CompletedTask;
-    }
-
-    public Task<IEntry> OpenEntry(string name, CancellationToken cancellationToken = default)
-    {
-        var path = CreatePath(_currentPathComponents.Concat([name]));
-        var fileSystemInfo = cdReader.GetFileSystemInfo(path);
-        if (!fileSystemInfo.Exists)
-        {
-            throw new IOException("Entry not found");
-        }
-
-        var directoryInfo = cdReader.GetDirectoryInfo(path);
-        if (directoryInfo.Exists)
-        {
-            var entry = CreateEntry(directoryInfo);
-            
-            _currentPathComponents.Add(entry.Name);
-            
-            return Task.FromResult(entry);
-        }
-
-        var fileInfo = cdReader.GetFileInfo(path);
-        if (!fileInfo.Exists)
-        {
-            throw new IOException("Entry not found");
-        }
-
-        var fileEntry = CreateEntry(fileInfo);
-
-        return Task.FromResult(fileEntry);
     }
 
     public Task<Stream> OpenRead(string name, CancellationToken cancellationToken = default)

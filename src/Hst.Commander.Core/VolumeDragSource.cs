@@ -296,16 +296,13 @@ public sealed class VolumeDragSource : IDisposable
 
         public string Name => string.Empty;
 
-        public IEnumerable<string> CurrentPathComponents => [];
+        public IReadOnlyList<string> CurrentPathComponents => [];
 
         public IAsyncEnumerable<IEntry> ListEntries(CancellationToken cancellationToken = default) =>
             AsyncEnumerable.Empty<IEntry>();
 
         public Task ChangeDirectory(IEnumerable<string> pathComponents,
             CancellationToken cancellationToken = default) => throw new NotSupportedException();
-
-        public Task<IEntry> OpenEntry(string name, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
 
         public Task<Stream> OpenRead(string name, CancellationToken cancellationToken = default) =>
             Task.FromResult<Stream>(new MemoryStream(_files[name], false));

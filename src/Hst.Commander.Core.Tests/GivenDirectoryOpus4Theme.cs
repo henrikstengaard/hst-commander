@@ -37,7 +37,7 @@ public class GivenDirectoryOpus4Theme : IDisposable
         // arrange
         var layout = new ButtonPanel(
         [
-            new ButtonColumn([new PanelButton("Copy", CommanderActions.Copy, null, "#6688BB", "#FFFFFF")]),
+            new ButtonColumn([new PanelButton("Copy", CommanderActions.Copy) { Background = "#6688BB", Foreground = "#FFFFFF" }]),
             new ButtonColumn([
                 new PanelButton("Parent", CommanderActions.Parent), new PanelButton("Root", CommanderActions.Root)
             ])

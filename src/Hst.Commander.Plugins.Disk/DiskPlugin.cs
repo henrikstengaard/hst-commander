@@ -17,8 +17,6 @@ public class DiskPlugin : IPlugin
 
     public IEnumerable<IFileVolumeProvider> FileVolumeProviders { get; }
 
-    public bool CanCreateVolumes => true;
-
     public IEnumerable<IVolumeCreator> VolumeCreators { get; } = [new ExFatVolumeCreator()];
 
     public DiskPlugin()

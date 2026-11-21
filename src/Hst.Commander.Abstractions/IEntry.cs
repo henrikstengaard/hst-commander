@@ -1,14 +1,30 @@
 ﻿namespace Hst.Commander.Abstractions;
 
+/// <summary>
+/// Item or container in a volume, listed by <see cref="IVolume.ListEntries" />.
+/// </summary>
 public interface IEntry
 {
+    /// <summary>
+    /// Name of the entry in its directory, used in paths and by the members of <see cref="IVolume" />.
+    /// </summary>
     string Name { get; }
+
+    /// <summary>
+    /// Whether the entry is a container (e.g. a directory or a partition) or an item (e.g. a file).
+    /// </summary>
     EntryType Type { get; }
+
     /// <summary>
     /// Size in bytes of an item, or of a container that is a volume or a disk, e.g. a drive, a partition table or a partition, shown in the size
     /// column. Null for other containers (shown as "&lt;DIR&gt;") and items of unknown size.
     /// </summary>
     long? Size { get; }
+
+    /// <summary>
+    /// Date the entry was last modified, preferably in UTC (<see cref="DateTimeKind.Utc" />); dates of kind
+    /// unspecified are treated as UTC, local dates are converted. Null when unknown.
+    /// </summary>
     DateTime? ModifiedDate { get; }
 
     /// <summary>

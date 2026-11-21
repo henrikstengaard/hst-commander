@@ -191,8 +191,10 @@ public sealed class PartitionTableVolume : VolumeListVolume
             EntryProperty.FromBytes("Free space", free),
             EntryProperty.FromBytes("Capacity", capacity)
         ];
-        return new EntryDetails(typeName, [partitionSection, locationSection, spaceSection],
-            capacity > 0 ? (double)(capacity - free) / capacity : null);
+        return new EntryDetails(typeName, [partitionSection, locationSection, spaceSection])
+        {
+            UsedFraction = capacity > 0 ? (double)(capacity - free) / capacity : null
+        };
     }
 
     private static bool IsPiStormRdb(PartitionInfo partition) =>

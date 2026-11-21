@@ -42,26 +42,28 @@ public sealed record VolumeCreatorChoice(string Value, string Label);
 /// <param name="Name">Name the value is looked up by in <see cref="VolumeCreatorValues" />, e.g. "VolumeName".</param>
 /// <param name="Label">Label shown to the user, e.g. "Volume name".</param>
 /// <param name="Type">Type of the field.</param>
-/// <param name="IsRequired">
-/// True when the user must enter a value: text that isn't empty, a number or a size. Check boxes and choices always have a
-/// value.
-/// </param>
-/// <param name="DefaultValue">
-/// Value shown initially: a <see cref="string" /> for text, a <see cref="long" /> for numbers and sizes (in bytes), a <see cref="bool" />
-/// for check boxes and the <see cref="VolumeCreatorChoice.Value" /> for choices. Null for an empty field, an unchecked
-/// check box or the first choice.
-/// </param>
-/// <param name="Choices">Choices of a <see cref="VolumeCreatorFieldType.Choice" /> field, in the order shown.</param>
-/// <param name="EnabledByField">
-/// Name of a <see cref="VolumeCreatorFieldType.Boolean" /> field enabling this field when checked, e.g. a file system
-/// only chosen when formatting. Null when the field is always enabled. A disabled required field doesn't have to be
-/// entered.
-/// </param>
-public sealed record VolumeCreatorField(
-    string Name,
-    string Label,
-    VolumeCreatorFieldType Type,
-    bool IsRequired = false,
-    object? DefaultValue = null,
-    IReadOnlyList<VolumeCreatorChoice>? Choices = null,
-    string? EnabledByField = null);
+public sealed record VolumeCreatorField(string Name, string Label, VolumeCreatorFieldType Type)
+{
+    /// <summary>
+    /// True when the user must enter a value: text that isn't empty, a number or a size. Check boxes and choices always
+    /// have a value.
+    /// </summary>
+    public bool IsRequired { get; init; }
+
+    /// <summary>
+    /// Value shown initially: a <see cref="string" /> for text, a <see cref="long" /> for numbers and sizes (in bytes),
+    /// a <see cref="bool" /> for check boxes and the <see cref="VolumeCreatorChoice.Value" /> for choices. Null for an
+    /// empty field, an unchecked check box or the first choice.
+    /// </summary>
+    public object? DefaultValue { get; init; }
+
+    /// <summary>Choices of a <see cref="VolumeCreatorFieldType.Choice" /> field, in the order shown.</summary>
+    public IReadOnlyList<VolumeCreatorChoice>? Choices { get; init; }
+
+    /// <summary>
+    /// Name of a <see cref="VolumeCreatorFieldType.Boolean" /> field enabling this field when checked, e.g. a file
+    /// system only chosen when formatting. Null when the field is always enabled. A disabled required field doesn't have
+    /// to be entered.
+    /// </summary>
+    public string? EnabledByField { get; init; }
+}

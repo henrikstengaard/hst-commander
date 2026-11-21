@@ -323,7 +323,7 @@ public class GivenImageViewing
     public void When_ZoomAndPanImage_Then_LayoutIsZoomedAndMovedWithinTheView()
     {
         // arrange: a 100 × 50 image in a 50 × 50 view
-        var image = new IconImage(100, 50, null, new byte[100 * 50 * 4], 32);
+        var image = new IconImage(100, 50, null, new byte[100 * 50 * 4]) { BitsPerPixel = 32 };
         using var session = new ViewerSession(ViewerDocument.Open(new MemoryStream([1, 0, 2])),
             [new EntryImage("Image", image)]);
 

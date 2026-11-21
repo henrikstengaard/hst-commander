@@ -205,23 +205,25 @@ public class GivenSmbVolume : IDisposable
     }
 
     [Fact]
-    public async Task When_OpeningEntries_Then_ContainersAreChangedTo()
+    public async Task When_ListingSharesAndShare_Then_SharesAreVolumesAndEntriesHaveTypesAndSizes()
     {
         // arrange
         using var volume = OpenVolume();
 
         // act
-        var share = await volume.OpenEntry("share");
-        var file = await volume.OpenEntry("file1.txt");
-        var dir = await volume.OpenEntry("dir1");
+        var share = await volume.ListEntries().FirstAsync(entry => entry.Name == "share");
+        await volume.ChangeDirectory(["share"]);
+        var entries = await volume.ListEntries().ToListAsync();
 
         // assert
         Assert.True(share.IsVolume);
+        Assert.Equal(EntryType.Container, share.Type);
+        var file = Assert.Single(entries, entry => entry.Name == "file1.txt");
         Assert.Equal(EntryType.Item, file.Type);
         Assert.Equal(15, file.Size);
-        Assert.Equal(EntryType.Container, dir.Type);
-        Assert.Equal(["share", "dir1"], volume.CurrentPathComponents);
-        await Assert.ThrowsAnyAsync<IOException>(() => volume.OpenEntry("missing"));
+        Assert.Equal(EntryType.Container, Assert.Single(entries, entry => entry.Name == "dir1").Type);
+        await Assert.ThrowsAnyAsync<IOException>(() => volume.ChangeDirectory(["missing"]));
+        Assert.Equal(["share"], volume.CurrentPathComponents);
     }
 
     [Fact]

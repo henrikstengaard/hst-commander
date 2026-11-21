@@ -54,7 +54,7 @@ public class RdbVolume : IVolume, IDisposable
     private AmigaFileSystemVolume? CurrentVolume =>
         _partitionIndex is { } partitionIndex ? _mountedVolumes[partitionIndex] : null;
 
-    public IEnumerable<string> CurrentPathComponents => !_inPartitionTable ? []
+    public IReadOnlyList<string> CurrentPathComponents => !_inPartitionTable ? []
         : _partitionIndex is { } partitionIndex
             ? [PartitionTableName, GetPartitionName(partitionIndex), .._mountedVolumes[partitionIndex].CurrentPathComponents]
             : [PartitionTableName];
@@ -161,8 +161,10 @@ public class RdbVolume : IVolume, IDisposable
             EntryProperty.FromBytes("Free space", free),
             EntryProperty.FromBytes("Capacity", capacity)
         ];
-        return new EntryDetails(PartitionTypeName, [partitionSection, bootSection, spaceSection],
-            capacity > 0 ? (double)(capacity - free) / capacity : null);
+        return new EntryDetails(PartitionTypeName, [partitionSection, bootSection, spaceSection])
+        {
+            UsedFraction = capacity > 0 ? (double)(capacity - free) / capacity : null
+        };
     }
 
     /// <summary>Mounted file system of a partition, mounting it the first time; null when it can't be mounted.</summary>
@@ -292,23 +294,6 @@ public class RdbVolume : IVolume, IDisposable
             throw new IOException($"Partition '{GetPartitionName(partitionIndex)}' ({partitionBlock.DriveName}) " +
                                   $"can't be mounted: {exception.Message}", exception);
         }
-    }
-
-    public async Task<IEntry> OpenEntry(string name, CancellationToken cancellationToken = default)
-    {
-        if (CurrentVolume is { } volume)
-        {
-            return await volume.OpenEntry(name, cancellationToken);
-        }
-
-        if (!_inPartitionTable)
-        {
-            OpenPartitionTable(name);
-            return CreatePartitionTableEntry();
-        }
-
-        await OpenPartition(name, cancellationToken);
-        return await CreatePartitionEntry(_partitionIndex!.Value);
     }
 
     public Task<Stream> OpenRead(string name, CancellationToken cancellationToken = default) =>

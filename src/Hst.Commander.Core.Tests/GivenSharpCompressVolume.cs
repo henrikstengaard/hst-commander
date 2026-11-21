@@ -95,7 +95,7 @@ public class GivenSharpCompressVolume
         await volume.ChangeDirectory(["dir1"]);
 
         // act
-        var entry = await volume.OpenEntry("file1.txt");
+        var entry = await volume.ListEntries().FirstAsync(entry => entry.Name == "file1.txt");
 
         // assert
         Assert.Equal(new DateTime(2024, 1, 2, 3, 4, 6, DateTimeKind.Utc), entry.ModifiedDate);

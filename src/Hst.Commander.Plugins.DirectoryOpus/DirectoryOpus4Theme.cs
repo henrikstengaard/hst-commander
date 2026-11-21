@@ -108,9 +108,11 @@ public sealed class DirectoryOpus4Theme : ITheme, ICustomizableButtonPanel
         ButtonBackground: Grey,
         ButtonForeground: Black,
         DialogBackground: Grey,
-        DialogForeground: Black,
-        MarkedContainerBackground: Blue,
-        MarkedItemBackground: Black);
+        DialogForeground: Black)
+    {
+        MarkedContainerBackground = Blue,
+        MarkedItemBackground = Black
+    };
 
     public string SettingsTitle => "Buttons";
 
@@ -188,8 +190,11 @@ public sealed class DirectoryOpus4Theme : ITheme, ICustomizableButtonPanel
                 .Where(column => column != null)
                 .Select(column => new ButtonColumn(column
                     .Where(button => button is { Label: not null, Action: not null })
-                    .Select(button => new PanelButton(button.Label!, button.Action!, null, button.Background,
-                        button.Foreground))
+                    .Select(button => new PanelButton(button.Label!, button.Action!)
+                    {
+                        Background = button.Background,
+                        Foreground = button.Foreground
+                    })
                     .ToList()))
                 .Where(column => column.Buttons.Count > 0)
                 .ToList();
@@ -204,7 +209,7 @@ public sealed class DirectoryOpus4Theme : ITheme, ICustomizableButtonPanel
     private static ButtonColumn Column(params PanelButton[] buttons) => new(buttons);
 
     private static PanelButton Button(string label, string action, string? background = null,
-        string? foreground = null) => new(label, action, null, background, foreground);
+        string? foreground = null) => new(label, action) { Background = background, Foreground = foreground };
 
     private sealed record ButtonsData(List<List<ButtonData>>? Columns);
 

@@ -27,17 +27,6 @@ public class GivenNavigationContextCreatingVolume
     }
 
     [Fact]
-    public void When_PluginCanNotCreateVolumes_Then_VolumeCreatorsAreNotListed()
-    {
-        // arrange
-        IPlugin plugin = new NoCreatePlugin();
-
-        // act & assert
-        Assert.False(plugin.CanCreateVolumes);
-        Assert.DoesNotContain(VolumeProviders.Creators, creator => creator is TestVolumeCreator);
-    }
-
-    [Fact]
     public async Task When_CreateFormattedAdfInLocalDirectory_Then_AdfIsCreatedWithVolumeNameAndSelected()
     {
         // arrange
@@ -289,7 +278,7 @@ public class GivenNavigationContextCreatingVolume
         var creator = new FieldsVolumeCreator(
         [
             new("Enable", "Enable", VolumeCreatorFieldType.Boolean),
-            new("Text", "Text", VolumeCreatorFieldType.Text, true, EnabledByField: "Enable")
+            new("Text", "Text", VolumeCreatorFieldType.Text) { IsRequired = true, EnabledByField = "Enable" }
         ]);
 
         // act
@@ -482,13 +471,6 @@ public class GivenNavigationContextCreatingVolume
         return path;
     }
 
-    private sealed class NoCreatePlugin : IPlugin
-    {
-        public string Name => "No create";
-
-        public IEnumerable<IVolumeCreator> VolumeCreators { get; } = [new TestVolumeCreator(false)];
-    }
-
     private sealed class TestVolumeCreator(bool fail) : IVolumeCreator
     {
         public string Name => "Test";
@@ -499,9 +481,9 @@ public class GivenNavigationContextCreatingVolume
 
         public IReadOnlyList<VolumeCreatorField> Fields { get; } =
         [
-            new("Text", "Text", VolumeCreatorFieldType.Text, true),
-            new("Number", "Number", VolumeCreatorFieldType.Number, true),
-            new("Boolean", "Boolean", VolumeCreatorFieldType.Boolean, false, true),
+            new("Text", "Text", VolumeCreatorFieldType.Text) { IsRequired = true },
+            new("Number", "Number", VolumeCreatorFieldType.Number) { IsRequired = true },
+            new("Boolean", "Boolean", VolumeCreatorFieldType.Boolean) { DefaultValue = true },
             new("Optional", "Optional", VolumeCreatorFieldType.Number)
         ];
 

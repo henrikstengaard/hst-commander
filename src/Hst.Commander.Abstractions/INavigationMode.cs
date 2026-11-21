@@ -55,21 +55,29 @@ public interface INavigationMode
 /// <summary>Colors and font of a pane in a navigation mode.</summary>
 /// <param name="Background">Background color, "#RRGGBB".</param>
 /// <param name="Foreground">Color of the icon names, "#RRGGBB".</param>
-/// <param name="FontFamily">Font families of the icon names in order of preference, null for the pane's font.</param>
-/// <param name="FontSize">Font size of the icon names, null for the pane's font size.</param>
-/// <param name="CurrentForeground">
-///     Color of the current icon's name while the pane is active, "#RRGGBB", null for <paramref name="Foreground" />.
-/// </param>
-public sealed record NavigationModeStyle(string Background, string Foreground, string? FontFamily = null,
-    double? FontSize = null, string? CurrentForeground = null);
+public sealed record NavigationModeStyle(string Background, string Foreground)
+{
+    /// <summary>Font families of the icon names in order of preference, null for the pane's font.</summary>
+    public string? FontFamily { get; init; }
+
+    /// <summary>Font size of the icon names, null for the pane's font size.</summary>
+    public double? FontSize { get; init; }
+
+    /// <summary>
+    /// Color of the current icon's name while the pane is active, "#RRGGBB", null for <see cref="Foreground" />.
+    /// </summary>
+    public string? CurrentForeground { get; init; }
+}
 
 /// <summary>Option of a navigation mode shown as a check box, see <see cref="INavigationMode.Options" />.</summary>
 /// <param name="Name">Name of the option in the values passed to <see cref="INavigationMode.Layout" />.</param>
 /// <param name="Label">Text of the check box, e.g. "Icons only".</param>
 /// <param name="Description">Description shown as tooltip.</param>
-/// <param name="DefaultValue">Value until the user changes it.</param>
-public sealed record NavigationModeOption(string Name, string Label, string Description, bool DefaultValue = false)
+public sealed record NavigationModeOption(string Name, string Label, string Description)
 {
+    /// <summary>Value until the user changes it, false by default.</summary>
+    public bool DefaultValue { get; init; }
+
     /// <summary>The value of the option in values passed to <see cref="INavigationMode.Layout" />.</summary>
     public bool GetValue(IReadOnlyDictionary<string, bool>? options) =>
         options != null && options.TryGetValue(Name, out var value) ? value : DefaultValue;
@@ -86,9 +94,13 @@ public sealed record NavigationLayout(IReadOnlyList<NavigationIcon> Icons);
 /// <param name="SelectedImage">Image shown while the icon is selected, null to draw the image highlighted.</param>
 /// <param name="X">Horizontal position of the image in pixels from the left, null when the icon has no position.</param>
 /// <param name="Y">Vertical position of the image in pixels from the top, null when the icon has no position.</param>
-/// <param name="IsMovable">False when the icon can't be dragged to another position, e.g. it has nowhere to store it.</param>
-public sealed record NavigationIcon(string Name, IconImage? Image, IconImage? SelectedImage, int? X, int? Y,
-    bool IsMovable = true);
+public sealed record NavigationIcon(string Name, IconImage? Image, IconImage? SelectedImage, int? X, int? Y)
+{
+    /// <summary>
+    /// False when the icon can't be dragged to another position, e.g. it has nowhere to store it. True by default.
+    /// </summary>
+    public bool IsMovable { get; init; } = true;
+}
 
 /// <summary>Position of an icon moved by the user, of the image in pixels from the upper left corner.</summary>
 public sealed record NavigationIconPosition(string Name, int X, int Y);

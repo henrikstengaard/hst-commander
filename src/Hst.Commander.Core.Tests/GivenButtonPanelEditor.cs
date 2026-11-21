@@ -130,7 +130,7 @@ public class GivenButtonPanelEditor
     {
         // arrange
         var editor = CreateEditor();
-        var changed = new PanelButton("Info", CommanderActions.Properties, null, "#AA0000", "#FFFFFF");
+        var changed = new PanelButton("Info", CommanderActions.Properties) { Background = "#AA0000", Foreground = "#FFFFFF" };
 
         // act
         editor.SetButton(1, 0, changed);
