@@ -1,6 +1,6 @@
 # Testing
 
-Test helpers in `Hst.Commander.Core.Tests`.
+Test helpers in `Hst.Commander.Core.Tests` and the manual smoke test before a release.
 
 Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../src/agents.md).
 
@@ -25,3 +25,64 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - `IlbmTestData` (`Hst.Commander.Core.Tests/IlbmTestData.cs`): creates IFF ILBM pictures from color indices (`CreateIlbm`: bitplanes, optionally ByteRun1 compressed, a CMAP, CAMG view modes and a mask plane) and a LIST of them (`CreateList`).
 - `ArchiveTestData` (`Hst.Commander.Core.Tests/ArchiveTestData.cs`): archives in `TestData/Archives`: lha and lzx archives (from the Hst.Compression tests), e.g. `dirs-files.lha`/`.lzx` (`ArchiveTestData.DirsFiles`), the same tree as `dirs-files.7z` (made with 7-Zip) and `dirs-files.rar`/`dirs-files-rar4.rar` (rar 5 and 4 with stored entries, written by hand as WinRAR is needed to make rar archives), `solid.7z` (one solid block, for `SolidArchiveReader`) and `deflate.7z` (a solid deflate block SharpCompress 0.50.5 read only partly), and `special_chars.lha`/`.lzx` (from the Hst Imager tests) with Amiga names, protection bits and comments.
 
+## Manual Smoke Test
+
+The unit tests cover Core and the plugins, not the front-ends, the packages or the operating systems. Before a release, go through this list with the packages of the draft release made by `build-and-release.yml` (signed, not `artifacts_only`), for both front-ends on each OS:
+
+- **Windows** x64 (and arm64 if available): the setup and the portable zip; the TUI in Windows Terminal and in the classic console.
+- **macOS** arm64 (and x64 if available): the dmgs; the TUI in Terminal.app (see [macOS Terminal](volumes.md#macos-terminal) for F1/F2).
+- **Linux** x64 and arm64 (e.g. a Raspberry Pi): the AppImage and the deb; the TUI in a desktop terminal (see [Linux terminals](volumes.md#linux-terminals)) and over SSH.
+
+Copy the list into the release's pull request or an issue and tick it per OS and front-end. Items marked (GUI) or (TUI) apply to that front-end only. Work in a scratch folder with copies of `Hst.Commander.Core.Tests/TestData/Archives` and some files of your own, and back up `~/.hst-commander` first.
+
+### Install and start
+
+- [ ] Installs and starts without warnings: Windows shows the publisher in SmartScreen and UAC, macOS opens the app without a Gatekeeper warning (notarized), the AppImage runs and the deb installs with a menu entry (GUI) and a command.
+- [ ] Help > About shows the release version (`1.0.<commits>`) and the build date, and Licenses lists the notices of Hst Commander, its components and .NET.
+- [ ] Installing over the previous release keeps the settings and bookmarks (bookmarks saved before 1.0 are a list and are still read).
+- [ ] Uninstalling (Windows setup, deb) removes the app and keeps `~/.hst-commander`.
+
+### Panes and navigation
+
+- [ ] Both panes list the start directory; Tab switches, Enter opens a directory, Backspace goes up, Ctrl+\ goes to the root and Ctrl+H home.
+- [ ] F1/F2 list the volume providers (Bookmarks, Local, Physical disks, FTP/SFTP and SMB when installed); choosing Local lists the drives or mount points.
+- [ ] Ctrl+L and clicking the path change location, also to a path inside an archive.
+- [ ] Clicking a column header sorts, and the order is kept after a restart; Ctrl+F quick search finds entries; Ctrl+R refreshes and Ctrl+U swaps the panes.
+- [ ] Resizing and maximizing the window keeps the layout: the panes reach the bottom area and the right edge.
+- [ ] Insert/Space, `+`, `-` and `*` mark entries, and the panel above the pane summarizes them.
+
+### Images and archives
+
+- [ ] Enter opens `dirs-files.zip` (make one), `.lha`, `.lzx`, `.7z` and `.rar` from the test data and an ISO image; Backspace at their root goes back. Ctrl+PageDown opens a file as a volume.
+- [ ] F9 creates an Amiga disk file (formatted) and an exFAT image; both open, files copied into them are listed after leaving and opening them again, and the other pane sees the same contents.
+- [ ] `special_chars.lha` copied to a local directory keeps the Amiga names, protection bits and comments as UAE metadata (Properties shows them), and copied into the adf they're kept as they are.
+
+### File operations
+
+- [ ] F5 copies and F6 moves marked entries between the panes, with the progress dialog (and the taskbar or terminal tab progress); copying over existing files asks to overwrite; Cancel stops.
+- [ ] Shift+F6 renames, F7 makes a directory, F8 and Delete delete after confirming.
+- [ ] Ctrl+C/Ctrl+X/Ctrl+V (Alt+V in the TUI) copy, cut and paste between the panes; on Windows also to and from Explorer, including files inside an archive. (GUI) Also with Finder and the Linux file manager.
+- [ ] (GUI) Dragging entries to the file manager and dropping files from it on a pane copies them.
+- [ ] Ctrl+S searches by name and by contents, optionally inside archives, and going to a result selects it in the pane.
+- [ ] Ctrl+P shows the properties with the size counted; changing an attribute (Windows) or the Amiga protection bits and comment (in the adf) is saved.
+
+### Viewing and editing
+
+- [ ] F3 views a text file and a large binary file (text, hex with F4, word wrap with F2, search) and Esc closes.
+- [ ] (GUI) F3 views a PNG, a JPEG and an Amiga icon.
+- [ ] F4 edits a text file, also inside the adf; saving keeps the encoding and line breaks; an external editor chosen in the settings opens the file and the changes are written back.
+
+### Locations
+
+- [ ] FTP/SFTP: connecting to a test server (e.g. a local SFTP server) asks for the password, lists, copies both ways, and a new host key is trusted on first use.
+- [ ] SMB: copying the plugin from `smb-plugin.zip` to `~/.hst-commander/plugins/` adds SMB to F1/F2 and its notice to Licenses; connecting to a share lists it and copies both ways.
+- [ ] Ctrl+B bookmarks a local directory and a server location with its password; the bookmark opens after a restart without asking (Windows Credential Manager, macOS Keychain, Linux Secret Service).
+- [ ] Physical disks: choosing them when not elevated offers to restart as administrator (UAC, sudo, pkexec); elevated, the disks are listed with their model and a USB stick opens (copy to it only on a stick that may be erased).
+
+### Interface
+
+- [ ] Ctrl+T runs a command (e.g. `dir` or `ls`) in the active pane's directory; Ctrl+Enter inserts the entry name. (TUI) The output is shown and Ctrl+O shows it again, and the panes come back afterwards.
+- [ ] The context menu (right-click, Shift+F10) works, and Terminal here (PowerShell and Command prompt here on Windows) opens a terminal in the directory.
+- [ ] The settings dialog changes the theme (Midnight Commander, Light, Dark, Directory Opus 4) with a preview, and Directory Opus 4's button editor saves its buttons; the settings are kept after a restart.
+- [ ] (GUI) Ctrl+1 to Ctrl+9 change the navigation mode: list, thumbnails and Workbench in the adf (dragging an icon and saving its position); entry icons show for `.info` files and programs.
+- [ ] F10 (and Esc in the TUI) asks before quitting; closing the editor with changes asks to save them.
