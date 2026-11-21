@@ -1,6 +1,5 @@
-﻿using Hst.Commander.Abstractions;
+using Hst.Commander.Abstractions;
 using Hst.Commander.Core;
-using Terminal.Gui;
 
 namespace Hst.Commander.Tui;
 
@@ -10,24 +9,25 @@ namespace Hst.Commander.Tui;
 ///     previewed immediately through the preview action; <see cref="Result" /> holds the changed settings on OK or null
 ///     on cancel, in which case the caller reverts the preview, and <see cref="ChangedButtons" /> the changed buttons.
 /// </summary>
-public sealed class SettingsDialog : Dialog
+public sealed class SettingsDialog : TuiDialog
 {
     private const int DefaultWidth = 64;
-    private const int DefaultHeight = 18;
+    // the tabs have a bottom border
+    private const int DefaultHeight = 19;
 
     private readonly IReadOnlyList<ThemeChoice> _themes = Themes.All;
-    private readonly TabView _tabView;
+    private readonly Tabs _tabView;
 
     /// <summary>Editors of the buttons by theme, so changes are kept when another theme is chosen and back again.</summary>
     private readonly Dictionary<ICustomizableButtonPanel, ButtonPanelEditor> _buttonEditors = [];
 
-    private Tab? _buttonsTab;
-    private readonly RadioGroup _themeRadioGroup;
-    private readonly RadioGroup _volumeProviderKeysRadioGroup;
-    private readonly RadioGroup _enterFileActionRadioGroup;
+    private View? _buttonsTab;
+    private readonly OptionSelector _themeRadioGroup;
+    private readonly OptionSelector _volumeProviderKeysRadioGroup;
+    private readonly OptionSelector _enterFileActionRadioGroup;
     private readonly TextField _temporaryCopyLimitField;
-    private readonly RadioGroup _uaeMetadataRadioGroup;
-    private readonly RadioGroup _editorRadioGroup;
+    private readonly OptionSelector _uaeMetadataRadioGroup;
+    private readonly OptionSelector _editorRadioGroup;
     private readonly TextField _editorCommandField;
     private readonly TuiSettings _settings;
     private readonly Action<ThemeChoice> _preview;
@@ -39,38 +39,38 @@ public sealed class SettingsDialog : Dialog
         Title = "Settings";
         Width = DefaultWidth;
         Height = DefaultHeight;
-        ColorScheme = palette.DialogColorScheme;
+        SetScheme(palette.DialogColorScheme);
 
         // appearance
         var themeLabel = new Label { X = 1, Y = 1, Text = "Theme:" };
-        _themeRadioGroup = new RadioGroup
+        _themeRadioGroup = new OptionSelector
         {
             X = 16,
             Y = 1,
-            RadioLabels = _themes.Select(theme => theme.Name).ToArray(),
-            SelectedItem = Math.Max(0, _themes.ToList().IndexOf(Themes.Find(_themes, settings.Theme)))
+            Labels = _themes.Select(theme => theme.Name).ToArray(),
+            Value = Math.Max(0, _themes.ToList().IndexOf(Themes.Find(_themes, settings.Theme)))
         };
-        _themeRadioGroup.SelectedItemChanged += (_, _) => Preview(SelectedTheme);
+        _themeRadioGroup.ValueChanged += (_, _) => Preview(SelectedTheme);
 
         // panes
         var volumeProviderKeysLabel = new Label { X = 1, Y = 1, Text = "Volume keys:" };
-        _volumeProviderKeysRadioGroup = new RadioGroup
+        _volumeProviderKeysRadioGroup = new OptionSelector
         {
             X = 16,
             Y = 1,
-            RadioLabels = VolumeProviderKeyBindings.All.Select(keys => keys == VolumeProviderKeyBindings.Default
+            Labels = VolumeProviderKeyBindings.All.Select(keys => keys == VolumeProviderKeyBindings.Default
                 ? $"{VolumeProviderKeyBindings.GetName(keys)} (default)"
                 : VolumeProviderKeyBindings.GetName(keys)).ToArray(),
-            SelectedItem = Math.Max(0, VolumeProviderKeyBindings.All.ToList().IndexOf(settings.EffectiveVolumeProviderKeys))
+            Value = Math.Max(0, VolumeProviderKeyBindings.All.ToList().IndexOf(settings.EffectiveVolumeProviderKeys))
         };
 
         var enterFileActionLabel = new Label { X = 1, Y = 4, Text = "Enter on file:" };
-        _enterFileActionRadioGroup = new RadioGroup
+        _enterFileActionRadioGroup = new OptionSelector
         {
             X = 16,
             Y = 4,
-            RadioLabels = EnterFileActions.All.Select(EnterFileActions.GetName).ToArray(),
-            SelectedItem = Math.Max(0, EnterFileActions.All.ToList().IndexOf(settings.EnterFileAction))
+            Labels = EnterFileActions.All.Select(EnterFileActions.GetName).ToArray(),
+            Value = Math.Max(0, EnterFileActions.All.ToList().IndexOf(settings.EnterFileAction))
         };
 
         var temporaryCopyLimitLabel = new Label { X = 1, Y = 7, Text = "Copy limit:" };
@@ -89,22 +89,22 @@ public sealed class SettingsDialog : Dialog
 
         // copying
         var uaeMetadataLabel = new Label { X = 1, Y = 1, Text = "UAE metadata:" };
-        _uaeMetadataRadioGroup = new RadioGroup
+        _uaeMetadataRadioGroup = new OptionSelector
         {
             X = 16,
             Y = 1,
-            RadioLabels = UaeMetadataFormats.All.Select(UaeMetadataFormats.GetName).ToArray(),
-            SelectedItem = Math.Max(0, UaeMetadataFormats.All.ToList().IndexOf(settings.UaeMetadata))
+            Labels = UaeMetadataFormats.All.Select(UaeMetadataFormats.GetName).ToArray(),
+            Value = Math.Max(0, UaeMetadataFormats.All.ToList().IndexOf(settings.UaeMetadata))
         };
 
         // editor
         var editorLabel = new Label { X = 1, Y = 1, Text = "Editor (F4):" };
-        _editorRadioGroup = new RadioGroup
+        _editorRadioGroup = new OptionSelector
         {
             X = 16,
             Y = 1,
-            RadioLabels = EditorKinds.All.Select(kind => EditorKinds.GetName(kind, true)).ToArray(),
-            SelectedItem = Math.Max(0, EditorKinds.All.ToList().IndexOf(settings.Editor))
+            Labels = EditorKinds.All.Select(kind => EditorKinds.GetName(kind, true)).ToArray(),
+            Value = Math.Max(0, EditorKinds.All.ToList().IndexOf(settings.Editor))
         };
         var editorCommandLabel = new Label { X = 1, Y = 5, Text = "Command:" };
         _editorCommandField = new TextField
@@ -118,24 +118,24 @@ public sealed class SettingsDialog : Dialog
             Width = Dim.Fill(1),
             Text = $"e.g. vim, {ExternalEditor.FilePlaceholder} is the file (else added last)"
         };
-        _editorRadioGroup.SelectedItemChanged += (_, _) => UpdateEditorCommand();
+        _editorRadioGroup.ValueChanged += (_, _) => UpdateEditorCommand();
         UpdateEditorCommand();
 
-        var tabView = new TabView { X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Fill(1) };
+        var tabView = new Tabs { X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Fill() };
         _tabView = tabView;
-        tabView.AddTab(CreateTab("Appearance", themeLabel, _themeRadioGroup), true);
-        tabView.AddTab(CreateTab("Panes", volumeProviderKeysLabel, _volumeProviderKeysRadioGroup,
+        tabView.Add(CreateTab("Appearance", themeLabel, _themeRadioGroup));
+        tabView.Add(CreateTab("Panes", volumeProviderKeysLabel, _volumeProviderKeysRadioGroup,
             enterFileActionLabel, _enterFileActionRadioGroup, temporaryCopyLimitLabel, _temporaryCopyLimitField,
-            temporaryCopyLimitHelp), false);
-        tabView.AddTab(CreateTab("Copying", uaeMetadataLabel, _uaeMetadataRadioGroup), false);
-        tabView.AddTab(CreateTab("Editor", editorLabel, _editorRadioGroup, editorCommandLabel, _editorCommandField,
-            editorCommandHelp), false);
+            temporaryCopyLimitHelp));
+        tabView.Add(CreateTab("Copying", uaeMetadataLabel, _uaeMetadataRadioGroup));
+        tabView.Add(CreateTab("Editor", editorLabel, _editorRadioGroup, editorCommandLabel, _editorCommandField,
+            editorCommandHelp));
         UpdateButtonsTab(palette);
 
         var okButton = new Button { Text = "OK", IsDefault = true };
         okButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
+            e.Handled = true;
             if (SelectedEditor == EditorKind.Custom && ExternalEditor.ParseCommand(_editorCommandField.Text) == null)
             {
                 ErrorBox.ShowNotice("Enter the command of the custom editor");
@@ -171,7 +171,7 @@ public sealed class SettingsDialog : Dialog
         var cancelButton = new Button { Text = "Cancel" };
         cancelButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
+            e.Handled = true;
             Application.RequestStop(this);
         };
 
@@ -182,7 +182,7 @@ public sealed class SettingsDialog : Dialog
     }
 
     /// <summary>Settings with the chosen theme when OK was pressed, otherwise null.</summary>
-    public TuiSettings? Result { get; private set; }
+    public new TuiSettings? Result { get; private set; }
 
     /// <summary>
     ///     Buttons of the chosen theme as changed in the editor, to be saved by the caller with
@@ -191,43 +191,43 @@ public sealed class SettingsDialog : Dialog
     /// </summary>
     public (ICustomizableButtonPanel ButtonPanel, ButtonPanel Layout)? ChangedButtons { get; private set; }
 
-    private ThemeChoice SelectedTheme => _themes[Math.Max(0, _themeRadioGroup.SelectedItem)];
+    private ThemeChoice SelectedTheme => _themes[Math.Max(0, (_themeRadioGroup.Value ?? 0))];
 
     private VolumeProviderKeys SelectedVolumeProviderKeys =>
-        VolumeProviderKeyBindings.All[Math.Max(0, _volumeProviderKeysRadioGroup.SelectedItem)];
+        VolumeProviderKeyBindings.All[Math.Max(0, (_volumeProviderKeysRadioGroup.Value ?? 0))];
 
     private EnterFileAction SelectedEnterFileAction =>
-        EnterFileActions.All[Math.Max(0, _enterFileActionRadioGroup.SelectedItem)];
+        EnterFileActions.All[Math.Max(0, (_enterFileActionRadioGroup.Value ?? 0))];
 
     private UaeMetadataFormat SelectedUaeMetadata =>
-        UaeMetadataFormats.All[Math.Max(0, _uaeMetadataRadioGroup.SelectedItem)];
+        UaeMetadataFormats.All[Math.Max(0, (_uaeMetadataRadioGroup.Value ?? 0))];
 
-    private EditorKind SelectedEditor => EditorKinds.All[Math.Max(0, _editorRadioGroup.SelectedItem)];
+    private EditorKind SelectedEditor => EditorKinds.All[Math.Max(0, (_editorRadioGroup.Value ?? 0))];
 
     /// <summary>The command can only be entered for the custom editor.</summary>
     private void UpdateEditorCommand() => _editorCommandField.Enabled = SelectedEditor == EditorKind.Custom;
 
-    private static Tab CreateTab(string name, params View[] views)
+    private static View CreateTab(string name, params View[] views)
     {
-        var view = new View { Width = Dim.Fill(), Height = Dim.Fill(), CanFocus = true };
+        var view = new View { Title = name, Width = Dim.Fill(), Height = Dim.Fill(), CanFocus = true };
         // a radio group highlighted while pressed keeps the color scheme it had when pressed as its own when released,
         // so after clicking a theme it would keep the colors of the theme before instead of the dialog's
-        foreach (var radioGroup in views.OfType<RadioGroup>())
+        foreach (var radioGroup in views.OfType<OptionSelector>())
         {
-            radioGroup.HighlightStyle = HighlightStyle.None;
+            radioGroup.MouseHighlightStates = MouseState.None;
         }
 
         view.Add(views);
-        return new Tab { DisplayText = name, View = view };
+        return view;
     }
 
     private void Preview(ThemeChoice theme)
     {
         _preview(theme);
         var palette = TuiPalette.For(theme);
-        ColorScheme = palette.DialogColorScheme;
+        SetScheme(palette.DialogColorScheme);
         UpdateButtonsTab(palette);
-        NeedsDraw = true;
+        SetNeedsDraw();
     }
 
     /// <summary>
@@ -238,7 +238,8 @@ public sealed class SettingsDialog : Dialog
     {
         if (_buttonsTab != null)
         {
-            _tabView.RemoveTab(_buttonsTab);
+            _tabView.Remove(_buttonsTab);
+            _buttonsTab.Dispose();
             _buttonsTab = null;
         }
 
@@ -279,35 +280,35 @@ public sealed class SettingsDialog : Dialog
         var addColumnButton = new Button { X = 1, Y = Pos.AnchorEnd(2), Text = "Add column" };
         addColumnButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
+            e.Handled = true;
             editorView.AddColumn();
             editorView.SetFocus();
         };
         var addButton = new Button { X = Pos.Right(addColumnButton) + 1, Y = Pos.AnchorEnd(2), Text = "Add button" };
         addButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
+            e.Handled = true;
             editorView.AddButton();
             editorView.SetFocus();
         };
         var removeButton = new Button { X = Pos.Right(addButton) + 1, Y = Pos.AnchorEnd(2), Text = "Remove" };
         removeButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
+            e.Handled = true;
             editorView.RemoveSelected();
             editorView.SetFocus();
         };
         var resetButton = new Button { X = Pos.Right(removeButton) + 1, Y = Pos.AnchorEnd(2), Text = "Reset" };
         resetButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
+            e.Handled = true;
             editor.Reset(buttonPanel.DefaultLayout);
             editorView.SetFocus();
         };
 
         _buttonsTab = CreateTab(buttonPanel.SettingsTitle, editorView, help, addColumnButton, addButton, removeButton,
             resetButton);
-        _tabView.AddTab(_buttonsTab, false);
+        _tabView.Add(_buttonsTab);
         Width = Dim.Percent(90);
         Height = Dim.Percent(90);
     }

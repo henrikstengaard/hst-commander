@@ -1,7 +1,6 @@
 using Hst.Commander.Abstractions;
 using Hst.Commander.Core;
-using Terminal.Gui;
-using TuiAttribute = Terminal.Gui.Attribute;
+using TuiAttribute = Terminal.Gui.Drawing.Attribute;
 
 namespace Hst.Commander.Tui;
 
@@ -149,7 +148,7 @@ public sealed class ButtonPanelEditorView : View
         return true;
     }
 
-    protected override bool OnMouseEvent(MouseEventArgs mouseEvent)
+    protected override bool OnMouseEvent(Mouse mouseEvent)
     {
         if (!mouseEvent.IsSingleClicked && !mouseEvent.IsDoubleClicked)
         {
@@ -157,10 +156,10 @@ public sealed class ButtonPanelEditorView : View
         }
 
         SetFocus();
-        var column = _scrollColumn + mouseEvent.Position.X / ColumnWidth;
+        var column = _scrollColumn + mouseEvent.Position!.Value.X / ColumnWidth;
         if (column < Editor.Columns.Count)
         {
-            Select(column, mouseEvent.Position.Y - 1);
+            Select(column, mouseEvent.Position!.Value.Y - 1);
             if (mouseEvent.IsDoubleClicked)
             {
                 EditSelected();
@@ -192,13 +191,13 @@ public sealed class ButtonPanelEditorView : View
             _scrollColumn = _column - visibleColumns + 1;
         }
 
-        NeedsDraw = true;
+        SetNeedsDraw();
     }
 
-    protected override bool OnDrawingContent()
+    protected override bool OnDrawingContent(DrawContext? context)
     {
-        var normal = GetNormalColor();
-        var cursor = HasFocus ? GetFocusColor() : new TuiAttribute(normal.Background, normal.Foreground);
+        var normal = GetAttributeForRole(VisualRole.Normal);
+        var cursor = HasFocus ? GetAttributeForRole(VisualRole.Focus) : new TuiAttribute(normal.Background, normal.Foreground);
         for (var y = 0; y < Viewport.Height; y++)
         {
             Move(0, y);

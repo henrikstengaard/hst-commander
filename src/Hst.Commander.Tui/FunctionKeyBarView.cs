@@ -1,5 +1,4 @@
-using Terminal.Gui;
-using TuiAttribute = Terminal.Gui.Attribute;
+using TuiAttribute = Terminal.Gui.Drawing.Attribute;
 
 namespace Hst.Commander.Tui;
 
@@ -15,7 +14,7 @@ public sealed class FunctionKeyBarView : View
 
     public TuiAttribute TitleAttribute { get; set; }
 
-    protected override bool OnDrawingContent()
+    protected override bool OnDrawingContent(DrawContext? context)
     {
         var width = Viewport.Width;
         if (width <= 0 || Items.Count == 0)
@@ -45,13 +44,18 @@ public sealed class FunctionKeyBarView : View
         return true;
     }
 
-    protected override bool OnMouseClick(MouseEventArgs mouseEvent)
+    protected override bool OnMouseEvent(Mouse mouseEvent)
     {
+        if (!mouseEvent.Flags.HasFlag(MouseFlags.LeftButtonClicked))
+        {
+            return base.OnMouseEvent(mouseEvent);
+        }
+
         var width = Viewport.Width;
         for (var index = 0; index < Items.Count; index++)
         {
             var (start, itemWidth) = GetItemBounds(index, width);
-            if (mouseEvent.Position.X < start || mouseEvent.Position.X >= start + itemWidth)
+            if (mouseEvent.Position!.Value.X < start || mouseEvent.Position!.Value.X >= start + itemWidth)
             {
                 continue;
             }

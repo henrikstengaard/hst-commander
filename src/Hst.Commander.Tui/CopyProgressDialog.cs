@@ -1,6 +1,5 @@
 using Hst.Commander.Core;
 using Hst.Commander.Core.Volumes;
-using Terminal.Gui;
 
 namespace Hst.Commander.Tui;
 
@@ -9,7 +8,7 @@ namespace Hst.Commander.Tui;
 ///     speed and estimated time left. Cancel (or Esc) cancels the copy through <see cref="CancellationToken" />; the
 ///     dialog stays open until the copy has stopped and <see cref="Complete" /> is called.
 /// </summary>
-public sealed class CopyProgressDialog : Dialog
+public sealed class CopyProgressDialog : TuiDialog
 {
     private readonly CancellationTokenSource _cancellationTokenSource = new();
     private readonly Label _currentLabel;
@@ -28,7 +27,7 @@ public sealed class CopyProgressDialog : Dialog
         Title = title;
         Width = Dim.Percent(70);
         Height = 13;
-        ColorScheme = palette.DialogColorScheme;
+        SetScheme(palette.DialogColorScheme);
 
         _currentLabel = new Label { X = 1, Y = 1, Width = Dim.Fill(1), Text = "Preparing..." };
         _currentProgressBar = CreateProgressBar(2);
@@ -39,12 +38,12 @@ public sealed class CopyProgressDialog : Dialog
         _cancelButton = new Button { Text = "Cancel", IsDefault = true };
         _cancelButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
+            e.Handled = true;
             Cancel();
         };
-        Closing += (_, e) =>
+        IsRunningChanging += (_, e) =>
         {
-            if (_completed)
+            if (e.NewValue || _completed)
             {
                 return;
             }

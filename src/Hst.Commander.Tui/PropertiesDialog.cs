@@ -1,6 +1,5 @@
 using Hst.Commander.Core;
 using Hst.Commander.Core.Volumes;
-using Terminal.Gui;
 
 namespace Hst.Commander.Tui;
 
@@ -14,7 +13,7 @@ namespace Hst.Commander.Tui;
 ///     <see cref="CancellationToken" />. When something can be changed the dialog has Save and Cancel, and Save sets
 ///     <see cref="CheckedFlags" /> and <see cref="TabTexts" />; nothing is changed before.
 /// </summary>
-public sealed class PropertiesDialog : Dialog
+public sealed class PropertiesDialog : TuiDialog
 {
     private readonly EntryProperties _properties;
     private readonly CancellationTokenSource _cancellationTokenSource = new();
@@ -27,7 +26,7 @@ public sealed class PropertiesDialog : Dialog
     {
         _properties = properties;
         Title = "Properties";
-        ColorScheme = palette.DialogColorScheme;
+        SetScheme(palette.DialogColorScheme);
 
         var sections = properties.GetSections();
         var labelWidth = sections.SelectMany(section => section).Select(line => line.Label)
@@ -40,18 +39,18 @@ public sealed class PropertiesDialog : Dialog
             .Select(group => group.Flags.Sum(flag => flag.Label.Length + 3) + group.Flags.Count - 1)
             .DefaultIfEmpty(0).Max();
         var minimumWidth = 1 + 1 + labelWidth + checkBoxesWidth + 1 + 1 + 2;
-        Width = Dim.Func(() => Math.Min(Application.Screen.Width,
+        Width = Dim.Func(_ => Math.Min(Application.Screen.Width,
             Math.Max(Application.Screen.Width * 70 / 100, minimumWidth)));
         Add(new Label { X = 1, Y = 1, Width = Dim.Fill(1), Text = properties.Name });
 
-        var general = new View { Width = Dim.Fill(), Height = Dim.Fill(), CanFocus = true };
+        var general = new View { Title = "General", Width = Dim.Fill(), Height = Dim.Fill(), CanFocus = true };
         var y = 0;
         foreach (var section in sections)
         {
             // separators between the sections, not above the first one
             if (y > 0)
             {
-                general.Add(new Line { X = 0, Y = y++, Width = Dim.Fill() });
+                general.Add(CreateSeparator(y++));
             }
 
             foreach (var line in section)
@@ -66,7 +65,7 @@ public sealed class PropertiesDialog : Dialog
         {
             if (y > 0)
             {
-                general.Add(new Line { X = 0, Y = y++, Width = Dim.Fill() });
+                general.Add(CreateSeparator(y++));
             }
 
             foreach (var group in properties.FlagGroups)
@@ -80,7 +79,7 @@ public sealed class PropertiesDialog : Dialog
                         X = checkBoxes.Count == 0 ? labelWidth : Pos.Right(checkBoxes[^1]) + 1,
                         Y = y,
                         Text = flag.Label,
-                        CheckedState = flag.IsSet ? CheckState.Checked : CheckState.UnChecked,
+                        Value = flag.IsSet ? CheckState.Checked : CheckState.UnChecked,
                         Enabled = group.CanChange
                     };
                     checkBoxes.Add(checkBox);
@@ -109,13 +108,14 @@ public sealed class PropertiesDialog : Dialog
 
         // the tab view is as high as its highest tab, with the 3 rows of the tabs and the bottom border
         var contentRows = properties.Tabs.Count > 0 ? Math.Max(y, PropertiesTabView.Rows) : y;
-        var tabView = new TabView { X = 1, Y = 2, Width = Dim.Fill(1), Height = contentRows + 4 };
-        tabView.AddTab(new Tab { DisplayText = "General", View = general }, true);
+        var tabView = new Tabs { X = 1, Y = 2, Width = Dim.Fill(1), Height = contentRows + 4 };
+        tabView.Add(general);
         foreach (var tab in properties.Tabs)
         {
             var tabContent = new PropertiesTabView(tab);
             _tabViews.Add(tabContent);
-            tabView.AddTab(new Tab { DisplayText = tab.Title, View = tabContent }, false);
+            tabContent.Title = tab.Title;
+            tabView.Add(tabContent);
         }
 
         Add(tabView);
@@ -130,16 +130,22 @@ public sealed class PropertiesDialog : Dialog
             {
                 CheckedFlags = _flagCheckBoxes
                     .Select(checkBoxes => (IReadOnlyList<bool>)checkBoxes
-                        .Select(checkBox => checkBox.CheckedState == CheckState.Checked)
+                        .Select(checkBox => checkBox.Value == CheckState.Checked)
                         .ToList())
                     .ToList();
                 TabTexts = _tabViews.Select(tabContent => tabContent.EditedText).ToList();
             }
 
-            e.Cancel = true;
+            e.Handled = true;
             Application.RequestStop(this);
         };
-        Closing += (_, _) => Close();
+        IsRunningChanging += (_, e) =>
+        {
+            if (!e.NewValue)
+            {
+                Close();
+            }
+        };
 
         AddButton(okButton);
         if (properties.CanChange)
@@ -147,7 +153,7 @@ public sealed class PropertiesDialog : Dialog
             var cancelButton = new Button { Text = "Cancel" };
             cancelButton.Accepting += (_, e) =>
             {
-                e.Cancel = true;
+                e.Handled = true;
                 Application.RequestStop(this);
             };
             AddButton(cancelButton);
@@ -216,4 +222,11 @@ public sealed class PropertiesDialog : Dialog
         _closed = true;
         _cancellationTokenSource.Cancel();
     }
+
+    /// <summary>
+    ///     A horizontal line drawn by itself: a <see cref="Line" /> is otherwise drawn by its superview's line canvas,
+    ///     which the tab view draws over all tabs, so it would show through the other tabs.
+    /// </summary>
+    private static Line CreateSeparator(int y) =>
+        new() { X = 0, Y = y, Width = Dim.Fill(), SuperViewRendersLineCanvas = false };
 }

@@ -2,8 +2,7 @@ using System.Data;
 using Hst.Commander.Core;
 using Hst.Commander.Core.Volumes;
 using Hst.Commander.Abstractions;
-using Terminal.Gui;
-using TuiAttribute = Terminal.Gui.Attribute;
+using TuiAttribute = Terminal.Gui.Drawing.Attribute;
 
 namespace Hst.Commander.Tui;
 
@@ -23,7 +22,7 @@ public sealed class MainWindow : Window
     private Pane _rightPane;
     private readonly MenuItem _leftVolumeMenuItem;
     private readonly MenuItem _rightVolumeMenuItem;
-    private ContextMenu? _entryMenu;
+    private PopoverMenu? _entryMenu;
     private VolumeProviderKeys _volumeProviderKeys;
     private TuiPalette _palette;
     private Pane _activePane;
@@ -46,6 +45,8 @@ public sealed class MainWindow : Window
         Height = Dim.Fill();
         _palette = TuiPalette.For(theme);
 
+        // menus get their border when created
+        MenuSettings.Current = MenuSettings.Current with { DefaultBorderStyle = LineStyle.Single };
         _leftVolumeMenuItem = new MenuItem("_Left volume...", string.Empty, ChooseLeftVolumeProvider);
         _rightVolumeMenuItem = new MenuItem("_Right volume...", string.Empty, ChooseRightVolumeProvider);
         _menuBar = new MenuBar
@@ -104,7 +105,7 @@ public sealed class MainWindow : Window
         _commandField = new TextField { X = Pos.Right(_commandPrompt), Y = Pos.AnchorEnd(2), Width = Dim.Fill() };
         _commandField.KeyDown += OnCommandFieldKeyDown;
         // the panes handle f9 (create volume) and f10 (quit) before the menu bar's key, so alt+f opens the menu
-        Closing += (_, e) => e.Cancel = !ConfirmClosing();
+        IsRunningChanging += (_, e) => e.Cancel = !e.NewValue && !ConfirmClosing();
         _leftPane = CreatePane(new NavigationContext(initialPath, StartFile), 0, true);
         _rightPane = CreatePane(new NavigationContext(initialPath, StartFile), 50, false);
         _activePane = _leftPane;
@@ -127,7 +128,7 @@ public sealed class MainWindow : Window
         // program has run in the terminal
         Application.InitializedChanged += (_, args) =>
         {
-            if (args.CurrentValue)
+            if (args.Value)
             {
                 ApplyMessageBoxColors();
             }
@@ -143,17 +144,22 @@ public sealed class MainWindow : Window
         // Application.Init installs Terminal.Gui's synchronization context, so awaiting a listing that isn't done at
         // once (e.g. the physical disks) before Application.Run would wait for a main loop that isn't running yet
         // cut files pasted in another application (e.g. Explorer) are moved by it, so the panes are listed again;
-        // checked on the main loop through Application.Invoke, also after the window runs again when a program has run
-        // in the terminal
-        _cutMovedTimer = new Timer(_ => Application.Invoke(() =>
+        // checked on the main loop, also after the window runs again when a program has run in the terminal (skipped
+        // while it runs)
+        _cutMovedTimer = new Timer(_ => UiThread.PostIfRunning(() =>
         {
             if (EntryClipboard.CheckCutMoved())
             {
                 _ = InitializeAsync();
             }
         }), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
-        Loaded += async (_, _) =>
+        IsRunningChanged += async (_, args) =>
         {
+            if (!args.Value)
+            {
+                return;
+            }
+
             _activePane.TableView.SetFocus();
             ShowPendingError();
             ShowPendingCrashReport();
@@ -162,7 +168,7 @@ public sealed class MainWindow : Window
                 _loadedOnce = true;
                 if (CrashHandler.TestCrash == "ui")
                 {
-                    Application.Invoke(() => throw CrashHandler.CreateTestUiException());
+                    UiThread.Post(() => throw CrashHandler.CreateTestUiException());
                 }
             }
 
@@ -203,7 +209,7 @@ public sealed class MainWindow : Window
         }
 
         _pendingError = null;
-        Application.Invoke(() => ErrorBox.Show(message));
+        UiThread.Post(() => ErrorBox.Show(message));
     }
 
     /// <summary>Report of the crash of the last run (<see cref="CrashMarker" />), offered to be reported when loaded.</summary>
@@ -226,12 +232,12 @@ public sealed class MainWindow : Window
         }
 
         _pendingCrashReport = null;
-        Application.Invoke(() => ShowUnexpectedError(UnexpectedErrorDialog.ForLastCrash(crashReport, _palette)));
+        UiThread.Post(() => ShowUnexpectedError(UnexpectedErrorDialog.ForLastCrash(crashReport, _palette)));
     }
 
     /// <summary>
     ///     Shows an unhandled exception caught by the main loop, already logged, unless one is shown already. Called
-    ///     through <see cref="Application.Invoke(Action)" />, not from the error handler of the main loop.
+    ///     through <see cref="UiThread.Post" />, not from the error handler of the main loop.
     /// </summary>
     public void ShowUnexpectedError(Exception exception) =>
         ShowUnexpectedError(UnexpectedErrorDialog.ForException(exception, _palette));
@@ -279,7 +285,7 @@ public sealed class MainWindow : Window
     ///     stopping it for a terminal action isn't quitting. Esc in the confirm dialog answers no.
     /// </summary>
     private bool ConfirmClosing() => _pendingTerminalAction != null || _restarting ||
-                                     MessageBox.Query("Quit", AppInfo.Current.QuitQuestion, "_Yes", "_No") == 0;
+                                     TuiMessageBox.Query("Quit", AppInfo.Current.QuitQuestion, "_Yes", "_No") == 0;
 
     /// <summary>Stops the window, so the action is done in the terminal while the TUI is shut down.</summary>
     private void RequestTerminalAction(TerminalAction action)
@@ -359,45 +365,48 @@ public sealed class MainWindow : Window
             pane.PathPanel.HighlightWhenActive = theme.HighlightActivePathPanel;
         }
 
-        _menuBar.ColorScheme = _palette.MenuColorScheme;
-        _menuBar.NeedsDraw = true;
+        _menuBar.SetScheme(_palette.MenuColorScheme);
+        _menuBar.SetNeedsDraw();
         if (_administratorLabel != null)
         {
-            _administratorLabel.ColorScheme = _palette.AdministratorColorScheme;
+            _administratorLabel.SetScheme(_palette.AdministratorColorScheme);
         }
 
         _bottomPanel.KeyAttribute = _palette.ButtonKey;
         _bottomPanel.TitleAttribute = _palette.ButtonTitle;
-        _bottomPanel.NeedsDraw = true;
+        _bottomPanel.SetNeedsDraw();
         var commandAttribute = new TuiAttribute(_palette.Item, _palette.PaneBackground);
-        _commandPrompt.ColorScheme = CreateColorScheme(_palette.PaneNormal, _palette.PaneNormal);
-        _commandField.ColorScheme = CreateColorScheme(commandAttribute, commandAttribute);
+        _commandPrompt.SetScheme(CreateColorScheme(_palette.PaneNormal, _palette.PaneNormal));
+        _commandField.SetScheme(TuiPalette.CreateScheme(commandAttribute, commandAttribute));
         foreach (var pane in new[] { _leftPane, _rightPane })
         {
             ApplyPaneColors(pane);
         }
 
         ApplyMessageBoxColors();
-        NeedsDraw = true;
+        SetNeedsDraw();
     }
 
     /// <summary>
-    ///     Message boxes (<c>MessageBox.Query</c> and <c>ErrorQuery</c>) use Terminal.Gui's "Dialog" and "Error" color
-    ///     schemes, whose focused buttons barely differ from the others (dark gray instead of black text), so they get
-    ///     the theme's dialog colors like the other dialogs.
+    ///     Message boxes (<see cref="TuiMessageBox" />) use Terminal.Gui's "Dialog" and "Error" color schemes, whose
+    ///     focused buttons barely differ from the others (dark gray instead of black text), so they get the theme's
+    ///     dialog colors like the other dialogs. The menus of the menu bar and the context menu of the entries are
+    ///     popovers with Terminal.Gui's "Menu" scheme, so it gets the theme's menu colors, and a border.
     /// </summary>
     private void ApplyMessageBoxColors()
     {
-        Colors.ColorSchemes["Dialog"] = _palette.DialogColorScheme;
-        Colors.ColorSchemes["Error"] = _palette.ErrorColorScheme;
+        SchemeManager.AddScheme("Dialog", _palette.DialogColorScheme);
+        SchemeManager.AddScheme("Error", _palette.ErrorColorScheme);
+        SchemeManager.AddScheme("Menu", _palette.MenuColorScheme);
+        MenuSettings.Current = MenuSettings.Current with { DefaultBorderStyle = LineStyle.Single };
     }
 
     /// <summary>Sets the keys opening the volume provider lists, shown in the File menu.</summary>
     private void ApplyVolumeProviderKeys(VolumeProviderKeys keys)
     {
         _volumeProviderKeys = keys;
-        _leftVolumeMenuItem.Help = VolumeProviderKeyBindings.GetLeftKeyText(keys);
-        _rightVolumeMenuItem.Help = VolumeProviderKeyBindings.GetRightKeyText(keys);
+        _leftVolumeMenuItem.HelpText = VolumeProviderKeyBindings.GetLeftKeyText(keys);
+        _rightVolumeMenuItem.HelpText = VolumeProviderKeyBindings.GetRightKeyText(keys);
     }
 
     /// <summary>Sets what Enter does with files in both panes.</summary>
@@ -438,19 +447,22 @@ public sealed class MainWindow : Window
         pane.PathPanel.BorderAttribute = normal;
         pane.PathPanel.PathAttribute = new TuiAttribute(_palette.Path, _palette.PaneBackground);
         pane.PathPanel.ActivePathAttribute = _palette.ActivePath;
-        pane.PathPanel.NeedsDraw = true;
-        pane.TableView.ColorScheme = CreateColorScheme(
+        pane.PathPanel.SetNeedsDraw();
+        pane.TableView.SetScheme(CreateColorScheme(
             normal,
             _palette.Cursor,
             new TuiAttribute(_palette.Header, _palette.PaneBackground),
-            _palette.Cursor);
-        pane.TableView.NeedsDraw = true;
-        pane.BottomLine.ColorScheme = CreateColorScheme(normal, normal);
-        pane.BottomLine.NeedsDraw = true;
-        pane.QuickSearchLabel.ColorScheme = CreateColorScheme(_palette.ActivePath, _palette.ActivePath);
-        pane.QuickSearchLabel.NeedsDraw = true;
+            _palette.Cursor));
+        // the headers are drawn in the pane's normal color, also while the pane has focus (Terminal.Gui v2 draws them
+        // in the focus color otherwise)
+        pane.TableView.Style.HeaderScheme = CreateColorScheme(normal, normal);
+        pane.TableView.SetNeedsDraw();
+        pane.BottomLine.SetScheme(CreateColorScheme(normal, normal));
+        pane.BottomLine.SetNeedsDraw();
+        pane.QuickSearchLabel.SetScheme(CreateColorScheme(_palette.ActivePath, _palette.ActivePath));
+        pane.QuickSearchLabel.SetNeedsDraw();
         pane.ParentStrip.Attribute = _palette.ButtonTitle;
-        pane.ParentStrip.NeedsDraw = true;
+        pane.ParentStrip.SetNeedsDraw();
     }
 
     /// <summary>
@@ -469,7 +481,7 @@ public sealed class MainWindow : Window
         }
 
         pane.View.SetNeedsLayout();
-        pane.View.NeedsDraw = true;
+        pane.View.SetNeedsDraw();
     }
 
     /// <summary>Runs a command of a button in the bottom area (<see cref="CommanderActions" />) on the active pane.</summary>
@@ -650,7 +662,6 @@ public sealed class MainWindow : Window
             Height = Dim.Fill(1),
             FullRowSelect = true,
             MaxCellWidth = int.MaxValue,
-            CellActivationKey = KeyCode.Enter,
             // typing letters doesn't jump to entries, the names start with a marker; Ctrl+F starts a quick search
             CollectionNavigator = null
         };
@@ -723,11 +734,11 @@ public sealed class MainWindow : Window
                 StopQuickSearch(pane);
             }
 
-            pane.TableView.NeedsDraw = true;
+            pane.TableView.SetNeedsDraw();
             pane.PathPanel.IsActive = pane.TableView.HasFocus;
-            pane.PathPanel.NeedsDraw = true;
+            pane.PathPanel.SetNeedsDraw();
         };
-        pane.TableView.SelectedCellChanged += (_, _) => pane.TableView.NeedsDraw = true;
+        pane.TableView.SelectedCellChanged += (_, _) => pane.TableView.SetNeedsDraw();
         pane.TableView.RightClicked += (_, click) => ShowEntryMenu(pane, click.Row, click.ScreenPosition);
         pane.TableView.HeaderClicked += (_, column) => SortPane(pane, column);
         pane.TableView.MousePressed += (_, _) => StopQuickSearch(pane);
@@ -950,7 +961,7 @@ public sealed class MainWindow : Window
     private void FocusCommandLine()
     {
         _commandField.SetFocus();
-        _commandField.CursorPosition = _commandField.Text.Length;
+        _commandField.InsertionPoint = _commandField.Text.Length;
     }
 
     /// <summary>
@@ -967,11 +978,11 @@ public sealed class MainWindow : Window
         }
 
         _commandLine.Text = _commandField.Text;
-        var position = atCursor ? _commandField.CursorPosition : _commandField.Text.Length;
+        var position = atCursor ? _commandField.InsertionPoint : _commandField.Text.Length;
         position = _commandLine.Insert(text, position);
         _commandField.Text = _commandLine.Text;
-        _commandField.CursorPosition = position;
-        _commandField.NeedsDraw = true;
+        _commandField.InsertionPoint = position;
+        _commandField.SetNeedsDraw();
     }
 
     /// <summary>
@@ -1004,7 +1015,7 @@ public sealed class MainWindow : Window
             if (previous ? _commandLine.Previous() : _commandLine.Next())
             {
                 _commandField.Text = _commandLine.Text;
-                _commandField.CursorPosition = _commandField.Text.Length;
+                _commandField.InsertionPoint = _commandField.Text.Length;
             }
         }
     }
@@ -1104,8 +1115,8 @@ public sealed class MainWindow : Window
     {
         pane.QuickSearchLabel.Visible = pane.QuickSearch.IsActive;
         pane.QuickSearchLabel.Text = $" Find: {pane.QuickSearch.Text} ";
-        pane.QuickSearchLabel.NeedsDraw = true;
-        pane.BottomLine.NeedsDraw = true;
+        pane.QuickSearchLabel.SetNeedsDraw();
+        pane.BottomLine.SetNeedsDraw();
     }
 
     /// <summary>
@@ -1175,7 +1186,7 @@ public sealed class MainWindow : Window
         _rightPane.View.X = Pos.Percent(50);
         _activePane.TableView.SetFocus();
         SetNeedsLayout();
-        NeedsDraw = true;
+        SetNeedsDraw();
         SaveSorts();
     }
 
@@ -1236,11 +1247,11 @@ public sealed class MainWindow : Window
 
         if (!store.CredentialStore.IsAvailable)
         {
-            MessageBox.Query("Bookmark", BookmarkStore.GetUnavailableMessage(), "OK");
+            TuiMessageBox.Query("Bookmark", BookmarkStore.GetUnavailableMessage(), "OK");
             return;
         }
 
-        if (MessageBox.Query("Bookmark", store.GetStorePasswordQuestion(bookmark), "_Yes",
+        if (TuiMessageBox.Query("Bookmark", store.GetStorePasswordQuestion(bookmark), "_Yes",
                 "_No") != 0)
         {
             return;
@@ -1425,11 +1436,11 @@ public sealed class MainWindow : Window
         if (properties.HasContents)
         {
             // count in the background and update the dialog on the UI thread
-            var progress = new UiProgress<EntryContents>(value => Application.Invoke(() => dialog.Update(value)));
+            var progress = new UiProgress<EntryContents>(value => UiThread.Post(() => dialog.Update(value)));
             var cancellationToken = dialog.CancellationToken;
             var countTask = Task.Run(() => pane.NavigationContext.CountContentsAsync(entries, progress,
                 cancellationToken), cancellationToken);
-            _ = countTask.ContinueWith(task => Application.Invoke(() =>
+            _ = countTask.ContinueWith(task => UiThread.Post(() =>
                     dialog.ShowError(task.Exception?.GetBaseException().Message ?? "Counting failed")),
                 CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
         }
@@ -1520,8 +1531,8 @@ public sealed class MainWindow : Window
     private static void UpdateMarks(Pane pane)
     {
         pane.PathPanel.Summary = pane.NavigationContext.MarkedSummary;
-        pane.PathPanel.NeedsDraw = true;
-        pane.TableView.NeedsDraw = true;
+        pane.PathPanel.SetNeedsDraw();
+        pane.TableView.SetNeedsDraw();
     }
 
     /// <summary>
@@ -1611,7 +1622,7 @@ public sealed class MainWindow : Window
         }
 
         if (Elevation.NeedsRestart(volumeProvider) &&
-            MessageBox.Query(Elevation.AdministratorName, Elevation.GetRestartQuestion(volumeProvider), "_Restart",
+            TuiMessageBox.Query(Elevation.AdministratorName, Elevation.GetRestartQuestion(volumeProvider), "_Restart",
                 "_Continue") == 0 &&
             RestartAsAdministrator(pane, volumeProvider, bookmark.Path))
         {
@@ -1631,7 +1642,7 @@ public sealed class MainWindow : Window
     private async Task ChangeVolumeProviderAsync(Pane pane, IVolumeProvider volumeProvider)
     {
         if (Elevation.NeedsRestart(volumeProvider) &&
-            MessageBox.Query(Elevation.AdministratorName, Elevation.GetRestartQuestion(volumeProvider), "_Restart",
+            TuiMessageBox.Query(Elevation.AdministratorName, Elevation.GetRestartQuestion(volumeProvider), "_Restart",
                 "_Continue") == 0 &&
             RestartAsAdministrator(pane, volumeProvider))
         {
@@ -1763,7 +1774,7 @@ public sealed class MainWindow : Window
         }
 
         // esc answers no
-        if (MessageBox.Query("Delete", NavigationContext.GetDeleteDescription(entries), "_Yes", "_No") != 0)
+        if (TuiMessageBox.Query("Delete", NavigationContext.GetDeleteDescription(entries), "_Yes", "_No") != 0)
         {
             pane.TableView.SetFocus();
             return;
@@ -1771,10 +1782,10 @@ public sealed class MainWindow : Window
 
         // delete in the background and update the dialog on the UI thread; it closes when the delete has stopped
         var progressDialog = new DeleteProgressDialog(_palette);
-        var progress = new UiProgress<DeleteProgress>(value => Application.Invoke(() => progressDialog.Update(value)));
+        var progress = new UiProgress<DeleteProgress>(value => UiThread.Post(() => progressDialog.Update(value)));
         var cancellationToken = progressDialog.CancellationToken;
         var deleteTask = Task.Run(() => pane.NavigationContext.DeleteAsync(entries, progress, cancellationToken));
-        _ = deleteTask.ContinueWith(_ => Application.Invoke(progressDialog.Complete), TaskScheduler.Default);
+        _ = deleteTask.ContinueWith(_ => UiThread.Post(progressDialog.Complete), TaskScheduler.Default);
         Application.Run(progressDialog);
         progressDialog.Dispose();
 
@@ -1905,11 +1916,11 @@ public sealed class MainWindow : Window
 
         // copy in the background and update the dialog on the UI thread; it closes when the copy has stopped
         var progressDialog = new CopyProgressDialog(_palette);
-        var progress = new UiProgress<CopyProgress>(value => Application.Invoke(() => progressDialog.Update(value)));
+        var progress = new UiProgress<CopyProgress>(value => UiThread.Post(() => progressDialog.Update(value)));
         var cancellationToken = progressDialog.CancellationToken;
         var copyTask = Task.Run(() => pane.NavigationContext.CopyAsync(entries, otherPane.NavigationContext,
             request.Destination, request.Filter, progress, ConfirmOverwriteAsync, cancellationToken));
-        _ = copyTask.ContinueWith(_ => Application.Invoke(progressDialog.Complete), TaskScheduler.Default);
+        _ = copyTask.ContinueWith(_ => UiThread.Post(progressDialog.Complete), TaskScheduler.Default);
         Application.Run(progressDialog);
         progressDialog.Dispose();
 
@@ -1983,11 +1994,11 @@ public sealed class MainWindow : Window
 
         // move in the background and update the dialog on the UI thread; it closes when the move has stopped
         var progressDialog = new CopyProgressDialog(_palette, "Move");
-        var progress = new UiProgress<CopyProgress>(value => Application.Invoke(() => progressDialog.Update(value)));
+        var progress = new UiProgress<CopyProgress>(value => UiThread.Post(() => progressDialog.Update(value)));
         var cancellationToken = progressDialog.CancellationToken;
         var moveTask = Task.Run(() => pane.NavigationContext.MoveAsync(entries, otherPane.NavigationContext,
             request.Destination, request.Filter, progress, ConfirmOverwriteAsync, cancellationToken));
-        _ = moveTask.ContinueWith(_ => Application.Invoke(progressDialog.Complete), TaskScheduler.Default);
+        _ = moveTask.ContinueWith(_ => UiThread.Post(progressDialog.Complete), TaskScheduler.Default);
         Application.Run(progressDialog);
         progressDialog.Dispose();
 
@@ -2018,8 +2029,9 @@ public sealed class MainWindow : Window
     private void ShowEntryMenu(Pane pane)
     {
         var tableView = pane.TableView;
-        var position = tableView.CellToScreen(0, tableView.SelectedRow) is { } cell
-            ? tableView.ViewportToScreen(cell)
+        var row = tableView.HeaderHeight + tableView.SelectedRow - tableView.RowOffset;
+        var position = row >= tableView.HeaderHeight && row < tableView.Viewport.Height
+            ? tableView.ViewportToScreen(new System.Drawing.Point(0, row))
             : tableView.ViewportToScreen(System.Drawing.Point.Empty);
         ShowEntryMenu(pane, null, position);
     }
@@ -2046,28 +2058,38 @@ public sealed class MainWindow : Window
         var canPaste = !pane.NavigationContext.IsDriveList;
         var isLocal = pane.NavigationContext.CurrentHostDirectory != null;
         var otherPane = GetOtherPane(pane);
-        var items = new List<MenuItem>
+        var items = new List<View>
         {
-            new("_Copy", "Ctrl+C", () => _ = CopyToClipboardAsync(pane, false), () => canChange),
-            new("Cu_t", "Ctrl+X", () => _ = CopyToClipboardAsync(pane, true), () => canChange),
-            new("_Paste", "Alt+V", () => _ = PasteAsync(pane, otherPane), () => canPaste),
-            null!,
-            new("_Rename...", "Shift+F6", () => _ = RenameAsync(pane, otherPane), () => canRename),
-            new("_Delete...", "F8", () => _ = DeleteAsync(pane, otherPane), () => canChange),
-            null!
+            CreateMenuItem("_Copy", "Ctrl+C", () => _ = CopyToClipboardAsync(pane, false), canChange),
+            CreateMenuItem("Cu_t", "Ctrl+X", () => _ = CopyToClipboardAsync(pane, true), canChange),
+            CreateMenuItem("_Paste", "Alt+V", () => _ = PasteAsync(pane, otherPane), canPaste),
+            new Line(),
+            CreateMenuItem("_Rename...", "Shift+F6", () => _ = RenameAsync(pane, otherPane), canRename),
+            CreateMenuItem("_Delete...", "F8", () => _ = DeleteAsync(pane, otherPane), canChange),
+            new Line()
         };
         foreach (var kind in ShellHere.Available)
         {
-            items.Add(new MenuItem(ShellHere.GetHeader(kind), string.Empty, () => OpenShellHere(pane, kind),
-                () => isLocal));
+            items.Add(CreateMenuItem(ShellHere.GetHeader(kind), string.Empty, () => OpenShellHere(pane, kind),
+                isLocal));
         }
 
-        items.Add(null!);
-        items.Add(new MenuItem("Pr_operties...", "Ctrl+P", () => _ = ShowPropertiesAsync(pane), () => hasEntries));
-        _entryMenu?.Dispose();
-        _entryMenu = new ContextMenu { Position = screenPosition };
-        _entryMenu.Show(new MenuBarItem(items.ToArray()));
+        items.Add(new Line());
+        items.Add(CreateMenuItem("Pr_operties...", "Ctrl+P", () => _ = ShowPropertiesAsync(pane), hasEntries));
+        if (_entryMenu != null)
+        {
+            Application.Popovers?.DeRegister(_entryMenu);
+            _entryMenu.Dispose();
+        }
+
+        _entryMenu = new PopoverMenu(items);
+        Application.Popovers?.Register(_entryMenu);
+        _entryMenu.MakeVisible(screenPosition);
     }
+
+    /// <summary>Creates an item of a context menu showing its key at the right, disabled when it can't be chosen.</summary>
+    private static MenuItem CreateMenuItem(string title, string keyText, Action action, bool enabled) =>
+        new(title, keyText, action) { Enabled = enabled };
 
     /// <summary>
     ///     Opens PowerShell, a terminal or the command prompt in a new window in a pane's directory from its context menu
@@ -2148,8 +2170,8 @@ public sealed class MainWindow : Window
             if (OperatingSystem.IsWindows())
             {
                 clipboard.SetWindowsClipboard(IntPtr.Zero,
-                    exception => Application.Invoke(() => ErrorBox.Show(exception)),
-                    moved => Application.Invoke(() => _ = ClipboardEntriesMovedAsync(moved)));
+                    exception => UiThread.PostIfRunning(() => ErrorBox.Show(exception)),
+                    moved => UiThread.PostIfRunning(() => _ = ClipboardEntriesMovedAsync(moved)));
             }
         }
         catch (Exception exception)
@@ -2195,11 +2217,11 @@ public sealed class MainWindow : Window
             // paste in the background and update the dialog on the UI thread; it closes when pasting has stopped
             var progressDialog = new CopyProgressDialog(_palette, source.Title);
             var progress =
-                new UiProgress<CopyProgress>(value => Application.Invoke(() => progressDialog.Update(value)));
+                new UiProgress<CopyProgress>(value => UiThread.Post(() => progressDialog.Update(value)));
             var cancellationToken = progressDialog.CancellationToken;
             var pasteTask = Task.Run(() => source.PasteAsync(pane.NavigationContext, progress,
                 ConfirmOverwriteAsync, cancellationToken));
-            _ = pasteTask.ContinueWith(_ => Application.Invoke(progressDialog.Complete), TaskScheduler.Default);
+            _ = pasteTask.ContinueWith(_ => UiThread.Post(progressDialog.Complete), TaskScheduler.Default);
             Application.Run(progressDialog);
             progressDialog.Dispose();
 
@@ -2299,7 +2321,7 @@ public sealed class MainWindow : Window
         pane.PathPanel.Path = pane.NavigationContext.CurrentPath;
         pane.PathPanel.DiskSpace = pane.NavigationContext.DiskSpace;
         pane.PathPanel.Summary = pane.NavigationContext.MarkedSummary;
-        pane.PathPanel.NeedsDraw = true;
+        pane.PathPanel.SetNeedsDraw();
 
         ShowEntries(pane, pane.NavigationContext.GetSelectedIndex(pane.Entries, previousPath,
             pane.TableView.SelectedRow));
@@ -2371,7 +2393,7 @@ public sealed class MainWindow : Window
 
             pane.DataTable.Rows[rowIndex][0] = FormatEntryName(pane, entry, GetColumnWidths(
                 pane.TableView.Viewport.Width).Name);
-            pane.TableView.NeedsDraw = true;
+            pane.TableView.SetNeedsDraw();
         }, cancellation.Token);
     }
 
@@ -2414,7 +2436,7 @@ public sealed class MainWindow : Window
         pane.TableView.ColumnWidths = [widths.Name, widths.Size, widths.Modified];
         pane.BottomLine.Text = CreateBottomLine(pane.TableView);
         pane.PathPanel.Dividers = pane.TableView.GetDividerPositions();
-        pane.PathPanel.NeedsDraw = true;
+        pane.PathPanel.SetNeedsDraw();
 
         if (pane.DataTable == null)
         {
@@ -2425,7 +2447,7 @@ public sealed class MainWindow : Window
         {
             pane.DataTable.Rows[rowIndex][0] = FormatEntryName(pane, pane.Entries[rowIndex], widths.Name);
         }
-        pane.TableView.NeedsDraw = true;
+        pane.TableView.SetNeedsDraw();
     }
 
     private static string CreateBottomLine(EntryTableView tableView)
@@ -2517,7 +2539,7 @@ public sealed class MainWindow : Window
         newRow = Math.Clamp(newRow, 0, pane.Entries.Count - 1);
         pane.TableView.SelectedRow = newRow;
         pane.TableView.EnsureSelectedCellIsVisible();
-        pane.TableView.NeedsDraw = true;
+        pane.TableView.SetNeedsDraw();
     }
 
     /// <summary>
@@ -2534,11 +2556,11 @@ public sealed class MainWindow : Window
 
         pane.NavigationContext.ToggleMark(pane.Entries[selectedRow]);
         pane.PathPanel.Summary = pane.NavigationContext.MarkedSummary;
-        pane.PathPanel.NeedsDraw = true;
+        pane.PathPanel.SetNeedsDraw();
         MoveSelection(pane, offset);
     }
 
-    private ColorScheme GetRowColorScheme(Pane pane, int rowIndex)
+    private Scheme GetRowColorScheme(Pane pane, int rowIndex)
     {
         if (rowIndex < 0 || rowIndex >= pane.Entries.Count)
         {
@@ -2566,19 +2588,13 @@ public sealed class MainWindow : Window
         return CreateColorScheme(normal, selected);
     }
 
-    private static ColorScheme CreateColorScheme(
+    private static Scheme CreateColorScheme(
         TuiAttribute normal,
         TuiAttribute focus,
         TuiAttribute? hotNormal = null,
         TuiAttribute? hotFocus = null) =>
-        new()
-        {
-            Normal = normal,
-            Focus = focus,
-            HotNormal = hotNormal ?? normal,
-            HotFocus = hotFocus ?? focus,
-            Disabled = normal
-        };
+        // the current entry of a pane without focus is drawn like the other entries (Active)
+        TuiPalette.CreateScheme(normal, focus, hotNormal, hotFocus, hotNormal ?? normal);
 
     /// <summary>
     ///     Asks on the UI thread whether to overwrite an existing file, called from the copy running in the background.
@@ -2587,11 +2603,11 @@ public sealed class MainWindow : Window
     private static Task<OverwriteAnswer> ConfirmOverwriteAsync(OverwriteRequest request, CancellationToken _)
     {
         var answer = new TaskCompletionSource<OverwriteAnswer>(TaskCreationOptions.RunContinuationsAsynchronously);
-        Application.Invoke(() =>
+        UiThread.Post(() =>
         {
             try
             {
-                var button = MessageBox.Query("Overwrite", request.Message, "_Yes", "_No", "_All");
+                var button = TuiMessageBox.Query("Overwrite", request.Message, "_Yes", "_No", "_All");
                 answer.SetResult(button switch
                 {
                     0 => OverwriteAnswer.Yes,

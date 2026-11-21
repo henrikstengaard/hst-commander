@@ -1,5 +1,4 @@
 using Hst.Commander.Core;
-using Terminal.Gui;
 
 namespace Hst.Commander.Tui;
 
@@ -8,7 +7,7 @@ namespace Hst.Commander.Tui;
 ///     the current path; OK changes to the entered path. Volumes opens the volume provider list, choosing one closes the
 ///     dialog. Home goes to the user's home directory. <see cref="Result" /> holds the path or volume provider, or null on cancel.
 /// </summary>
-public sealed class LocationDialog : Dialog
+public sealed class LocationDialog : TuiDialog
 {
     private readonly TextField _pathField;
 
@@ -21,7 +20,7 @@ public sealed class LocationDialog : Dialog
         Title = title;
         Width = Dim.Percent(70);
         Height = 8;
-        ColorScheme = palette.DialogColorScheme;
+        SetScheme(palette.DialogColorScheme);
 
         var pathLabel = new Label { X = 1, Y = 1, Text = "Path:" };
         _pathField = new TextField { X = 1, Y = 2, Width = Dim.Fill(1), Text = path };
@@ -29,7 +28,7 @@ public sealed class LocationDialog : Dialog
         var volumesButton = new Button { Text = "_Volumes..." };
         volumesButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
+            e.Handled = true;
             if (chooseVolumeProvider() is not { } volumeChoice)
             {
                 _pathField.SetFocus();
@@ -43,20 +42,20 @@ public sealed class LocationDialog : Dialog
         homeButton.Accepting += (_, e) =>
         {
             Result = new LocationDialogResult(null, null, true);
-            e.Cancel = true;
+            e.Handled = true;
             Application.RequestStop(this);
         };
         var okButton = new Button { Text = "OK", IsDefault = true };
         okButton.Accepting += (_, e) =>
         {
             Result = new LocationDialogResult(_pathField.Text, null);
-            e.Cancel = true;
+            e.Handled = true;
             Application.RequestStop(this);
         };
         var cancelButton = new Button { Text = "Cancel" };
         cancelButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
+            e.Handled = true;
             Application.RequestStop(this);
         };
 
@@ -69,7 +68,7 @@ public sealed class LocationDialog : Dialog
     }
 
     /// <summary>Path entered on OK or volume provider chosen with Volumes, otherwise null.</summary>
-    public LocationDialogResult? Result { get; private set; }
+    public new LocationDialogResult? Result { get; private set; }
 }
 
 /// <summary>

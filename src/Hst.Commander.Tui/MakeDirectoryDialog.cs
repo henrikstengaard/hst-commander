@@ -1,4 +1,3 @@
-using Terminal.Gui;
 
 namespace Hst.Commander.Tui;
 
@@ -6,7 +5,7 @@ namespace Hst.Commander.Tui;
 ///     Modal dialog asking for a name: of the directory to create (F7), or the new name of an entry to rename
 ///     (Shift+F6) with its name filled in. <see cref="Result" /> holds the name on OK or null on cancel.
 /// </summary>
-public sealed class MakeDirectoryDialog : Dialog
+public sealed class MakeDirectoryDialog : TuiDialog
 {
     private readonly TextField _nameField;
 
@@ -16,7 +15,7 @@ public sealed class MakeDirectoryDialog : Dialog
         Title = title;
         Width = Dim.Percent(50);
         Height = 8;
-        ColorScheme = palette.DialogColorScheme;
+        SetScheme(palette.DialogColorScheme);
 
         var nameLabel = new Label { X = 1, Y = 1, Text = prompt };
         _nameField = new TextField { X = 1, Y = 2, Width = Dim.Fill(1), Text = name };
@@ -25,13 +24,13 @@ public sealed class MakeDirectoryDialog : Dialog
         okButton.Accepting += (_, e) =>
         {
             Result = _nameField.Text;
-            e.Cancel = true;
+            e.Handled = true;
             Application.RequestStop(this);
         };
         var cancelButton = new Button { Text = "Cancel" };
         cancelButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
+            e.Handled = true;
             Application.RequestStop(this);
         };
 
@@ -42,5 +41,5 @@ public sealed class MakeDirectoryDialog : Dialog
     }
 
     /// <summary>Name entered when OK was pressed, otherwise null.</summary>
-    public string? Result { get; private set; }
+    public new string? Result { get; private set; }
 }

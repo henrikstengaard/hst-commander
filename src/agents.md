@@ -200,7 +200,7 @@ These apply across features and aren't obvious from a single file:
 
 ### Error Handling
 - Throw `ArgumentNullException.ThrowIfNull(arg)` for null guard checks.
-- Surface errors to the TUI via `ErrorBox.Show(exception)` (or `ErrorBox.Show(message, exception)`), which logs them and shows `MessageBox.ErrorQuery`, or `ErrorBox.ShowNotice(message)` for messages that aren't failures, e.g. invalid input or an action the location doesn't support (not logged); don't call `MessageBox.ErrorQuery` directly.
+- Surface errors to the TUI via `ErrorBox.Show(exception)` (or `ErrorBox.Show(message, exception)`), which logs them and shows `TuiMessageBox.ErrorQuery`, or `ErrorBox.ShowNotice(message)` for messages that aren't failures, e.g. invalid input or an action the location doesn't support (not logged); don't call `TuiMessageBox.ErrorQuery` directly.
 - Surface errors to the GUI via `PaneView.NavigationFailed`, which `MainWindow` shows with `ErrorDialog`; pass the exception to `ErrorDialog` so it's logged with its stack trace, or use `ErrorDialog.Notice(message)` for messages that aren't failures (not logged).
 - Unhandled exceptions are logged and shown with `UnexpectedErrorDialog` (with a GitHub issue report), and a crash is offered to be reported on the next start; see [Errors and crash reports](../docs/application.md#errors-and-crash-reports).
 
@@ -255,7 +255,7 @@ See [`docs/testing.md`](../docs/testing.md) for the test helpers (`TestVolume`, 
 
 The details for each front-end are in [`docs/tui.md`](../docs/tui.md) and [`docs/gui.md`](../docs/gui.md). The essentials:
 
-- **TUI:** Terminal.Gui **v2 pre-alpha** (`2.0.0-prealpha.1895`). Its API differs from v1, so consult the installed package, not online v1 docs. Each pane is a private `Pane` class holding its `NavigationContext`; pane keys are handled in `tableView.KeyDown`. Dialogs are `new Dialog { Buttons = [...] }` run with `Application.Run(dialog)`; background work reports back with `Application.Invoke`.
+- **TUI:** Terminal.Gui **v2** (`2.5.0`). Its API differs from v1 and the v2 pre-alphas, so consult the installed package, not online v1 docs. Each pane is a private `Pane` class holding its `NavigationContext`; pane keys are handled in `tableView.KeyDown`. Dialogs derive from `TuiDialog` (keeping the default button and leaving closing to the buttons) and are run with `Application.Run(dialog)`; message boxes are `TuiMessageBox`; background work reports back with `UiThread.Post` (not `Application.Invoke`, which runs at once on the UI thread).
 - **GUI:** Avalonia 12 with the Fluent theme and plain code-behind (no MVVM). `PaneView` holds a `NavigationContext`; most keys are handled at window level with tunnelling `KeyDown` handlers. Dialogs are shown with `ShowDialog(owner)`; background work reports through a `Progress<T>` created on the UI thread. Theme brushes live in `App.axaml` `ThemeDictionaries` and are referenced with `DynamicResource`.
 - Both front-ends have the same File menu, command line above the bottom area (see [`docs/command-line.md`](../docs/command-line.md)), bottom area (`ButtonPanelView`: the function key bar F1-F10, or a plugin theme's buttons), themes (Midnight Commander, Light, Dark and plugin themes) and settings dialog with tabs (Appearance, Panes, Copying, Editor; stored separately in `~/.hst-commander/tui-settings.json` and `gui-settings.json`).
 
@@ -308,8 +308,7 @@ dotnet test src/Hst.Commander.Core.Tests/Hst.Commander.Core.Tests.csproj --logge
 | `FluentFTP` | 55.1.0 | `Hst.Commander.Plugins.Ftp` — FTP and FTPS client |
 | `SSH.NET` | 2026.0.0 | `Hst.Commander.Plugins.Ftp` — SFTP client (with `BouncyCastle.Cryptography`) |
 | `SMBLibrary` | 1.5.8.1 | `Hst.Commander.Plugins.Smb` (external plugin, not included with the apps) — SMB 2/3 client (LGPL-3.0-or-later); its version and source commit are also in the plugin's `THIRD-PARTY-NOTICES.txt` and `build-and-release.yml` |
-| `Terminal.Gui` | 2.0.0-prealpha.1895 | `Hst.Commander.Tui` — TUI framework |
-| `Microsoft.Build.Tasks.Git` | 10.0.402 | `Hst.Commander.Tui` — build only (`PrivateAssets="all"`), overrides the vulnerable 8.0.0 (GHSA-23fw-v26w-5fgq) pulled in by Terminal.Gui's `Microsoft.SourceLink.GitHub` 8.0.0 dependency |
+| `Terminal.Gui` | 2.5.0 | `Hst.Commander.Tui` — TUI framework |
 | `Avalonia`, `Avalonia.Desktop`, `Avalonia.Themes.Fluent` | 12.1.4 | `Hst.Commander.Gui` — desktop GUI framework |
 | `xunit` | 2.5.3 | `Hst.Commander.Core.Tests` |
 | `coverlet.collector` | 6.0.0 | `Hst.Commander.Core.Tests` — coverage |

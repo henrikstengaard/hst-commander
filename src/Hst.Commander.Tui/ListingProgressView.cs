@@ -1,5 +1,4 @@
 using Hst.Commander.Core;
-using Terminal.Gui;
 
 namespace Hst.Commander.Tui;
 
@@ -41,7 +40,7 @@ public sealed class ListingProgressView : View, IProgressIndicator
         _cancelButton = new Button { X = Pos.Center(), Y = 2, Text = "Cancel", Visible = false };
         _cancelButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
+            e.Handled = true;
             Cancel();
         };
         Add(_spinner, _label, _progressBar, _cancelButton);

@@ -101,7 +101,7 @@ public static class TerminalScreen
 
         try
         {
-            var driver = Terminal.Gui.Application.Driver;
+            var driver = Application.Driver;
             var winConsoleProperty = driver?.GetType().GetProperty("WinConsole",
                 BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
             var winConsole = winConsoleProperty?.GetValue(driver);

@@ -1,4 +1,3 @@
-using Terminal.Gui;
 
 namespace Hst.Commander.Tui;
 
@@ -7,7 +6,7 @@ namespace Hst.Commander.Tui;
 ///     Bookmarks are changed with <see cref="EditBookmarkDialog" />. <see cref="Result" /> holds the description on OK or null on
 ///     cancel or when empty.
 /// </summary>
-public sealed class BookmarkDialog : Dialog
+public sealed class BookmarkDialog : TuiDialog
 {
     private readonly TextField _descriptionField;
 
@@ -20,7 +19,7 @@ public sealed class BookmarkDialog : Dialog
         Title = title;
         Width = Dim.Percent(60);
         Height = 10;
-        ColorScheme = palette.DialogColorScheme;
+        SetScheme(palette.DialogColorScheme);
 
         var locationLabel = new Label { X = 1, Y = 1, Text = "Location:" };
         var locationValue = new Label { X = 1, Y = 2, Width = Dim.Fill(1), Text = location };
@@ -30,7 +29,7 @@ public sealed class BookmarkDialog : Dialog
         var okButton = new Button { Text = "OK", IsDefault = true };
         okButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
+            e.Handled = true;
             var text = _descriptionField.Text.Trim();
             if (text.Length == 0)
             {
@@ -43,7 +42,7 @@ public sealed class BookmarkDialog : Dialog
         var cancelButton = new Button { Text = "Cancel" };
         cancelButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
+            e.Handled = true;
             Application.RequestStop(this);
         };
 
@@ -54,5 +53,5 @@ public sealed class BookmarkDialog : Dialog
     }
 
     /// <summary>Description entered on OK, otherwise null.</summary>
-    public string? Result { get; private set; }
+    public new string? Result { get; private set; }
 }

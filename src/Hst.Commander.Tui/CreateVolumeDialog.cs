@@ -1,6 +1,5 @@
 using System.Collections.ObjectModel;
 using Hst.Commander.Abstractions;
-using Terminal.Gui;
 
 namespace Hst.Commander.Tui;
 
@@ -9,7 +8,7 @@ namespace Hst.Commander.Tui;
 ///     double-click chooses the selected volume creator, Cancel or Esc cancels. <see cref="Result" /> holds the chosen
 ///     volume creator or null on cancel.
 /// </summary>
-public sealed class CreateVolumeDialog : Dialog
+public sealed class CreateVolumeDialog : TuiDialog
 {
     // rows below the list taken by the OK and Cancel buttons and their shadow
     private const int ButtonsHeight = 2;
@@ -34,18 +33,23 @@ public sealed class CreateVolumeDialog : Dialog
         Width = Math.Max(Math.Max(items.Max(item => item.Length) + 2, Title.Length + 4), ButtonsWidth) +
                 adornments.Horizontal;
         Height = Math.Min(creators.Count + ButtonsHeight + adornments.Vertical, 20);
-        ColorScheme = palette.DialogColorScheme;
+        SetScheme(palette.DialogColorScheme);
 
         _listView = new ListView
         {
             X = 0,
             Y = 0,
             Width = Dim.Fill(),
-            Height = Dim.Fill(ButtonsHeight)
+            // the buttons are below the content, in the dialog's padding
+            Height = Dim.Fill()
         };
         _listView.SetSource(new ObservableCollection<string>(items));
         _listView.SelectedItem = 0;
-        _listView.OpenSelectedItem += (_, e) => CloseWith(e.Item);
+        _listView.Accepting += (_, e) =>
+        {
+            e.Handled = true;
+            CloseWith(_listView.SelectedItem ?? 0);
+        };
         _listView.KeyDown += (_, e) =>
         {
             if (e != Key.Enter)
@@ -54,19 +58,19 @@ public sealed class CreateVolumeDialog : Dialog
             }
 
             e.Handled = true;
-            CloseWith(_listView.SelectedItem);
+            CloseWith(_listView.SelectedItem ?? 0);
         };
 
         var okButton = new Button { Text = "OK", IsDefault = true };
         okButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
-            CloseWith(_listView.SelectedItem);
+            e.Handled = true;
+            CloseWith(_listView.SelectedItem ?? 0);
         };
         var cancelButton = new Button { Text = "Cancel" };
         cancelButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
+            e.Handled = true;
             Application.RequestStop(this);
         };
 
@@ -77,7 +81,7 @@ public sealed class CreateVolumeDialog : Dialog
     }
 
     /// <summary>Chosen volume creator, null when cancelled.</summary>
-    public IVolumeCreator? Result { get; private set; }
+    public new IVolumeCreator? Result { get; private set; }
 
     private void CloseWith(int index)
     {

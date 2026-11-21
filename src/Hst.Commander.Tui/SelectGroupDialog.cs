@@ -1,5 +1,4 @@
 using Hst.Commander.Core;
-using Terminal.Gui;
 
 namespace Hst.Commander.Tui;
 
@@ -8,7 +7,7 @@ namespace Hst.Commander.Tui;
 ///     or Unselect group: wildcards like "*.txt" or a regular expression, case sensitive and files only.
 ///     <see cref="Result" /> holds the options on OK or null on cancel.
 /// </summary>
-public sealed class SelectGroupDialog : Dialog
+public sealed class SelectGroupDialog : TuiDialog
 {
     private readonly TextField _filterField;
     private readonly CheckBox _caseSensitiveCheckBox;
@@ -19,7 +18,7 @@ public sealed class SelectGroupDialog : Dialog
         Title = title;
         Width = Dim.Percent(50);
         Height = 10;
-        ColorScheme = palette.DialogColorScheme;
+        SetScheme(palette.DialogColorScheme);
 
         var filterLabel = new Label { X = 1, Y = 1, Text = "Filter (wildcards or regular expression):" };
         _filterField = new TextField { X = 1, Y = 2, Width = Dim.Fill(1), Text = options.Filter };
@@ -28,29 +27,29 @@ public sealed class SelectGroupDialog : Dialog
             X = 1,
             Y = 4,
             Text = "C_ase sensitive",
-            CheckedState = options.CaseSensitive ? CheckState.Checked : CheckState.UnChecked
+            Value = options.CaseSensitive ? CheckState.Checked : CheckState.UnChecked
         };
         _filesOnlyCheckBox = new CheckBox
         {
             X = Pos.Right(_caseSensitiveCheckBox) + 3,
             Y = 4,
             Text = "_Files only",
-            CheckedState = options.FilesOnly ? CheckState.Checked : CheckState.UnChecked
+            Value = options.FilesOnly ? CheckState.Checked : CheckState.UnChecked
         };
 
         var okButton = new Button { Text = "OK", IsDefault = true };
         okButton.Accepting += (_, e) =>
         {
             Result = new SelectGroupOptions(_filterField.Text,
-                _caseSensitiveCheckBox.CheckedState == CheckState.Checked,
-                _filesOnlyCheckBox.CheckedState == CheckState.Checked);
-            e.Cancel = true;
+                _caseSensitiveCheckBox.Value == CheckState.Checked,
+                _filesOnlyCheckBox.Value == CheckState.Checked);
+            e.Handled = true;
             Application.RequestStop(this);
         };
         var cancelButton = new Button { Text = "Cancel" };
         cancelButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
+            e.Handled = true;
             Application.RequestStop(this);
         };
 
@@ -61,5 +60,5 @@ public sealed class SelectGroupDialog : Dialog
     }
 
     /// <summary>Filter and options when OK was pressed, otherwise null.</summary>
-    public SelectGroupOptions? Result { get; private set; }
+    public new SelectGroupOptions? Result { get; private set; }
 }

@@ -1,7 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Drawing;
 using Hst.Commander.Core;
-using Terminal.Gui;
 
 namespace Hst.Commander.Tui;
 
@@ -11,7 +10,7 @@ namespace Hst.Commander.Tui;
 ///     or Delete deletes the selected bookmark after confirming and F4, F2 or Edit edits it
 ///     (<see cref="EditBookmarkDialog" />); the dialog closes when the last bookmark is deleted. <see cref="Result" /> holds the chosen bookmark, or null on cancel.
 /// </summary>
-public sealed class BookmarksDialog : Dialog
+public sealed class BookmarksDialog : TuiDialog
 {
     // rows below the list taken by the buttons and their shadow
     private const int ButtonsHeight = 2;
@@ -50,24 +49,29 @@ public sealed class BookmarksDialog : Dialog
         Y = paneFrame.Y + Math.Max(0, (paneFrame.Height - height) / 3);
         Width = width;
         Height = height;
-        ColorScheme = palette.DialogColorScheme;
+        SetScheme(palette.DialogColorScheme);
 
         _listView = new ListView
         {
             X = 0,
             Y = 0,
             Width = Dim.Fill(),
-            Height = Dim.Fill(ButtonsHeight)
+            // the buttons are below the content, in the dialog's padding
+            Height = Dim.Fill()
         };
         _listView.SetSource(new ObservableCollection<string>(items));
         _listView.SelectedItem = 0;
-        _listView.OpenSelectedItem += (_, e) => CloseWith(e.Item);
+        _listView.Accepting += (_, e) =>
+        {
+            e.Handled = true;
+            CloseWith(_listView.SelectedItem ?? 0);
+        };
         _listView.KeyDown += (_, e) =>
         {
             if (e == Key.Enter)
             {
                 e.Handled = true;
-                CloseWith(_listView.SelectedItem);
+                CloseWith(_listView.SelectedItem ?? 0);
             }
             else if (e.KeyCode == KeyCode.Delete)
             {
@@ -84,25 +88,25 @@ public sealed class BookmarksDialog : Dialog
         var okButton = new Button { Text = "OK", IsDefault = true };
         okButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
-            CloseWith(_listView.SelectedItem);
+            e.Handled = true;
+            CloseWith(_listView.SelectedItem ?? 0);
         };
         var editButton = new Button { Text = "_Edit" };
         editButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
+            e.Handled = true;
             EditSelectedBookmark();
         };
         var deleteButton = new Button { Text = "_Delete" };
         deleteButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
+            e.Handled = true;
             DeleteSelectedBookmark();
         };
         var cancelButton = new Button { Text = "Cancel" };
         cancelButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
+            e.Handled = true;
             Application.RequestStop(this);
         };
 
@@ -115,7 +119,7 @@ public sealed class BookmarksDialog : Dialog
     }
 
     /// <summary>Chosen bookmark, null when cancelled.</summary>
-    public Bookmark? Result { get; private set; }
+    public new Bookmark? Result { get; private set; }
 
     /// <summary>Rows of the bookmarks: the description followed by the path.</summary>
     private List<string> CreateItems()
@@ -125,14 +129,14 @@ public sealed class BookmarksDialog : Dialog
         return choices.Select(choice => $"{choice.Name.PadRight(nameWidth)}  {choice.Description}").ToList();
     }
 
-    private Bookmark? SelectedBookmark => _listView.SelectedItem >= 0 && _listView.SelectedItem < _bookmarks.Count
-        ? _bookmarks[_listView.SelectedItem]
+    private Bookmark? SelectedBookmark => _listView.SelectedItem is { } row && row >= 0 && row < _bookmarks.Count
+        ? _bookmarks[row]
         : null;
 
     private void DeleteSelectedBookmark()
     {
         if (SelectedBookmark is not { } bookmark ||
-            MessageBox.Query("Delete bookmark", $"Delete bookmark '{bookmark.Description}'?", "_Yes", "_No") != 0)
+            TuiMessageBox.Query("Delete bookmark", $"Delete bookmark '{bookmark.Description}'?", "_Yes", "_No") != 0)
         {
             return;
         }
@@ -172,7 +176,7 @@ public sealed class BookmarksDialog : Dialog
             ErrorBox.Show(exception);
         }
 
-        var row = _listView.SelectedItem;
+        var row = _listView.SelectedItem ?? 0;
         _bookmarks = _bookmarkStore.Load();
         if (_bookmarks.Count == 0)
         {

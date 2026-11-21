@@ -1,6 +1,5 @@
 using Hst.Commander.Abstractions;
 using Hst.Commander.Core;
-using Terminal.Gui;
 
 namespace Hst.Commander.Tui;
 
@@ -11,10 +10,10 @@ namespace Hst.Commander.Tui;
 ///     details and user name entered. Invalid input is shown below the fields and keeps the dialog open.
 ///     <see cref="Result" /> holds the location and credentials on OK or null on cancel.
 /// </summary>
-public sealed class ConnectionDialog : Dialog
+public sealed class ConnectionDialog : TuiDialog
 {
     private readonly IConnectionVolumeProvider _volumeProvider;
-    private readonly RadioGroup _protocolRadioGroup;
+    private readonly OptionSelector _protocolRadioGroup;
     private readonly TextField _hostField;
     private readonly TextField _portField;
     private readonly Label _defaultPortLabel;
@@ -29,18 +28,18 @@ public sealed class ConnectionDialog : Dialog
         Title = volumeProvider.Name;
         Width = Dim.Percent(60);
         Height = 17 + volumeProvider.Protocols.Count;
-        ColorScheme = palette.DialogColorScheme;
+        SetScheme(palette.DialogColorScheme);
 
         var details = VolumeConnector.GetLastConnectionDetails(volumeProvider);
         var protocols = volumeProvider.Protocols;
 
         var protocolLabel = new Label { X = 1, Y = 1, Text = "Protocol:" };
-        _protocolRadioGroup = new RadioGroup
+        _protocolRadioGroup = new OptionSelector
         {
             X = 12,
             Y = 1,
-            RadioLabels = protocols.Select(protocol => protocol.Label).ToArray(),
-            SelectedItem = Math.Max(0, protocols.ToList().FindIndex(protocol => protocol.Name == details.Protocol))
+            Labels = protocols.Select(protocol => protocol.Label).ToArray(),
+            Value = Math.Max(0, protocols.ToList().FindIndex(protocol => protocol.Name == details.Protocol))
         };
         var y = 1 + protocols.Count + 1;
 
@@ -67,13 +66,13 @@ public sealed class ConnectionDialog : Dialog
         y += 2;
         _errorLabel = new Label { X = 1, Y = y, Width = Dim.Fill(1), Text = string.Empty };
 
-        _protocolRadioGroup.SelectedItemChanged += (_, _) => UpdateDefaultPort();
+        _protocolRadioGroup.ValueChanged += (_, _) => UpdateDefaultPort();
         UpdateDefaultPort();
 
         var okButton = new Button { Text = "OK", IsDefault = true };
         okButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
+            e.Handled = true;
             try
             {
                 Result = VolumeConnector.CreateConnectionRequest(_volumeProvider, SelectedProtocol,
@@ -90,7 +89,7 @@ public sealed class ConnectionDialog : Dialog
         var cancelButton = new Button { Text = "Cancel" };
         cancelButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
+            e.Handled = true;
             Application.RequestStop(this);
         };
 
@@ -108,12 +107,12 @@ public sealed class ConnectionDialog : Dialog
     }
 
     /// <summary>Location and credentials entered when OK was pressed, otherwise null.</summary>
-    public ConnectionRequest? Result { get; private set; }
+    public new ConnectionRequest? Result { get; private set; }
 
     private string SelectedProtocol =>
         _volumeProvider.Protocols.Count == 0
             ? string.Empty
-            : _volumeProvider.Protocols[Math.Clamp(_protocolRadioGroup.SelectedItem, 0,
+            : _volumeProvider.Protocols[Math.Clamp((_protocolRadioGroup.Value ?? 0), 0,
                 _volumeProvider.Protocols.Count - 1)].Name;
 
     private void UpdateDefaultPort() =>

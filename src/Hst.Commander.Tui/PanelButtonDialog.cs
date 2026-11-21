@@ -1,7 +1,6 @@
 using System.Collections.ObjectModel;
 using Hst.Commander.Abstractions;
 using Hst.Commander.Core;
-using Terminal.Gui;
 
 namespace Hst.Commander.Tui;
 
@@ -10,7 +9,7 @@ namespace Hst.Commander.Tui;
 ///     command it runs and its colors as "#RRGGBB" (empty for the theme's colors). <see cref="Result" /> holds the
 ///     changed button on OK, otherwise null.
 /// </summary>
-public sealed class PanelButtonDialog : Dialog
+public sealed class PanelButtonDialog : TuiDialog
 {
     public PanelButtonDialog(PanelButton button, TuiPalette palette)
     {
@@ -18,25 +17,23 @@ public sealed class PanelButtonDialog : Dialog
         Title = "Button";
         Width = 52;
         Height = 20;
-        ColorScheme = palette.DialogColorScheme;
+        SetScheme(palette.DialogColorScheme);
 
         var labelLabel = new Label { X = 1, Y = 1, Text = "Label:" };
         var labelField = new TextField { X = 13, Y = 1, Width = Dim.Fill(1), Text = button.Label };
         var actionLabel = new Label { X = 1, Y = 3, Text = "Command:" };
         var actions = CommanderActions.All;
-        // an unfocused list draws its selected item in HotNormal, which is the dialog's normal color, so the button's
-        // command wouldn't stand out while the label is edited; the dialog's colors inverted show it
+        // an unfocused list draws its selected item in the Active role; the dialog's colors inverted show the button's
+        // command while the label is edited
         var actionList = new ListView
         {
             X = 13,
             Y = 3,
             Width = Dim.Fill(1),
-            Height = 8,
-            ColorScheme = new ColorScheme(palette.DialogColorScheme)
-            {
-                HotNormal = new Terminal.Gui.Attribute(palette.Dialog.Background, palette.Dialog.Foreground)
-            }
+            Height = 8
         };
+        var selected = new Attribute(palette.Dialog.Background, palette.Dialog.Foreground);
+        actionList.SetScheme(TuiPalette.CreateScheme(palette.Dialog, palette.DialogFocus, active: selected));
         actionList.SetSource(new ObservableCollection<string>(actions.Select(action => action.Description)));
         actionList.SelectedItem = Math.Max(0, actions.ToList().FindIndex(action => action.Id == button.Action));
         var backgroundLabel = new Label { X = 1, Y = 12, Text = "Background:" };
@@ -48,7 +45,7 @@ public sealed class PanelButtonDialog : Dialog
         var okButton = new Button { Text = "OK", IsDefault = true };
         okButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
+            e.Handled = true;
             if (!ButtonPanelEditor.TryParseColor(backgroundField.Text, out var background) ||
                 !ButtonPanelEditor.TryParseColor(foregroundField.Text, out var foreground))
             {
@@ -56,7 +53,7 @@ public sealed class PanelButtonDialog : Dialog
                 return;
             }
 
-            var index = Math.Clamp(actionList.SelectedItem, 0, actions.Count - 1);
+            var index = Math.Clamp(actionList.SelectedItem ?? 0, 0, actions.Count - 1);
             Result = button with
             {
                 Label = labelField.Text.Trim(), Action = actions[index].Id, Background = background,
@@ -67,7 +64,7 @@ public sealed class PanelButtonDialog : Dialog
         var cancelButton = new Button { Text = "Cancel" };
         cancelButton.Accepting += (_, e) =>
         {
-            e.Cancel = true;
+            e.Handled = true;
             Application.RequestStop(this);
         };
 
@@ -79,5 +76,5 @@ public sealed class PanelButtonDialog : Dialog
     }
 
     /// <summary>The changed button when OK was pressed, otherwise null.</summary>
-    public PanelButton? Result { get; private set; }
+    public new PanelButton? Result { get; private set; }
 }

@@ -1,6 +1,5 @@
 using Hst.Commander.Core;
 using Hst.Commander.Tui;
-using Terminal.Gui;
 
 // unhandled exceptions are logged; one ending the process is offered to be reported on the next start
 CrashHandler.Install("tui");
@@ -60,13 +59,13 @@ try
         // Terminal.Gui's configuration and resets it.
         if (!OperatingSystem.IsWindows() && !TerminalScreen.SupportsTrueColor)
         {
-            Application.Force16Colors = true;
+            Application.Driver!.Force16Colors = true;
         }
         // an exception escaping the main loop is logged and shown, and the loop resumes
         Application.Run(mainWindow, exception =>
         {
             ErrorLog.Unhandled(exception, "main loop");
-            Application.Invoke(() => mainWindow.ShowUnexpectedError(exception));
+            UiThread.Post(() => mainWindow.ShowUnexpectedError(exception));
             return true;
         });
         TerminalScreen.BeforeShutdown();
