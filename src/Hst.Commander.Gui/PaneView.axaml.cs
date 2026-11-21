@@ -24,6 +24,7 @@ public partial class PaneView : UserControl
     private NavigationContext? _navigationContext;
     private CancellationTokenSource? _iconsCancellation;
     private CancellationTokenSource? _volumeFilesCancellation;
+    private readonly QuickSearch _quickSearch = new();
 
     /// <summary>Values of the options of the navigation modes changed by the user, by mode and option name.</summary>
     private readonly Dictionary<INavigationMode, Dictionary<string, bool>> _navigationModeOptions = [];
@@ -39,6 +40,8 @@ public partial class PaneView : UserControl
         _listItemsPanel = EntriesList.ItemsPanel;
         _listHorizontalScrollBarVisibility = ScrollViewer.GetHorizontalScrollBarVisibility(EntriesList);
         EntriesList.AddHandler(KeyDownEvent, OnEntriesKeyDown, RoutingStrategies.Tunnel);
+        EntriesList.AddHandler(TextInputEvent, OnEntriesTextInput, RoutingStrategies.Tunnel);
+        AddHandler(PointerPressedEvent, (_, _) => StopQuickSearch(), RoutingStrategies.Tunnel, true);
         EntriesList.DoubleTapped += async (_, _) => await ActivateSelectedEntryAsync();
         EntriesList.SelectionChanged += (_, _) => UpdateIconSelection();
         PathBadge.Tapped += (_, _) => PathClicked?.Invoke(this, EventArgs.Empty);
@@ -50,6 +53,7 @@ public partial class PaneView : UserControl
             if (e.Property == IsKeyboardFocusWithinProperty)
             {
                 UpdatePathBadge();
+                StopQuickSearchWithoutFocus();
             }
         };
 
@@ -65,11 +69,13 @@ public partial class PaneView : UserControl
         DragDrop.AddDropHandler(this, OnDrop);
 
         IconLayout.AddHandler(KeyDownEvent, OnEntriesKeyDown, RoutingStrategies.Tunnel);
+        IconLayout.AddHandler(TextInputEvent, OnEntriesTextInput, RoutingStrategies.Tunnel);
         IconLayout.PropertyChanged += (_, e) =>
         {
             if (e.Property == IsKeyboardFocusWithinProperty)
             {
                 UpdatePathBadge();
+                StopQuickSearchWithoutFocus();
             }
         };
         IconLayout.ItemClicked += (_, item) => EntriesList.SelectedItem = item;
@@ -503,8 +509,161 @@ public partial class PaneView : UserControl
         EntriesList.ContainerFromIndex(EntriesList.SelectedIndex)?.Focus(NavigationMethod.Tab);
     }
 
+    /// <summary>Starts the quick search (Ctrl+F) in the entries, see <see cref="Core.QuickSearch" />.</summary>
+    public void StartQuickSearch()
+    {
+        FocusEntries();
+        _quickSearch.Start();
+        UpdateQuickSearchBar();
+
+        // the bar makes the list shorter, so keep the current entry visible once laid out again
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            if (_quickSearch.IsActive && EntriesList.SelectedItem != null && NavigationMode.PluginMode == null)
+            {
+                EntriesList.ScrollIntoView(EntriesList.SelectedItem);
+            }
+        }, Avalonia.Threading.DispatcherPriority.Loaded);
+    }
+
+    private void StopQuickSearch()
+    {
+        if (!_quickSearch.IsActive)
+        {
+            return;
+        }
+
+        _quickSearch.Stop();
+        UpdateQuickSearchBar();
+    }
+
+    /// <summary>
+    ///     Stops the quick search when the focus has left the entries, e.g. to the other pane. Checked after the pending
+    ///     focus changes: moving to an entry further away recycles the focused row's container, so the focus leaves the
+    ///     list for a moment until <see cref="FocusEntries" /> focuses the new row.
+    /// </summary>
+    private void StopQuickSearchWithoutFocus()
+    {
+        if (!_quickSearch.IsActive || EntriesList.IsKeyboardFocusWithin || IconLayout.IsKeyboardFocusWithin)
+        {
+            return;
+        }
+
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            if (!EntriesList.IsKeyboardFocusWithin && !IconLayout.IsKeyboardFocusWithin)
+            {
+                StopQuickSearch();
+            }
+        }, Avalonia.Threading.DispatcherPriority.Input);
+    }
+
+    private void UpdateQuickSearchBar()
+    {
+        QuickSearchBar.IsVisible = _quickSearch.IsActive;
+        QuickSearchText.Text = $"Find: {_quickSearch.Text}";
+    }
+
+    /// <summary>
+    ///     Handles a key while the quick search is active, called by the window's tunnelling key handler before it handles
+    ///     its own keys: Backspace, Ctrl+F, Up and Down search, Esc stops, typed characters are left to the text input.
+    ///     Other keys stop the quick search and return false, so they do what they always do, e.g. Enter opens the entry
+    ///     found. <c>+</c>, <c>-</c>, <c>*</c> and Space only stop it as the first character.
+    /// </summary>
+    public bool HandleQuickSearchKey(KeyEventArgs e)
+    {
+        if (!_quickSearch.IsActive)
+        {
+            return false;
+        }
+
+        int? index;
+        switch (e.Key)
+        {
+            // pressing Shift for an upper case letter
+            case Key.LeftShift or Key.RightShift or Key.LeftCtrl or Key.RightCtrl or Key.LeftAlt or Key.RightAlt
+                or Key.LWin or Key.RWin:
+                return true;
+            case Key.Escape:
+                e.Handled = true;
+                StopQuickSearch();
+                return true;
+            case Key.Back:
+                e.Handled = true;
+                index = _quickSearch.RemoveLast(GetQuickSearchNames());
+                break;
+            case Key.Up or Key.Down when e.KeyModifiers == KeyModifiers.None:
+            case Key.F when e.KeyModifiers == KeyModifiers.Control:
+                e.Handled = true;
+                index = _quickSearch.Next(GetQuickSearchNames(), EntriesList.SelectedIndex, e.Key != Key.Up);
+                break;
+            default:
+                if (IsQuickSearchCharacter(e))
+                {
+                    // added by the text input that follows
+                    return true;
+                }
+
+                StopQuickSearch();
+                return false;
+        }
+
+        SelectQuickSearchMatch(index);
+        return true;
+    }
+
+    /// <summary>
+    ///     True for a key typing a character into the quick search: no Ctrl or Alt, except both for AltGr. <c>+</c>,
+    ///     <c>-</c>, <c>*</c> and Space only after the first character, so they select entries otherwise.
+    /// </summary>
+    private bool IsQuickSearchCharacter(KeyEventArgs e)
+    {
+        var modifiers = e.KeyModifiers & (KeyModifiers.Control | KeyModifiers.Alt | KeyModifiers.Meta);
+        return (modifiers == KeyModifiers.None || modifiers == (KeyModifiers.Control | KeyModifiers.Alt)) &&
+               e.KeySymbol is { Length: > 0 } symbol && !char.IsControl(symbol[0]) &&
+               (_quickSearch.Text.Length > 0 || symbol is not ("+" or "-" or "*" or " "));
+    }
+
+    private void OnEntriesTextInput(object? sender, TextInputEventArgs e)
+    {
+        if (!_quickSearch.IsActive || string.IsNullOrEmpty(e.Text) || char.IsControl(e.Text[0]))
+        {
+            return;
+        }
+
+        // a character without a match is rejected
+        e.Handled = true;
+        SelectQuickSearchMatch(_quickSearch.TryAppend(e.Text, GetQuickSearchNames()));
+    }
+
+    private void SelectQuickSearchMatch(int? index)
+    {
+        if (index is { } selectedIndex)
+        {
+            EntriesList.SelectedIndex = selectedIndex;
+            if (NavigationMode.PluginMode == null)
+            {
+                FocusEntries();
+            }
+        }
+
+        UpdateQuickSearchBar();
+    }
+
+    /// <summary>The shown names of the entries for the quick search, null for the parent entry.</summary>
+    private string?[] GetQuickSearchNames() =>
+        (EntriesList.ItemsSource as IReadOnlyList<EntryItem> ?? [])
+        .Select(item => item.Name == Paths.Parent ? null : item.DisplayName)
+        .ToArray();
+
     private async void OnEntriesKeyDown(object? sender, KeyEventArgs e)
     {
+        // typed characters of the quick search are added by the text input, e.g. Space doesn't mark
+        if (_quickSearch.IsActive && IsQuickSearchCharacter(e))
+        {
+            return;
+        }
+
         if (IsGoRootKey(e))
         {
             e.Handled = true;
@@ -805,6 +964,7 @@ public partial class PaneView : UserControl
     {
         var items = (EntriesList.ItemsSource as IReadOnlyList<EntryItem> ?? [])
             .ToDictionary<EntryItem, IEntry>(item => item.Entry, ReferenceEqualityComparer.Instance);
+        StopQuickSearch();
         var selectedItem = EntriesList.SelectedItem;
         var sorted = NavigationContext.ToggleSort(column)
             .Select(entry => items.GetValueOrDefault(entry))
@@ -833,6 +993,7 @@ public partial class PaneView : UserControl
 
     private async Task RefreshAsync()
     {
+        StopQuickSearch();
         var hadFocus = EntriesList.IsKeyboardFocusWithin || IconLayout.IsKeyboardFocusWithin;
         var selectedIndex = EntriesList.SelectedIndex;
         _volumeFilesCancellation?.Cancel();

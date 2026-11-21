@@ -68,6 +68,7 @@ public sealed class MainWindow : Window
                     new("_Unselect group...", "-", UnselectGroupInActivePane),
                     new("_Invert selection", "*", InvertSelectionInActivePane),
                     new("Searc_h...", "Ctrl+S", SearchInActivePane),
+                    new("Quic_k search", "Ctrl+F", QuickSearchInActivePane),
                     null!,
                     _leftVolumeMenuItem,
                     _rightVolumeMenuItem,
@@ -382,6 +383,8 @@ public sealed class MainWindow : Window
         pane.TableView.NeedsDraw = true;
         pane.BottomLine.ColorScheme = CreateColorScheme(normal, normal);
         pane.BottomLine.NeedsDraw = true;
+        pane.QuickSearchLabel.ColorScheme = CreateColorScheme(_palette.ActivePath, _palette.ActivePath);
+        pane.QuickSearchLabel.NeedsDraw = true;
         pane.ParentStrip.Attribute = _palette.ButtonTitle;
         pane.ParentStrip.NeedsDraw = true;
     }
@@ -494,6 +497,9 @@ public sealed class MainWindow : Window
             case CommanderActions.Search:
                 SearchInActivePane();
                 break;
+            case CommanderActions.QuickSearch:
+                QuickSearchInActivePane();
+                break;
             case CommanderActions.Settings:
                 ShowSettings();
                 break;
@@ -580,7 +586,9 @@ public sealed class MainWindow : Window
             Height = Dim.Fill(1),
             FullRowSelect = true,
             MaxCellWidth = int.MaxValue,
-            CellActivationKey = KeyCode.Enter
+            CellActivationKey = KeyCode.Enter,
+            // typing letters doesn't jump to entries, the names start with a marker; Ctrl+F starts a quick search
+            CollectionNavigator = null
         };
 
         var bottomLine = new Label
@@ -588,6 +596,15 @@ public sealed class MainWindow : Window
             X = 0,
             Y = Pos.AnchorEnd(),
             Width = Dim.Fill()
+        };
+
+        // the quick search text (Ctrl+F) on the bottom border, like Midnight Commander
+        var quickSearchLabel = new Label
+        {
+            X = Pos.Left(bottomLine) + 1,
+            Y = Pos.AnchorEnd(),
+            Width = Dim.Auto(),
+            Visible = false
         };
 
         // the parent button at the outer side of the pane, shown by themes of plugins (see ShowParentStrip)
@@ -601,7 +618,10 @@ public sealed class MainWindow : Window
         };
 
         var progress = new ListingProgressView();
-        var pane = new Pane(navigationContext, view, pathPanel, tableView, bottomLine, progress, parentStrip, isLeft);
+        var pane = new Pane(navigationContext, view, pathPanel, tableView, bottomLine, progress, parentStrip, isLeft)
+        {
+            QuickSearchLabel = quickSearchLabel
+        };
         parentStrip.Clicked += (_, _) =>
         {
             pane.TableView.SetFocus();
@@ -619,7 +639,7 @@ public sealed class MainWindow : Window
         };
         tableView.FrameChanged += (_, _) => UpdatePaneColumns(pane);
 
-        view.Add(pathPanel, tableView, bottomLine, parentStrip, progress);
+        view.Add(pathPanel, tableView, bottomLine, quickSearchLabel, parentStrip, progress);
 
         return pane;
     }
@@ -634,6 +654,10 @@ public sealed class MainWindow : Window
             {
                 _activePane = pane;
             }
+            else
+            {
+                StopQuickSearch(pane);
+            }
 
             pane.TableView.NeedsDraw = true;
             pane.PathPanel.IsActive = pane.TableView.HasFocus;
@@ -642,9 +666,14 @@ public sealed class MainWindow : Window
         pane.TableView.SelectedCellChanged += (_, _) => pane.TableView.NeedsDraw = true;
         pane.TableView.RightClicked += (_, click) => ShowEntryMenu(pane, click.Row, click.ScreenPosition);
         pane.TableView.HeaderClicked += (_, column) => SortPane(pane, column);
+        pane.TableView.MousePressed += (_, _) => StopQuickSearch(pane);
         pane.TableView.KeyDown += (_, key) =>
         {
-            if (key.KeyCode == KeyCode.Tab)
+            if (pane.QuickSearch.IsActive && HandleQuickSearchKey(pane, key))
+            {
+                key.Handled = true;
+            }
+            else if (key.KeyCode == KeyCode.Tab)
             {
                 otherPane.TableView.SetFocus();
                 key.Handled = true;
@@ -748,6 +777,11 @@ public sealed class MainWindow : Window
             {
                 key.Handled = true;
                 _ = SearchAsync(pane);
+            }
+            else if (key == Key.F.WithCtrl)
+            {
+                key.Handled = true;
+                StartQuickSearch(pane);
             }
             else if (key == Key.R.WithCtrl)
             {
@@ -977,6 +1011,91 @@ public sealed class MainWindow : Window
     private void GoHome(Pane pane) => _ = RunNavigationAsync(pane, () => pane.NavigationContext.GoHomeAsync());
 
     private void SearchInActivePane() => _ = SearchAsync(_activePane);
+
+    private void QuickSearchInActivePane()
+    {
+        _activePane.TableView.SetFocus();
+        StartQuickSearch(_activePane);
+    }
+
+    /// <summary>Starts the quick search of a pane (Ctrl+F), see <see cref="QuickSearch" />.</summary>
+    private static void StartQuickSearch(Pane pane)
+    {
+        pane.QuickSearch.Start();
+        UpdateQuickSearchLabel(pane);
+    }
+
+    private static void StopQuickSearch(Pane pane)
+    {
+        if (!pane.QuickSearch.IsActive)
+        {
+            return;
+        }
+
+        pane.QuickSearch.Stop();
+        UpdateQuickSearchLabel(pane);
+    }
+
+    private static void UpdateQuickSearchLabel(Pane pane)
+    {
+        pane.QuickSearchLabel.Visible = pane.QuickSearch.IsActive;
+        pane.QuickSearchLabel.Text = $" Find: {pane.QuickSearch.Text} ";
+        pane.QuickSearchLabel.NeedsDraw = true;
+        pane.BottomLine.NeedsDraw = true;
+    }
+
+    /// <summary>
+    ///     Handles a key while the quick search of a pane is active: typed characters, Backspace, Ctrl+F, Up and Down
+    ///     search, Esc stops. Other keys stop the quick search and return false, so they do what they always do, e.g.
+    ///     Enter opens the entry found. <c>+</c>, <c>-</c>, <c>*</c> and Space only stop it as the first character.
+    /// </summary>
+    private static bool HandleQuickSearchKey(Pane pane, Key key)
+    {
+        var quickSearch = pane.QuickSearch;
+        int? index;
+        // Key equality includes Handled, so the key codes are compared (the caller handles the key afterwards)
+        switch (key.KeyCode)
+        {
+            case KeyCode.Esc:
+                StopQuickSearch(pane);
+                return true;
+            case KeyCode.Backspace:
+                index = quickSearch.RemoveLast(GetQuickSearchNames(pane));
+                break;
+            case KeyCode.CursorDown:
+            case KeyCode.CursorUp:
+            case KeyCode.F | KeyCode.CtrlMask:
+                index = quickSearch.Next(GetQuickSearchNames(pane), pane.TableView.SelectedRow,
+                    key.KeyCode != KeyCode.CursorUp);
+                break;
+            default:
+                var rune = key.AsRune;
+                if (key.IsCtrl || key.IsAlt || rune.Value < ' ' ||
+                    (quickSearch.Text.Length == 0 && rune.Value is '+' or '-' or '*' or ' '))
+                {
+                    StopQuickSearch(pane);
+                    return false;
+                }
+
+                // a character without a match is rejected
+                index = quickSearch.TryAppend(rune.ToString(), GetQuickSearchNames(pane));
+                break;
+        }
+
+        if (index is { } row)
+        {
+            MoveSelection(pane, row, true);
+        }
+
+        UpdateQuickSearchLabel(pane);
+        return true;
+    }
+
+    /// <summary>The shown names of a pane's entries for the quick search, null for the parent entry.</summary>
+    private static string?[] GetQuickSearchNames(Pane pane) =>
+        pane.Entries.Select(entry => entry.Name == Paths.Parent
+            ? null
+            : string.IsNullOrEmpty(entry.DisplayName) ? entry.Name : entry.DisplayName).ToArray();
 
     /// <summary>Lists the entries of the active pane again (Ctrl+R), e.g. after files were changed outside.</summary>
     private void RefreshActivePane() => _ = RunNavigationAsync(_activePane, () => Task.CompletedTask);
@@ -2109,6 +2228,7 @@ public sealed class MainWindow : Window
 
     private static async Task RefreshPaneAsync(Pane pane)
     {
+        StopQuickSearch(pane);
         pane.VolumeDetection?.Cancel();
         var previousPath = pane.PathPanel.Path;
         pane.Entries = await ListingProgress.ListEntriesAsync(pane.NavigationContext, pane.Progress.Show,
@@ -2451,6 +2571,11 @@ public sealed class MainWindow : Window
         public PathPanelView PathPanel { get; } = pathPanel;
         public EntryTableView TableView { get; } = tableView;
         public Label BottomLine { get; } = bottomLine;
+
+        /// <summary>The quick search text on the bottom border, shown while <see cref="QuickSearch" /> is active.</summary>
+        public required Label QuickSearchLabel { get; init; }
+
+        public QuickSearch QuickSearch { get; } = new();
         public ListingProgressView Progress { get; } = progress;
         public IReadOnlyList<IEntry> Entries { get; set; } = [];
         public DataTable? DataTable { get; set; }

@@ -138,7 +138,7 @@
 
         <Border x:Name="EntriesBorder" Grid.Row="1" Grid.Column="1" Background="{DynamicResource PaneBackground}"
                 BorderBrush="{DynamicResource PaneBorder}" BorderThickness="1" Margin="2">
-            <Grid RowDefinitions="Auto,*">
+            <Grid RowDefinitions="Auto,*,Auto">
                 <!-- column dividers continue below the last entry -->
                 <Grid x:Name="DividersGrid" Grid.RowSpan="2" IsHitTestVisible="False">
                     <Grid.ColumnDefinitions>
@@ -193,6 +193,16 @@
 
                 <!-- navigation modes of plugins: icons at positions, e.g. the Amiga Workbench -->
                 <local:IconLayoutView x:Name="IconLayout" Grid.Row="0" Grid.RowSpan="2" IsVisible="False" />
+
+                <!-- the quick search text (Ctrl+F) in a row of its own below the entries, so it never covers the entry
+                     found; not a text box, so the entries keep the focus and their keys -->
+                <Border x:Name="QuickSearchBar" Grid.Row="2" IsVisible="False" Padding="2"
+                        Background="{DynamicResource PaneBackground}" BorderBrush="{DynamicResource PaneBorder}"
+                        BorderThickness="0,1,0,0">
+                    <Border HorizontalAlignment="Left" Padding="4,1" Background="{DynamicResource ActivePathBackground}">
+                        <TextBlock x:Name="QuickSearchText" Foreground="{DynamicResource ActivePathForeground}" />
+                    </Border>
+                </Border>
 
                 <!-- shown while listing takes long, e.g. the physical disks while a sleeping disk wakes up -->
                 <Border x:Name="ListingProgress" Grid.Row="0" Grid.RowSpan="2" IsVisible="False"

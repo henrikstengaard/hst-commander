@@ -21,8 +21,17 @@ public sealed class EntryTableView : TableView
     /// <summary>Raised when a column header is clicked with the left mouse button: the column clicked.</summary>
     public event EventHandler<int>? HeaderClicked;
 
+    /// <summary>Raised when a mouse button is pressed or clicked in the table, e.g. to stop the quick search.</summary>
+    public event EventHandler? MousePressed;
+
     protected override bool OnMouseEvent(MouseEventArgs mouseEvent)
     {
+        if (mouseEvent.Flags.HasFlag(MouseFlags.Button1Pressed) || mouseEvent.Flags.HasFlag(MouseFlags.Button1Clicked) ||
+            mouseEvent.Flags.HasFlag(MouseFlags.Button3Pressed) || mouseEvent.Flags.HasFlag(MouseFlags.Button3Clicked))
+        {
+            MousePressed?.Invoke(this, EventArgs.Empty);
+        }
+
         if (mouseEvent.Flags.HasFlag(MouseFlags.Button1Clicked) && Table != null &&
             ScreenToCell(mouseEvent.Position, out int? headerColumn) == null &&
             headerColumn is { } column && column >= 0 && column < Table.Columns)

@@ -33,6 +33,7 @@ public static class CommanderActions
     public const string Location = "Location";
     public const string AddBookmark = "AddBookmark";
     public const string Search = "Search";
+    public const string QuickSearch = "QuickSearch";
     public const string Settings = "Settings";
     public const string Quit = "Quit";
 
@@ -66,6 +67,7 @@ public static class CommanderActions
         new(Location, "Location"),
         new(AddBookmark, "Add bookmark"),
         new(Search, "Search"),
+        new(QuickSearch, "Quick search"),
         new(Settings, "Settings"),
         new(Quit, "Quit")
     ];
