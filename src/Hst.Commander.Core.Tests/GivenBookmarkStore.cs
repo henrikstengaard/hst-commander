@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using Hst.Commander.Abstractions;
 
 namespace Hst.Commander.Core.Tests;
@@ -225,6 +226,67 @@ public class GivenBookmarkStore : IDisposable
         Assert.False(bookmarkChoice.IsBookmarks);
         Assert.Equal("temp", bookmarkChoice.Name);
         Assert.Equal(@"c:\temp", bookmarkChoice.Description);
+    }
+
+    [Fact]
+    public void When_BookmarksAreSaved_Then_FileHasCurrentVersionAndBookmarks()
+    {
+        // act
+        _store.Add(CreateBookmark("1", "temp"));
+
+        // assert
+        var json = JsonNode.Parse(File.ReadAllText(_store.FilePath))!;
+        Assert.Equal(BookmarkStore.CurrentVersion, json["Version"]!.GetValue<int>());
+        Assert.Equal("temp", json["Bookmarks"]![0]!["Description"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public void When_FileIsListWithoutVersion_Then_BookmarksAreLoadedAndSavedWithVersion()
+    {
+        // arrange - the format before the file had a version
+        Directory.CreateDirectory(Path.GetDirectoryName(_store.FilePath)!);
+        File.WriteAllText(_store.FilePath,
+            """[{ "Id": "1", "Description": "temp", "Path": "c:\\temp", "HasPassword": false }]""");
+
+        // act
+        var loaded = _store.Load();
+        _store.Add(CreateBookmark("2", "Amiga"));
+
+        // assert
+        Assert.Equal(CreateBookmark("1", "temp"), Assert.Single(loaded));
+        Assert.Equal(["Amiga", "temp"], _store.Load().Select(bookmark => bookmark.Description));
+        var json = JsonNode.Parse(File.ReadAllText(_store.FilePath))!;
+        Assert.Equal(BookmarkStore.CurrentVersion, json["Version"]!.GetValue<int>());
+    }
+
+    [Fact]
+    public void When_FileOfNewerVersionHasUnknownFields_Then_BookmarksAreLoadedAndUnknownFieldsAreKept()
+    {
+        // arrange - a file of a newer Hst Commander with fields this version doesn't know
+        Directory.CreateDirectory(Path.GetDirectoryName(_store.FilePath)!);
+        File.WriteAllText(_store.FilePath,
+            """
+            {
+              "Version": 99,
+              "Folders": ["Work"],
+              "Bookmarks": [
+                { "Id": "1", "Description": "temp", "Path": "c:\\temp", "HasPassword": false, "Folder": "Work" }
+              ]
+            }
+            """);
+
+        // act
+        var loaded = Assert.Single(_store.Load());
+        _store.Edit("1", new BookmarkChanges("tmp", null, @"c:\tmp", null, null, false));
+
+        // assert - read as far as known, and saved with the unknown fields of the file and of the bookmark
+        Assert.Equal("temp", loaded.Description);
+        var json = JsonNode.Parse(File.ReadAllText(_store.FilePath))!;
+        Assert.Equal(BookmarkStore.CurrentVersion, json["Version"]!.GetValue<int>());
+        Assert.Equal("Work", json["Folders"]![0]!.GetValue<string>());
+        var bookmark = json["Bookmarks"]![0]!;
+        Assert.Equal("tmp", bookmark["Description"]!.GetValue<string>());
+        Assert.Equal("Work", bookmark["Folder"]!.GetValue<string>());
     }
 
     [Fact]

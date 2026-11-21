@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using Hst.Commander.Abstractions;
 using Hst.Commander.Plugins.DirectoryOpus;
 
@@ -52,6 +53,33 @@ public class GivenDirectoryOpus4Theme : IDisposable
         Assert.Equal(2, read.Columns.Count);
         Assert.Equal(layout.Columns[0].Buttons, read.Columns[0].Buttons);
         Assert.Equal(layout.Columns[1].Buttons, read.Columns[1].Buttons);
+    }
+
+    [Fact]
+    public void When_ButtonsAreSaved_Then_FileHasVersion()
+    {
+        // act
+        CreateTheme().SaveLayout(new ButtonPanel([new ButtonColumn([new PanelButton("Copy", CommanderActions.Copy)])]));
+
+        // assert
+        var json = JsonNode.Parse(File.ReadAllText(Path.Combine(_directory, DirectoryOpus4Theme.ButtonsFileName)))!;
+        Assert.Equal(1, json["version"]!.GetValue<int>());
+    }
+
+    [Theory]
+    [InlineData("""{ "columns": [[{ "label": "Copy", "action": "Copy" }]] }""")]
+    [InlineData("""{ "version": 99, "columns": [[{ "label": "Copy", "action": "Copy", "icon": "x" }]], "rows": 4 }""")]
+    public void When_ButtonsFileHasNoVersionOrIsNewer_Then_ButtonsAreRead(string json)
+    {
+        // arrange - a file written before it had a version, and one of a newer plugin with unknown fields
+        Directory.CreateDirectory(_directory);
+        File.WriteAllText(Path.Combine(_directory, DirectoryOpus4Theme.ButtonsFileName), json);
+
+        // act
+        var layout = CreateTheme().Layout;
+
+        // assert
+        Assert.Equal(new PanelButton("Copy", CommanderActions.Copy), Assert.Single(Assert.Single(layout.Columns).Buttons));
     }
 
     [Fact]

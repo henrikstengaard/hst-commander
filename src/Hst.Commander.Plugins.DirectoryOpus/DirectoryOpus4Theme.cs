@@ -160,7 +160,7 @@ public sealed class DirectoryOpus4Theme : ITheme, ICustomizableButtonPanel
             .Select(column => column.Buttons
                 .Select(button => new ButtonData(button.Label, button.Action, button.Background, button.Foreground))
                 .ToList())
-            .ToList());
+            .ToList()) { Version = ButtonsVersion };
         File.WriteAllText(Path.Combine(Directory, ButtonsFileName), JsonSerializer.Serialize(data, JsonOptions));
     }
 
@@ -211,7 +211,16 @@ public sealed class DirectoryOpus4Theme : ITheme, ICustomizableButtonPanel
     private static PanelButton Button(string label, string action, string? background = null,
         string? foreground = null) => new(label, action) { Background = background, Foreground = foreground };
 
-    private sealed record ButtonsData(List<List<ButtonData>>? Columns);
+    /// <summary>
+    ///     Version of the format of the buttons file written by this version of the plugin. A file without a version
+    ///     (0) has the same format; unknown fields are ignored.
+    /// </summary>
+    private const int ButtonsVersion = 1;
+
+    private sealed record ButtonsData(List<List<ButtonData>>? Columns)
+    {
+        public int Version { get; init; }
+    }
 
     private sealed record ButtonData(string? Label, string? Action, string? Background, string? Foreground);
 }

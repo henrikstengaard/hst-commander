@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Hst.Commander.Abstractions;
 
 namespace Hst.Commander.Core;
@@ -42,6 +43,13 @@ public sealed record Bookmark(
             ? location.Trim() + Path[current.Length..]
             : null;
     }
+
+    /// <summary>
+    ///     Fields of the bookmark in the file this version doesn't know, e.g. added by a newer Hst Commander, written
+    ///     back unchanged so running an older version doesn't lose them.
+    /// </summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; init; }
 }
 
 /// <summary>
@@ -104,10 +112,15 @@ public sealed record BookmarkChanges(
 /// <summary>
 ///     Bookmarks stored in a JSON file shared by both front-ends (<see cref="Default" />,
 ///     <c>~/.hst-commander/bookmarks.json</c>), read again on each call, so both can run at once. Passwords are only
-///     stored in a secure credential store (see <see cref="CredentialStores" />), never in the file.
+///     stored in a secure credential store (see <see cref="CredentialStores" />), never in the file. The file is an
+///     object with the <see cref="CurrentVersion" /> of its format and the bookmarks; a file written before it had a
+///     version, a list of bookmarks, is read too and written in the new format when bookmarks change.
 /// </summary>
 public sealed class BookmarkStore(string filePath, ICredentialStore credentialStore)
 {
+    /// <summary>Version of the format of the bookmarks file written by this version of Hst Commander.</summary>
+    public const int CurrentVersion = 1;
+
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     private static readonly Lock FileLock = new();
@@ -300,20 +313,36 @@ public sealed class BookmarkStore(string filePath, ICredentialStore credentialSt
         "The user name and password can't be stored securely on this system, as there is no credential store " +
         "(e.g. a keyring with secret-tool on Linux). The bookmark asks for them when opened.";
 
-    private List<Bookmark> Read()
+    private List<Bookmark> Read() => ReadFile().Bookmarks ?? [];
+
+    /// <summary>
+    ///     The bookmarks file, empty when it doesn't exist or can't be read. A list of bookmarks is a file written before
+    ///     it had a version (version 0).
+    /// </summary>
+    private BookmarksFile ReadFile()
     {
         try
         {
-            return File.Exists(filePath)
-                ? JsonSerializer.Deserialize<List<Bookmark>>(File.ReadAllText(filePath), JsonOptions)?
+            if (!File.Exists(filePath))
+            {
+                return new BookmarksFile();
+            }
+
+            var json = File.ReadAllText(filePath);
+            var file = json.TrimStart().StartsWith('[')
+                ? new BookmarksFile { Bookmarks = JsonSerializer.Deserialize<List<Bookmark>>(json, JsonOptions) }
+                : JsonSerializer.Deserialize<BookmarksFile>(json, JsonOptions) ?? new BookmarksFile();
+            return file with
+            {
+                Bookmarks = file.Bookmarks?
                     .Where(bookmark => bookmark is { Id: not null, Description: not null, Path: not null })
-                    .ToList() ?? []
-                : [];
+                    .ToList()
+            };
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException
                                               or JsonException)
         {
-            return [];
+            return new BookmarksFile();
         }
     }
 
@@ -321,7 +350,8 @@ public sealed class BookmarkStore(string filePath, ICredentialStore credentialSt
     {
         lock (FileLock)
         {
-            var bookmarks = Read();
+            var file = ReadFile();
+            var bookmarks = file.Bookmarks ?? [];
             change(bookmarks);
             try
             {
@@ -330,13 +360,28 @@ public sealed class BookmarkStore(string filePath, ICredentialStore credentialSt
                     Directory.CreateDirectory(directory);
                 }
 
-                File.WriteAllText(filePath, JsonSerializer.Serialize(bookmarks, JsonOptions));
+                File.WriteAllText(filePath, JsonSerializer.Serialize(
+                    file with { Version = CurrentVersion, Bookmarks = bookmarks }, JsonOptions));
             }
             catch (UnauthorizedAccessException exception)
             {
                 throw new IOException(exception.Message, exception);
             }
         }
+    }
+
+    /// <summary>
+    ///     The bookmarks file: the version of its format, the bookmarks and the fields this version doesn't know (e.g.
+    ///     added by a newer Hst Commander), written back unchanged.
+    /// </summary>
+    private sealed record BookmarksFile
+    {
+        public int Version { get; init; }
+
+        public List<Bookmark>? Bookmarks { get; init; }
+
+        [JsonExtensionData]
+        public Dictionary<string, JsonElement>? ExtensionData { get; init; }
     }
 }
 
