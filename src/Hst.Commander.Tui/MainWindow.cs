@@ -666,11 +666,14 @@ public sealed class MainWindow : Window
             CollectionNavigator = null
         };
 
+        // a fixed height: an automatic height wraps the border made for a wider pane (set while the pane grows, before
+        // the label is wider) to two rows, leaving an empty row below the pane
         var bottomLine = new Label
         {
             X = 0,
             Y = Pos.AnchorEnd(),
-            Width = Dim.Fill()
+            Width = Dim.Fill(),
+            Height = 1
         };
 
         // the quick search text (Ctrl+F) on the bottom border, like Midnight Commander
@@ -679,6 +682,7 @@ public sealed class MainWindow : Window
             X = Pos.Left(bottomLine) + 1,
             Y = Pos.AnchorEnd(),
             Width = Dim.Auto(),
+            Height = 1,
             Visible = false
         };
 
