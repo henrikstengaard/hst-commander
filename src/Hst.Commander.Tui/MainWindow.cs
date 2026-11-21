@@ -106,8 +106,8 @@ public sealed class MainWindow : Window
         _commandField.KeyDown += OnCommandFieldKeyDown;
         // the panes handle f9 (create volume) and f10 (quit) before the menu bar's key, so alt+f opens the menu
         IsRunningChanging += (_, e) => e.Cancel = !e.NewValue && !ConfirmClosing();
-        _leftPane = CreatePane(new NavigationContext(initialPath, StartFile), 0, true);
-        _rightPane = CreatePane(new NavigationContext(initialPath, StartFile), 50, false);
+        _leftPane = CreatePane(new NavigationContext(initialPath, StartFile), true);
+        _rightPane = CreatePane(new NavigationContext(initialPath, StartFile), false);
         _activePane = _leftPane;
         _leftPane.NavigationContext.Sort = settings.LeftSort ?? EntrySort.Default;
         _rightPane.NavigationContext.Sort = settings.RightSort ?? EntrySort.Default;
@@ -636,16 +636,15 @@ public sealed class MainWindow : Window
         }
     }
 
-    private Pane CreatePane(NavigationContext navigationContext, int xPercent, bool isLeft)
+    private Pane CreatePane(NavigationContext navigationContext, bool isLeft)
     {
         var view = new View
         {
-            X = Pos.Percent(xPercent),
             Y = 1,
-            Width = Dim.Percent(50),
             Height = Dim.Fill(1),
             CanFocus = true
         };
+        PlacePaneView(view, isLeft);
         var pathPanel = new PathPanelView
         {
             X = 0,
@@ -721,6 +720,16 @@ public sealed class MainWindow : Window
         view.Add(pathPanel, tableView, bottomLine, quickSearchLabel, parentStrip, progress);
 
         return pane;
+    }
+
+    /// <summary>
+    ///     Places a pane's view on the left or right half of the window. The left pane is half the width rounded down
+    ///     and the right pane fills the rest, so with an odd width no column is left empty at the right edge.
+    /// </summary>
+    private static void PlacePaneView(View view, bool left)
+    {
+        view.X = left ? 0 : Pos.Percent(50);
+        view.Width = left ? Dim.Percent(50) : Dim.Fill();
     }
 
     private void ConfigurePaneKeys(Pane pane, Pane otherPane)
@@ -1186,8 +1195,8 @@ public sealed class MainWindow : Window
     private void SwapPanes()
     {
         (_leftPane, _rightPane) = (_rightPane, _leftPane);
-        _leftPane.View.X = Pos.Percent(0);
-        _rightPane.View.X = Pos.Percent(50);
+        PlacePaneView(_leftPane.View, true);
+        PlacePaneView(_rightPane.View, false);
         _activePane.TableView.SetFocus();
         SetNeedsLayout();
         SetNeedsDraw();
