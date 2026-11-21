@@ -23,7 +23,8 @@ public class ExFatValidator
     private uint clusterHeapOffset;
     private uint clusterCount;
 
-    public string VolumeLabel { get; private set; }
+    /// <summary>Volume label of the volume label entry, empty when the root directory has none.</summary>
+    public string VolumeLabel { get; private set; } = string.Empty;
     public int BytesPerCluster => bytesPerSector * sectorsPerCluster;
     public uint ClusterCount => clusterCount;
 
@@ -283,7 +284,13 @@ public class ExFatValidator
         var bitmapEntryOffset = Enumerable.Range(0, rootDirectory.Length / 32).First(i => rootDirectory[i * 32] == 0x81) * 32;
         var firstCluster = BinaryPrimitives.ReadUInt32LittleEndian(rootDirectory.AsSpan(bitmapEntryOffset + 20));
         var dataLength = BinaryPrimitives.ReadUInt64LittleEndian(rootDirectory.AsSpan(bitmapEntryOffset + 24));
-        var bitmap = ReadClusters(GetClusterChain("Allocation bitmap", firstCluster, dataLength));
+        // only called without errors, so the chain was valid when the allocation bitmap entry was validated
+        if (GetClusterChain("Allocation bitmap", firstCluster, dataLength) is not { } bitmapClusters)
+        {
+            return;
+        }
+
+        var bitmap = ReadClusters(bitmapClusters);
 
         // clusters used by allocation bitmap, up-case table and root directory are allocated and no other clusters
         for (uint cluster = 2; cluster < clusterCount + 2; cluster++)
@@ -298,7 +305,8 @@ public class ExFatValidator
         }
     }
 
-    private List<uint> GetClusterChain(string name, uint firstCluster, ulong? dataLength)
+    /// <summary>Clusters of a cluster chain, null (with an error added) when the chain is invalid.</summary>
+    private List<uint>? GetClusterChain(string name, uint firstCluster, ulong? dataLength)
     {
         if (!IsValidCluster(firstCluster))
         {
