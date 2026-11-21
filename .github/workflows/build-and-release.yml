@@ -7,6 +7,10 @@ on:
         description: 'Only build unsigned artifacts, skip code signing and creating draft release'
         type: boolean
         default: false
+      prerelease:
+        description: 'Mark the draft release as a prerelease (uncheck for a full release, e.g. 1.0)'
+        type: boolean
+        default: true
 
 env:
   PUBLISH_ARGS: --configuration Release -p:PublishSingleFile=True -p:SelfContained=True -p:PublishReadyToRun=True -p:IncludeNativeLibrariesForSelfExtract=true
@@ -379,6 +383,31 @@ jobs:
           }
           Get-ChildItem -Filter "$($env:RELEASE_VERSION)_*" -name
 
+      # the release text, saying whether it's a prerelease, with the files to download for each platform
+      - name: Write release notes
+        shell: pwsh
+        env:
+          PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          $intro = if ($env:PRERELEASE -eq 'true') {
+            "Prerelease of Hst Commander $($env:RELEASE_TAG) for testing."
+          } else {
+            "Hst Commander $($env:RELEASE_TAG)."
+          }
+          @(
+            $intro
+            ''
+            'The terminal UI (`tui`) and the desktop GUI (`gui`) are packaged separately:'
+            ''
+            '- **Windows**: `_setup.exe` installs the app, `_portable.zip` runs without installing.'
+            '- **macOS**: `.dmg` for Intel (`x64`) or Apple silicon (`arm64`).'
+            '- **Linux**: `.AppImage` runs without installing, `.deb` installs on Debian and Ubuntu.'
+            '- **SMB plugin** (Windows file shares, every platform): `_smb-plugin.zip`; copy its `Hst.Commander.Plugins.Smb` directory to `~/.hst-commander/plugins/`.'
+            ''
+            'Third-party notices are included with the apps and shown in Help > About > Licenses.'
+          ) | Set-Content -Path release-notes.md -Encoding utf8
+          Get-Content release-notes.md
+
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
@@ -386,6 +415,6 @@ jobs:
             ${{ env.RELEASE_VERSION }}_*
           tag_name: ${{ env.RELEASE_TAG }}
           name: ${{ env.RELEASE_VERSION }}
-          body: Prerelease of ${{ env.RELEASE_VERSION }}
+          body_path: release-notes.md
           draft: true
-          prerelease: true
+          prerelease: ${{ inputs.prerelease }}
