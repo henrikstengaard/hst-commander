@@ -6,8 +6,14 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 
 ## Versioning
 
-- `Directory.Build.props` is the single source of the version and sets the product, authors and copyright for all projects. Bump the major/minor version there.
-- `Directory.Build.targets` replaces the last version part with `git rev-list --count HEAD` (e.g. `0.1.29`) unless a version is passed with `-p:Version=...`. The .NET SDK appends the commit sha to the product version.
+The app version is `Major.Minor.<commit count>`, e.g. `1.0.190`: the major and minor version are set by hand, the last part is the number of commits, so every build has its own increasing version that names the commit it was built from, and a release needs no version change. This was decided for 1.0 over semantic versions set by hand (1.0.0, 1.0.1, ...); the format is still a valid semantic version, only the last part grows by more than one between releases.
+
+- `Directory.Build.props` is the single source of the version and sets the product, authors and copyright for all projects. Bump the major/minor version there; its last part is replaced.
+- Increase the minor version (e.g. 1.0 to 1.1) for a release with new features and the major version for a release that changes how Hst Commander is used or drops something, e.g. a settings file older versions can't read. Bug-fix releases keep both, their last part is higher anyway.
+- `Directory.Build.targets` replaces the last version part with `git rev-list --count HEAD` (e.g. `0.1.29`) unless a version is passed with `-p:Version=...`. The .NET SDK appends the commit sha to the product version (e.g. `1.0.190+98d7be8...`).
+- The commit count needs the full history: the workflows check out with `fetch-depth: 0`, and a shallow clone gives a lower count. A branch counts its own commits, so its builds can have the same version as a build of `main`; build releases from `main`, where pull requests are squashed into one commit each.
+- `build-and-release.yml` computes the same version (`build_version`), tags the release with it (e.g. `1.0.190`, without a `v`) and names it and its files `hst-commander_v<version>-<sha>` (see [Release workflows](#release-workflows)).
+- The plugin API has its own version, the assembly version of Abstractions (see [Plugin API versions](plugin-api.md#plugin-api-versions)), and the settings files have format versions (see [Settings files](#settings-files)); neither follows the app version.
 - `AppInfo` (Core) reads the name, author, version (`Major.Minor.Build`), description and build date of the entry assembly: `NameAndVersion` (e.g. `Hst Commander v0.1.29`, also the GUI window title), `Description` and `BuildDateText` (e.g. `Built 2026-11-01 21:15`, in local time). Help > About shows them in both front-ends (`AboutDialog`), with the Licenses section below.
 - The description is `ProductDescription` in `Directory.Build.props`, and `Directory.Build.targets` sets it as the `Description` of the apps and adds the build date (UTC, round-trip format, as the culture of the build would change `:` in a custom format) as the assembly metadata `BuildDate`. Only executables get them, as the date changes on every build and makes the project compile again; libraries have an empty description and no build date.
 

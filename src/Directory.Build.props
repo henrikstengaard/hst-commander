@@ -6,7 +6,11 @@
     <Copyright>Copyright © 2026</Copyright>
   </PropertyGroup>
   <PropertyGroup>
-    <!-- Single source of truth for app version. AssemblyVersion, FileVersion and PackageVersion are derived from it by the .NET SDK -->
+    <!--
+      Single source of truth for app version. AssemblyVersion, FileVersion and PackageVersion are derived from it by the
+      .NET SDK. Set the major and minor version here; Directory.Build.targets replaces the last part with the git commit
+      count (see Versioning in docs/application.md).
+    -->
     <Version>0.1.0</Version>
   </PropertyGroup>
   <PropertyGroup>
