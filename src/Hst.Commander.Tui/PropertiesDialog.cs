@@ -191,7 +191,7 @@ public sealed class PropertiesDialog : Dialog
     {
         if (!_closed)
         {
-            MessageBox.ErrorQuery("Error", message, "OK");
+            ErrorBox.Show(message);
         }
     }
 

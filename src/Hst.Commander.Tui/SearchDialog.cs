@@ -187,7 +187,7 @@ public sealed class SearchDialog : Dialog
         }
         catch (IOException exception)
         {
-            MessageBox.ErrorQuery("Error", exception.Message, "OK");
+            ErrorBox.Show(exception);
             return;
         }
 
@@ -233,7 +233,7 @@ public sealed class SearchDialog : Dialog
                 else if (task.Exception?.GetBaseException() is { } exception)
                 {
                     _statusLabel.Text = string.Empty;
-                    MessageBox.ErrorQuery("Error", exception.Message, "OK");
+                    ErrorBox.Show(exception);
                 }
 
                 if (_results.Count > 0)

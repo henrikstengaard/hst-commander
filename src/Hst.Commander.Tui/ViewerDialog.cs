@@ -273,7 +273,7 @@ public sealed class ViewerDialog : Dialog
         {
             if (!_closed)
             {
-                MessageBox.ErrorQuery("Error", exception.Message, "OK");
+                ErrorBox.Show(exception);
             }
         }
         finally

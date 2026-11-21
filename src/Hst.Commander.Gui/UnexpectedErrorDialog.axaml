@@ -1,0 +1,43 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Hst.Commander.Gui.UnexpectedErrorDialog"
+        Title="Unexpected error"
+        Width="640" SizeToContent="Height"
+        MinWidth="400"
+        CanResize="False"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner">
+    <StackPanel Margin="16" Spacing="12">
+        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+            <!-- error icon: a white cross in a red circle, the same in all themes, like ErrorDialog -->
+            <Viewbox Grid.Column="0" Width="32" Height="32" VerticalAlignment="Top">
+                <Canvas Width="16" Height="16">
+                    <Ellipse Width="15" Height="15" Canvas.Left="0.5" Canvas.Top="0.5"
+                             Fill="#D93025" Stroke="#A1241B" StrokeThickness="1" />
+                    <Path Data="M5,5 L11,11 M11,5 L5,11" Stroke="White" StrokeThickness="2"
+                          StrokeLineCap="Round" />
+                </Canvas>
+            </Viewbox>
+            <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Center">
+                <TextBlock x:Name="HeadingText" FontWeight="Bold" TextWrapping="Wrap" />
+                <TextBlock x:Name="MessageText" TextWrapping="Wrap" />
+            </StackPanel>
+        </Grid>
+        <TextBlock TextWrapping="Wrap"
+                   Text="You can report it as a new GitHub issue, which opens in the browser for you to review before submitting it." />
+        <Expander Header="Details" HorizontalAlignment="Stretch">
+            <TextBox x:Name="DetailsTextBox" IsReadOnly="True" TextWrapping="NoWrap" AcceptsReturn="True" Height="240"
+                     FontFamily="Cascadia Mono, Consolas, Menlo, DejaVu Sans Mono, monospace"
+                     ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto" />
+        </Expander>
+        <SelectableTextBlock x:Name="LogText" TextWrapping="Wrap" />
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+            <Button x:Name="ReportButton" Content="Report on GitHub" MinWidth="80" HorizontalContentAlignment="Center"
+                    IsDefault="True" />
+            <Button x:Name="CopyButton" Content="Copy details" MinWidth="80" HorizontalContentAlignment="Center" />
+            <Button x:Name="CloseButton" Content="Close" MinWidth="80" HorizontalContentAlignment="Center"
+                    IsCancel="True" />
+        </StackPanel>
+    </StackPanel>
+</Window>

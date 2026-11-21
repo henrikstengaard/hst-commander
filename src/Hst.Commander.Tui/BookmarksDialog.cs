@@ -169,7 +169,7 @@ public sealed class BookmarksDialog : Dialog
         }
         catch (IOException exception)
         {
-            MessageBox.ErrorQuery("Error", exception.Message, "OK");
+            ErrorBox.Show(exception);
         }
 
         var row = _listView.SelectedItem;
