@@ -12,7 +12,7 @@ public class LocalVolume(string path) : IVolume
 
     public string Name => "Local";
 
-    public IEnumerable<string> CurrentPathComponents => _currentPathComponents;
+    public IReadOnlyList<string> CurrentPathComponents => _currentPathComponents.ToList();
 
     /// <summary>Full path of the current directory, null in the drive list.</summary>
     public string? LocalPath => _currentPath;
@@ -117,35 +117,6 @@ public class LocalVolume(string path) : IVolume
         return ChangeDirectory([Paths.Parent], cancellationToken);
     }
     
-    public Task<IEntry> OpenEntry(string name, CancellationToken cancellationToken = default)
-    {
-        var path = Path.Combine(_currentPath ?? string.Empty, name);
-        var directoryInfo = new DirectoryInfo(path);
-
-        if (directoryInfo.Exists)
-        {
-            var entry = CreateEntry(directoryInfo);
-            
-            // a drive opened from the drive list keeps its name as listed: on Linux and macOS a mount point like
-            // "/run", whose directory name is only "run"
-            var component = _currentPath == null ? name : entry.Name;
-            _currentPath = directoryInfo.FullName;
-            _currentPathComponents = _currentPathComponents.Concat([component]).ToList();
-            
-            return Task.FromResult(entry);
-        }
-        
-        var fileInfo = new FileInfo(path);
-        if (!fileInfo.Exists)
-        {
-            throw new IOException("Entry not found");
-        }
-
-        var fileEntry = CreateEntry(fileInfo);
-
-        return Task.FromResult(fileEntry);
-    }
-
     /// <summary>
     /// Opens an item for reading, shared with writers, e.g. a writable image opened in a pane (see
     /// <c>SharedImages</c>), so it can still be detected as an image or copied.

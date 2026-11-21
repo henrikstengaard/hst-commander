@@ -353,7 +353,7 @@ public static class EmbeddedIconReader
             int? pngBitsPerPixel = data.Length >= 26
                 ? data[24] * data[25] switch { 6 => 4, 2 => 3, 4 => 2, _ => 1 }
                 : null;
-            return new IconImage(pngWidth, pngHeight, data, null, pngBitsPerPixel);
+            return new IconImage(pngWidth, pngHeight, data, null) { BitsPerPixel = pngBitsPerPixel };
         }
 
         if (data.Length < 40)
@@ -429,7 +429,7 @@ public static class EmbeddedIconReader
             }
         }
 
-        return new IconImage(width, height, null, pixels, bitCount);
+        return new IconImage(width, height, null, pixels) { BitsPerPixel = bitCount };
     }
 
     private static int CheckSize(uint size) => size is > 0 and <= MaxResourceSize

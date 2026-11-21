@@ -33,8 +33,8 @@ public static class VolumeProviders
     public static IReadOnlyList<IFileVolumeProvider> Files => GetLists().Files;
 
     /// <summary>
-    ///     Volume creators listed in the create dialog (F9): those of the plugins that can create volumes
-    ///     (<see cref="IPlugin.CanCreateVolumes" />), in plugin order.
+    ///     Volume creators listed in the create dialog (F9): those of the plugins (<see cref="IPlugin.VolumeCreators" />),
+    ///     in plugin order.
     /// </summary>
     public static IReadOnlyList<IVolumeCreator> Creators => GetLists().Creators;
 
@@ -72,7 +72,7 @@ public static class VolumeProviders
         lists = new Lists(plugins,
             [Local, ..plugins.SelectMany(plugin => plugin.VolumeProviders)],
             [Iso9660, ..plugins.SelectMany(plugin => plugin.FileVolumeProviders)],
-            [..plugins.Where(plugin => plugin.CanCreateVolumes).SelectMany(plugin => plugin.VolumeCreators)],
+            [..plugins.SelectMany(plugin => plugin.VolumeCreators)],
             [..plugins.SelectMany(plugin => plugin.IconProviders)],
             [..plugins.SelectMany(plugin => plugin.NavigationModes)],
             [..plugins.SelectMany(plugin => plugin.ImageProviders), WindowsIcons, StandardImages],

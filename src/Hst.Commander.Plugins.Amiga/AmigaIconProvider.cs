@@ -155,7 +155,10 @@ public class AmigaIconProvider : IIconProvider
         {
             var trueColorIcon = trueColorIcons[index];
             yield return new EntryIcon($"{GetImageName(index)} (true color)",
-                [new IconImage(trueColorIcon.Image.Width, trueColorIcon.Image.Height, trueColorIcon.PngData, null, 32)]);
+                [new IconImage(trueColorIcon.Image.Width, trueColorIcon.Image.Height, trueColorIcon.PngData, null)
+                {
+                    BitsPerPixel = 32
+                }]);
         }
 
         var colorIconImages = amigaIcon.ColorIcon?.Images ?? [];
@@ -240,7 +243,7 @@ public class AmigaIconProvider : IIconProvider
             }
         }
 
-        return new IconImage(image.Width, image.Height, null, pixels, bitsPerPixel);
+        return new IconImage(image.Width, image.Height, null, pixels) { BitsPerPixel = bitsPerPixel };
     }
 
     private static void SetPixel(byte[] pixels, int index, int r, int g, int b, int a)

@@ -8,7 +8,8 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 
 ### IVolume
 
-- A volume has a current directory; `ListEntries`, `OpenEntry`, `OpenRead`, `OpenWrite`, `CreateContainer`, `Delete`, `Rename` and `SetModifiedDate` act on names in it. `ChangeDirectory` takes path components and handles `Paths.Root` and `Paths.Parent` case-insensitively.
+- A volume has a current directory; `ListEntries`, `OpenRead`, `OpenWrite`, `CreateContainer`, `Delete`, `Rename` and `SetModifiedDate` act on names in it. `ChangeDirectory` takes path components and handles `Paths.Root` and `Paths.Parent` case-insensitively; a missing directory throws an `IOException` and keeps the current directory. `CurrentPathComponents` is an `IReadOnlyList<string>` from the root, empty at the root.
+- `ListEntries` doesn't include `..`; dates (`IEntry.ModifiedDate`, `SetModifiedDate`) are UTC, and dates of kind unspecified are treated as UTC.
 - Write members throw `NotSupportedException` when read-only. `OpenWrite` creates or overwrites; `CreateContainer` is a no-op when the container exists; `Delete` only deletes items and empty containers; `Rename` throws `IOException` when the new name exists (case-only changes are allowed); `SetModifiedDate` treats an unspecified `DateTimeKind` as UTC.
 - `GetWritableImageId(name)` and `OpenReadWrite(name)` (optional, default null and `NotSupportedException`): an item with an id unique across volumes (e.g. a local file's full path, a file's UNC path on an SMB share or a physical disk's device path) is opened once for reading and writing as a writable image shared by both panes, see [Writable images](volumes.md#writable-images). `OpenReadWrite` throws `UnauthorizedAccessException` or `IOException` when the item can only be read, and the image is then opened read-only with `OpenRead`.
 - Optional members with defaults: `SupportsAmigaMetadata` (the current directory stores Amiga names, protection bits and comments as they are, see [UAE metadata](file-operations.md#uae-metadata)), `CanSetAmigaMetadata`/`SetAmigaMetadata` and `GetChangeableAttributes`/`SetAttributes` (only the changeable attributes are changed). The properties dialog uses `CanSetAmigaMetadata` and `GetChangeableAttributes` to decide what can be changed. `GetSpace` (default null) returns the free and total space (`VolumeSpace(Free, Total)`) of the file system of the current directory, read after each listing and shown as free/total in the path panel like local drives (e.g. FAT, NTFS and Amiga file systems); volumes wrapping other volumes (partition tables, RDB partitions, hybrid disks) forward it to the current one.
@@ -19,7 +20,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 
 - `Name`, `Type` (`Container` or `Item`), `Size`, `ModifiedDate`.
 - `DisplayName` (default `Name`): shown in the panes and at the top of the properties dialog, e.g. `1 - DH0 - Workbench`. Paths, file operations and other dialogs use `Name`.
-- `Details`: `EntryDetails(TypeName, Sections, UsedFraction)` made of `EntryProperty(Label, Value)` lines, shown in the properties dialog of a single entry. Use `EntryProperty.FromBytes` for sizes.
+- `Details`: `EntryDetails(TypeName, Sections) { UsedFraction }` made of `EntryProperty(Label, Value)` lines, shown in the properties dialog of a single entry. Use `EntryProperty.FromBytes` for sizes.
 - `IsVolume`: a container that is the root of a volume of its own (e.g. an RDB partition), whose icon can be inside it.
 - `AmigaMetadata`: `AmigaMetadata(ProtectionBits, Comment)` with the bits as stored on disk (`hsparwed`; `rwed` are set when *not* allowed, so 0 is `----rwed`).
 - `Attributes`: DOS/Windows `EntryAttributes` (the values of `FileAttributes`).
@@ -57,16 +58,16 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 
 ### IVolumeCreator
 
-- Creates a new volume file with F9. `FileExtension` is added to the file name when missing. `Fields` are `VolumeCreatorField`s (`Text`, `Number` as long, `Size` as long bytes entered with a unit, `Boolean`, `Choice` of `VolumeCreatorChoice` values and labels; required, default value, `EnabledByField` naming a check box that enables the field), read from `VolumeCreatorValues`.
+- Creates a new volume file with F9. `FileExtension` is added to the file name when missing. `Fields` are `VolumeCreatorField`s (`Text`, `Number` as long, `Size` as long bytes entered with a unit, `Boolean`, `Choice` of `VolumeCreatorChoice` values and labels; the optional `IsRequired`, `DefaultValue`, `Choices` and `EnabledByField`, naming a check box that enables the field, are init properties), read from `VolumeCreatorValues`.
 - `Create(stream, values)` writes to an empty seekable, readable and writable stream and throws `IOException` for invalid values.
 - `CreatesSparseFile` true asks for a sparse file (e.g. a large disk image that is mostly empty); `Create` then sets the stream's length and only writes what isn't zeros.
-- Only plugins with `CanCreateVolumes` are listed in `VolumeProviders.Creators`. See [Creating volumes](file-operations.md#creating-volumes).
+- The volume creators of all plugins are listed in `VolumeProviders.Creators`, in plugin order. See [Creating volumes](file-operations.md#creating-volumes).
 
 ### IIconProvider
 
 - `GetIconFileName(name)` finds an icon file by name only (`file.info` for both `file` and `file.info`); `GetVolumeIconFileName` gives the icon file inside a volume entry (e.g. `Disk.info`).
 - `ReadIcon(name, stream, size)` checks the signature and returns null for other files; `ReadIcons` returns all icons for the icon viewer; `ReadIconProperties` returns lines for the properties dialog.
-- `IconImage` is PNG data or 32-bit BGRA pixels (not premultiplied, top-down) with an optional `BitsPerPixel`; `EntryIcon(Name, Images)` is one icon with its images. See [Entry icons](icons-and-navigation-modes.md#entry-icons).
+- `IconImage` is PNG data or 32-bit BGRA pixels (not premultiplied, top-down) with an optional `BitsPerPixel` (an init property); `EntryIcon(Name, Images)` is one icon with its images. See [Entry icons](icons-and-navigation-modes.md#entry-icons).
 
 ### IPropertiesTabProvider
 
@@ -80,7 +81,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 
 ### INavigationMode
 
-- `Layout(volume, entries, options)` returns a `NavigationIcon` per entry shown, in order: entries without an icon are hidden, a null image shows Hst Commander's icon of the entry, a null selected image is drawn highlighted, a null position is placed by Hst Commander and `IsMovable` false can't be dragged. Entries don't include `..`.
+- `Layout(volume, entries, options)` returns a `NavigationIcon` per entry shown, in order: entries without an icon are hidden, a null image shows Hst Commander's icon of the entry, a null selected image is drawn highlighted, a null position is placed by Hst Commander and an icon with `IsMovable = false` can't be dragged. Entries don't include `..`.
 - `SavePositions` stores the positions of icons moved by the user.
 - Both get the pane's volume and may change its directory (e.g. into a volume entry) as long as they change back before returning.
 - `Options` are `NavigationModeOption`s shown as check boxes; `GetValue(options)` gives the default for a missing value. See [Navigation modes](icons-and-navigation-modes.md#navigation-modes).
@@ -88,7 +89,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 ### ITheme
 
 - `Id` is stored in the settings, so it must never change. `Name` is shown in Settings > Appearance. `IsDark` picks the Fluent variant the GUI uses for controls the theme doesn't color.
-- `Colors` is a `ThemeColors` record of "#RRGGBB" strings. The TUI uses the closest of its 16 colors for each one. Its optional `MarkedContainerBackground` and `MarkedItemBackground` give marked directories and files a background of their own.
+- `Colors` is a `ThemeColors` record of "#RRGGBB" strings. The TUI uses the closest of its 16 colors for each one. Its optional `MarkedContainerBackground` and `MarkedItemBackground` (init properties) give marked directories and files a background of their own.
 - `GetBottomPanel()` returns the buttons of the bottom area as a `ButtonPanel` of `ButtonColumn`s of `PanelButton(Label, Action, Key, Background, Foreground)`. `Action` is one of the `CommanderActions` ids. It's called again after the settings change.
 - `ShowParentButtons` (default false) shows a narrow parent button on the outer side of each pane. See [Themes](themes.md).
 - `HighlightActivePathPanel` (default false) colors the whole panel above the active pane with the active path's colors, not only the path.
@@ -102,7 +103,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 
 ### IPlugin
 
-- Returns the plugin's volume providers, file volume providers, volume creators (with `CanCreateVolumes`), icon providers, navigation modes, image providers and themes. `Initialize(host)` is called once before the plugin is used.
+- Returns the plugin's volume providers, file volume providers, volume creators, icon providers, navigation modes, image providers, properties tab providers and themes; each defaults to none. `Initialize(host)` is called once before the plugin is used.
 - A plugin references only Abstractions. Plugins can't use each other's types, because each loads in its own load context, so they work together through `IPluginHost`.
 - `ThirdPartyNotices` (optional, default null): the copyright notices and licenses of the third-party components the plugin uses, shown in Help > About > Licenses while it's loaded, e.g. the SMB plugin returns SMBLibrary's notice with the LGPL and GPL texts (an embedded resource). A plugin throwing from it is left out of the list.
 
@@ -134,3 +135,4 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - A plugin records the version it was built for in its reference to Abstractions, so plugins don't declare it themselves. Before creating a plugin's types, `PluginLoader` compares it with its own (`PluginLoader.IsCompatible`): the major versions must be the same and the plugin's minor version not newer. Otherwise the plugin isn't loaded and the error says whether the plugin is older (install a version made for this Hst Commander) or needs a newer Hst Commander. Without the check such a plugin would fail with a type load error, or later with a missing method. Assemblies not referencing Abstractions have no plugins and are skipped as before.
 - Increase the minor version for additions plugins built for an older version keep working with: new interfaces and types, new interface members with default implementations (like the optional members above), new optional parameters of Hst Commander's own types. Increase the major version (and reset the minor version) for any other change, e.g. removing, renaming or changing a member or adding an interface member without a default implementation; plugins then have to be built again.
 - The built-in plugins are project references of Core, not loaded by `PluginLoader`, so they're always built for the current version.
+- Records of the plugin API take their required values as positional parameters and their optional values as init properties (e.g. `new PanelButton("Copy", CommanderActions.Copy) { Key = "F5" }`), so a new optional value is added as an init property in a minor version. Adding a positional parameter changes the record's constructor, which plugins built for the older version call, so it's a major version.

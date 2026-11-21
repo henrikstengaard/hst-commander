@@ -19,8 +19,14 @@ public sealed record ButtonColumn(IReadOnlyList<PanelButton> Buttons);
 /// <summary>Button of a <see cref="ButtonPanel" /> running a command of Hst Commander when clicked.</summary>
 /// <param name="Label">Text of the button, e.g. "Copy".</param>
 /// <param name="Action">Command run when clicked, one of <see cref="CommanderActions" />, e.g. "Copy".</param>
-/// <param name="Key">Key shown before the label, e.g. "F5", null for none.</param>
-/// <param name="Background">Background "#RRGGBB", null for the theme's button background.</param>
-/// <param name="Foreground">Text color "#RRGGBB", null for the theme's button text color.</param>
-public sealed record PanelButton(string Label, string Action, string? Key = null, string? Background = null,
-    string? Foreground = null);
+public sealed record PanelButton(string Label, string Action)
+{
+    /// <summary>Key shown before the label, e.g. "F5", null for none.</summary>
+    public string? Key { get; init; }
+
+    /// <summary>Background "#RRGGBB", null for the theme's button background.</summary>
+    public string? Background { get; init; }
+
+    /// <summary>Text color "#RRGGBB", null for the theme's button text color.</summary>
+    public string? Foreground { get; init; }
+}

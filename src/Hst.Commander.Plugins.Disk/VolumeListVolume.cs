@@ -43,7 +43,7 @@ public abstract class VolumeListVolume : IVolume, IDisposable
     /// <summary>Volume of the current directory, null in the list.</summary>
     private IVolume? CurrentVolume => _index is { } index ? _mountedVolumes[index] : null;
 
-    public IEnumerable<string> CurrentPathComponents => !_inList ? []
+    public IReadOnlyList<string> CurrentPathComponents => !_inList ? []
         : _index is { } index ? [ListName, GetEntryName(index), .._mountedVolumes[index].CurrentPathComponents]
         : [ListName];
 
@@ -186,23 +186,6 @@ public abstract class VolumeListVolume : IVolume, IDisposable
         }
 
         _index = index;
-    }
-
-    public async Task<IEntry> OpenEntry(string name, CancellationToken cancellationToken = default)
-    {
-        if (CurrentVolume is { } volume)
-        {
-            return await volume.OpenEntry(name, cancellationToken);
-        }
-
-        if (!_inList)
-        {
-            OpenList(name);
-            return CreateListEntry();
-        }
-
-        await OpenVolume(name, cancellationToken);
-        return CreateEntry(_index!.Value, CurrentVolume);
     }
 
     public Task<Stream> OpenRead(string name, CancellationToken cancellationToken = default) =>

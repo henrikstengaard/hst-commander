@@ -26,8 +26,6 @@ public class AmigaPlugin : IPlugin
     public IEnumerable<IFileVolumeProvider> FileVolumeProviders { get; } =
         [new AdfFileVolumeProvider(), new RdbFileVolumeProvider(), new AmigaPartitionFileVolumeProvider()];
 
-    public bool CanCreateVolumes => true;
-
     public IEnumerable<IVolumeCreator> VolumeCreators { get; } = [new AdfVolumeCreator()];
 
     public IEnumerable<IIconProvider> IconProviders { get; } = [new AmigaIconProvider()];

@@ -43,7 +43,7 @@ public sealed class RemoteVolume : IVolume, IDisposable
     /// <summary>Root of the server's paths, e.g. "sftp://server".</summary>
     public string Name => _server.PathRoot;
 
-    public IEnumerable<string> CurrentPathComponents => _pathComponents.ToList();
+    public IReadOnlyList<string> CurrentPathComponents => _pathComponents.ToList();
 
     /// <summary>Path components of the directory the user starts in after logging in, e.g. ["home", "user"].</summary>
     public async Task<IReadOnlyList<string>> GetHomePathComponents(CancellationToken cancellationToken = default) =>
@@ -100,22 +100,6 @@ public sealed class RemoteVolume : IVolume, IDisposable
         }
 
         _pathComponents = newPathComponents;
-    }
-
-    public async Task<IEntry> OpenEntry(string name, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(name);
-
-        var pathComponents = _pathComponents.ToList();
-        var client = await GetClient(cancellationToken);
-        var entry = await client.GetEntry(GetPath(pathComponents, name), cancellationToken) ??
-                    throw new FileNotFoundException($"Entry '{name}' not found");
-        if (entry.IsDirectory)
-        {
-            _pathComponents = [..pathComponents, entry.Name];
-        }
-
-        return new RemoteVolumeEntry(entry);
     }
 
     public async Task<Stream> OpenRead(string name, CancellationToken cancellationToken = default)

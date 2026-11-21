@@ -48,7 +48,7 @@ public sealed class DiscFileSystemVolume : IVolume, IDisposable
 
     public string Name { get; }
 
-    public IEnumerable<string> CurrentPathComponents => _currentPathComponents.ToList();
+    public IReadOnlyList<string> CurrentPathComponents => _currentPathComponents.ToList();
 
     /// <summary>Name of the file system, e.g. "Microsoft FAT".</summary>
     public string FileSystemName => _fileSystem.FriendlyName;
@@ -128,23 +128,6 @@ public sealed class DiscFileSystemVolume : IVolume, IDisposable
 
         _currentPathComponents = changedPathComponents;
         return Task.CompletedTask;
-    }
-
-    public async Task<IEntry> OpenEntry(string name, CancellationToken cancellationToken = default)
-    {
-        var info = FindEntry(_currentPathComponents, name) ?? throw new IOException($"Entry '{name}' not found");
-        if (info.IsDirectory)
-        {
-            await ChangeDirectory([info.Name], cancellationToken);
-            var path = GetPath(_currentPathComponents);
-            return new DiscEntry(info.Name, EntryType.Container, null,
-                Run(() => _fileSystem.GetLastWriteTimeUtc(path)),
-                ToEntryAttributes(Run(() => _fileSystem.GetAttributes(path))));
-        }
-
-        var fileInfo = Run(() => _fileSystem.GetFileInfo(GetPath(info.Name)));
-        return new DiscEntry(fileInfo.Name, EntryType.Item, fileInfo.Length, fileInfo.LastWriteTimeUtc,
-            ToEntryAttributes(Run(() => fileInfo.Attributes)));
     }
 
     public Task<Stream> OpenRead(string name, CancellationToken cancellationToken = default)

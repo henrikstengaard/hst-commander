@@ -37,7 +37,7 @@ public class AmigaFileSystemVolume : IVolume, IDisposable
 
     public string Name { get; }
 
-    public IEnumerable<string> CurrentPathComponents => _currentPathComponents.ToList();
+    public IReadOnlyList<string> CurrentPathComponents => _currentPathComponents.ToList();
 
     /// <summary>True when the current directory is the root of the file system.</summary>
     public bool IsAtRoot => _currentPathComponents.Count == 0;
@@ -119,18 +119,6 @@ public class AmigaFileSystemVolume : IVolume, IDisposable
             await Run(() => _fileSystemVolume.ChangeDirectory(pathComponent));
             _currentPathComponents.Add(pathComponent);
         }
-    }
-
-    public async Task<IEntry> OpenEntry(string name, CancellationToken cancellationToken = default)
-    {
-        var amigaEntry = await FindEntry(name) ?? throw new IOException($"Entry '{name}' not found");
-        var entry = CreateEntry(amigaEntry);
-        if (entry.Type == EntryType.Container)
-        {
-            await ChangeDirectory([amigaEntry.Name], cancellationToken);
-        }
-
-        return entry;
     }
 
     public async Task<Stream> OpenRead(string name, CancellationToken cancellationToken = default)

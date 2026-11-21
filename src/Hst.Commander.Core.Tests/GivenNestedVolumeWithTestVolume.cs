@@ -41,14 +41,14 @@ public class GivenNestedVolumeWithTestVolume
         iso9660VolumeProvider.AddEntry([], new TestEntry("iso9660-dir1", EntryType.Container));
         iso9660VolumeProvider.AddEntry(["iso9660-dir1"], new TestEntry("iso9660-file1.txt", EntryType.Item));
         
-        // act - open entry "local-dir1"
-        await nestedVolume.OpenEntry("local-dir1");
+        // act - change to "local-dir1"
+        await nestedVolume.ChangeDirectory(["local-dir1"]);
 
         // assert - current path components of the nested volume is changed to "local-dir1"
         Assert.Equal(["local-dir1"], nestedVolume.CurrentPathComponents);
         
-        // act - open entry "local-cdrom.iso"
-        var cdRomIsoEntry = await nestedVolume.OpenEntry("local-cdrom.iso");
+        // act - get entry "local-cdrom.iso"
+        var cdRomIsoEntry = await nestedVolume.ListEntries().FirstAsync(entry => entry.Name == "local-cdrom.iso");
         
         // simulate a registry is used to determine the cdrom.iso entry stream can be read
         // by a iso9660 volume and pushes it to the nested volume

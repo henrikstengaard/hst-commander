@@ -51,7 +51,7 @@ public class NestedVolume(IVolume volume) : IVolume
     /// <summary>
     /// Current path components of all nested volumes.
     /// </summary>
-    public IEnumerable<string> CurrentPathComponents => _nestedVolumes
+    public IReadOnlyList<string> CurrentPathComponents => _nestedVolumes
         .SelectMany(p => p.CurrentPathComponents)
         .Where(pathComponent => !pathComponent.Equals(Paths.Root, StringComparison.OrdinalIgnoreCase))
         .ToList();
@@ -97,12 +97,6 @@ public class NestedVolume(IVolume volume) : IVolume
             await _currentVolume.ChangeDirectory([pathComponent], cancellationToken);
         }
     }
-
-    public async Task<IEntry> GetEntry(string name, CancellationToken cancellationToken = default) => 
-        await _currentVolume.OpenEntry(name, cancellationToken);
-    
-    public async Task<IEntry> OpenEntry(string name, CancellationToken cancellationToken = default) => 
-        await _currentVolume.OpenEntry(name, cancellationToken);
 
     public Task<Stream> OpenRead(string name, CancellationToken cancellationToken = default) =>
         _currentVolume.OpenRead(name, cancellationToken);

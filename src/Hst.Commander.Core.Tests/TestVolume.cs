@@ -41,7 +41,7 @@ public class TestVolume : IVolume
             : null;
     }
 
-    public IEnumerable<string> CurrentPathComponents => currentPathComponents;
+    public IReadOnlyList<string> CurrentPathComponents => currentPathComponents.ToList();
 
     /// <summary>
     /// Root of the host paths of items (<see cref="GetHostPath" />), e.g. @"\\server\share"; null (the default) when the
@@ -110,29 +110,6 @@ public class TestVolume : IVolume
         currentPathComponents = changedPathComponents;
 
         return Task.CompletedTask;
-    }
-
-    public Task<IEntry> OpenEntry(string name, CancellationToken cancellationToken = default)
-    {
-        var path = CreatePath(currentPathComponents);
-        if (!entries.ContainsKey(path))
-        {
-            throw new IOException("Dir not found");
-        }
-
-        IEntry? entry = entries[path].FirstOrDefault(entry => entry.Name.Equals(name));
-
-        if (entry == null)
-        {
-            throw new IOException("Entry not found");
-        }
-
-        if (entry.Type == EntryType.Container)
-        {
-            currentPathComponents.Add(entry.Name);
-        }
-
-        return Task.FromResult(entry);
     }
 
     public Task<Stream> OpenRead(string name, CancellationToken cancellationToken = default)

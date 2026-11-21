@@ -229,7 +229,7 @@ public class GivenExFatVolumeCreator : IDisposable
     {
         // arrange
         VolumeCreatorField Field(object? defaultValue) =>
-            new("Size", "Size", VolumeCreatorFieldType.Size, true, defaultValue);
+            new("Size", "Size", VolumeCreatorFieldType.Size) { IsRequired = true, DefaultValue = defaultValue };
 
         // act & assert
         Assert.Equal(new VolumeCreatorSizeInput("1", "GB"), VolumeCreation.GetSizeInput(_creator.Fields[0], null));

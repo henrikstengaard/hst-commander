@@ -139,7 +139,7 @@ All are in `Hst.Commander.Abstractions`; see [`docs/plugin-api.md`](../docs/plug
 
 These apply across features and aren't obvious from a single file:
 
-- **Plugins reference only `Hst.Commander.Abstractions`.** Each loads in its own `AssemblyLoadContext` sharing Abstractions with the host, so plugins can't use each other's types and work together through `IPluginHost`. Abstractions' `AssemblyVersion` is the plugin API version, checked when loading plugins: increase the minor version for additions old plugins keep working with (e.g. interface members with default implementations) and the major version for any other change to Abstractions (see [Plugin API versions](../docs/plugin-api.md#plugin-api-versions)). Built-in plugins are listed in `Plugins.BuiltIn`, and the order matters (Disk before Amiga, so hybrid disks open as hybrid disks).
+- **Plugins reference only `Hst.Commander.Abstractions`.** Each loads in its own `AssemblyLoadContext` sharing Abstractions with the host, so plugins can't use each other's types and work together through `IPluginHost`. Abstractions' `AssemblyVersion` is the plugin API version, checked when loading plugins: increase the minor version for additions old plugins keep working with (e.g. interface members with default implementations) and the major version for any other change to Abstractions; records of the plugin API take optional values as init properties, so new ones can be added in a minor version (see [Plugin API versions](../docs/plugin-api.md#plugin-api-versions)). Built-in plugins are listed in `Plugins.BuiltIn`, and the order matters (Disk before Amiga, so hybrid disks open as hybrid disks).
 - **Each `NavigationContext` owns a `NestedVolume`.** Opening an image pushes a volume (wrapped in `EntryVolumeProvider`); going up from its root pops and disposes it.
 - **Background work never uses the pane's volume.** Copy, move, delete, viewing, editing, counting contents and reading icons inside volume entries open an independent volume with `NavigationContext.OpenLocationAsync`, because volumes aren't thread safe.
 - **Writable images are shared.** A file of the root volume with an id (`IVolume.GetWritableImageId`, e.g. a local file, a file on an SMB share or a physical disk) opened by a provider with `CanWrite` is opened once (`SharedImages`) and shared by both panes and file operations through `SharedImageVolume` views serialized by a semaphore; two volumes writing one file would damage its file system. The lock is only held on the thread pool, never by work waiting for a UI thread. A stream caching writes (`IWriteCache`, e.g. `CachedDiskStream` of physical disks) is committed (`IWriteCache.Commit`, not `Flush`) only between operations, when the file system is consistent. Images inside other images are read-only.
@@ -152,7 +152,7 @@ These apply across features and aren't obvious from a single file:
 
 - `Paths.Root` = `"/"`
 - `Paths.Parent` = `".."`
-- `CurrentPathComponents` returns path segments as a `string[]`, not a joined string.
+- `CurrentPathComponents` returns path segments as an `IReadOnlyList<string>`, not a joined string.
 - The empty array represents the root of a volume.
 
 ---
@@ -209,13 +209,13 @@ These apply across features and aren't obvious from a single file:
 ## How to Add a New Volume Type
 
 1. **Create the class** in `Hst.Commander.Core/Volumes/` or a plugin project, implementing `IVolume` (and `IDisposable` when it holds resources).
-2. **Implement all members**: `Name`, `CurrentPathComponents`, `ListEntries`, `ChangeDirectory`, `OpenEntry`, `OpenRead`, `OpenWrite`, `CreateContainer`, `Delete`, `Rename`, `SetModifiedDate` (throw `NotSupportedException` from the write members when the volume is read-only). Copying and moving to and from the volume then works through `VolumeCopy.CopyToAsync` and `VolumeMove.MoveToAsync`.
+2. **Implement all members**: `Name`, `CurrentPathComponents`, `ListEntries`, `ChangeDirectory`, `OpenRead`, `OpenWrite`, `CreateContainer`, `Delete`, `Rename`, `SetModifiedDate` (throw `NotSupportedException` from the write members when the volume is read-only). Copying and moving to and from the volume then works through `VolumeCopy.CopyToAsync` and `VolumeMove.MoveToAsync`.
 3. **Handle `Paths.Root` and `Paths.Parent`** in `ChangeDirectory` — both are case-insensitive string comparisons.
 4. **Add unit tests** in `Hst.Commander.Core.Tests/` using the `Given<YourVolume>` naming pattern.
 5. **To make it selectable with F1/F2**, implement `IVolumeProvider` (see `LocalVolumeProvider`) and add it to `VolumeProviders.All`. To ask for a location (e.g. a server path) and credentials when chosen, implement `ILocationVolumeProvider` instead (see `SmbVolumeProvider` and [`docs/plugin-api.md`](../docs/plugin-api.md#ilocationvolumeprovider)).
 6. **Or open files as the volume** (images): implement `IFileVolumeProvider` with `IsMatch` checking the file's magic signature (see `Iso9660FileVolumeProvider` and `ZipFileVolumeProvider`; for a read-only archive, derive the volume from `ArchiveVolume<T>` like `ZipVolume`) and add it to `VolumeProviders.Files`, or return it from `IPlugin.FileVolumeProviders` of a plugin. `NavigationContext` then opens matching files as images (see [Images](../docs/volumes.md#images)). Return true from `CanWrite` when the volume can write to the file (see [Writable images](../docs/volumes.md#writable-images) and `AdfFileVolumeProvider`).
 
-7. **To create new volumes as files with F9**, implement `IVolumeCreator` (see `AdfVolumeCreator`) with its input fields and return it from `IPlugin.VolumeCreators` with `IPlugin.CanCreateVolumes` true (see [Creating volumes](../docs/file-operations.md#creating-volumes)).
+7. **To create new volumes as files with F9**, implement `IVolumeCreator` (see `AdfVolumeCreator`) with its input fields and return it from `IPlugin.VolumeCreators` (see [Creating volumes](../docs/file-operations.md#creating-volumes)).
 
 8. **To show icons from icon files next to entries** (like Amiga `.info` files), implement `IIconProvider` (see `AmigaIconProvider`) and return it from `IPlugin.IconProviders` (see [Entry icons](../docs/icons-and-navigation-modes.md#entry-icons)).
 

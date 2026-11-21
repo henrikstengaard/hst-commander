@@ -133,63 +133,6 @@ public class GivenLocalVolume
         Assert.NotEmpty(entries);
     }
 
-    [Fact]
-    public async Task When_OpenDirectoryEntry_Then_DirectoryIsChanged()
-    {
-        // arrange - create local volume with entries
-        var localVolume = new LocalVolume(string.Empty);
-        
-        // assert - current path components of the local volume is root
-        Assert.Equal([], localVolume.CurrentPathComponents);
-
-        // arrange - get first entry in root
-        var entries = await localVolume.ListEntries().ToListAsync();
-        var firstEntry = entries.FirstOrDefault();
-        Assert.NotNull(firstEntry);
-
-        // act - open first entry
-        await localVolume.OpenEntry(firstEntry.Name);
-
-        // assert - current path components of the local volume is first entry
-        Assert.Equal([firstEntry.Name], localVolume.CurrentPathComponents);
-    }
-
-    [Fact]
-    public async Task When_OpenFileEntry_Then_DirectoryIsNotChanged()
-    {
-        var localPath = $"local-{Guid.NewGuid()}";
-        var localPathComponents = Path.GetFullPath(localPath).Split(Path.DirectorySeparatorChar);
-
-        try
-        {
-            await CreateLocalDirectoriesAndFiles(localPath);
-
-            // arrange - create local volume with entries
-            var localVolume = new LocalVolume(localPath);
-
-            // assert - current path components of the local volume is equal to local path components
-            Assert.Equal(localPathComponents, localVolume.CurrentPathComponents);
-
-            // act - open entry "file1.txt"
-            var entry = await localVolume.OpenEntry("file1.txt");
-        
-            // assert - entry is a file
-            Assert.NotNull(entry);
-            Assert.Equal("file1.txt", entry.Name);
-            Assert.Equal(EntryType.Item, entry.Type);
-        
-            // assert - current path components of the local volume is equal to local path components
-            Assert.Equal(localPathComponents, localVolume.CurrentPathComponents);
-        }
-        finally
-        {
-            if (Directory.Exists(localPath))
-            {
-                Directory.Delete(localPath, true);
-            }
-        }
-    }
-
     private static async Task CreateLocalDirectoriesAndFiles(string path)
     {
         Directory.CreateDirectory(path);

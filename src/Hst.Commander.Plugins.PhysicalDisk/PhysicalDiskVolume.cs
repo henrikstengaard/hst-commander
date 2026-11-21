@@ -24,7 +24,7 @@ public sealed class PhysicalDiskVolume(IPhysicalDisks disks, long cacheSize = Ph
 
     public string Name => VolumeName;
 
-    public IEnumerable<string> CurrentPathComponents => [];
+    public IReadOnlyList<string> CurrentPathComponents => [];
 
     public async IAsyncEnumerable<IEntry> ListEntries(
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -53,9 +53,6 @@ public sealed class PhysicalDiskVolume(IPhysicalDisks disks, long cacheSize = Ph
 
         return Task.CompletedTask;
     }
-
-    public Task<IEntry> OpenEntry(string name, CancellationToken cancellationToken = default) =>
-        Task.FromResult(CreateEntry(GetDisk(name)));
 
     public Task<Stream> OpenRead(string name, CancellationToken cancellationToken = default)
     {

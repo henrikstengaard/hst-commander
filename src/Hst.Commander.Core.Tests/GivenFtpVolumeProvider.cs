@@ -165,21 +165,6 @@ public class GivenFtpVolumeProvider : IDisposable
     }
 
     [Fact]
-    public async Task When_OpeningDirectoryEntry_Then_VolumeChangesToIt()
-    {
-        // arrange
-        using var volume = await OpenHomeAsync();
-
-        // act
-        var entry = await volume.OpenEntry("dir1");
-
-        // assert
-        Assert.Equal(EntryType.Container, entry.Type);
-        Assert.Equal(["home", "user", "dir1"], volume.CurrentPathComponents);
-        await Assert.ThrowsAsync<FileNotFoundException>(() => volume.OpenEntry("missing"));
-    }
-
-    [Fact]
     public async Task When_ServerClosedConnection_Then_VolumeConnectsAgain()
     {
         // arrange
