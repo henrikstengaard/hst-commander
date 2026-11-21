@@ -823,6 +823,12 @@ public sealed class MainWindow : Window
                 key.Handled = true;
                 _ = CreateVolumeAsync(pane, otherPane);
             }
+            // the context menu at the current entry, like the GUI's Shift+F10 (terminals send no menu key)
+            else if (key == Key.F10.WithShift)
+            {
+                key.Handled = true;
+                ShowEntryMenu(pane);
+            }
             // terminals like gnome terminal use f10 for their menu, so ctrl+q too
             else if (key.KeyCode == KeyCode.F10 || key == Key.Q.WithCtrl)
             {
@@ -1824,9 +1830,24 @@ public sealed class MainWindow : Window
     private Pane GetOtherPane(Pane pane) => pane == _leftPane ? _rightPane : _leftPane;
 
     /// <summary>
+    ///     Shows the context menu of the entries of a pane with the keyboard (Shift+F10), below the current entry, or at
+    ///     the top left of the table when the current entry isn't visible.
+    /// </summary>
+    private void ShowEntryMenu(Pane pane)
+    {
+        var tableView = pane.TableView;
+        var position = tableView.CellToScreen(0, tableView.SelectedRow) is { } cell
+            ? tableView.ViewportToScreen(cell)
+            : tableView.ViewportToScreen(System.Drawing.Point.Empty);
+        ShowEntryMenu(pane, null, position);
+    }
+
+    /// <summary>
     ///     Shows the context menu of the entries of a pane at the mouse (right-click): the row clicked becomes the
     ///     current entry, and the menu acts on the marked entries or, when none are marked, the current entry, like the
     ///     function keys. Copy, Cut, Rename and Delete need an entry (not ".."), drives only have properties.
+    ///     PowerShell here, Terminal here and Command prompt here (only Terminal here on macOS and Linux) open a shell
+    ///     in a new window in the pane's directory when it's local, see <see cref="ShellHere" />.
     /// </summary>
     private void ShowEntryMenu(Pane pane, int? row, System.Drawing.Point screenPosition)
     {
@@ -1841,10 +1862,9 @@ public sealed class MainWindow : Window
         var canChange = hasEntries && !pane.NavigationContext.IsDriveList;
         var canRename = canChange && currentEntry != null && currentEntry.Name != Paths.Parent;
         var canPaste = !pane.NavigationContext.IsDriveList;
+        var isLocal = pane.NavigationContext.CurrentHostDirectory != null;
         var otherPane = GetOtherPane(pane);
-        _entryMenu?.Dispose();
-        _entryMenu = new ContextMenu { Position = screenPosition };
-        _entryMenu.Show(new MenuBarItem(new MenuItem[]
+        var items = new List<MenuItem>
         {
             new("_Copy", "Ctrl+C", () => _ = CopyToClipboardAsync(pane, false), () => canChange),
             new("Cu_t", "Ctrl+X", () => _ = CopyToClipboardAsync(pane, true), () => canChange),
@@ -1852,9 +1872,43 @@ public sealed class MainWindow : Window
             null!,
             new("_Rename...", "Shift+F6", () => _ = RenameAsync(pane, otherPane), () => canRename),
             new("_Delete...", "F8", () => _ = DeleteAsync(pane, otherPane), () => canChange),
-            null!,
-            new("Pr_operties...", "Ctrl+P", () => _ = ShowPropertiesAsync(pane), () => hasEntries)
-        }));
+            null!
+        };
+        foreach (var kind in ShellHere.Available)
+        {
+            items.Add(new MenuItem(ShellHere.GetHeader(kind), string.Empty, () => OpenShellHere(pane, kind),
+                () => isLocal));
+        }
+
+        items.Add(null!);
+        items.Add(new MenuItem("Pr_operties...", "Ctrl+P", () => _ = ShowPropertiesAsync(pane), () => hasEntries));
+        _entryMenu?.Dispose();
+        _entryMenu = new ContextMenu { Position = screenPosition };
+        _entryMenu.Show(new MenuBarItem(items.ToArray()));
+    }
+
+    /// <summary>
+    ///     Opens PowerShell, a terminal or the command prompt in a new window in a pane's directory from its context menu
+    ///     (<see cref="ShellHere" />), without waiting for it.
+    /// </summary>
+    private static void OpenShellHere(Pane pane, ShellHereKind kind)
+    {
+        if (pane.NavigationContext.CurrentHostDirectory is not { } directory)
+        {
+            return;
+        }
+
+        try
+        {
+            ShellHere.Start(kind, directory);
+        }
+        catch (Exception exception) when (exception is System.ComponentModel.Win32Exception or IOException
+                                              or InvalidOperationException)
+        {
+            MessageBox.ErrorQuery("Error", exception.Message, "OK");
+        }
+
+        pane.TableView.SetFocus();
     }
 
     /// <summary>
