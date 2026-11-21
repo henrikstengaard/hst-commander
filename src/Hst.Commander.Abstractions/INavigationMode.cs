@@ -57,8 +57,11 @@ public interface INavigationMode
 /// <param name="Foreground">Color of the icon names, "#RRGGBB".</param>
 /// <param name="FontFamily">Font families of the icon names in order of preference, null for the pane's font.</param>
 /// <param name="FontSize">Font size of the icon names, null for the pane's font size.</param>
+/// <param name="CurrentForeground">
+///     Color of the current icon's name while the pane is active, "#RRGGBB", null for <paramref name="Foreground" />.
+/// </param>
 public sealed record NavigationModeStyle(string Background, string Foreground, string? FontFamily = null,
-    double? FontSize = null);
+    double? FontSize = null, string? CurrentForeground = null);
 
 /// <summary>Option of a navigation mode shown as a check box, see <see cref="INavigationMode.Options" />.</summary>
 /// <param name="Name">Name of the option in the values passed to <see cref="INavigationMode.Layout" />.</param>
