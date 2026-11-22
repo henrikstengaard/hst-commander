@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Input;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
 using Hst.Commander.Core;
@@ -25,6 +26,8 @@ public partial class App : Application
             Dispatcher.UIThread.Post(() => _ = ShowUnexpectedErrorAsync(args.Exception));
         };
 
+        AddContextMenuKeys();
+
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             // plugins are loaded before the panes are created, so their volume providers and themes are used; the main
@@ -42,6 +45,29 @@ public partial class App : Application
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    /// <summary>
+    ///     Shift+F10 and Ctrl+F10 open the context menu on every system, like the menu key. Avalonia only adds Shift+F10
+    ///     on Windows; Ctrl+F10 is the same key in the TUI, for terminals taking Shift+F10 themselves.
+    /// </summary>
+    private void AddContextMenuKeys()
+    {
+        if (PlatformSettings?.HotkeyConfiguration.OpenContextMenu is not { } keys)
+        {
+            return;
+        }
+
+        foreach (var gesture in new[]
+                 {
+                     new KeyGesture(Key.F10, KeyModifiers.Shift), new KeyGesture(Key.F10, KeyModifiers.Control)
+                 })
+        {
+            if (!keys.Contains(gesture))
+            {
+                keys.Add(gesture);
+            }
+        }
     }
 
     private async Task ShowUnexpectedErrorAsync(Exception exception)

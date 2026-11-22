@@ -45,7 +45,7 @@ Copy the list into the release's pull request or an issue and tick it per OS and
 
 ### Panes and navigation
 
-- [ ] Both panes list the start directory; Tab switches, Enter opens a directory, Backspace goes up, Ctrl+\ goes to the root and Ctrl+H home.
+- [ ] Both panes list the start directory; Tab switches, Enter opens a directory, Backspace goes up, Ctrl+\ and typing `/` or `\` go to the root and Ctrl+H home.
 - [ ] F1/F2 list the volume providers (Bookmarks, Local, Physical disks, FTP/SFTP and SMB when installed); choosing Local lists the drives or mount points.
 - [ ] Ctrl+L and clicking the path change location, also to a path inside an archive.
 - [ ] Clicking a column header sorts, and the order is kept after a restart; Ctrl+F quick search finds entries; Ctrl+R refreshes and Ctrl+U swaps the panes.
@@ -84,7 +84,7 @@ Copy the list into the release's pull request or an issue and tick it per OS and
 ### Interface
 
 - [ ] Ctrl+T runs a command (e.g. `dir` or `ls`) in the active pane's directory; Ctrl+Enter inserts the entry name. (TUI) The output is shown and Ctrl+O shows it again, and the panes come back afterwards.
-- [ ] The context menu (right-click, Shift+F10) works, and Terminal here (PowerShell and Command prompt here on Windows) opens a terminal in the directory.
+- [ ] The context menu (right-click, Shift+F10, Ctrl+F10) works, and Terminal here (PowerShell and Command prompt here on Windows) opens a terminal in the directory.
 - [ ] The settings dialog changes the theme (Midnight Commander, Light, Dark, Directory Opus 4) with a preview, and Directory Opus 4's button editor saves its buttons; the settings are kept after a restart.
 - [ ] (GUI) Ctrl+1 to Ctrl+9 change the navigation mode: list, thumbnails and Workbench in the adf (dragging an icon and saving its position); entry icons show for `.info` files and programs.
 - [ ] F10 (and Esc in the TUI) asks before quitting; closing the editor with changes asks to save them.

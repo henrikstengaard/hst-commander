@@ -482,7 +482,7 @@ public partial class MainWindow : Window
             // Avalonia opens the context menu when the menu key or Shift+F10 is released (Control.OnKeyUp) and closes
             // it on the next release, so opening it here when pressed made the release close it again; only F10's
             // quitting is stopped
-            case Key.F10 when e.KeyModifiers == KeyModifiers.Shift:
+            case Key.F10 when e.KeyModifiers is KeyModifiers.Shift or KeyModifiers.Control:
                 e.Handled = true;
                 break;
             case Key.F6 when e.KeyModifiers == KeyModifiers.Shift:

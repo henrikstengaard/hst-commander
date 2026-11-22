@@ -127,7 +127,7 @@ After listing, both front-ends call `DetectVolumeFilesAsync` in the background t
 
 ### Going to the Root
 
-`GoRootAsync` (Ctrl+\) goes to the root of the current volume: the local drive root (via `Path.GetPathRoot`), the root of the image when inside one (pressing again at an image root closes the images), or the root of another provider's volume. The first entry is selected once, even when the location doesn't change.
+`GoRootAsync` (Ctrl+\, or typing `/` or `\` in a pane, which works with every keyboard layout and terminal) goes to the root of the current volume: the local drive root (via `Path.GetPathRoot`), the root of the image when inside one (pressing again at an image root closes the images), or the root of another provider's volume. The first entry is selected once, even when the location doesn't change.
 
 ### Starting Files
 
