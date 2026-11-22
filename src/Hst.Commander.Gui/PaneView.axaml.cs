@@ -353,6 +353,21 @@ public partial class PaneView : UserControl
             pane.ListingCancelButton.Focus();
         }
 
+        public void ShowIndeterminate(string message, Action cancel)
+        {
+            Show(message, cancel);
+            pane.ListingProgressBar.IsIndeterminate = true;
+            pane.ListingProgressBar.ShowProgressText = false;
+        }
+
+        public void ReportMessage(string message)
+        {
+            if (pane._progressCancel != null && pane.ListingCancelButton.IsEnabled)
+            {
+                pane.ListingProgressText.Text = message;
+            }
+        }
+
         public void Report(double fraction)
         {
             if (pane._progressCancel != null)

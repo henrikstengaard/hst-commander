@@ -69,13 +69,15 @@ public static class UiThread
     }
 
     /// <summary>
-    ///     Runs the queued actions one at a time in the order posted. An action showing a dialog runs the following
-    ///     actions in the dialog's main loop; an exception reaches the main loop's error handler and the other actions
-    ///     run in the next iteration.
+    ///     Runs the actions queued before this iteration one at a time in the order posted; actions posted meanwhile run
+    ///     in the next iteration, after the input, so frequent progress reports taking long to show can't keep the main
+    ///     loop from handling keys (e.g. Cancel). An action showing a dialog runs the following actions in the dialog's
+    ///     main loop; an exception reaches the main loop's error handler and the other actions run in the next
+    ///     iteration.
     /// </summary>
     private static void RunPending()
     {
-        while (Pending.TryDequeue(out var action))
+        for (var count = Pending.Count; count > 0 && Pending.TryDequeue(out var action); count--)
         {
             action();
         }

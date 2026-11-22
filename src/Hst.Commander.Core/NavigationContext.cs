@@ -1274,9 +1274,10 @@ public sealed class NavigationContext : IDisposable
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 Func<CancellationToken, Task<Stream>> openRead = localPath != null
-                    ? _ => Task.FromResult<Stream>(new FileStream(Path.Combine(localPath, entry.Name), FileMode.Open,
-                        FileAccess.Read, FileShare.ReadWrite))
-                    : token => location!.Volume.OpenRead(entry.Name, token);
+                    ? _ => Task.FromResult(SplitFile.OpenLocal(Path.Combine(localPath, entry.Name)) ??
+                                           new FileStream(Path.Combine(localPath, entry.Name), FileMode.Open,
+                                               FileAccess.Read, FileShare.ReadWrite))
+                    : token => OpenFileAsync(location!.Volume, entry.Name, token);
                 IFileVolumeProvider? fileVolumeProvider;
                 try
                 {
@@ -1320,16 +1321,19 @@ public sealed class NavigationContext : IDisposable
     {
         var volume = _nestedVolume;
         var fileVolumeProvider = await DetectFileVolumeProviderAsync(entry.Name, fileVolumeProviders.ToList(),
-            token => volume.OpenRead(entry.Name, token), ignoreReadErrors, cancellationToken);
+            token => OpenFileAsync(volume, entry.Name, token), ignoreReadErrors, cancellationToken);
         if (fileVolumeProvider == null)
         {
             return false;
         }
 
         // a file of the root volume with an id, e.g. a local file or a physical disk, is shared when it can be
-        // written, otherwise an image inside another image is opened again from the directory it's in, e.g. for copying
+        // written, otherwise an image inside another image is opened again from the directory it's in, e.g. for copying;
+        // the parts of a split file are read-only
         var parentPathComponents = IsInImage ? _images.Peek().Volume.CurrentPathComponents.ToList() : [];
-        var sharedId = fileVolumeProvider.CanWrite && !IsInImage ? volume.GetWritableImageId(entry.Name) : null;
+        var sharedId = fileVolumeProvider.CanWrite && !IsInImage && !SplitFile.IsFirstPart(entry.Name)
+            ? volume.GetWritableImageId(entry.Name)
+            : null;
         var image = await OpenImageAsync(fileVolumeProvider, entry.Name, parentPathComponents, sharedId, volume,
             entry.Size, true, cancellationToken);
         _nestedVolume.PushVolume(new EntryVolumeProvider(entry, image.Volume));
@@ -1413,13 +1417,13 @@ public sealed class NavigationContext : IDisposable
                 sharedVolume.IsWritable);
         }
 
-        var stream = await OpenSeekableAsync(name, size, token => parentVolume.OpenRead(name, token), showProgress,
-            cancellationToken);
+        var stream = await OpenSeekableAsync(name, SplitFile.IsFirstPart(name) ? null : size,
+            token => OpenFileAsync(parentVolume, name, token), showProgress, cancellationToken);
         try
         {
             // a file volume provider that can write gets a read-only stream, e.g. of a temporary copy of the file
-            var volume = await fileVolumeProvider.CreateVolume(
-                fileVolumeProvider.CanWrite ? new ReadOnlyStream(stream) : stream, cancellationToken);
+            var volume = await CreateVolumeAsync(fileVolumeProvider, name,
+                fileVolumeProvider.CanWrite ? new ReadOnlyStream(stream) : stream, showProgress, cancellationToken);
             return new OpenedImage(fileVolumeProvider, name, parentPathComponents, volume, stream, null, false);
         }
         catch
@@ -1428,6 +1432,44 @@ public sealed class NavigationContext : IDisposable
             throw;
         }
     }
+
+    /// <summary>
+    ///     Opens a file in the current directory of a volume for reading; the first part of a split file (e.g.
+    ///     "archive.7z.001") is read joined with its other parts (see <see cref="SplitFile" />).
+    /// </summary>
+    private static async Task<Stream> OpenFileAsync(IVolume volume, string name, CancellationToken cancellationToken) =>
+        await SplitFile.OpenAsync(volume, name, cancellationToken) ?? await volume.OpenRead(name, cancellationToken);
+
+    /// <summary>
+    ///     Creates the volume of a file on the thread pool, as reading e.g. the entries of a large archive can take
+    ///     long. With <paramref name="showProgress" />, <see cref="ProgressIndicator" /> shows the number of entries read
+    ///     (see <see cref="VolumeOpening" />) when it takes longer than <see cref="ListingProgress.Delay" />, with a
+    ///     cancel button throwing <see cref="OperationCanceledException" />.
+    /// </summary>
+    private async Task<IVolume> CreateVolumeAsync(IFileVolumeProvider fileVolumeProvider, string name, Stream stream,
+        bool showProgress, CancellationToken cancellationToken)
+    {
+        if (!showProgress || ProgressIndicator is not { } progressIndicator)
+        {
+            return await Task.Run(() => VolumeOpening.RunAsync(
+                () => fileVolumeProvider.CreateVolume(stream, cancellationToken), null, cancellationToken),
+                cancellationToken);
+        }
+
+        // reported on the calling (UI) thread
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var entriesRead = new Progress<long>(count => progressIndicator.ReportMessage(GetOpeningMessage(name, count)));
+        var createTask = Task.Run(() => VolumeOpening.RunAsync(
+            () => fileVolumeProvider.CreateVolume(stream, cancellation.Token), entriesRead, cancellation.Token),
+            cancellation.Token);
+        return await ListingProgress.RunAsync(createTask, GetOpeningMessage(name, 0),
+            message => progressIndicator.ShowIndeterminate(message, cancellation.Cancel), progressIndicator.Hide,
+            ListingProgress.Delay);
+    }
+
+    /// <summary>Text shown with the progress while a file takes long to open, with the entries read so far.</summary>
+    public static string GetOpeningMessage(string name, long entriesRead) =>
+        entriesRead > 0 ? $"Opening {name}... {entriesRead:N0} entries read" : $"Opening {name}...";
 
     /// <summary>Default of <see cref="TemporaryCopyLimit" />, 1 GB.</summary>
     public const long DefaultTemporaryCopyLimit = 1024L * 1024 * 1024;
