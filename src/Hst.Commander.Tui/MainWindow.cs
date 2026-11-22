@@ -141,7 +141,7 @@ public sealed class MainWindow : Window
         ConfigurePaneKeys(_leftPane, _rightPane);
         ConfigurePaneKeys(_rightPane, _leftPane);
         // also when run again after a program has run in the terminal. The panes are listed once the window runs:
-        // Application.Init installs Terminal.Gui's synchronization context, so awaiting a listing that isn't done at
+        // UiThread.Attach installs the main loop's synchronization context, so awaiting a listing that isn't done at
         // once (e.g. the physical disks) before Application.Run would wait for a main loop that isn't running yet
         // cut files pasted in another application (e.g. Explorer) are moved by it, so the panes are listed again;
         // checked on the main loop, also after the window runs again when a program has run in the terminal (skipped
