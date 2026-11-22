@@ -51,6 +51,8 @@ try
     {
         TerminalScreen.EnterTui();
         Application.Init();
+        // actions posted from other threads and await continuations run on the main loop
+        UiThread.Attach();
         TerminalScreen.DisableLineInput();
         TuiTrueColors.Apply();
         // Terminal.Gui writes 24-bit colors on Linux and macOS, which terminals without true color (e.g. Terminal.app

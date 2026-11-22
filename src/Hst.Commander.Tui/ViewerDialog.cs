@@ -256,9 +256,10 @@ public sealed class ViewerDialog : TuiDialog
         using var cancellation = new CancellationTokenSource();
         _searchCancellation = cancellation;
         _statusLabel.Text = "Searching... (Esc cancels)";
+        // progress posted before the search ended may run after it, so only while this search runs
         var progress = new UiProgress<double>(fraction => UiThread.Post(() =>
         {
-            if (!_closed && !cancellation.IsCancellationRequested)
+            if (!_closed && _searchCancellation == cancellation && !cancellation.IsCancellationRequested)
             {
                 _statusLabel.Text = $"Searching... {fraction:P0} (Esc cancels)";
             }
