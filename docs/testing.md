@@ -41,6 +41,7 @@ Copy the list into the release's pull request or an issue and tick it per OS and
 - [ ] Help > About shows the release version (`1.0.<commits>`) and the build date, and Licenses lists the notices of Hst Commander, its components and .NET.
 - [ ] Installing over the previous release keeps the settings and bookmarks (bookmarks saved before 1.0 are a list and are still read).
 - [ ] Uninstalling (Windows setup, deb) removes the app and keeps `~/.hst-commander`.
+- [ ] The install command of the release text installs the TUI on each platform (Windows PowerShell 5.1 and PowerShell 7, macOS, Linux); `hst.commander` starts in a new terminal, running it again updates it, and `-Uninstall`/`--uninstall` removes it.
 
 ### Panes and navigation
 
@@ -76,6 +77,7 @@ Copy the list into the release's pull request or an issue and tick it per OS and
 
 - [ ] FTP/SFTP: connecting to a test server (e.g. a local SFTP server) asks for the password, lists, copies both ways, and a new host key is trusted on first use.
 - [ ] SMB: copying the plugin from `smb-plugin.zip` to `~/.hst-commander/plugins/` adds SMB to F1/F2 and its notice to Licenses; connecting to a share lists it and copies both ways.
+- [ ] SMB on Windows: `smb-plugin_windows_setup.exe` installs without administrator rights and shows the publisher; the TUI and GUI list SMB, and uninstalling it in Settings > Apps removes it. `-Smb`/`--smb` of the install scripts installs it too.
 - [ ] Ctrl+B bookmarks a local directory and a server location with its password; the bookmark opens after a restart without asking (Windows Credential Manager, macOS Keychain, Linux Secret Service).
 - [ ] Physical disks: choosing them when not elevated offers to restart as administrator (UAC, sudo, pkexec); elevated, the disks are listed with their model and a USB stick opens (copy to it only on a stick that may be erased).
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Packages a published Hst Commander app for Linux as AppImage and .deb.
+# Packages a published Hst Commander app for Linux as AppImage and .deb, and the tui also as .tar.gz for install.sh.
 # usage: package.sh <tui|gui> <linux-x64|linux-arm64|linux-arm> <version> <publish dir> <output dir>
 # appimagetool is used from the APPIMAGETOOL environment variable (default: appimagetool on the path).
 set -euo pipefail
@@ -70,6 +70,13 @@ exec "\$here/usr/bin/$exe" "\$@"
 EOF
 chmod 755 "$appdir/AppRun"
 ARCH=$appimage_arch "${APPIMAGETOOL:-appimagetool}" --no-appstream "$appdir" "$output_dir/hst-commander.$app.$rid.AppImage"
+
+# tar.gz of the tui's files, which src/install/install.sh installs for the user without root and fuse (needed by the
+# AppImage)
+if [ "$app" = tui ]; then
+  chmod 755 "$publish_dir/$exe"
+  tar -czf "$output_dir/hst-commander.$app.$rid.tar.gz" -C "$publish_dir" .
+fi
 
 # deb
 root=$work/deb

@@ -26,7 +26,7 @@ The behavior of each feature is described in `docs/` at the repository root. Rea
 | [`docs/tui.md`](../docs/tui.md) | TUI files, key handling, dialogs, themes, terminal programs, supported terminals (PuTTY) |
 | [`docs/gui.md`](../docs/gui.md) | GUI files, key handling, dialogs, themes, icons |
 | [`docs/themes.md`](../docs/themes.md) | Built-in and plugin themes, the bottom area's buttons, parent buttons, the button editor, Directory Opus 4 |
-| [`docs/application.md`](../docs/application.md) | Versioning, release workflows, local publishing, settings files and their versions, About, licenses and third-party notices, error log and crash reports, quitting |
+| [`docs/application.md`](../docs/application.md) | Versioning, release workflows, install scripts, local publishing, settings files and their versions, About, licenses and third-party notices, error log and crash reports, quitting |
 | [`docs/testing.md`](../docs/testing.md) | Test helpers, the manual smoke test before a release |
 | [`docs/status.md`](../docs/status.md) | What works and what isn't implemented |
 
@@ -44,7 +44,8 @@ src/
   Hst.Commander.sln             Solution file (14 projects)
   Directory.Build.props         Shared product name, version, authors and copyright
   Directory.Build.targets       Replaces the last version part with the git commit count
-  packaging/                    Release packaging scripts (Linux AppImage/.deb, macOS .dmg, Windows Inno Setup)
+  packaging/                    Release packaging scripts (Linux AppImage/.deb/.tar.gz, macOS .dmg, Windows Inno Setup for the apps and the SMB plugin)
+  install/                      One-line install scripts for the TUI and SMB plugin from a release (install.ps1, install.sh), attached to releases
   publish/                      Local publish scripts for testing, PowerShell and bash per platform (output in publish/ at the root, ignored)
   icon/                         App icon sources, rendered sizes and make scripts
   Hst.Commander.Abstractions/   Plugin API: IVolume, IEntry, IVolumeProvider, IFileVolumeProvider, IPlugin, IPluginHost, IWriteCache, ITheme, ..., Paths and the ArchiveVolume<T> base class (no external deps)

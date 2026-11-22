@@ -343,8 +343,67 @@ jobs:
           path: dist/*
           retention-days: 3
 
+  # inno setup installer of the smb plugin for windows, made from the plugin's zip, installing it for the current user
+  # in ~/.hst-commander/plugins. the zip is made on linux, as Compress-Archive on windows may write paths with
+  # backslashes, which unzip on linux and macos doesn't take as directories
+  build-smb-plugin-setup:
+    needs: [version, build-smb-plugin]
+    runs-on: windows-latest
+    # id token is used by azure login for code signing
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download smb plugin
+        uses: actions/download-artifact@v4
+        with:
+          name: hst-commander.smb-plugin
+          path: smb-plugin
+
+      - name: Build smb plugin setup
+        shell: pwsh
+        run: |
+          Expand-Archive -Path smb-plugin/hst-commander.smb-plugin.zip -DestinationPath plugin
+          New-Item -ItemType Directory -Force dist | Out-Null
+          $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress }
+          & $iscc /DVersion=${{ needs.version.outputs.build_version }} "/DSourceDir=$(Resolve-Path plugin)" "/DOutputDir=$(Resolve-Path dist)" `
+            '/DOutputName=hst-commander.smb-plugin.setup' src/packaging/windows/smb-plugin.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Get-ChildItem dist
+
+      - name: Azure login
+        uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+        if: ${{ !inputs.artifacts_only && vars.ARTIFACT_SIGNING_ENABLED == 'true' }}
+
+      - name: Sign smb plugin setup
+        uses: azure/artifact-signing-action@v2
+        with:
+          endpoint: ${{ vars.ARTIFACT_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ vars.ARTIFACT_SIGNING_ACCOUNT_NAME }}
+          certificate-profile-name: ${{ vars.ARTIFACT_SIGNING_CERTIFICATE_PROFILE_NAME }}
+          files: ${{ github.workspace }}\dist\hst-commander.smb-plugin.setup.exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+        if: ${{ !inputs.artifacts_only && vars.ARTIFACT_SIGNING_ENABLED == 'true' }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: hst-commander.smb-plugin-setup
+          path: dist/*
+          retention-days: 3
+
   publish:
-    needs: [version, build-windows, build-macos, build-linux, build-smb-plugin]
+    needs: [version, build-windows, build-macos, build-linux, build-smb-plugin, build-smb-plugin-setup]
     # skip draft release, when only building artifacts
     if: ${{ !inputs.artifacts_only }}
     runs-on: windows-latest
@@ -352,6 +411,17 @@ jobs:
       RELEASE_TAG: ${{ needs.version.outputs.release_tag }}
       RELEASE_VERSION: ${{ needs.version.outputs.release_version }}
     steps:
+      # the install scripts, attached to the release unversioned, so releases/latest/download/install.sh is the
+      # script of the latest release
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: src/install
+
+      - name: Copy install scripts
+        shell: pwsh
+        run: |
+          Copy-Item -Path src/install/install.ps1, src/install/install.sh -Destination .
+
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
@@ -365,7 +435,8 @@ jobs:
 
       # e.g. hst-commander.tui.win-x64.setup.exe -> hst-commander_v0.1.29-98d7be8_tui_windows_x64_setup.exe,
       # hst-commander.gui.linux-amd64.deb -> hst-commander_v0.1.29-98d7be8_gui_linux_amd64.deb,
-      # hst-commander.smb-plugin.zip -> hst-commander_v0.1.29-98d7be8_smb-plugin.zip
+      # hst-commander.smb-plugin.zip -> hst-commander_v0.1.29-98d7be8_smb-plugin.zip,
+      # hst-commander.smb-plugin.setup.exe -> hst-commander_v0.1.29-98d7be8_smb-plugin_windows_setup.exe
       - name: Version artifacts
         shell: pwsh
         run: |
@@ -373,6 +444,10 @@ jobs:
           Get-ChildItem -File -Filter 'hst-commander.*' | ForEach-Object {
             if ($_.Name -match '^hst-commander\.([a-z]+-plugin)\.zip$') {
               Rename-Item -Path $_.FullName -NewName ('{0}_{1}.zip' -f $env:RELEASE_VERSION, $Matches[1])
+              return
+            }
+            if ($_.Name -match '^hst-commander\.([a-z]+-plugin)\.setup\.exe$') {
+              Rename-Item -Path $_.FullName -NewName ('{0}_{1}_windows_setup.exe' -f $env:RELEASE_VERSION, $Matches[1])
               return
             }
             if ($_.Name -notmatch '^hst-commander\.(tui|gui)\.(win|osx|linux)-([^.]+)\.(.+)$') { throw "Unexpected artifact '$($_.Name)'" }
@@ -394,15 +469,49 @@ jobs:
           } else {
             "Hst Commander $($env:RELEASE_TAG)."
           }
+          # a prerelease isn't the latest release, so its install commands name its tag
+          $base = 'https://github.com/${{ github.repository }}/releases'
+          if ($env:PRERELEASE -eq 'true') {
+            $scripts = "$base/download/$($env:RELEASE_TAG)"
+            $versionPs = " -Version $($env:RELEASE_TAG)"
+            $versionSh = " -s -- --version $($env:RELEASE_TAG)"
+          } else {
+            $scripts = "$base/latest/download"
+            $versionPs = ''
+            $versionSh = ''
+          }
+          $installPs = if ($versionPs) {
+            "& ([scriptblock]::Create((irm $scripts/install.ps1)))$versionPs"
+          } else {
+            "irm $scripts/install.ps1 | iex"
+          }
           @(
             $intro
+            ''
+            '## Install the TUI with one command'
+            ''
+            'Windows (PowerShell):'
+            ''
+            '```powershell'
+            $installPs
+            '```'
+            ''
+            'macOS and Linux:'
+            ''
+            '```sh'
+            "curl -fsSL $scripts/install.sh | bash$versionSh"
+            '```'
+            ''
+            'This installs the TUI for the current user and adds `hst.commander` to the path. Add `-Smb` (PowerShell) or `--smb` (bash) to install the SMB plugin too, `-SmbOnly` or `--smb-only` to install only the plugin.'
+            ''
+            '## Downloads'
             ''
             'The terminal UI (`tui`) and the desktop GUI (`gui`) are packaged separately:'
             ''
             '- **Windows**: `_setup.exe` installs the app, `_portable.zip` runs without installing.'
             '- **macOS**: `.dmg` for Intel (`x64`) or Apple silicon (`arm64`).'
-            '- **Linux**: `.AppImage` runs without installing, `.deb` installs on Debian and Ubuntu.'
-            '- **SMB plugin** (Windows file shares, every platform): `_smb-plugin.zip`; copy its `Hst.Commander.Plugins.Smb` directory to `~/.hst-commander/plugins/`.'
+            '- **Linux**: `.AppImage` runs without installing, `.deb` installs on Debian and Ubuntu, `.tar.gz` (TUI) holds the files to run.'
+            '- **SMB plugin** (Windows file shares): `_smb-plugin_windows_setup.exe` installs it on Windows for both apps. On every platform, `_smb-plugin.zip` holds its `Hst.Commander.Plugins.Smb` directory to copy to `~/.hst-commander/plugins/`.'
             ''
             'Third-party notices are included with the apps and shown in Help > About > Licenses.'
           ) | Set-Content -Path release-notes.md -Encoding utf8
@@ -413,6 +522,8 @@ jobs:
         with:
           files: |
             ${{ env.RELEASE_VERSION }}_*
+            install.ps1
+            install.sh
           tag_name: ${{ env.RELEASE_TAG }}
           name: ${{ env.RELEASE_VERSION }}
           body_path: release-notes.md

@@ -6,6 +6,12 @@ It is an **external plugin**, not included with Hst Commander: SMBLibrary is lic
 
 ## Installing
 
+On Windows, download and run `hst-commander_v<version>_smb-plugin_windows_setup.exe` from the Hst Commander release. It installs the plugin for the current user in `%USERPROFILE%\.hst-commander\plugins\Hst.Commander.Plugins.Smb`, where the TUI and the GUI load it, and is uninstalled in Settings > Apps.
+
+The install scripts install it on every platform, with the TUI (`-Smb`, `--smb`) or alone (`-SmbOnly`, `--smb-only`), see the [README](../../README.md#download).
+
+Or install it by hand:
+
 1. Download `hst-commander_v<version>_smb-plugin.zip` from the Hst Commander release (the same zip for Windows, Linux and macOS).
 2. Copy the `Hst.Commander.Plugins.Smb` directory from the zip to `~/.hst-commander/plugins/` (`%USERPROFILE%\.hst-commander\plugins\` on Windows), or to `plugins` next to the Hst Commander executable.
 3. Start Hst Commander. **SMB** is listed in the volume provider list (F1/F2), and Help > About > Licenses shows the plugin's notices.
