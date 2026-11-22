@@ -102,12 +102,38 @@ The viewer and the editor have their own keys; see the [viewer](docs/viewer.md) 
 
 ## Download
 
+The TUI can be installed with one command, which downloads the latest release, installs it for the current user and adds `hst.commander` to the path.
+
+Windows (PowerShell):
+
+```powershell
+irm https://github.com/henrikstengaard/hst-commander/releases/latest/download/install.ps1 | iex
+```
+
+macOS and Linux:
+
+```sh
+curl -fsSL https://github.com/henrikstengaard/hst-commander/releases/latest/download/install.sh | bash
+```
+
+To install the SMB plugin too, pass `-Smb` or `--smb`:
+
+```powershell
+& ([scriptblock]::Create((irm https://github.com/henrikstengaard/hst-commander/releases/latest/download/install.ps1))) -Smb
+```
+
+```sh
+curl -fsSL https://github.com/henrikstengaard/hst-commander/releases/latest/download/install.sh | bash -s -- --smb
+```
+
+`-SmbOnly`/`--smb-only` installs only the SMB plugin, `-Uninstall`/`--uninstall` removes the TUI. See [Install scripts](docs/application.md#install-scripts).
+
 Releases are published on the [GitHub releases page](https://github.com/henrikstengaard/hst-commander/releases), with the TUI and GUI packaged separately:
 
 - **Windows** (x64, x86, arm64): setup installer and portable zip.
 - **macOS** (x64, arm64): dmg.
-- **Linux** (x64, arm, arm64): AppImage and deb package.
-- **SMB plugin** (all platforms): `smb-plugin.zip`, released separately as it uses the LGPL licensed [SMBLibrary](https://github.com/TalAloni/SMBLibrary). Copy its `Hst.Commander.Plugins.Smb` directory to `~/.hst-commander/plugins/` (see the [SMB plugin](src/Hst.Commander.Plugins.Smb/readme.md)).
+- **Linux** (x64, arm, arm64): AppImage and deb package, and a tar.gz of the TUI.
+- **SMB plugin**: released separately as it uses the LGPL licensed [SMBLibrary](https://github.com/TalAloni/SMBLibrary). On Windows, `smb-plugin_windows_setup.exe` installs it for both apps. On every platform, `smb-plugin.zip` holds its `Hst.Commander.Plugins.Smb` directory to copy to `~/.hst-commander/plugins/` (see the [SMB plugin](src/Hst.Commander.Plugins.Smb/readme.md)).
 
 Settings, bookmarks and the error log are stored in `~/.hst-commander` (`%USERPROFILE%\.hst-commander` on Windows).
 
