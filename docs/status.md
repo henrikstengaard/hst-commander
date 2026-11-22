@@ -17,7 +17,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - The volume abstraction layer and implementations: `LocalVolume`, `Iso9660Volume`, `ZipVolume`, `LhaVolume`, `LzxVolume`, `SharpCompressVolume` (rar and 7z), their base class `ArchiveVolume<T>`, `NestedVolume`, `EntryVolumeProvider`, and `NullVolume`.
 - All unit tests in `Hst.Commander.Core.Tests`.
 
-- Going to the root of the volume with Ctrl+\ in both front-ends.
+- Going to the root of the volume with Ctrl+\ or by typing `/` or `\` in both front-ends.
 - Quitting with F10, Ctrl+Q or File > Quit (and Esc in the TUI) after a confirm dialog in both front-ends.
 - Refreshing the active pane with Ctrl+R and swapping the left and right panes with Ctrl+U (File > Refresh, File > Swap panes) in both front-ends.
 - Changing location with Ctrl+L or by clicking the path (location dialog), including paths into images, and going to the home directory with Ctrl+H.

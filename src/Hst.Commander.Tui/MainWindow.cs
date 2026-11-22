@@ -850,8 +850,9 @@ public sealed class MainWindow : Window
                 key.Handled = true;
                 _ = ShowLocationAsync(pane);
             }
-            // terminals sending Backspace as Ctrl+H (0x08) may decode it as Backspace, which goes to the parent instead
-            else if (key == Key.H.WithCtrl)
+            // terminals and the Windows console send Ctrl+H as the control character 0x08, which Terminal.Gui decodes
+            // as Ctrl+Backspace
+            else if (key == Key.H.WithCtrl || key == Key.Backspace.WithCtrl)
             {
                 key.Handled = true;
                 GoHome(pane);
@@ -945,8 +946,9 @@ public sealed class MainWindow : Window
                 key.Handled = true;
                 _ = CreateVolumeAsync(pane, otherPane);
             }
-            // the context menu at the current entry, like the GUI's Shift+F10 (terminals send no menu key)
-            else if (key == Key.F10.WithShift)
+            // the context menu at the current entry, like the GUI's Shift+F10 (terminals send no menu key); Ctrl+F10
+            // too, as some terminals take Shift+F10 for their own context menu (e.g. GNOME Terminal)
+            else if (key == Key.F10.WithShift || key == Key.F10.WithCtrl)
             {
                 key.Handled = true;
                 ShowEntryMenu(pane);
@@ -2531,14 +2533,22 @@ public sealed class MainWindow : Window
     private static int GetPageSize(Pane pane) => pane.TableView.VisibleRows;
 
     /// <summary>
-    ///     Ctrl+\ going to the root of the volume. Terminals send it as the control character 0x1C, also sent for
-    ///     Ctrl+4, which may be decoded as either key. The Windows driver decodes Ctrl with the key's character in the
-    ///     current layout, so the key left of Z (the \ key on US layouts) is Ctrl+&lt; on e.g. Danish and German layouts.
+    ///     Typing / or \ (like the root path), or Ctrl+\, goes to the root of the volume. The typed characters work with
+    ///     every keyboard layout and terminal; \ is typed with AltGr on e.g. Danish and German layouts, which the Windows
+    ///     driver may report with Ctrl and Alt. Terminals send Ctrl+\ as the control character 0x1C, also sent for
+    ///     Ctrl+4, which may be decoded as either key, but can't send it on layouts without a \ key. The Windows driver
+    ///     decodes Ctrl with the key's character in the current layout, so the key left of Z (the \ key on US layouts) is
+    ///     Ctrl+&lt; on e.g. Danish and German layouts.
     /// </summary>
-    private static bool IsGoRootKey(Key key) =>
-        key == new Key('\\').WithCtrl || key == new Key('<').WithCtrl || key == Key.D4.WithCtrl ||
-        key.KeyCode == (KeyCode)0x1C ||
-        key.KeyCode == ((KeyCode)0x1C | KeyCode.CtrlMask);
+    private static bool IsGoRootKey(Key key)
+    {
+        var character = key.KeyCode & ~(KeyCode.CtrlMask | KeyCode.AltMask);
+        var modifiers = key.KeyCode & (KeyCode.CtrlMask | KeyCode.AltMask);
+        return (character is (KeyCode)'/' or (KeyCode)'\\' && modifiers is 0 or (KeyCode.CtrlMask | KeyCode.AltMask)) ||
+               key == new Key('\\').WithCtrl || key == new Key('<').WithCtrl || key == Key.D4.WithCtrl ||
+               key.KeyCode == (KeyCode)0x1C ||
+               key.KeyCode == ((KeyCode)0x1C | KeyCode.CtrlMask);
+    }
 
     private static void MoveSelection(Pane pane, int offset, bool absolute = false)
     {

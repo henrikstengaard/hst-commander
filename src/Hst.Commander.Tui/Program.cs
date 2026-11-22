@@ -53,6 +53,8 @@ try
         Application.Init();
         // actions posted from other threads and await continuations run on the main loop
         UiThread.Attach();
+        // function key sequences Terminal.Gui doesn't know, e.g. Shift+F10 in Terminal.app
+        TerminalKeyPatterns.Install();
         TerminalScreen.DisableLineInput();
         TuiTrueColors.Apply();
         // Terminal.Gui writes 24-bit colors on Linux and macOS, which terminals without true color (e.g. Terminal.app

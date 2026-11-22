@@ -626,6 +626,14 @@ public partial class PaneView : UserControl
 
     private void OnEntriesTextInput(object? sender, TextInputEventArgs e)
     {
+        // typing / or \ (like the root path) goes to the root, with every keyboard layout
+        if (!_quickSearch.IsActive && e.Text is "/" or "\\")
+        {
+            e.Handled = true;
+            _ = RunNavigationAsync(() => NavigationContext.GoRootAsync());
+            return;
+        }
+
         if (!_quickSearch.IsActive || string.IsNullOrEmpty(e.Text) || char.IsControl(e.Text[0]))
         {
             return;
@@ -745,12 +753,15 @@ public partial class PaneView : UserControl
     }
 
     /// <summary>
-    ///     Ctrl+\ going to the root of the volume, matched by the typed character or the backslash keys (on some
-    ///     layouts, e.g. Danish, the key with backslash is the 102nd key).
+    ///     Ctrl+\ going to the root of the volume, matched by the typed character or the backslash keys: on some layouts,
+    ///     e.g. Danish, the key with backslash is the 102nd key (left of Z), which Windows reports as the backslash key
+    ///     but Linux and macOS by its character (&lt;), so its physical key is matched too. Typing / or \ also goes to
+    ///     the root (see <see cref="OnEntriesTextInput" />).
     /// </summary>
     private static bool IsGoRootKey(KeyEventArgs e) =>
         e.KeyModifiers == KeyModifiers.Control &&
-        (e.KeySymbol is "\\" or "\u001C" || e.Key is Key.OemPipe or Key.OemBackslash);
+        (e.KeySymbol is "\\" or "\u001C" || e.Key is Key.OemPipe or Key.OemBackslash ||
+         e.PhysicalKey is PhysicalKey.Backslash or PhysicalKey.IntlBackslash);
 
     private int GetPageSize()
     {

@@ -70,7 +70,7 @@ The keys are the same in both front-ends unless noted. The File menu lists them 
 | Tab | Switch between the left and right pane |
 | Enter / double-click | Open a directory or image, start a file |
 | Backspace | Go to the parent directory |
-| Ctrl+\ | Go to the root of the volume |
+| Ctrl+\ or / | Go to the root of the volume (typing `/` or `\` works with every keyboard layout) |
 | Ctrl+PageDown | Open a file as a volume |
 | Insert / Space | Mark the entry under the cursor |
 | + / - / * | Mark / unmark a group of entries, invert the marks |
@@ -94,7 +94,7 @@ The keys are the same in both front-ends unless noted. The File menu lists them 
 | Ctrl+R | Refresh the active pane |
 | Ctrl+U | Swap the panes |
 | Ctrl+T | Go to the command line |
-| Shift+F10 / menu key | Context menu |
+| Shift+F10 / Ctrl+F10 / menu key | Context menu |
 | Ctrl+1 to Ctrl+9 | Choose the navigation mode (GUI only) |
 | Ctrl+O | Show the terminal output (TUI only) |
 
