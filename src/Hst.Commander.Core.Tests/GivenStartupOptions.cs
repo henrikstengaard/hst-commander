@@ -47,113 +47,70 @@ public class GivenStartupOptions : IDisposable
     private static readonly PaneLocations Saved = new(new PaneStartup(null, "/saved/left"),
         new PaneStartup(PhysicalDiskVolume.VolumeName, "PhysicalDrive1"), true);
 
-    private static string? NoEnvironmentVariable(string name) => null;
-
-    [Theory]
-    [InlineData(new[] { "--restore-panes" }, null, true)]
-    [InlineData(new[] { "--left-path", "/tmp", "--restore-panes" }, null, true)]
-    [InlineData(new string[0], "1", true)]
-    [InlineData(new string[0], null, false)]
-    [InlineData(new string[0], "0", false)]
-    public void When_ArgumentsOrEnvironmentMarkAShortcut_Then_LaunchedFromShortcutIsTrue(string[] args,
-        string? launchedFromApp, bool expected)
-    {
-        // act
-        var options = StartupOptions.Parse(args,
-            name => name == StartupOptions.LaunchedFromAppVariable ? launchedFromApp : null);
-
-        // assert
-        Assert.Equal(expected, options.IsLaunchedFromShortcut);
-    }
-
     [Fact]
-    public void When_RestorePanesIsFollowedByAnOption_Then_TheOptionIsParsed()
+    public void When_GuiRestoresSavedPanes_Then_BothPanesAndActivePaneAreRestored()
     {
         // act
-        var options = StartupOptions.Parse(["--restore-panes", "--right-path", "/tmp"], NoEnvironmentVariable);
-
-        // assert
-        Assert.Equal(new PaneStartup(null, "/tmp"), options.Right);
-        Assert.DoesNotContain(StartupOptions.RestorePanesOption, options.ToArguments());
-    }
-
-    [Fact]
-    public void When_LaunchedFromShortcut_Then_BothPanesAndActivePaneAreRestored()
-    {
-        // arrange
-        var options = StartupOptions.Parse(["--restore-panes"], NoEnvironmentVariable);
-
-        // act
-        var restored = options.WithSavedPanes(Saved, "/home/me");
+        var restored = StartupOptions.Parse([]).WithSavedPanes(Saved, true, "/home/me");
 
         // assert
         Assert.Equal(Saved.Left, restored.Left);
         Assert.Equal(Saved.Right, restored.Right);
         Assert.True(restored.IsRightActive);
-        Assert.Equal("/home/me", restored.GetInitialDirectory("/opt/app", "/home/me"));
     }
 
     [Fact]
-    public void When_LaunchedFromTerminal_Then_LeftPaneIsCurrentDirectoryAndRightPaneIsRestored()
+    public void When_TuiRestoresSavedPanes_Then_OnlyRightPaneIsRestored()
     {
-        // arrange
-        var options = StartupOptions.Parse([], NoEnvironmentVariable);
-
         // act
-        var restored = options.WithSavedPanes(Saved, "/home/me");
+        var restored = StartupOptions.Parse([]).WithSavedPanes(Saved, false, "/home/me");
 
-        // assert
+        // assert - the left pane stays in the current directory, and is active
         Assert.Equal(new PaneStartup(null, null), restored.Left);
         Assert.Equal(Saved.Right, restored.Right);
         Assert.False(restored.IsRightActive);
-        Assert.Equal("/work", restored.GetInitialDirectory("/work", "/home/me"));
     }
 
-    [Fact]
-    public void When_PanesAreGiven_Then_SavedPanesAreNotRestored()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void When_PanesAreGiven_Then_SavedPanesAreNotRestored(bool restoreLeft)
     {
-        // arrange - e.g. restarted as administrator from a shortcut start
-        var options = StartupOptions.Parse(["--restore-panes", "--left-path", "/elevated"], NoEnvironmentVariable);
+        // arrange - e.g. restarted as administrator
+        var options = StartupOptions.Parse(["--left-path", "/elevated"]);
 
         // act
-        var restored = options.WithSavedPanes(Saved, "/home/me");
+        var restored = options.WithSavedPanes(Saved, restoreLeft, "/home/me");
 
         // assert
         Assert.Equal(options, restored);
     }
 
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void When_PaneWasOnServer_Then_ItStartsInHomeDirectory(bool fromShortcut)
+    [Fact]
+    public void When_PaneWasOnServer_Then_ItStartsInHomeDirectory()
     {
         // arrange - a pane connected to an SMB server is saved without a location, as it needs the password
         var saved = new PaneLocations(new PaneStartup(null, null), new PaneStartup(null, null), false);
-        var options = new StartupOptions { IsLaunchedFromShortcut = fromShortcut };
 
         // act
-        var restored = options.WithSavedPanes(saved, "/home/me");
+        var restored = StartupOptions.Parse([]).WithSavedPanes(saved, true, "/home/me");
 
         // assert
-        Assert.Equal(new PaneStartup(null, fromShortcut ? "/home/me" : null), restored.Left);
+        Assert.Equal(new PaneStartup(null, "/home/me"), restored.Left);
         Assert.Equal(new PaneStartup(null, "/home/me"), restored.Right);
     }
 
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void When_NothingWasSaved_Then_ShortcutStartsInHomeAndTerminalInCurrentDirectory(bool fromShortcut)
+    [Fact]
+    public void When_NothingWasSaved_Then_PanesStartInCurrentDirectory()
     {
         // arrange
-        var options = new StartupOptions { IsLaunchedFromShortcut = fromShortcut };
+        var options = StartupOptions.Parse([]);
 
         // act
-        var restored = options.WithSavedPanes(null, "/home/me");
+        var restored = options.WithSavedPanes(null, true, "/home/me");
 
         // assert
-        var expected = new PaneStartup(null, fromShortcut ? "/home/me" : null);
-        Assert.Equal(expected, restored.Left);
-        Assert.Equal(expected, restored.Right);
+        Assert.Equal(options, restored);
     }
 
     [Fact]

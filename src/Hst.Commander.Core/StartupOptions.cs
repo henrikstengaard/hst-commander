@@ -6,21 +6,10 @@ namespace Hst.Commander.Core;
 ///     Where the panes start, given on the command line, e.g. when restarted as administrator (see
 ///     <see cref="Elevation" />): "--left-volume", "--left-path", "--right-volume" and "--right-path" with the name of a
 ///     volume provider and a location (<see cref="NavigationContext.ChangeLocationAsync" />), and "--active" with "left"
-///     or "right". "--restore-panes" (passed by the Start menu, desktop and app menu shortcuts) or the environment
-///     variable <see cref="LaunchedFromAppVariable" /> (set by the macOS app bundle) tells it was started from a
-///     shortcut, not a terminal (see <see cref="WithSavedPanes" />). Unknown arguments are ignored.
+///     or "right". Unknown arguments are ignored.
 /// </summary>
 public sealed record StartupOptions
 {
-    /// <summary>Argument of the shortcuts starting Hst Commander, e.g. in the Start menu or a Linux .desktop file.</summary>
-    public const string RestorePanesOption = "--restore-panes";
-
-    /// <summary>
-    ///     Environment variable set to "1" by the macOS app bundle (LSEnvironment in Info.plist), as Finder and the Dock
-    ///     pass no arguments.
-    /// </summary>
-    public const string LaunchedFromAppVariable = "HSTC_LAUNCHED_FROM_APP";
-
     private const string LeftVolumeOption = "--left-volume";
     private const string LeftPathOption = "--left-path";
     private const string RightVolumeOption = "--right-volume";
@@ -37,24 +26,39 @@ public sealed record StartupOptions
     /// <summary>True when the right pane is the active pane, otherwise the left pane is.</summary>
     public bool IsRightActive { get; init; }
 
-    /// <summary>
-    ///     True when started from a shortcut (Start menu, desktop, app menu, Finder or the Dock), false when started from
-    ///     a terminal or command prompt.
-    /// </summary>
-    public bool IsLaunchedFromShortcut { get; init; }
-
     /// <summary>True when a pane's volume provider or location is given, e.g. when restarted as administrator.</summary>
     public bool HasPaneOptions => !Left.IsEmpty || !Right.IsEmpty;
 
     /// <summary>
-    ///     Parses the command line arguments, reading <see cref="LaunchedFromAppVariable" /> with
-    ///     <paramref name="getEnvironmentVariable" /> (the process's environment by default).
+    ///     Options starting the panes where they were when Hst Commander was last quit (see <see cref="PaneLocations" />),
+    ///     unless panes are given (<see cref="HasPaneOptions" />, e.g. when restarted as administrator), which always
+    ///     win. The GUI restores both panes and the active pane; the TUI only the right pane, as its left pane starts in
+    ///     the current directory, where it was started in the terminal. A pane that was on a volume provider connected
+    ///     to a location (e.g. an SMB server, saved without a location as it needs the password) starts in the home
+    ///     directory. A pane with nothing saved starts in the current directory.
     /// </summary>
-    public static StartupOptions Parse(IReadOnlyList<string> args,
-        Func<string, string?>? getEnvironmentVariable = null)
+    /// <param name="saved">Pane locations saved when last quit, null when none were saved.</param>
+    /// <param name="restoreLeft">True to restore the left pane and the active pane too (GUI).</param>
+    /// <param name="homeDirectory">Home directory of the user (see <see cref="NavigationContext.HomeDirectory" />).</param>
+    public StartupOptions WithSavedPanes(PaneLocations? saved, bool restoreLeft, string? homeDirectory)
+    {
+        if (HasPaneOptions || saved == null)
+        {
+            return this;
+        }
+
+        PaneStartup Restore(PaneStartup pane) => pane.IsEmpty ? new PaneStartup(null, homeDirectory) : pane;
+        return this with
+        {
+            Left = restoreLeft ? Restore(saved.Left) : Left,
+            Right = Restore(saved.Right),
+            IsRightActive = restoreLeft && saved.IsRightActive
+        };
+    }
+
+    public static StartupOptions Parse(IReadOnlyList<string> args)
     {
         ArgumentNullException.ThrowIfNull(args);
-        getEnvironmentVariable ??= Environment.GetEnvironmentVariable;
 
         string? leftVolume = null, leftPath = null, rightVolume = null, rightPath = null;
         var isRightActive = false;
@@ -89,60 +93,9 @@ public sealed record StartupOptions
         {
             Left = new PaneStartup(leftVolume, leftPath),
             Right = new PaneStartup(rightVolume, rightPath),
-            IsRightActive = isRightActive,
-            IsLaunchedFromShortcut = args.Contains(RestorePanesOption, StringComparer.OrdinalIgnoreCase) ||
-                                     getEnvironmentVariable(LaunchedFromAppVariable) == "1"
+            IsRightActive = isRightActive
         };
     }
-
-    /// <summary>
-    ///     Options starting the panes where they were when Hst Commander was last quit (see <see cref="PaneLocations" />),
-    ///     unless panes are given (<see cref="HasPaneOptions" />, e.g. when restarted as administrator), which always
-    ///     win:
-    ///     <list type="bullet">
-    ///         <item>started from a shortcut, both panes are restored, and the right pane is active when it was;</item>
-    ///         <item>
-    ///             started from a terminal, the left pane starts in the current directory (where it was started) and
-    ///             the right pane is restored.
-    ///         </item>
-    ///     </list>
-    ///     A pane that was on a volume provider connected to a location (e.g. an SMB server, saved without a location
-    ///     as it needs the password) starts in the home directory, and so does a pane started from a shortcut with
-    ///     nothing saved, instead of the working directory a shortcut gives (e.g. the install directory).
-    /// </summary>
-    /// <param name="saved">Pane locations saved when last quit, null when none were saved.</param>
-    /// <param name="homeDirectory">Home directory of the user (see <see cref="NavigationContext.HomeDirectory" />).</param>
-    public StartupOptions WithSavedPanes(PaneLocations? saved, string? homeDirectory)
-    {
-        if (HasPaneOptions)
-        {
-            return this;
-        }
-
-        var home = new PaneStartup(null, homeDirectory);
-        var unchanged = new PaneStartup(null, null);
-        PaneStartup Restore(PaneStartup? pane, PaneStartup fallback) => pane switch
-        {
-            null => fallback,
-            { IsEmpty: true } => home,
-            _ => pane
-        };
-
-        return this with
-        {
-            Left = IsLaunchedFromShortcut ? Restore(saved?.Left, home) : unchanged,
-            Right = Restore(saved?.Right, IsLaunchedFromShortcut ? home : unchanged),
-            IsRightActive = IsLaunchedFromShortcut && saved?.IsRightActive == true
-        };
-    }
-
-    /// <summary>
-    ///     Directory the panes are created in before the options are applied, where a pane stays when its location
-    ///     can't be opened: the home directory when started from a shortcut (whose working directory is e.g. the
-    ///     install directory), otherwise the current directory.
-    /// </summary>
-    public string GetInitialDirectory(string currentDirectory, string? homeDirectory) =>
-        IsLaunchedFromShortcut && homeDirectory != null ? homeDirectory : currentDirectory;
 
     /// <summary>
     ///     Options starting the panes where they are: their volume providers (except Local) and current paths. A pane

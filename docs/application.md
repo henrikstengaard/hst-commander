@@ -92,15 +92,10 @@ Hst Commander keeps its files in `~/.hst-commander` (`SettingsPaths.Directory`):
 
 Both front-ends save where the panes are when quitting, as `Panes` (`PaneLocations`: each pane's `PaneStartup.From`, its volume provider unless Local and its current path, also inside images, and whether the right pane was active) in their own settings file, and start there next time (`StartupOptions.WithSavedPanes`):
 
-- **From a shortcut** (Start menu, desktop, app menu, Finder or the Dock): both panes are restored, and the right pane is active when it was.
-- **From a terminal or command prompt**: the left pane starts in the current directory, where Hst Commander was started, and the right pane is restored.
+- **GUI:** both panes are restored, and the right pane is active when it was.
+- **TUI:** only the right pane is restored. The left pane always starts in the current directory, where the TUI was started in the terminal, and is active.
 - **Given panes win:** when any `--left-*` or `--right-*` option is given (e.g. restarting as administrator), nothing is restored.
-- A pane that was on a volume provider connected to a location (SMB, FTP and SFTP servers) is saved without a location, as it needs the password, and starts in the home directory. A pane started from a shortcut with nothing saved starts in the home directory too, not in the working directory of the shortcut (e.g. the install directory). The panes are created in that directory (`StartupOptions.GetInitialDirectory`), so a pane whose saved location can't be opened anymore stays there.
-
-How it was started (`StartupOptions.IsLaunchedFromShortcut`):
-
-- The shortcuts pass `--restore-panes`: the Windows setup's Start menu and desktop shortcuts and the Run after installing (`setup.iss`), and the Linux `.desktop` files of the AppImage and deb (`package.sh`). The macOS app bundle sets the environment variable `HSTC_LAUNCHED_FROM_APP=1` (`LSEnvironment` in `Info.plist`), as Finder and the Dock pass no arguments.
-- Starts without either, e.g. an AppImage or an executable double-clicked in a file manager, are told apart by `LaunchDetection.IsStartedFromTerminal`: the Windows GUI is from a terminal when its parent process has a console (`AttachConsole(ATTACH_PARENT_PROCESS)` succeeds; it's freed again at once), the Windows TUI when another process uses its console (`GetConsoleProcessList`, e.g. cmd.exe or PowerShell; the Start menu gives it a console of its own), the GUI on Linux and macOS when standard input is a terminal. The TUI on Linux and macOS always counts as started from a terminal unless given `--restore-panes`, as the terminal a `.desktop` file opens looks like any other.
+- A pane that was on a volume provider connected to a location (SMB, FTP and SFTP servers) is saved without a location, as it needs the password, and starts in the home directory. With nothing saved (the first start), the panes start in the current directory, and a pane whose saved location can't be opened anymore stays there (`PaneStartup.ApplyAsync` skips it).
 - Saving: the GUI saves when the window has closed (also when the OS shuts down), the TUI when the main loop quits (`Program.cs`); neither saves when restarting as administrator, as the restarted process saves when it quits, nor after a crash. Saving is done with `with` on freshly loaded settings, and a failure is only logged.
 
 ## Errors and Crash Reports

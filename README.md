@@ -33,7 +33,7 @@ Hst Commander comes with two front-ends that have the same functionality:
 - Windows file shares and other SMB 2/3 servers with the SMB plugin, installed separately (see [Download](#download)), entered as `\\server\share` or `smb://server/share`.
 - Bookmarks of any location, with passwords stored in Windows Credential Manager, the macOS Keychain or the Linux Secret Service.
 - Changing location by typing a path, including paths into images, or clicking the path above a pane.
-- The panes start where they were when last quit; started from a terminal, the left pane starts in the current directory.
+- The panes start where they were when last quit (in the TUI the right pane, as the left pane starts in the current directory).
 
 ### File operations
 

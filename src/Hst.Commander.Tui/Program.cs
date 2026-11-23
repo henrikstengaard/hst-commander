@@ -30,11 +30,11 @@ TuiTrueColors.Apply();
 // plugins are loaded before the panes are created, so their volume providers are used
 var pluginErrors = Plugins.FormatErrors(Plugins.Load());
 var settings = TuiSettings.Load();
-// the panes start where they were when last quit, see StartupOptions.WithSavedPanes
-var startupOptions = LaunchDetection.ParseStartupOptions(args, false)
-    .WithSavedPanes(settings.Panes, NavigationContext.HomeDirectory);
-var mainWindow = new MainWindow(
-    startupOptions.GetInitialDirectory(Environment.CurrentDirectory, NavigationContext.HomeDirectory), settings);
+// the right pane starts where it was when last quit and the left pane in the current directory, see
+// StartupOptions.WithSavedPanes
+var startupOptions = StartupOptions.Parse(args)
+    .WithSavedPanes(settings.Panes, false, NavigationContext.HomeDirectory);
+var mainWindow = new MainWindow(Environment.CurrentDirectory, settings);
 // waited for here, so the TUI runs on the main thread (there's no synchronization context yet to deadlock)
 mainWindow.ApplyStartupOptionsAsync(startupOptions).GetAwaiter().GetResult();
 if (pluginErrors != null)
