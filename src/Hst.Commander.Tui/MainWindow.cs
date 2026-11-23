@@ -60,31 +60,39 @@ public sealed class MainWindow : Window
                     new("_Copy...", "F5", CopyFromActivePane),
                     new("Mo_ve/rename...", "F6", MoveFromActivePane),
                     new("_Make directory...", "F7", MakeDirectoryInActivePane),
-                    new("Cr_eate volume...", "F9", CreateVolumeInActivePane),
                     new("_Delete...", "F8", DeleteFromActivePane),
+                    new("Create vo_lume...", "F9", CreateVolumeInActivePane),
                     new("_Properties...", "Ctrl+P", ShowPropertiesOfActivePane),
                     new("Ope_n as volume", "Ctrl+PgDn", OpenAsVolumeInActivePane),
-                    null!,
-                    new("Select _all", "Ctrl+A", SelectAllInActivePane),
-                    new("Select _group...", "+", SelectGroupInActivePane),
-                    new("_Unselect group...", "-", UnselectGroupInActivePane),
-                    new("_Invert selection", "*", InvertSelectionInActivePane),
-                    new("Searc_h...", "Ctrl+S", SearchInActivePane),
-                    new("Quic_k search", "Ctrl+F", QuickSearchInActivePane),
-                    null!,
-                    _leftVolumeMenuItem,
-                    _rightVolumeMenuItem,
-                    new("L_ocation...", "Ctrl+L", ShowLocationOfActivePane),
-                    new("Home director_y", "Ctrl+H", GoHomeInActivePane),
-                    new("Add _bookmark...", "Ctrl+B", AddBookmarkInActivePane),
-                    new("Re_fresh", "Ctrl+R", RefreshActivePane),
-                    new("Sw_ap panes", "Ctrl+U", SwapPanes),
-                    new("Same location in o_ther pane", "Ctrl+D", ShowSameLocationInOtherPane),
-                    new("Command _line", "Ctrl+T", FocusCommandLine),
                     null!,
                     new("_Settings...", string.Empty, ShowSettings),
                     null!,
                     new("_Quit", "F10/Ctrl+Q", Quit)
+                }),
+                new MenuBarItem("_Mark", new MenuItem[]
+                {
+                    new("Select _all", "Ctrl+A", SelectAllInActivePane),
+                    new("Select _group...", "+", SelectGroupInActivePane),
+                    new("_Unselect group...", "-", UnselectGroupInActivePane),
+                    new("_Invert selection", "*", InvertSelectionInActivePane)
+                }),
+                new MenuBarItem("_Go", new MenuItem[]
+                {
+                    _leftVolumeMenuItem,
+                    _rightVolumeMenuItem,
+                    new("L_ocation...", "Ctrl+L", ShowLocationOfActivePane),
+                    new("_Home directory", "Ctrl+H", GoHomeInActivePane),
+                    new("Add _bookmark...", "Ctrl+B", AddBookmarkInActivePane),
+                    null!,
+                    new("_Same location in other pane", "Ctrl+D", ShowSameLocationInOtherPane),
+                    new("Sw_ap panes", "Ctrl+U", SwapPanes),
+                    new("Re_fresh", "Ctrl+R", RefreshActivePane)
+                }),
+                new MenuBarItem("_Commands", new MenuItem[]
+                {
+                    new("_Search...", "Ctrl+S", SearchInActivePane),
+                    new("_Quick search", "Ctrl+F", QuickSearchInActivePane),
+                    new("Command _line", "Ctrl+T", FocusCommandLine)
                 }),
                 new MenuBarItem("_Help", new MenuItem[]
                 {

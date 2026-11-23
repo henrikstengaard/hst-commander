@@ -23,31 +23,36 @@
                     <MenuItem x:Name="MoveMenuItem" Header="Mo_ve/rename..." InputGesture="F6" />
                     <MenuItem x:Name="MakeDirectoryMenuItem" Header="_Make directory..." InputGesture="F7" />
                     <MenuItem x:Name="DeleteMenuItem" Header="_Delete..." InputGesture="F8" />
-                    <MenuItem x:Name="CreateVolumeMenuItem" Header="Cr_eate volume..." InputGesture="F9" />
+                    <MenuItem x:Name="CreateVolumeMenuItem" Header="Create vo_lume..." InputGesture="F9" />
                     <MenuItem x:Name="PropertiesMenuItem" Header="_Properties..." InputGesture="Alt+Enter" />
                     <MenuItem x:Name="OpenAsVolumeMenuItem" Header="Ope_n as volume" InputGesture="Ctrl+PageDown" />
                     <Separator />
+                    <MenuItem x:Name="SettingsMenuItem" Header="_Settings..." />
+                    <Separator />
+                    <MenuItem x:Name="QuitMenuItem" Header="_Quit" InputGesture="F10" />
+                </MenuItem>
+                <MenuItem Header="_Mark">
                     <!-- +, - and * are matched by their symbol in MainWindow, key gestures would be shown as "OemPlus" etc. -->
                     <MenuItem x:Name="SelectAllMenuItem" Header="Select _all" InputGesture="Ctrl+A" />
                     <MenuItem x:Name="SelectGroupMenuItem" Header="Select _group... (+)" />
                     <MenuItem x:Name="UnselectGroupMenuItem" Header="_Unselect group... (-)" />
                     <MenuItem x:Name="InvertSelectionMenuItem" Header="_Invert selection (*)" />
-                    <MenuItem x:Name="SearchMenuItem" Header="Searc_h..." InputGesture="Ctrl+S" />
-                    <MenuItem x:Name="QuickSearchMenuItem" Header="Quic_k search" InputGesture="Ctrl+F" />
-                    <Separator />
+                </MenuItem>
+                <MenuItem Header="_Go">
                     <MenuItem x:Name="LeftVolumeMenuItem" Header="_Left volume..." />
                     <MenuItem x:Name="RightVolumeMenuItem" Header="_Right volume..." />
                     <MenuItem x:Name="LocationMenuItem" Header="L_ocation..." InputGesture="Ctrl+L" />
-                    <MenuItem x:Name="HomeMenuItem" Header="Home director_y" InputGesture="Ctrl+H" />
+                    <MenuItem x:Name="HomeMenuItem" Header="_Home directory" InputGesture="Ctrl+H" />
                     <MenuItem x:Name="AddBookmarkMenuItem" Header="Add _bookmark..." InputGesture="Ctrl+B" />
-                    <MenuItem x:Name="RefreshMenuItem" Header="Re_fresh" InputGesture="Ctrl+R" />
+                    <Separator />
+                    <MenuItem x:Name="SameLocationMenuItem" Header="_Same location in other pane" InputGesture="Ctrl+D" />
                     <MenuItem x:Name="SwapPanesMenuItem" Header="Sw_ap panes" InputGesture="Ctrl+U" />
-                    <MenuItem x:Name="SameLocationMenuItem" Header="Same location in o_ther pane" InputGesture="Ctrl+D" />
+                    <MenuItem x:Name="RefreshMenuItem" Header="Re_fresh" InputGesture="Ctrl+R" />
+                </MenuItem>
+                <MenuItem Header="_Commands">
+                    <MenuItem x:Name="SearchMenuItem" Header="_Search..." InputGesture="Ctrl+S" />
+                    <MenuItem x:Name="QuickSearchMenuItem" Header="_Quick search" InputGesture="Ctrl+F" />
                     <MenuItem x:Name="CommandLineMenuItem" Header="Command _line" InputGesture="Ctrl+T" />
-                    <Separator />
-                    <MenuItem x:Name="SettingsMenuItem" Header="_Settings..." />
-                    <Separator />
-                    <MenuItem x:Name="QuitMenuItem" Header="_Quit" InputGesture="F10" />
                 </MenuItem>
                 <!-- the navigation modes of the active pane, added by the code-behind -->
                 <MenuItem x:Name="ViewMenu" Header="_View" />
