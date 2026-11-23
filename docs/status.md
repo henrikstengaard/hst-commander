@@ -14,6 +14,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - Browsing, reading and writing FTP, FTPS (explicit TLS) and SFTP servers with the default Ftp plugin: the `FTP/SFTP` volume provider shows a connection dialog with the protocol, host, port, path, user name and password. SSH host keys and untrusted FTPS certificates are trusted on first use and checked afterwards.
 - Starting/executing local files with Enter or double-click, with executables drawn in green.
 - GUI entry icons: Amiga .info icons (the default Amiga plugin's icon provider) for the .info file and the entry it belongs to, icons contained in programs and .ico files (also inside images), otherwise the host OS icons for file types, folders and drives.
+- Clicking anywhere on a pane's path panel opens the location dialog; GUI drops from Ubuntu's Files (and other Linux apps suggesting move) are taken.
 - SMB listing and other reading requests wait up to 30 seconds for the server and are sent again once on a new connection when it doesn't answer in time (e.g. a NAS spinning up its disks).
 - The properties dialog changes the read, write and execute permissions of the owner, group and others of local files on Linux and macOS.
 - Files split by 7-Zip (`name.001`, `name.002`, ...) open as the joined file, e.g. a split 7z archive; opening a large archive shows the entries read after 2 seconds and can be cancelled.
@@ -23,7 +24,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - Going to the root of the volume with Ctrl+\ or by typing `/` or `\` in both front-ends.
 - Quitting with F10, Ctrl+Q or File > Quit (and Esc in the TUI) after a confirm dialog in both front-ends.
 - Refreshing the active pane with Ctrl+R and swapping the left and right panes with Ctrl+U (File > Refresh, File > Swap panes) in both front-ends.
-- Changing location with Ctrl+L or by clicking the path (location dialog), including paths into images, and going to the home directory with Ctrl+H.
+- Changing location with Ctrl+L or by clicking the path panel (location dialog), including paths into images, and going to the home directory with Ctrl+H.
 - Searching for entries with Ctrl+S (File > Search) in both front-ends: by name with wildcards or a regular expression, by contents (text, regular expression or hex values), from any location, in all subdirectories, the current directory or a number of levels, optionally inside images and archives, going to a result in the pane (see [Searching](file-operations.md#searching)).
 - Quick search with Ctrl+F (File > Quick search) in both front-ends: typing moves the cursor to the first entry starting with the text; Up/Down/Ctrl+F go through the matches (see [Quick search](file-operations.md#quick-search)).
 - Bookmarking locations with Ctrl+B (File > Add bookmark) in both front-ends, listed by the Bookmarks item of the volume provider list (F1/F2), edited with F4 (description, location, path, user name and stored password) and deleted with Del; SMB, FTP and SFTP passwords can be stored with a bookmark in Windows Credential Manager, the macOS Keychain or the Linux Secret Service (see [Bookmarks](volumes.md#bookmarks)).

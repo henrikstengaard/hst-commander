@@ -260,10 +260,27 @@ public partial class PaneView
     private static DragDropEffects GetDropEffect(DragEventArgs e) =>
         e.KeyModifiers.HasFlag(KeyModifiers.Shift) ? DragDropEffects.Move : DragDropEffects.Copy;
 
+    /// <summary>
+    ///     Effect of dragging over the pane: copy, or move with Shift, when the drag allows it. A drag of another
+    ///     application allowing neither is still taken with the effect it suggests, or copy: on Linux (X11 drag and drop)
+    ///     the drag only suggests one action, e.g. move from Ubuntu's Files (or none for "ask"), and the drop is copied or
+    ///     moved by Hst Commander after asking anyway, reporting copy (see <see cref="OnDrop" />).
+    /// </summary>
+    private static DragDropEffects GetDragOverEffect(DragEventArgs e, bool isPaneDrag)
+    {
+        var effect = GetDropEffect(e);
+        if ((e.DragEffects & effect) != 0 || isPaneDrag)
+        {
+            return effect & e.DragEffects;
+        }
+
+        return e.DragEffects is DragDropEffects.Copy or DragDropEffects.Move ? e.DragEffects : DragDropEffects.Copy;
+    }
+
     private void OnDragOver(object? sender, DragEventArgs e)
     {
         var target = GetDropTarget(e);
-        e.DragEffects = target == null ? DragDropEffects.None : GetDropEffect(e) & e.DragEffects;
+        e.DragEffects = target == null ? DragDropEffects.None : GetDragOverEffect(e, GetPaneDrag(e) != null);
         ShowDropTarget(target?.Container, target != null && target.Value.Container == null);
         e.Handled = true;
     }

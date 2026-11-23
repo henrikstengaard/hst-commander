@@ -47,7 +47,7 @@ Copy the list into the release's pull request or an issue and tick it per OS and
 
 - [ ] Both panes list the start directory; Tab switches, Enter opens a directory, Backspace goes up, Ctrl+\ and typing `/` or `\` go to the root and Ctrl+H home.
 - [ ] F1/F2 list the volume providers (Bookmarks, Local, Physical disks, FTP/SFTP and SMB when installed); choosing Local lists the drives or mount points.
-- [ ] Ctrl+L and clicking the path change location, also to a path inside an archive.
+- [ ] Ctrl+L and clicking anywhere on the path panel (also beside the path and on the disk space) change location, also to a path inside an archive.
 - [ ] Clicking a column header sorts, and the order is kept after a restart; Ctrl+F quick search finds entries; Ctrl+R refreshes and Ctrl+U swaps the panes.
 - [ ] Resizing and maximizing the window keeps the layout: the panes reach the bottom area and the right edge.
 - [ ] Insert/Space, `+`, `-` and `*` mark entries, and the panel above the pane summarizes them.
@@ -63,7 +63,7 @@ Copy the list into the release's pull request or an issue and tick it per OS and
 - [ ] F5 copies and F6 moves marked entries between the panes, with the progress dialog (and the taskbar or terminal tab progress); copying over existing files asks to overwrite; Cancel stops.
 - [ ] Shift+F6 renames, F7 makes a directory, F8 and Delete delete after confirming.
 - [ ] Ctrl+C/Ctrl+X/Ctrl+V (Alt+V in the TUI) copy, cut and paste between the panes; on Windows also to and from Explorer, including files inside an archive. (GUI) Also with Finder and the Linux file manager.
-- [ ] (GUI) Dragging entries to the file manager and dropping files from it on a pane copies them.
+- [ ] (GUI) Dragging entries to the file manager (Explorer, Finder, Files on Ubuntu) and dropping files from it on a pane copies them, also without Shift from Files, which suggests a move.
 - [ ] Ctrl+S searches by name and by contents, optionally inside archives, and going to a result selects it in the pane.
 - [ ] Ctrl+P shows the properties with the size counted; changing an attribute (Windows) or the Amiga protection bits and comment (in the adf) is saved.
 
