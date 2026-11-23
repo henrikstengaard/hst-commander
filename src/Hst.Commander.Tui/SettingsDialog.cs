@@ -13,7 +13,7 @@ public sealed class SettingsDialog : TuiDialog
 {
     private const int DefaultWidth = 64;
     // the tabs have a bottom border
-    private const int DefaultHeight = 19;
+    private const int DefaultHeight = 21;
 
     private readonly IReadOnlyList<ThemeChoice> _themes = Themes.All;
     private readonly Tabs _tabView;
@@ -26,6 +26,7 @@ public sealed class SettingsDialog : TuiDialog
     private readonly OptionSelector _volumeProviderKeysRadioGroup;
     private readonly OptionSelector _enterFileActionRadioGroup;
     private readonly TextField _temporaryCopyLimitField;
+    private readonly CheckBox _detectVolumeFilesCheckBox;
     private readonly OptionSelector _uaeMetadataRadioGroup;
     private readonly OptionSelector _editorRadioGroup;
     private readonly TextField _editorCommandField;
@@ -87,6 +88,15 @@ public sealed class SettingsDialog : TuiDialog
             Text = "MB copied to open an image inside an image\n(e.g. zip in zip), 0 for no limit"
         };
 
+        var detectVolumeFilesLabel = new Label { X = 1, Y = 11, Text = "Listings:" };
+        _detectVolumeFilesCheckBox = new CheckBox
+        {
+            X = 16,
+            Y = 11,
+            Text = "Detect images and archives (>)",
+            Value = settings.DetectVolumeFiles ? CheckState.Checked : CheckState.UnChecked
+        };
+
         // copying
         var uaeMetadataLabel = new Label { X = 1, Y = 1, Text = "UAE metadata:" };
         _uaeMetadataRadioGroup = new OptionSelector
@@ -126,7 +136,7 @@ public sealed class SettingsDialog : TuiDialog
         tabView.Add(CreateTab("Appearance", themeLabel, _themeRadioGroup));
         tabView.Add(CreateTab("Panes", volumeProviderKeysLabel, _volumeProviderKeysRadioGroup,
             enterFileActionLabel, _enterFileActionRadioGroup, temporaryCopyLimitLabel, _temporaryCopyLimitField,
-            temporaryCopyLimitHelp));
+            temporaryCopyLimitHelp, detectVolumeFilesLabel, _detectVolumeFilesCheckBox));
         tabView.Add(CreateTab("Copying", uaeMetadataLabel, _uaeMetadataRadioGroup));
         tabView.Add(CreateTab("Editor", editorLabel, _editorRadioGroup, editorCommandLabel, _editorCommandField,
             editorCommandHelp));
@@ -158,6 +168,7 @@ public sealed class SettingsDialog : TuiDialog
                 {
                     Theme = SelectedTheme.Id,
                     EnterFileAction = SelectedEnterFileAction,
+                    DetectVolumeFiles = _detectVolumeFilesCheckBox.Value == CheckState.Checked,
                     UaeMetadata = SelectedUaeMetadata,
                     TemporaryCopyLimit = temporaryCopyLimit,
                     Editor = SelectedEditor,

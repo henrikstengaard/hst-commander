@@ -49,6 +49,12 @@ public sealed record TuiSettings
     /// <summary>What Enter does with files: browse images as volumes or start them with the host operating system.</summary>
     public EnterFileAction EnterFileAction { get; init; } = EnterFileAction.OpenAsVolume;
 
+    /// <summary>
+    ///     True when the panes read listed files in the background to show which can be opened as volumes (see
+    ///     <see cref="NavigationContext.DetectVolumeFiles" />).
+    /// </summary>
+    public bool DetectVolumeFiles { get; init; } = true;
+
     /// <summary>How Amiga names, protection bits and comments are stored when copying from Amiga volumes to others.</summary>
     public UaeMetadataFormat UaeMetadata { get; init; } = UaeMetadataFormat.UaeFsDb;
 

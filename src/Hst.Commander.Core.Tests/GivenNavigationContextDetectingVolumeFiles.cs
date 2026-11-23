@@ -64,6 +64,34 @@ public class GivenNavigationContextDetectingVolumeFiles
     }
 
     [Fact]
+    public async Task When_DetectVolumeFilesIsTurnedOff_Then_NothingIsDetectedAndZipStillOpensAsVolume()
+    {
+        // arrange
+        var rootPath = CreateTempDirectory();
+        await File.WriteAllBytesAsync(Path.Combine(rootPath, "archive.dat"),
+            ZipTestData.CreateZipWithDirectoriesAndFiles());
+        try
+        {
+            using var navigationContext = new NavigationContext(rootPath) { DetectVolumeFiles = false };
+            var entries = await navigationContext.ListEntriesAsync();
+            var archive = entries.First(entry => entry.Name == "archive.dat");
+
+            // act
+            var detectedNames = await DetectAsync(navigationContext, entries);
+            await navigationContext.OpenEntryAsync(archive);
+
+            // assert
+            Assert.Empty(detectedNames);
+            Assert.False(navigationContext.IsVolumeFile(archive));
+            Assert.True(navigationContext.IsInImage);
+        }
+        finally
+        {
+            Directory.Delete(rootPath, true);
+        }
+    }
+
+    [Fact]
     public async Task When_DetectVolumeFilesInsideZip_Then_InnerZipIsDetected()
     {
         // arrange

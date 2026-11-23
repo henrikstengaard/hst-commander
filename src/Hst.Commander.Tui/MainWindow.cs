@@ -135,6 +135,8 @@ public sealed class MainWindow : Window
         };
         ApplyVolumeProviderKeys(settings.EffectiveVolumeProviderKeys);
         ApplyEnterFileAction(settings.EnterFileAction);
+        _leftPane.NavigationContext.DetectVolumeFiles = settings.DetectVolumeFiles;
+        _rightPane.NavigationContext.DetectVolumeFiles = settings.DetectVolumeFiles;
         ApplyUaeMetadata(settings.UaeMetadata);
         ApplyTemporaryCopyLimit(settings.TemporaryCopyLimitBytes);
         _editorSettings = settings;
@@ -416,6 +418,22 @@ public sealed class MainWindow : Window
         _rightPane.NavigationContext.EnterFileAction = action;
     }
 
+    /// <summary>
+    ///     Sets whether both panes detect which listed files can be opened as volumes, listing them again when it
+    ///     changes, so the markers are shown or removed.
+    /// </summary>
+    private void ApplyDetectVolumeFiles(bool detect)
+    {
+        var changed = _leftPane.NavigationContext.DetectVolumeFiles != detect;
+        _leftPane.NavigationContext.DetectVolumeFiles = detect;
+        _rightPane.NavigationContext.DetectVolumeFiles = detect;
+        if (changed)
+        {
+            _ = RunNavigationAsync(_leftPane, () => Task.CompletedTask);
+            _ = RunNavigationAsync(_rightPane, () => Task.CompletedTask);
+        }
+    }
+
     /// <summary>Sets how both panes store Amiga names, protection bits and comments when copying from Amiga volumes.</summary>
     private void ApplyUaeMetadata(UaeMetadataFormat format)
     {
@@ -623,6 +641,7 @@ public sealed class MainWindow : Window
         ApplyTheme(Themes.Find(result.Theme));
         ApplyVolumeProviderKeys(result.EffectiveVolumeProviderKeys);
         ApplyEnterFileAction(result.EnterFileAction);
+        ApplyDetectVolumeFiles(result.DetectVolumeFiles);
         ApplyUaeMetadata(result.UaeMetadata);
         ApplyTemporaryCopyLimit(result.TemporaryCopyLimitBytes);
         _editorSettings = result;
