@@ -2054,7 +2054,8 @@ public sealed class NavigationContext : IDisposable
     ///     pane's volume, so call it on the thread using the pane. Not with <see cref="UaeMetadataFormat.None" />. The
     ///     check boxes of a single entry (<see cref="EntryProperties.FlagGroups" />) can be changed when the volume can
     ///     change its attributes (<see cref="IVolume.GetChangeableAttributes" />) or Amiga protection bits
-    ///     (<see cref="IVolume.CanSetAmigaMetadata" />, or UAE metadata in a writable location).
+    ///     (<see cref="IVolume.CanSetAmigaMetadata" />, or UAE metadata in a writable location), and the permissions
+    ///     of local files on Linux and macOS.
     /// </summary>
     public async Task<EntryProperties> GetPropertiesAsync(IReadOnlyList<IEntry> entries,
         CancellationToken cancellationToken = default)
@@ -2072,9 +2073,9 @@ public sealed class NavigationContext : IDisposable
             ? await _nestedVolume.CanSetAmigaMetadata(cancellationToken)
             : (uaeMetadata != null || await CanCreateUaeMetadataAsync(cancellationToken)) &&
               MoveNotSupportedMessage == null;
-        var changes = new PropertyChanges(await _nestedVolume.GetChangeableAttributes(cancellationToken),
-            canSetAmigaMetadata);
         var localDirectory = !IsInImage ? LocalPath : null;
+        var changes = new PropertyChanges(await _nestedVolume.GetChangeableAttributes(cancellationToken),
+            canSetAmigaMetadata, localDirectory != null && !OperatingSystem.IsWindows());
         var context = new EntryPropertiesContext(_nestedVolume, entry, GetIconFile(entry),
             CreateDirectoryNotSupportedMessage == null, entry.AmigaMetadata ?? uaeMetadata?.Metadata,
             canSetAmigaMetadata
@@ -2155,7 +2156,8 @@ public sealed class NavigationContext : IDisposable
     ///     <see cref="EntryProperties.Tabs" /> that changed (see <see cref="PropertiesTab.Save" />), given the text of
     ///     each tab (null when it has none). Only groups that can be changed and differ are changed: attributes with
     ///     <see cref="IVolume.SetAttributes" />, protection bits with <see cref="IVolume.SetAmigaMetadata" /> or in the
-    ///     UAE metadata of the entry (see <see cref="UaeMetadataUpdater.SetMetadataAsync" />). Empty texts are no text
+    ///     UAE metadata of the entry (see <see cref="UaeMetadataUpdater.SetMetadataAsync" />), permissions of local
+    ///     files with <see cref="File.SetUnixFileMode(string, UnixFileMode)" /> (other mode bits, e.g. setuid, are kept). Empty texts are no text
     ///     and texts are saved with "\n" line breaks. Changes with the pane's volume, so call it on the thread using
     ///     the pane. Returns true when something was changed.
     /// </summary>
@@ -2214,6 +2216,20 @@ public sealed class NavigationContext : IDisposable
                     {
                         await _nestedVolume.SetAttributes(entry.Name, (EntryAttributes)newAttributes,
                             cancellationToken);
+                        changed = true;
+                    }
+
+                    break;
+                }
+                case PropertyFlagKind.Permissions when !OperatingSystem.IsWindows() && LocalPath is { } localPath:
+                {
+                    // each line changes the permissions of its class, keeping those changed by the lines before
+                    var path = Path.Combine(localPath, entry.Name);
+                    var mode = (int)File.GetUnixFileMode(path);
+                    var newMode = EntryProperties.GetValue(group, mode, isChecked[index]);
+                    if (newMode != mode)
+                    {
+                        File.SetUnixFileMode(path, (UnixFileMode)newMode);
                         changed = true;
                     }
 

@@ -12,7 +12,7 @@ namespace Hst.Commander.Gui;
 /// <summary>
 ///     Modal properties dialog (Alt+Enter) showing the name and, in the General tab, the sections of lines of
 ///     <see cref="EntryProperties" /> separated by lines, the used space of drives as a progress bar and the check boxes
-///     of <see cref="EntryProperties.FlagGroups" /> (attributes and Amiga protection bits), enabled when they can be
+///     of <see cref="EntryProperties.FlagGroups" /> (attributes, permissions and Amiga protection bits), enabled when they can be
 ///     changed, followed by the tabs of the plugins (<see cref="EntryProperties.Tabs" />, see
 ///     <see cref="PropertiesTabView" />). Clicking the icon shows it in a higher resolution in the
 ///     <see cref="IconViewerDialog" />. When opened it counts the size and contents in the background and updates the
