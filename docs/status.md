@@ -14,6 +14,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - Browsing, reading and writing FTP, FTPS (explicit TLS) and SFTP servers with the default Ftp plugin: the `FTP/SFTP` volume provider shows a connection dialog with the protocol, host, port, path, user name and password. SSH host keys and untrusted FTPS certificates are trusted on first use and checked afterwards.
 - Starting/executing local files with Enter or double-click, with executables drawn in green.
 - GUI entry icons: Amiga .info icons (the default Amiga plugin's icon provider) for the .info file and the entry it belongs to, icons contained in programs and .ico files (also inside images), otherwise the host OS icons for file types, folders and drives.
+- SMB listing and other reading requests wait up to 30 seconds for the server and are sent again once on a new connection when it doesn't answer in time (e.g. a NAS spinning up its disks).
 - The properties dialog changes the read, write and execute permissions of the owner, group and others of local files on Linux and macOS.
 - Files split by 7-Zip (`name.001`, `name.002`, ...) open as the joined file, e.g. a split 7z archive; opening a large archive shows the entries read after 2 seconds and can be cancelled.
 - The volume abstraction layer and implementations: `LocalVolume`, `Iso9660Volume`, `ZipVolume`, `LhaVolume`, `LzxVolume`, `SharpCompressVolume` (rar and 7z), their base class `ArchiveVolume<T>`, `NestedVolume`, `EntryVolumeProvider`, and `NullVolume`.

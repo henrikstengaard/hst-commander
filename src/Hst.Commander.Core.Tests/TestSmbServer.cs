@@ -20,6 +20,24 @@ public sealed class TestSmbServer : ISmbConnector
     /// <summary>Shares guests can't open.</summary>
     public HashSet<string> GuestDeniedShares { get; } = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Number of the next requests opening files or directories that time out like a server not answering in time
+    /// (STATUS_IO_TIMEOUT), e.g. a NAS spinning up its disks.
+    /// </summary>
+    public int Timeouts { get; set; }
+
+    /// <summary>True for a request that times out, counting down <see cref="Timeouts" />.</summary>
+    private bool TimesOut()
+    {
+        if (Timeouts <= 0)
+        {
+            return false;
+        }
+
+        Timeouts--;
+        return true;
+    }
+
     /// <summary>Connections made, the last one last.</summary>
     public List<TestSmbConnection> Connections { get; } = [];
 
@@ -43,6 +61,9 @@ public sealed class TestSmbServer : ISmbConnector
 
         public bool IsDisposed { get; private set; }
 
+        /// <summary>True when closed without logging off, after a request timed out.</summary>
+        public bool IsAborted { get; private set; }
+
         public int MaxReadSize { get; set; } = 7;
 
         public int MaxWriteSize { get; set; } = 5;
@@ -58,8 +79,10 @@ public sealed class TestSmbServer : ISmbConnector
 
             return isGuest && server.GuestDeniedShares.Contains(share)
                 ? throw new UnauthorizedAccessException($"Access to share '{share}' denied")
-                : fileStore.ForConnection(() => IsConnected);
+                : fileStore.ForConnection(() => IsConnected, server.TimesOut);
         }
+
+        public void Abort() => IsAborted = IsDisposed = true;
 
         public void Dispose() => IsDisposed = true;
     }
@@ -73,13 +96,15 @@ public sealed class DirectoryFileStore(string rootPath) : INTFileStore
 {
     private Dictionary<string, FileAttributes> _attributes = new(StringComparer.Ordinal);
     private Func<bool> _isConnected = () => true;
+    private Func<bool> _timesOut = () => false;
 
     /// <summary>
     /// The store as used by a connection, sharing the files and attributes: reading, writing and file information
-    /// fail like on a closed connection when <paramref name="isConnected" /> is false.
+    /// fail like on a closed connection when <paramref name="isConnected" /> is false, and opening files and directories
+    /// times out when <paramref name="timesOut" /> returns true.
     /// </summary>
-    public DirectoryFileStore ForConnection(Func<bool> isConnected) =>
-        new(rootPath) { _attributes = _attributes, _isConnected = isConnected };
+    public DirectoryFileStore ForConnection(Func<bool> isConnected, Func<bool>? timesOut = null) =>
+        new(rootPath) { _attributes = _attributes, _isConnected = isConnected, _timesOut = timesOut ?? (() => false) };
 
     /// <summary>Status of a request on a closed connection, which SMBLibrary returns when it gets no response.</summary>
     private const NTStatus DisconnectedStatus = NTStatus.STATUS_INVALID_SMB;
@@ -116,6 +141,11 @@ public sealed class DirectoryFileStore(string rootPath) : INTFileStore
     {
         handle = null!;
         fileStatus = FileStatus.FILE_DOES_NOT_EXIST;
+        if (_timesOut())
+        {
+            return NTStatus.STATUS_IO_TIMEOUT;
+        }
+
         var fullPath = GetFullPath(path);
         if (!Directory.Exists(Path.GetDirectoryName(Path.TrimEndingDirectorySeparator(fullPath)) ?? rootPath))
         {

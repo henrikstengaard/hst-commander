@@ -9,7 +9,9 @@ namespace Hst.Commander.Plugins.Smb;
 /// Volume of an SMB server: its root lists the disk shares of the server, except hidden shares ending with "$" (which
 /// can still be changed to by name, e.g. "c$"), and the first path component is a share, e.g. ["share", "dir"]. The
 /// shares are read and written with the user's credentials. A connection closed by the server, e.g. after being idle,
-/// is connected again. Requests to the server are synchronous, so the volume runs them on the thread pool.
+/// is connected again. Requests to the server are synchronous, so the volume runs them on the thread pool. Listing,
+/// changing directory, opening files for reading and reading the space are sent again once on a new connection when
+/// the server didn't answer in time (<see cref="SmbTimeoutException" />), e.g. a NAS whose disks were asleep.
 /// </summary>
 public sealed class SmbVolume : IVolume, IDisposable
 {
@@ -59,7 +61,7 @@ public sealed class SmbVolume : IVolume, IDisposable
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var pathComponents = _pathComponents.ToList();
-        var entries = await RunAsync(() => ListEntries(pathComponents), cancellationToken);
+        var entries = await RunReadAsync(() => ListEntries(pathComponents), cancellationToken);
         foreach (var entry in entries)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -139,7 +141,7 @@ public sealed class SmbVolume : IVolume, IDisposable
         }
 
         // the directory must be opened before changing to it, so the volume stays where it is when it can't
-        await RunAsync(() => CheckDirectory(newPathComponents), cancellationToken);
+        await RunReadAsync(() => CheckDirectory(newPathComponents), cancellationToken);
         _pathComponents = newPathComponents;
     }
 
@@ -201,7 +203,7 @@ public sealed class SmbVolume : IVolume, IDisposable
         ArgumentNullException.ThrowIfNull(name);
 
         var pathComponents = _pathComponents.ToList();
-        return RunAsync<Stream>(() =>
+        return RunReadAsync<Stream>(() =>
         {
             var (fileStore, path) = GetFile(pathComponents, name, "read");
             var status = fileStore.CreateFile(out var handle, out _, path, AccessMask.GENERIC_READ,
@@ -484,7 +486,7 @@ public sealed class SmbVolume : IVolume, IDisposable
         }
 
         var share = _pathComponents[0];
-        return await RunAsync<VolumeSpace?>(() =>
+        return await RunReadAsync<VolumeSpace?>(() =>
         {
             var status = GetShare(share).GetFileSystemInformation(out var information,
                 FileSystemInformationClass.FileFsFullSizeInformation);
@@ -531,6 +533,33 @@ public sealed class SmbVolume : IVolume, IDisposable
         }
 
         return fileStore;
+    }
+
+    /// <summary>
+    /// Runs requests that only read like <see cref="RunAsync{T}" />, and again once on a new connection when the server
+    /// didn't answer in time: the connection may be broken without being closed, and a server waking up (e.g. a NAS
+    /// spinning up its disks) answers the second time.
+    /// </summary>
+    private Task<T> RunReadAsync<T>(Func<T> requests, CancellationToken cancellationToken) => RunAsync(() =>
+    {
+        try
+        {
+            return requests();
+        }
+        catch (SmbTimeoutException)
+        {
+            Reconnect();
+            return requests();
+        }
+    }, cancellationToken);
+
+    /// <summary>Closes the connection without waiting for the server and connects again.</summary>
+    private void Reconnect()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        _shares.Clear();
+        _connection.Abort();
+        _connection = _connector.Connect(_server, _credentials);
     }
 
     /// <summary>The connection, connected again when the server closed it.</summary>

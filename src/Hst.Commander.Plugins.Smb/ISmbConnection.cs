@@ -29,6 +29,12 @@ public interface ISmbConnection : IDisposable
     /// <see cref="DirectoryNotFoundException" /> when the share doesn't exist.
     /// </summary>
     INTFileStore OpenShare(string share);
+
+    /// <summary>
+    /// Closes the connection without waiting for the server, e.g. after a request timed out, where logging off would
+    /// wait for the timeout again. The server closes the files opened on it.
+    /// </summary>
+    void Abort() => Dispose();
 }
 
 /// <summary>Connects and logs in to SMB servers.</summary>

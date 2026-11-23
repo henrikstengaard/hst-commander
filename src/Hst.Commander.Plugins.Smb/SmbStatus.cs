@@ -36,6 +36,15 @@ public static class SmbStatus
         NTStatus.STATUS_FILE_IS_A_DIRECTORY => new IOException($"{what} failed: is a directory"),
         NTStatus.STATUS_OBJECT_NAME_INVALID or NTStatus.STATUS_OBJECT_PATH_INVALID
             or NTStatus.STATUS_OBJECT_PATH_SYNTAX_BAD => new IOException($"{what} failed: invalid name"),
+        // SMBLibrary's own status when the server doesn't answer within the response timeout
+        NTStatus.STATUS_IO_TIMEOUT => new SmbTimeoutException(
+            $"{what} failed: the server didn't answer in time (STATUS_IO_TIMEOUT)"),
         _ => new IOException($"{what} failed: {status}")
     };
 }
+
+/// <summary>
+/// A request the server didn't answer within the response timeout (STATUS_IO_TIMEOUT), e.g. while a NAS spins up its
+/// disks or after the network dropped the connection without closing it.
+/// </summary>
+public sealed class SmbTimeoutException(string message) : IOException(message);
