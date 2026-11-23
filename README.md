@@ -132,7 +132,7 @@ Releases are published on the [GitHub releases page](https://github.com/henrikst
 
 - **Windows** (x64, x86, arm64): setup installer and portable zip.
 - **macOS** (x64, arm64): dmg.
-- **Linux** (x64, arm, arm64): AppImage and deb package, and a tar.gz of the TUI.
+- **Linux** (x64, arm, arm64; there's no 32-bit x86 build, as .NET doesn't support it on Linux): AppImage and deb package, and a tar.gz of the TUI. Make a downloaded AppImage executable before running it (`chmod +x hst-commander_*.AppImage`); it needs FUSE 2 (`libfuse2t64` on Ubuntu 24.04 and later, `libfuse2` before).
 - **SMB plugin**: released separately as it uses the LGPL licensed [SMBLibrary](https://github.com/TalAloni/SMBLibrary). On Windows, `smb-plugin_windows_setup.exe` installs it for both apps. On every platform, `smb-plugin.zip` holds its `Hst.Commander.Plugins.Smb` directory to copy to `~/.hst-commander/plugins/` (see the [SMB plugin](src/Hst.Commander.Plugins.Smb/readme.md)).
 
 Settings, bookmarks and the error log are stored in `~/.hst-commander` (`%USERPROFILE%\.hst-commander` on Windows).

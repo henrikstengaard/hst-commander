@@ -28,5 +28,12 @@ internal static class Program
     private static AppBuilder BuildAvaloniaApp() =>
         AppBuilder.Configure<App>()
             .UsePlatformDetect()
+            // the X11 window class (WM_CLASS) is the desktop file's name and StartupWMClass of the Linux packages
+            // (src/packaging/linux/package.sh), so desktops show the window with the app's icon, e.g. in the Ubuntu
+            // dock; the default, the assembly name, matches no desktop file
+            .With(new X11PlatformOptions { WmClass = LinuxDesktopFileName })
             .LogToTrace();
+
+    /// <summary>Name of the GUI's desktop file in the Linux packages, without .desktop.</summary>
+    private const string LinuxDesktopFileName = "hst-commander-gui";
 }

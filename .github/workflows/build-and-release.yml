@@ -434,7 +434,7 @@ jobs:
           Get-ChildItem -Filter 'hst-commander.*' -name
 
       # e.g. hst-commander.tui.win-x64.setup.exe -> hst-commander_v0.1.29-98d7be8_tui_windows_x64_setup.exe,
-      # hst-commander.gui.linux-amd64.deb -> hst-commander_v0.1.29-98d7be8_gui_linux_amd64.deb,
+      # hst-commander.gui.linux-x64.deb -> hst-commander_v0.1.29-98d7be8_gui_linux_x64.deb,
       # hst-commander.smb-plugin.zip -> hst-commander_v0.1.29-98d7be8_smb-plugin.zip,
       # hst-commander.smb-plugin.setup.exe -> hst-commander_v0.1.29-98d7be8_smb-plugin_windows_setup.exe
       - name: Version artifacts
@@ -510,7 +510,7 @@ jobs:
             ''
             '- **Windows**: `_setup.exe` installs the app, `_portable.zip` runs without installing.'
             '- **macOS**: `.dmg` for Intel (`x64`) or Apple silicon (`arm64`).'
-            '- **Linux**: `.AppImage` runs without installing, `.deb` installs on Debian and Ubuntu, `.tar.gz` (TUI) holds the files to run.'
+            '- **Linux**: for `x64` (Intel and AMD), `arm64` and `arm` (32-bit, e.g. Raspberry Pi OS); there is no 32-bit `x86` build, as .NET does not run on it on Linux. `.deb` installs on Debian and Ubuntu, `.AppImage` runs without installing, `.tar.gz` (TUI) holds the files to run. A downloaded AppImage must be made executable first, as browsers save downloads without the execute permission: `chmod +x hst-commander_*.AppImage`, or Properties > Executable as Program in Files. It needs FUSE 2: `sudo apt install libfuse2t64` on Ubuntu 24.04 and later, `libfuse2` before.'
             '- **SMB plugin** (Windows file shares): `_smb-plugin_windows_setup.exe` installs it on Windows for both apps. On every platform, `_smb-plugin.zip` holds its `Hst.Commander.Plugins.Smb` directory to copy to `~/.hst-commander/plugins/`.'
             ''
             'Third-party notices are included with the apps and shown in Help > About > Licenses.'

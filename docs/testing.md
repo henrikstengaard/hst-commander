@@ -37,7 +37,7 @@ Copy the list into the release's pull request or an issue and tick it per OS and
 
 ### Install and start
 
-- [ ] Installs and starts without warnings: Windows shows the publisher in SmartScreen and UAC, macOS opens the app without a Gatekeeper warning (notarized), the AppImage runs and the deb installs with a menu entry (GUI) and a command.
+- [ ] Installs and starts without warnings: Windows shows the publisher in SmartScreen and UAC, macOS opens the app without a Gatekeeper warning (notarized), the AppImage runs after `chmod +x` and the deb installs with a menu entry (GUI) and a command; the GUI's window shows the app's icon in the taskbar or dock (from the deb, and from the AppImage when integrated, e.g. with Gear Lever or AppImageLauncher).
 - [ ] Help > About shows the release version (`1.0.<commits>`) and the build date, and Licenses lists the notices of Hst Commander, its components and .NET.
 - [ ] Installing over the previous release keeps the settings and bookmarks (bookmarks saved before 1.0 are a list and are still read).
 - [ ] Uninstalling (Windows setup, deb) removes the app and keeps `~/.hst-commander`.

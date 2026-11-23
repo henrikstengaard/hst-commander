@@ -20,6 +20,7 @@ case $app in
     name="Hst Commander TUI"
     comment="Dual-pane file manager for the terminal"
     terminal=true
+    wm_class=""
     extra_depends=""
     ;;
   gui)
@@ -28,6 +29,9 @@ case $app in
     name="Hst Commander"
     comment="Dual-pane file manager"
     terminal=false
+    # the window class the gui sets (X11PlatformOptions.WmClass in Program.cs), so desktops show its window with this
+    # desktop file's icon, e.g. in the Ubuntu dock
+    wm_class=$id
     extra_depends=", libx11-6, libice6, libsm6, libfontconfig1"
     ;;
   *) echo "Unknown app '$app'" >&2; exit 1 ;;
@@ -54,6 +58,9 @@ Icon=$id
 Terminal=$terminal
 Categories=System;FileManager;
 EOF
+  if [ -n "$wm_class" ]; then
+    echo "StartupWMClass=$wm_class" >> "$1"
+  fi
 }
 
 # appimage
@@ -78,7 +85,7 @@ if [ "$app" = tui ]; then
   tar -czf "$output_dir/hst-commander.$app.$rid.tar.gz" -C "$publish_dir" .
 fi
 
-# deb
+# deb, named by the runtime like the other packages (x64 rather than debian's amd64)
 root=$work/deb
 mkdir -p "$root/DEBIAN" "$root/usr/lib/$id" "$root/usr/bin" "$root/usr/share/applications" "$root/usr/share/icons/hicolor/512x512/apps"
 cp -a "$publish_dir/." "$root/usr/lib/$id/"
@@ -102,4 +109,4 @@ Description: $name - $comment
  Dual-pane file manager inspired by Norton Commander and Midnight Commander,
  browsing local directories and images like ISO 9660 in the same panes.
 EOF
-dpkg-deb -Zxz --build --root-owner-group "$root" "$output_dir/hst-commander.$app.linux-$deb_arch.deb"
+dpkg-deb -Zxz --build --root-owner-group "$root" "$output_dir/hst-commander.$app.$rid.deb"
