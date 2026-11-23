@@ -65,6 +65,7 @@ public sealed class MainWindow : Window
                     new("_Properties...", "Ctrl+P", ShowPropertiesOfActivePane),
                     new("Ope_n as volume", "Ctrl+PgDn", OpenAsVolumeInActivePane),
                     null!,
+                    new("Select _all", "Ctrl+A", SelectAllInActivePane),
                     new("Select _group...", "+", SelectGroupInActivePane),
                     new("_Unselect group...", "-", UnselectGroupInActivePane),
                     new("_Invert selection", "*", InvertSelectionInActivePane),
@@ -560,8 +561,7 @@ public sealed class MainWindow : Window
                 _ = RunNavigationAsync(pane, () => pane.NavigationContext.GoRootAsync());
                 break;
             case CommanderActions.SelectAll:
-                pane.NavigationContext.MarkAll(pane.Entries);
-                UpdateMarks(pane);
+                SelectAll(pane);
                 break;
             case CommanderActions.SelectNone:
                 pane.NavigationContext.ClearMarks();
@@ -891,6 +891,11 @@ public sealed class MainWindow : Window
                 key.Handled = true;
                 StartQuickSearch(pane);
             }
+            else if (key == Key.A.WithCtrl)
+            {
+                key.Handled = true;
+                SelectAll(pane);
+            }
             else if (key == Key.R.WithCtrl)
             {
                 key.Handled = true;
@@ -1104,6 +1109,8 @@ public sealed class MainWindow : Window
     private void UnselectGroupInActivePane() => SelectGroup(_activePane, false);
 
     private void InvertSelectionInActivePane() => InvertSelection(_activePane);
+
+    private void SelectAllInActivePane() => SelectAll(_activePane);
 
     private void ChooseLeftVolumeProvider() => _ = ChooseVolumeProviderAsync(_leftPane);
 
@@ -1551,6 +1558,13 @@ public sealed class MainWindow : Window
             return;
         }
 
+        UpdateMarks(pane);
+    }
+
+    /// <summary>Marks all entries of a pane except ".." (Ctrl+A).</summary>
+    private static void SelectAll(Pane pane)
+    {
+        pane.NavigationContext.MarkAll(pane.Entries);
         UpdateMarks(pane);
     }
 

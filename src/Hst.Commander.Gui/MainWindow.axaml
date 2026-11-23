@@ -28,6 +28,7 @@
                     <MenuItem x:Name="OpenAsVolumeMenuItem" Header="Ope_n as volume" InputGesture="Ctrl+PageDown" />
                     <Separator />
                     <!-- +, - and * are matched by their symbol in MainWindow, key gestures would be shown as "OemPlus" etc. -->
+                    <MenuItem x:Name="SelectAllMenuItem" Header="Select _all" InputGesture="Ctrl+A" />
                     <MenuItem x:Name="SelectGroupMenuItem" Header="Select _group... (+)" />
                     <MenuItem x:Name="UnselectGroupMenuItem" Header="_Unselect group... (-)" />
                     <MenuItem x:Name="InvertSelectionMenuItem" Header="_Invert selection (*)" />
