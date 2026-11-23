@@ -30,6 +30,7 @@ public static class CommanderActions
     public const string InvertSelection = "InvertSelection";
     public const string Refresh = "Refresh";
     public const string SwapPanes = "SwapPanes";
+    public const string SameLocation = "SameLocation";
     public const string Location = "Location";
     public const string AddBookmark = "AddBookmark";
     public const string Search = "Search";
@@ -64,6 +65,7 @@ public static class CommanderActions
         new(InvertSelection, "Invert selection"),
         new(Refresh, "Refresh"),
         new(SwapPanes, "Swap panes"),
+        new(SameLocation, "Same location in other pane"),
         new(Location, "Location"),
         new(AddBookmark, "Add bookmark"),
         new(Search, "Search"),

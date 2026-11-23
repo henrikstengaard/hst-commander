@@ -94,6 +94,7 @@ The keys are the same in both front-ends unless noted. The File menu lists them 
 | Ctrl+B | Add a bookmark (bookmarks are listed with F1 / F2) |
 | Ctrl+R | Refresh the active pane |
 | Ctrl+U | Swap the panes |
+| Ctrl+D | Show the same location in the other pane |
 | Ctrl+T | Go to the command line |
 | Shift+F10 / Ctrl+F10 / menu key | Context menu |
 | Ctrl+1 to Ctrl+9 | Choose the navigation mode (GUI only) |

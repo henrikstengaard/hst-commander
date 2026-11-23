@@ -79,6 +79,7 @@ public sealed class MainWindow : Window
                     new("Add _bookmark...", "Ctrl+B", AddBookmarkInActivePane),
                     new("Re_fresh", "Ctrl+R", RefreshActivePane),
                     new("Sw_ap panes", "Ctrl+U", SwapPanes),
+                    new("Same location in o_ther pane", "Ctrl+D", ShowSameLocationInOtherPane),
                     new("Command _line", "Ctrl+T", FocusCommandLine),
                     null!,
                     new("_Settings...", string.Empty, ShowSettings),
@@ -582,6 +583,9 @@ public sealed class MainWindow : Window
             case CommanderActions.SwapPanes:
                 SwapPanes();
                 break;
+            case CommanderActions.SameLocation:
+                ShowSameLocationInOtherPane();
+                break;
             case CommanderActions.Location:
                 ShowLocationOfActivePane();
                 break;
@@ -906,6 +910,11 @@ public sealed class MainWindow : Window
                 key.Handled = true;
                 SwapPanes();
             }
+            else if (key == Key.D.WithCtrl)
+            {
+                key.Handled = true;
+                ShowSameLocationInOtherPane();
+            }
             // plain F1/F2 also when other keys are chosen, for terminals that don't send them, e.g. Terminal.app sends
             // nothing for Shift+F1/Shift+F2 (see VolumeProviderKeyBindings)
             else if (key == LeftVolumeProviderKey || key == Key.F1)
@@ -1220,6 +1229,18 @@ public sealed class MainWindow : Window
     ///     Swaps the left and right panes (Ctrl+U), like Midnight Commander: each pane moves to the other side with its
     ///     location, entries, marks and cursor, and the active pane stays active, so the focus moves to the other side.
     /// </summary>
+    /// <summary>
+    ///     Shows the location of the active pane in the other pane (Ctrl+D), also inside images and on servers
+    ///     connected to (see <see cref="NavigationContext.ChangeLocationAsync(NavigationContext, CancellationToken)" />).
+    ///     The active pane stays active.
+    /// </summary>
+    private void ShowSameLocationInOtherPane()
+    {
+        var pane = _activePane;
+        var otherPane = GetOtherPane(pane);
+        _ = RunNavigationAsync(otherPane, () => otherPane.NavigationContext.ChangeLocationAsync(pane.NavigationContext));
+    }
+
     private void SwapPanes()
     {
         (_leftPane, _rightPane) = (_rightPane, _leftPane);

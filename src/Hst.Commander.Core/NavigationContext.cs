@@ -264,6 +264,25 @@ public sealed class NavigationContext : IDisposable
         }
     }
 
+    /// <summary>
+    ///     Shows the location of another context, e.g. of the other pane (Ctrl+D), like <see cref="CloneAsync" />:
+    ///     images are opened again and a connected location (e.g. an SMB share) is connected again with its
+    ///     credentials. This context keeps its own settings. The location is unchanged when it can't be opened.
+    /// </summary>
+    public async Task ChangeLocationAsync(NavigationContext other, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(other);
+
+        if (other.ConnectedLocation is { } connection)
+        {
+            await ChangeVolumeProviderAsync(connection, other.CurrentPath, cancellationToken);
+        }
+        else
+        {
+            await ChangeLocationAsync(other._volumeProvider, other.CurrentPath, cancellationToken);
+        }
+    }
+
     /// <summary>Shows the location of a context made by <see cref="CreateChildContext" />, taking its volumes.</summary>
     private void Adopt(NavigationContext context)
     {
