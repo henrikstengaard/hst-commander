@@ -44,7 +44,8 @@ public partial class PaneView : UserControl
         AddHandler(PointerPressedEvent, (_, _) => StopQuickSearch(), RoutingStrategies.Tunnel, true);
         EntriesList.DoubleTapped += async (_, _) => await ActivateSelectedEntryAsync();
         EntriesList.SelectionChanged += (_, _) => UpdateIconSelection();
-        PathBadge.Tapped += (_, _) => PathClicked?.Invoke(this, EventArgs.Empty);
+        // anywhere in the panel, not only on the path, as the path is often short
+        PathPanel.Tapped += (_, _) => PathClicked?.Invoke(this, EventArgs.Empty);
         NameHeader.Tapped += (_, _) => SortBy(EntryColumn.Name);
         SizeHeader.Tapped += (_, _) => SortBy(EntryColumn.Size);
         ModifiedHeader.Tapped += (_, _) => SortBy(EntryColumn.Modified);
@@ -280,7 +281,10 @@ public partial class PaneView : UserControl
     /// <summary>Raised when navigation fails, so the window can show the error.</summary>
     public event EventHandler<Exception>? NavigationFailed;
 
-    /// <summary>Raised when the path is clicked, so the window can show the location dialog.</summary>
+    /// <summary>
+    ///     Raised when the path panel (the path, the marked summary or the disk space) is clicked, so the window can show
+    ///     the location dialog.
+    /// </summary>
     public event EventHandler? PathClicked;
 
     /// <summary>Raised when the entries were sorted by a clicked column header, so the window can save the order.</summary>

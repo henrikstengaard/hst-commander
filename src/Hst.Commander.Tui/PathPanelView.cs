@@ -43,13 +43,16 @@ public sealed class PathPanelView : View
 
     private bool IsHighlighted => IsActive && HighlightWhenActive;
 
-    /// <summary>Raised when the path is clicked, opening the location dialog.</summary>
+    /// <summary>
+    ///     Raised when the panel (the path, the marked summary, the disk space or the border) is clicked, opening the
+    ///     location dialog.
+    /// </summary>
     public event EventHandler? PathClicked;
 
     protected override bool OnMouseEvent(Mouse mouseEvent)
     {
-        // the path is on the first line inside the border
-        if (mouseEvent.Flags.HasFlag(MouseFlags.LeftButtonClicked) && mouseEvent.Position!.Value.Y == 1)
+        // anywhere in the panel, not only on the path, as the path is often short
+        if (mouseEvent.Flags.HasFlag(MouseFlags.LeftButtonClicked))
         {
             PathClicked?.Invoke(this, EventArgs.Empty);
             return true;
