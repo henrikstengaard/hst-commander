@@ -267,6 +267,8 @@ Terminal.app sends nothing for Shift+F1/Shift+F2 (`cat -v` prints nothing for th
 
 Ctrl+F1/Ctrl+F2 can't be used: macOS takes them (keyboard navigation and focusing the menu bar).
 
+Terminal.app also sends plain Up and Down for Shift+Up/Shift+Down, so the TUI moves the cursor without marking entries (Insert and Space still mark them; iTerm2 sends Shift+Up/Shift+Down without setup). To mark with Shift and the arrows, in Settings > Profiles > Keyboard add Shift+Cursor Up sending `\033[1;2A` and Shift+Cursor Down sending `\033[1;2B`, xterm's sequences for them (if the field keeps `\033` as text, press Esc in it instead).
+
 ## Enter on Files
 
 The `Enter on file` setting is `OpenAsVolume` (the default: detect images, otherwise start the file) or `StartWithHost` (always start files with a host path, e.g. local files, with the host OS; files inside images are still opened as images when detected; Ctrl+PageDown still opens a file as a volume). Both front-ends set `NavigationContext.EnterFileAction` of both panes at startup and when the settings are saved.
