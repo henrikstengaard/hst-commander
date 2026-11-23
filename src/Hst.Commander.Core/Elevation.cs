@@ -19,6 +19,15 @@ public static class Elevation
     /// <summary>Exit code of pkexec when the user dismisses the password dialog or isn't allowed.</summary>
     private const int PkexecNotAuthorized = 126;
 
+    /// <summary>
+    ///     osascript of macOS, running a shell command as root with <c>do shell script</c>, where macOS asks for an
+    ///     administrator's password in its own dialog.
+    /// </summary>
+    private const string OsascriptPath = "/usr/bin/osascript";
+
+    /// <summary>AppleScript error number when the user cancels the password dialog.</summary>
+    private const string UserCanceledError = "(-128)";
+
     /// <summary>Paths pkexec is looked for at.</summary>
     private static readonly string[] PkexecPaths = ["/usr/bin/pkexec", "/bin/pkexec", "/usr/local/bin/pkexec"];
 
@@ -43,10 +52,12 @@ public static class Elevation
 
     /// <summary>
     ///     True when the GUI can start Hst Commander as administrator (<see cref="StartAsAdministratorAsync" />): with UAC
-    ///     on Windows and with pkexec on Linux, which asks for the password with the desktop's polkit agent.
+    ///     on Windows, with pkexec on Linux, which asks for the password with the desktop's polkit agent, and with
+    ///     osascript on macOS, which asks for it in macOS's own dialog.
     /// </summary>
     public static bool CanStartAsAdministrator =>
-        OperatingSystem.IsWindows() || (OperatingSystem.IsLinux() && FindPkexec() != null);
+        OperatingSystem.IsWindows() || (OperatingSystem.IsLinux() && FindPkexec() != null) ||
+        (OperatingSystem.IsMacOS() && File.Exists(OsascriptPath));
 
     /// <summary>True when choosing a volume provider should offer to restart as administrator.</summary>
     public static bool NeedsRestart(IVolumeProvider volumeProvider) =>
@@ -62,7 +73,7 @@ public static class Elevation
 
     /// <summary>
     ///     Message shown when choosing a volume provider that needs administrator rights and Hst Commander can't restart
-    ///     itself, e.g. the GUI on macOS and on Linux without pkexec.
+    ///     itself, e.g. the GUI on Linux without pkexec.
     /// </summary>
     public static string GetRestartManuallyMessage(IVolumeProvider volumeProvider) =>
         $"{volumeProvider.Name} needs root rights. Start {AppInfo.Current.Name} as root, e.g. with sudo, to open them.";
@@ -101,13 +112,18 @@ public static class Elevation
 
     /// <summary>
     ///     Starts this program again as administrator: with UAC on Windows (<see cref="StartAsAdministrator" />) and with
-    ///     pkexec on Linux, returning true once the password is given and the program runs as root, or false when the
-    ///     password dialog is dismissed. The caller quits after it's started. Throws <see cref="IOException" /> when it
-    ///     can't be started, e.g. without a polkit agent.
+    ///     pkexec on Linux or osascript on macOS, returning true once the password is given and the program runs as root,
+    ///     or false when the password dialog is dismissed. The caller quits after it's started. Throws
+    ///     <see cref="IOException" /> when it can't be started, e.g. without a polkit agent.
     /// </summary>
     public static async Task<bool> StartAsAdministratorAsync(StartupOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
+
+        if (OperatingSystem.IsMacOS())
+        {
+            return await StartAsRootWithOsascriptAsync(options);
+        }
 
         if (!OperatingSystem.IsLinux())
         {
@@ -154,6 +170,71 @@ public static class Elevation
     }
 
     private static string? FindPkexec() => PkexecPaths.FirstOrDefault(File.Exists);
+
+    /// <summary>
+    ///     Starts this program as root on macOS with osascript's <c>do shell script ... with administrator
+    ///     privileges</c>, where macOS asks for an administrator's password. The program runs in the background, so
+    ///     osascript exits once it's started. Returns false when the password dialog is cancelled.
+    /// </summary>
+    private static async Task<bool> StartAsRootWithOsascriptAsync(StartupOptions options)
+    {
+        var (fileName, arguments) = GetProgram(options);
+        var startInfo = new ProcessStartInfo(OsascriptPath, ["-e", GetAdministratorScript(fileName, arguments)])
+        {
+            UseShellExecute = false,
+            RedirectStandardError = true,
+            RedirectStandardOutput = true,
+            WorkingDirectory = Environment.CurrentDirectory
+        };
+
+        Process process;
+        try
+        {
+            process = Process.Start(startInfo) ?? throw new Win32Exception("osascript can't be started");
+        }
+        catch (Win32Exception exception)
+        {
+            throw new IOException($"{AppInfo.Current.Name} can't be started as root: {exception.Message}", exception);
+        }
+
+        using (process)
+        {
+            var error = process.StandardError.ReadToEndAsync();
+            await process.StandardOutput.ReadToEndAsync();
+            await process.WaitForExitAsync();
+            var message = (await error).Trim();
+            if (process.ExitCode == 0)
+            {
+                return true;
+            }
+
+            return message.Contains(UserCanceledError, StringComparison.Ordinal)
+                ? false
+                : throw new IOException($"{AppInfo.Current.Name} can't be started as root: {message}");
+        }
+    }
+
+    /// <summary>
+    ///     AppleScript running a program with its arguments as root in the background with <c>do shell script</c>, its
+    ///     output discarded so osascript doesn't wait for it, e.g.
+    ///     <c>do shell script "'/Applications/Hst Commander.app/Contents/MacOS/hst.commander.gui' --active right &gt;
+    ///     /dev/null 2&gt;&amp;1 &amp;" with prompt "..." with administrator privileges</c>.
+    /// </summary>
+    public static string GetAdministratorScript(string fileName, IEnumerable<string> arguments)
+    {
+        var command = string.Join(' ', new[] { fileName }.Concat(arguments).Select(QuoteShellArgument)) +
+                      " > /dev/null 2>&1 &";
+        var prompt = $"{AppInfo.Current.Name} restarts as root.";
+        return $"do shell script {QuoteAppleScriptString(command)} with prompt {QuoteAppleScriptString(prompt)} " +
+               "with administrator privileges";
+    }
+
+    /// <summary>Quotes an argument for a POSIX shell in single quotes, e.g. <c>it's</c> as <c>'it'\''s'</c>.</summary>
+    private static string QuoteShellArgument(string argument) => $"'{argument.Replace("'", @"'\''")}'";
+
+    /// <summary>Quotes a text as an AppleScript string, escaping backslashes and double quotes.</summary>
+    private static string QuoteAppleScriptString(string text) =>
+        $"\"{text.Replace(@"\", @"\\").Replace("\"", "\\\"")}\"";
 
     /// <summary>
     ///     The display variables that are set, with the user's Xauthority file when <c>XAUTHORITY</c> isn't set, as root
