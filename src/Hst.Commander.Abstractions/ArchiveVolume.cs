@@ -56,6 +56,8 @@ public abstract class ArchiveVolume<TArchiveEntry> : IVolume
         AmigaMetadata? amigaMetadata = null, bool isDirectory = false)
     {
         ArgumentNullException.ThrowIfNull(path);
+        // counted while the volume is opened, which can be cancelled then (see VolumeOpening)
+        VolumeOpening.ReportEntryRead();
 
         var pathComponents = path
             .Split(['/', '\\'], StringSplitOptions.RemoveEmptyEntries)

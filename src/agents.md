@@ -48,7 +48,7 @@ src/
   install/                      One-line install scripts for the TUI and SMB plugin from a release (install.ps1, install.sh), attached to releases
   publish/                      Local publish scripts for testing, PowerShell and bash per platform (output in publish/ at the root, ignored)
   icon/                         App icon sources, rendered sizes and make scripts
-  Hst.Commander.Abstractions/   Plugin API: IVolume, IEntry, IVolumeProvider, IFileVolumeProvider, IPlugin, IPluginHost, IWriteCache, ITheme, ..., Paths and the ArchiveVolume<T> base class (no external deps)
+  Hst.Commander.Abstractions/   Plugin API: IVolume, IEntry, IVolumeProvider, IFileVolumeProvider, IPlugin, IPluginHost, IWriteCache, ITheme, ..., Paths, the ArchiveVolume<T> base class and VolumeOpening (entries read while opening) (no external deps)
   Hst.Commander.Plugins.Zip/    Zip archives (default plugin)
   Hst.Commander.Plugins.LhaLzx/ Lha and lzx archives (default plugin)
   Hst.Commander.Plugins.RarSevenZip/ Rar and 7z archives (default plugin)

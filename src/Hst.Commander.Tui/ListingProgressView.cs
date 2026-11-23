@@ -68,7 +68,35 @@ public sealed class ListingProgressView : View, IProgressIndicator
         _cancelButton.Enabled = true;
         Height = 5;
         ShowMessage(message, Math.Max(ProgressWidth, message.Length + 6));
+        // the view can only pass the focus to the button while it can have the focus itself
+        CanFocus = true;
         _cancelButton.SetFocus();
+    }
+
+    public void ShowIndeterminate(string message, Action cancel)
+    {
+        _cancel = cancel;
+        _progressBar.Visible = false;
+        _cancelButton.Visible = true;
+        _cancelButton.Enabled = true;
+        Height = 5;
+        ShowMessage(message, Math.Max(ProgressWidth, message.Length + 6));
+        // the view can only pass the focus to the button while it can have the focus itself
+        CanFocus = true;
+        _cancelButton.SetFocus();
+    }
+
+    public void ReportMessage(string message)
+    {
+        if (!Visible || _cancel == null)
+        {
+            return;
+        }
+
+        // drawn by the main loop, as the message changes often
+        _label.Text = message;
+        Width = Math.Max(Frame.Width, message.Length + 6);
+        SuperView?.SetNeedsLayout();
     }
 
     public void Report(double fraction)
@@ -90,6 +118,7 @@ public sealed class ListingProgressView : View, IProgressIndicator
         _progressBar.Visible = false;
         _cancelButton.Visible = false;
         Visible = false;
+        CanFocus = false;
         SuperView?.SetNeedsLayout();
         if (hadCancel)
         {
