@@ -45,6 +45,8 @@ public partial class MainWindow : Window
         LeftPane.NavigationContext = new NavigationContext(initialPath);
         RightPane.NavigationContext = new NavigationContext(initialPath);
         ApplyEnterFileAction(settings.EnterFileAction);
+        LeftPane.NavigationContext.DetectVolumeFiles = settings.DetectVolumeFiles;
+        RightPane.NavigationContext.DetectVolumeFiles = settings.DetectVolumeFiles;
         ApplyUaeMetadata(settings.UaeMetadata);
         ApplyTemporaryCopyLimit(settings.TemporaryCopyLimitBytes);
         _editorSettings = settings;
@@ -633,6 +635,23 @@ public partial class MainWindow : Window
     {
         LeftPane.NavigationContext.EnterFileAction = action;
         RightPane.NavigationContext.EnterFileAction = action;
+    }
+
+    /// <summary>
+    ///     Sets whether both panes detect which listed files can be opened as volumes, listing them again when it
+    ///     changes, so the arrows are shown or removed.
+    /// </summary>
+    private async Task ApplyDetectVolumeFilesAsync(bool detect)
+    {
+        var changed = LeftPane.NavigationContext.DetectVolumeFiles != detect;
+        LeftPane.NavigationContext.DetectVolumeFiles = detect;
+        RightPane.NavigationContext.DetectVolumeFiles = detect;
+        if (changed)
+        {
+            await LeftPane.RefreshEntriesAsync();
+            await RightPane.RefreshEntriesAsync();
+            _activePane.FocusEntries();
+        }
     }
 
     /// <summary>Sets the largest file both panes copy to a temporary file to open it.</summary>
@@ -1778,6 +1797,7 @@ public partial class MainWindow : Window
         ApplyAppearance(Themes.Find(settings.Theme), settings.FontFamily, settings.FontSize);
         ApplyVolumeProviderKeys(settings.EffectiveVolumeProviderKeys);
         ApplyEnterFileAction(settings.EnterFileAction);
+        await ApplyDetectVolumeFilesAsync(settings.DetectVolumeFiles);
         ApplyUaeMetadata(settings.UaeMetadata);
         ApplyTemporaryCopyLimit(settings.TemporaryCopyLimitBytes);
         _editorSettings = settings;

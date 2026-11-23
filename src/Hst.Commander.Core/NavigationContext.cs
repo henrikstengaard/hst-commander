@@ -231,6 +231,7 @@ public sealed class NavigationContext : IDisposable
             TemporaryCopyLimit = TemporaryCopyLimit,
             ProgressIndicator = ProgressIndicator,
             EnterFileAction = EnterFileAction,
+            DetectVolumeFiles = DetectVolumeFiles,
             UaeMetadata = UaeMetadata,
             _connectedLocation = _connectedLocation
         };
@@ -1205,6 +1206,13 @@ public sealed class NavigationContext : IDisposable
     public EnterFileAction EnterFileAction { get; set; } = EnterFileAction.OpenAsVolume;
 
     /// <summary>
+    ///     True when <see cref="DetectVolumeFilesAsync" /> reads the listed files to show which can be opened as volumes
+    ///     (default). When false, nothing is read in the background; <see cref="OpenEntryAsync" /> still opens files
+    ///     detected by a file volume provider as volumes.
+    /// </summary>
+    public bool DetectVolumeFiles { get; set; } = true;
+
+    /// <summary>
     ///     How <see cref="CopyAsync" /> and <see cref="MoveAsync" /> store Amiga names, protection bits and comments
     ///     when copying from an Amiga volume to other volumes, e.g. a local directory (see
     ///     <see cref="CopyOptions.UaeMetadata" />).
@@ -1245,7 +1253,8 @@ public sealed class NavigationContext : IDisposable
     ///     each detected file. The files are read on the thread pool from a volume of their own
     ///     (<see cref="OpenLocationAsync" />), so the pane's volume isn't used and navigating needn't wait. Files that
     ///     can't be read or fail detection are not volumes. Stops when cancelled, e.g. when the entries are listed again.
-    ///     Nothing is detected when listed files aren't read (<see cref="ReadsListedFiles" />, e.g. FTP servers).
+    ///     Nothing is detected when listed files aren't read (<see cref="ReadsListedFiles" />, e.g. FTP servers) or
+    ///     detecting is turned off (<see cref="DetectVolumeFiles" />).
     /// </summary>
     public async Task DetectVolumeFilesAsync(IReadOnlyList<IEntry> entries, Action<IEntry> detected,
         CancellationToken cancellationToken = default)
@@ -1254,7 +1263,8 @@ public sealed class NavigationContext : IDisposable
         ArgumentNullException.ThrowIfNull(detected);
 
         var files = entries.Where(entry => entry.Type == EntryType.Item).ToList();
-        if (files.Count == 0 || _fileVolumeProviders.Count == 0 || IsDriveList || !ReadsListedFiles)
+        if (!DetectVolumeFiles || files.Count == 0 || _fileVolumeProviders.Count == 0 || IsDriveList ||
+            !ReadsListedFiles)
         {
             return;
         }

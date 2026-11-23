@@ -87,6 +87,7 @@ public partial class SettingsDialog : Window
         EnterFileActionComboBox.SelectedIndex =
             Math.Max(0, EnterFileActions.All.ToList().IndexOf(settings.EnterFileAction));
         TemporaryCopyLimitUpDown.Value = settings.TemporaryCopyLimit;
+        DetectVolumeFilesCheckBox.IsChecked = settings.DetectVolumeFiles;
         UaeMetadataComboBox.ItemsSource = UaeMetadataFormats.All.Select(UaeMetadataFormats.GetName).ToList();
         UaeMetadataComboBox.SelectedIndex = Math.Max(0, UaeMetadataFormats.All.ToList().IndexOf(settings.UaeMetadata));
         EditorComboBox.ItemsSource = EditorKinds.All.Select(kind => EditorKinds.GetName(kind, false)).ToList();
@@ -124,6 +125,7 @@ public partial class SettingsDialog : Window
                     FontFamily = SelectedFontFamily,
                     FontSize = SelectedFontSize,
                     EnterFileAction = SelectedEnterFileAction,
+                    DetectVolumeFiles = DetectVolumeFilesCheckBox.IsChecked == true,
                     UaeMetadata = SelectedUaeMetadata,
                     TemporaryCopyLimit = (long)Math.Max(0, TemporaryCopyLimitUpDown.Value ?? 0),
                     Editor = SelectedEditor,
