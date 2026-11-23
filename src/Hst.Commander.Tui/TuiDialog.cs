@@ -10,6 +10,14 @@ public class TuiDialog : Dialog
 {
     private Button? _defaultButton;
 
+    /// <summary>
+    ///     Without a shadow: Terminal.Gui 2.5's transparent shadow of dialogs takes its colors from the screen under it,
+    ///     which holds the shadow of the previous frame when the views under the dialog aren't drawn again, so each
+    ///     redraw (e.g. each character typed in a text field) darkened it again and the shadow along the right and
+    ///     bottom border flickered.
+    /// </summary>
+    public TuiDialog() => ShadowStyle = ShadowStyles.None;
+
     /// <summary>Adds a button to the bottom of the dialog, keeping the default button.</summary>
     public new void AddButton(Button button)
     {

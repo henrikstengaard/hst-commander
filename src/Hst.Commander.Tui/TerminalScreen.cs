@@ -212,7 +212,7 @@ public static class TerminalScreen
         if (DateTime.Now - started < ExternalEditor.HandOffTime)
         {
             Console.WriteLine($"Press a key when done editing in {command.Name}...");
-            Console.ReadKey(true);
+            WaitForKey();
         }
 
         return null;
@@ -244,7 +244,19 @@ public static class TerminalScreen
     }
 
     /// <summary>Shows the output screen until a key is pressed (Ctrl+O), like Midnight Commander.</summary>
-    public static void ShowOutput() => Console.ReadKey(true);
+    public static void ShowOutput() => WaitForKey();
+
+    /// <summary>
+    ///     Waits for a key: on Linux and macOS with <see cref="UnixTerminalKey" />, as <see cref="Console.ReadKey(bool)" />
+    ///     would make the programs started afterwards run with the terminal in raw mode.
+    /// </summary>
+    private static void WaitForKey()
+    {
+        if (OperatingSystem.IsWindows() || !UnixTerminalKey.Wait())
+        {
+            Console.ReadKey(true);
+        }
+    }
 
     /// <summary>
     ///     Turns off line input of the Windows console after Terminal.Gui's Init, which keeps it on. With line input
