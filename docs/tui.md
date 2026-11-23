@@ -76,6 +76,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 ## Terminals
 
 - From Windows, run the TUI on a remote machine with the Windows OpenSSH client (`ssh`) in Windows Terminal; it's the tested route. SSH usually doesn't pass on `COLORTERM`, so the TUI uses 16 colors there (see [Terminal.Gui](#terminalgui)).
+- Terminal.app on macOS needs keyboard settings for Shift+F1/Shift+F2 and for marking with Shift+Up/Shift+Down, as it doesn't send these keys by default; see [macOS Terminal](volumes.md#macos-terminal).
 - PuTTY isn't supported, and there's no code for it: it sends `TERM=xterm` like other terminals, and only its answerback to ENQ identifies it.
   - F1-F4 don't work with PuTTY's default keyboard setting, which sends `ESC[11~` to `ESC[14~` instead of xterm's `ESC OP` to `ESC OS` that Terminal.Gui reads. Set Terminal > Keyboard > "The Function keys and keypad" to Xterm R6.
   - Some controls show black text on a black background in PuTTY; the cause isn't known yet.
