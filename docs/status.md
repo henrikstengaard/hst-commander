@@ -48,6 +48,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - Loading plugins at startup from `~/.hst-commander/plugins` and `plugins` next to the executable in both front-ends, showing load errors.
 - Sorting the panes by name, size or modified date by clicking a column header, ascending or descending with ▲ or ▼ in the header, saved in the settings, in both front-ends.
 - Selecting all entries with Ctrl+A (Mark > Select all), selecting (marking) or unselecting a group of entries with + or - (Mark > Select group / Unselect group), using wildcards or a regular expression, and inverting the selection with * (Mark > Invert selection).
+- Starting the GUI maximized (Settings > Appearance > Start maximized).
 - GUI navigation modes (View menu, Ctrl+1 to Ctrl+9): list, thumbnails and the plugins' modes, e.g. the Amiga Workbench with icons at their `.info` positions, which can be dragged, sorted by name and saved, and def icons (`.info` or image files in `~/.hst-commander/plugins/amiga`) for entries without an icon.
 
 - Themes added by plugins in both front-ends, with their own colors, buttons in the bottom area and parent buttons at the outer side of the panes; the default DirectoryOpus plugin's Directory Opus 4 theme has a button bank the user changes in the settings (dragging buttons and columns in the GUI, with keys in the TUI), see [Themes](themes.md).

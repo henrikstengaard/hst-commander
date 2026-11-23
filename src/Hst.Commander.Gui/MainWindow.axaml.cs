@@ -41,6 +41,12 @@ public partial class MainWindow : Window
         _activePane = LeftPane;
         LeftPane.IsActive = true;
         var settings = GuiSettings.Load();
+        // set before the window is shown; changing the setting takes effect on the next start
+        if (settings.StartMaximized)
+        {
+            WindowState = WindowState.Maximized;
+        }
+
         ApplyVolumeProviderKeys(settings.EffectiveVolumeProviderKeys);
         LeftPane.GotFocus += (_, _) => SetActivePane(LeftPane);
         RightPane.GotFocus += (_, _) => SetActivePane(RightPane);

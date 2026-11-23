@@ -6,7 +6,7 @@ Hst Commander is a dual-pane file manager for .NET 10, inspired by Norton Comman
 
 There are two front-ends with the same functionality: a terminal UI (TUI) built with Terminal.Gui v2 and a desktop GUI built with Avalonia 12. Both share `NavigationContext` from Core. The earlier ASP.NET Core + React web prototype has been removed and is no longer relevant.
 
-**Front-end parity:** user-facing features are implemented in both front-ends. Put navigation and volume logic in `Hst.Commander.Core` (e.g. `NavigationContext`) so the TUI and GUI only contain presentation and key handling. Exceptions where a terminal can't do what the GUI does: the TUI has no entry icons, navigation modes or drag and drop, doesn't view images (they are viewed as binary files) and only exchanges clipboard files with other applications on Windows.
+**Front-end parity:** user-facing features are implemented in both front-ends. Put navigation and volume logic in `Hst.Commander.Core` (e.g. `NavigationContext`) so the TUI and GUI only contain presentation and key handling. Exceptions where a terminal can't do what the GUI does: the TUI has no entry icons, navigation modes, drag and drop or start maximized setting (a terminal's window isn't the TUI's), doesn't view images (they are viewed as binary files) and only exchanges clipboard files with other applications on Windows.
 
 ---
 
