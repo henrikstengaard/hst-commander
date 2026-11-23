@@ -143,10 +143,12 @@ public class GivenNavigationContextShowingProperties
                 [false, false, false]
             ]);
 
-            // assert - the setgid bit not shown is kept
-            Assert.Equal(["Owner", "Group", "Others"], properties.FlagGroups.Select(group => group.Label));
-            Assert.Equal([true, true, false], properties.FlagGroups[0].Flags.Select(flag => flag.IsSet));
-            Assert.All(properties.FlagGroups, group => Assert.True(group.CanChange));
+            // assert - the setgid bit not shown is kept (the protection bits after the permissions are unchanged)
+            var permissions = properties.FlagGroups.Where(group => group.Kind == PropertyFlagKind.Permissions)
+                .ToList();
+            Assert.Equal(["Owner", "Group", "Others"], permissions.Select(group => group.Label));
+            Assert.Equal([true, true, false], permissions[0].Flags.Select(flag => flag.IsSet));
+            Assert.All(permissions, group => Assert.True(group.CanChange));
             Assert.True(changed);
             Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
                          UnixFileMode.GroupRead | UnixFileMode.GroupExecute | UnixFileMode.SetGroup,
@@ -176,7 +178,7 @@ public class GivenNavigationContextShowingProperties
             using var navigationContext = new NavigationContext(rootPath);
             var entry = (await navigationContext.ListEntriesAsync()).Single(entry => entry.Name == "a.txt");
             var properties = await navigationContext.GetPropertiesAsync([entry]);
-            var attributes = Assert.Single(properties.FlagGroups);
+            var attributes = Assert.Single(properties.FlagGroups, group => group.Kind == PropertyFlagKind.Attributes);
 
             // act
             var changed = await navigationContext.ChangePropertiesAsync(properties,

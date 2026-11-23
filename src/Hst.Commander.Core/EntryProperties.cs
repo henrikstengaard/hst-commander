@@ -192,10 +192,14 @@ public sealed class EntryProperties
     /// </param>
     /// <param name="tabs">Tabs of the plugins of a single entry.</param>
     /// <param name="context">The single entry given to the tab providers.</param>
+    /// <param name="showProtectionBits">
+    ///     True to show the protection bits of a single entry without Amiga metadata too, as "----rwed" (see
+    ///     <see cref="DefaultAmigaMetadata" />).
+    /// </param>
     internal static EntryProperties Create(IReadOnlyList<IEntry> entries, string location, string? localDirectory,
         bool isDriveList, UaeMetadataNode? uaeMetadata = null, PropertyChanges? changes = null,
         IReadOnlyList<EntryProperty>? iconProperties = null, IReadOnlyList<PropertiesTab>? tabs = null,
-        EntryPropertiesContext? context = null)
+        EntryPropertiesContext? context = null, bool showProtectionBits = false)
     {
         ArgumentNullException.ThrowIfNull(entries);
         if (entries.Count == 0)
@@ -210,9 +214,15 @@ public sealed class EntryProperties
 
         return entries.Count == 1
             ? CreateForEntry(entries[0], location, localDirectory, uaeMetadata, changes ?? PropertyChanges.None,
-                iconProperties ?? []).WithTabs(tabs ?? [], context)
+                iconProperties ?? [], showProtectionBits).WithTabs(tabs ?? [], context)
             : CreateForEntries(entries, location, localDirectory);
     }
+
+    /// <summary>
+    ///     Amiga metadata of entries without any: no comment and the protection bits "----rwed" (0), as the Amiga file
+    ///     systems give new files.
+    /// </summary>
+    public static AmigaMetadata DefaultAmigaMetadata { get; } = new(0, string.Empty);
 
     /// <summary>
     ///     Amiga protection bits as shown by the Amiga List command, e.g. "----rwed": "hspa" when set, "rwed" when
@@ -300,7 +310,8 @@ public sealed class EntryProperties
     }
 
     private static EntryProperties CreateForEntry(IEntry entry, string location, string? localDirectory,
-        UaeMetadataNode? uaeMetadata, PropertyChanges changes, IReadOnlyList<EntryProperty> iconProperties)
+        UaeMetadataNode? uaeMetadata, PropertyChanges changes, IReadOnlyList<EntryProperty> iconProperties,
+        bool showProtectionBits)
     {
         var isContainer = entry.Type == EntryType.Container;
         var info = GetLocalInfo(entry, localDirectory);
@@ -372,8 +383,9 @@ public sealed class EntryProperties
             amigaSection.Add(new Field("Amiga name", uaeMetadata.AmigaName));
         }
 
-        // the comment is shown in a tab of the Amiga plugin
-        if ((entry.AmigaMetadata ?? uaeMetadata?.Metadata) is { } amigaMetadata)
+        // the comment is shown in a tab of the Amiga plugin, for all entries, and so are the protection bits
+        if ((entry.AmigaMetadata ?? uaeMetadata?.Metadata ?? (showProtectionBits ? DefaultAmigaMetadata : null)) is
+            { } amigaMetadata)
         {
             flagGroups.Add(CreateProtectionBitsGroup(amigaMetadata.ProtectionBits, changes.ProtectionBits));
         }
