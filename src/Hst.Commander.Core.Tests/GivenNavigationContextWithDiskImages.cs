@@ -82,7 +82,7 @@ public class GivenNavigationContextWithDiskImages : IDisposable
         await navigationContext.CreateDirectoryAsync("dir1");
         var entry = (await navigationContext.ListEntriesAsync()).Single(entry => entry.Name == "dir1");
         var properties = await navigationContext.GetPropertiesAsync([entry]);
-        var attributes = Assert.Single(properties.FlagGroups);
+        var attributes = Assert.Single(properties.FlagGroups, group => group.Kind == PropertyFlagKind.Attributes);
 
         // act
         var changed = await navigationContext.ChangePropertiesAsync(properties,

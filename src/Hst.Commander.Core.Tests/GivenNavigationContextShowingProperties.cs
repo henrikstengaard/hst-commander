@@ -176,7 +176,7 @@ public class GivenNavigationContextShowingProperties
             using var navigationContext = new NavigationContext(rootPath);
             var entry = (await navigationContext.ListEntriesAsync()).Single(entry => entry.Name == "a.txt");
             var properties = await navigationContext.GetPropertiesAsync([entry]);
-            var attributes = Assert.Single(properties.FlagGroups);
+            var attributes = Assert.Single(properties.FlagGroups, group => group.Kind == PropertyFlagKind.Attributes);
 
             // act
             var changed = await navigationContext.ChangePropertiesAsync(properties,

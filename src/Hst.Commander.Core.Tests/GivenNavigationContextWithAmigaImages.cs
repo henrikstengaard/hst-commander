@@ -945,7 +945,7 @@ public class GivenNavigationContextWithAmigaImages : IDisposable
     }
 
     [Fact]
-    public async Task When_LocalFileHasNoAmigaMetadata_Then_CommentTabHasNoCommentAndCanBeChanged()
+    public async Task When_LocalFileHasNoAmigaMetadata_Then_CommentTabAndDefaultProtectionBitsCanBeChanged()
     {
         // arrange
         await File.WriteAllTextAsync(Path.Combine(_rootPath, "file.txt"), "text");
@@ -958,7 +958,52 @@ public class GivenNavigationContextWithAmigaImages : IDisposable
         var tab = GetTab(properties, "Comment");
         Assert.Null(tab.Text);
         Assert.True(tab.CanChange);
-        Assert.DoesNotContain(properties.FlagGroups, group => group.Label == "Protection bits");
+        Assert.Equal("----rwed", FormatFlags(GetProtectionBits(properties)));
+        Assert.True(GetProtectionBits(properties).CanChange);
+    }
+
+    [Theory]
+    [InlineData(UaeMetadataFormat.UaeFsDb, "_UAEFSDB.___")]
+    [InlineData(UaeMetadataFormat.UaeMetafile, "file.txt.uaem")]
+    public async Task When_ProtectionBitsOfLocalFileWithoutAmigaMetadataAreChanged_Then_UaeMetadataIsCreated(
+        UaeMetadataFormat format, string metadataFileName)
+    {
+        // arrange
+        await File.WriteAllTextAsync(Path.Combine(_rootPath, "file.txt"), "text");
+        using var navigationContext = new NavigationContext(_rootPath) { UaeMetadata = format };
+        var properties = await navigationContext.GetPropertiesAsync([await GetEntryAsync(navigationContext, "file.txt")]);
+
+        // act
+        var changed = await navigationContext.ChangePropertiesAsync(properties,
+            CheckProtectionBits(properties, "-s--rwe-"));
+
+        // assert
+        Assert.True(changed);
+        Assert.True(File.Exists(Path.Combine(_rootPath, metadataFileName)));
+        var changedProperties = await navigationContext.GetPropertiesAsync(
+            [await GetEntryAsync(navigationContext, "file.txt")]);
+        Assert.Equal("-s--rwe-", FormatFlags(GetProtectionBits(changedProperties)));
+        Assert.Null(GetTabText(changedProperties, "Comment"));
+    }
+
+    [Fact]
+    public async Task When_ProtectionBitsAndCommentOfLocalFileAreChangedTogether_Then_BothAreWritten()
+    {
+        // arrange
+        await File.WriteAllTextAsync(Path.Combine(_rootPath, "file.txt"), "text");
+        using var navigationContext = new NavigationContext(_rootPath);
+        var properties = await navigationContext.GetPropertiesAsync([await GetEntryAsync(navigationContext, "file.txt")]);
+
+        // act
+        var changed = await navigationContext.ChangePropertiesAsync(properties,
+            CheckProtectionBits(properties, "--p-rwed"), ChangeTabText(properties, "Comment", "New comment"));
+
+        // assert
+        Assert.True(changed);
+        var changedProperties = await navigationContext.GetPropertiesAsync(
+            [await GetEntryAsync(navigationContext, "file.txt")]);
+        Assert.Equal("--p-rwed", FormatFlags(GetProtectionBits(changedProperties)));
+        Assert.Equal("New comment", GetTabText(changedProperties, "Comment"));
     }
 
     [Fact]
@@ -973,6 +1018,8 @@ public class GivenNavigationContextWithAmigaImages : IDisposable
 
         // assert
         Assert.False(GetTab(properties, "Comment").CanChange);
+        Assert.Equal("----rwed", FormatFlags(GetProtectionBits(properties)));
+        Assert.False(GetProtectionBits(properties).CanChange);
     }
 
     [Theory]

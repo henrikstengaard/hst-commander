@@ -2092,8 +2092,11 @@ public sealed class NavigationContext : IDisposable
                 ? (metadata, token) => SetAmigaMetadataAsync(entry, metadata, token)
                 : null);
         var iconProperties = await ReadIconPropertiesAsync(entry, cancellationToken);
+        // the protection bits are shown for all entries, like the comment tab of the Amiga plugin, while a plugin adds
+        // tabs (entries without Amiga metadata as "----rwed")
         return EntryProperties.Create(entries, CurrentPath, localDirectory, IsDriveList, uaeMetadata, changes,
-            iconProperties, await GetPropertiesTabsAsync(context, cancellationToken), context);
+            iconProperties, await GetPropertiesTabsAsync(context, cancellationToken), context,
+            VolumeProviders.PropertiesTabs.Count > 0);
     }
 
     /// <summary>
@@ -2245,9 +2248,10 @@ public sealed class NavigationContext : IDisposable
 
                     break;
                 }
-                case PropertyFlagKind.ProtectionBits
-                    when properties.Context?.AmigaMetadata is { } metadata:
+                case PropertyFlagKind.ProtectionBits when properties.Context is { } context:
                 {
+                    // entries without Amiga metadata get it with the changed protection bits and no comment
+                    var metadata = context.AmigaMetadata ?? EntryProperties.DefaultAmigaMetadata;
                     var protectionBits = EntryProperties.GetValue(group, metadata.ProtectionBits, isChecked[index]);
                     if (protectionBits == metadata.ProtectionBits)
                     {
@@ -2255,7 +2259,7 @@ public sealed class NavigationContext : IDisposable
                     }
 
                     // through the context, so a comment saved by a tab keeps the changed protection bits
-                    await properties.Context.SetAmigaMetadata(metadata with { ProtectionBits = protectionBits },
+                    await context.SetAmigaMetadata(metadata with { ProtectionBits = protectionBits },
                         cancellationToken);
                     changed = true;
                     break;
