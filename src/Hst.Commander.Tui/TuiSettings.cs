@@ -82,6 +82,12 @@ public sealed record TuiSettings
     /// <summary>Order of the entries of the right pane (see <see cref="EntrySort" />), null for by name ascending.</summary>
     public EntrySort? RightSort { get; init; }
 
+    /// <summary>
+    ///     Where the panes were when last quit, restored on the next start (see
+    ///     <see cref="StartupOptions.WithSavedPanes" />); null when never saved.
+    /// </summary>
+    public PaneLocations? Panes { get; init; }
+
     /// <summary>Keys opening the volume provider lists, the chosen ones or the default of the host operating system.</summary>
     [JsonIgnore]
     public VolumeProviderKeys EffectiveVolumeProviderKeys => VolumeProviderKeys ?? VolumeProviderKeyBindings.Default;

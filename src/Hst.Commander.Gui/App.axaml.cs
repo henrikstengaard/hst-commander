@@ -35,12 +35,16 @@ public partial class App : Application
             var pluginErrors = Core.Plugins.FormatErrors(Core.Plugins.Load());
             // fonts downloaded for themes (e.g. Topaz for Directory Opus 4), before the window uses the theme's font
             GuiFonts.LoadDownloadedFonts();
-            desktop.MainWindow = new MainWindow(Environment.CurrentDirectory)
-            {
-                StartupError = pluginErrors,
-                LastCrashReport = CrashMarker.TakePending(),
-                StartupOptions = StartupOptions.Parse(desktop.Args ?? [])
-            };
+            // both panes start where they were when last quit, see StartupOptions.WithSavedPanes
+            var startupOptions = StartupOptions.Parse(desktop.Args ?? [])
+                .WithSavedPanes(GuiSettings.Load().Panes, true, NavigationContext.HomeDirectory);
+            desktop.MainWindow =
+                new MainWindow(Environment.CurrentDirectory)
+                {
+                    StartupError = pluginErrors,
+                    LastCrashReport = CrashMarker.TakePending(),
+                    StartupOptions = startupOptions
+                };
             CrashHandler.StartTestCrashThread();
         }
 

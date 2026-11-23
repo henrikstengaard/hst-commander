@@ -44,6 +44,105 @@ public class GivenStartupOptions : IDisposable
         Assert.False(options.IsRightActive);
     }
 
+    private static readonly PaneLocations Saved = new(new PaneStartup(null, "/saved/left"),
+        new PaneStartup(PhysicalDiskVolume.VolumeName, "PhysicalDrive1"), true);
+
+    [Fact]
+    public void When_GuiRestoresSavedPanes_Then_BothPanesAndActivePaneAreRestored()
+    {
+        // act
+        var restored = StartupOptions.Parse([]).WithSavedPanes(Saved, true, "/home/me");
+
+        // assert
+        Assert.Equal(Saved.Left, restored.Left);
+        Assert.Equal(Saved.Right, restored.Right);
+        Assert.True(restored.IsRightActive);
+    }
+
+    [Fact]
+    public void When_TuiRestoresSavedPanes_Then_OnlyRightPaneIsRestored()
+    {
+        // act
+        var restored = StartupOptions.Parse([]).WithSavedPanes(Saved, false, "/home/me");
+
+        // assert - the left pane stays in the current directory, and is active
+        Assert.Equal(new PaneStartup(null, null), restored.Left);
+        Assert.Equal(Saved.Right, restored.Right);
+        Assert.False(restored.IsRightActive);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void When_PanesAreGiven_Then_SavedPanesAreNotRestored(bool restoreLeft)
+    {
+        // arrange - e.g. restarted as administrator
+        var options = StartupOptions.Parse(["--left-path", "/elevated"]);
+
+        // act
+        var restored = options.WithSavedPanes(Saved, restoreLeft, "/home/me");
+
+        // assert
+        Assert.Equal(options, restored);
+    }
+
+    [Fact]
+    public void When_PaneWasOnServer_Then_ItStartsInHomeDirectory()
+    {
+        // arrange - a pane connected to an SMB server is saved without a location, as it needs the password
+        var saved = new PaneLocations(new PaneStartup(null, null), new PaneStartup(null, null), false);
+
+        // act
+        var restored = StartupOptions.Parse([]).WithSavedPanes(saved, true, "/home/me");
+
+        // assert
+        Assert.Equal(new PaneStartup(null, "/home/me"), restored.Left);
+        Assert.Equal(new PaneStartup(null, "/home/me"), restored.Right);
+    }
+
+    [Fact]
+    public void When_NothingWasSaved_Then_PanesStartInCurrentDirectory()
+    {
+        // arrange
+        var options = StartupOptions.Parse([]);
+
+        // act
+        var restored = options.WithSavedPanes(null, true, "/home/me");
+
+        // assert
+        Assert.Equal(options, restored);
+    }
+
+    [Fact]
+    public void When_PaneLocationsAreSavedAndLoaded_Then_TheyAreTheSame()
+    {
+        // arrange
+        var options = new System.Text.Json.JsonSerializerOptions { WriteIndented = true };
+
+        // act
+        var json = System.Text.Json.JsonSerializer.Serialize(Saved, options);
+        var loaded = System.Text.Json.JsonSerializer.Deserialize<PaneLocations>(json, options);
+
+        // assert
+        Assert.Equal(Saved, loaded);
+        Assert.DoesNotContain("IsEmpty", json);
+    }
+
+    [Fact]
+    public void When_PaneLocationsAreTakenFromPanes_Then_LocalPaneHasItsPath()
+    {
+        // arrange
+        using var left = new NavigationContext(_rootPath);
+        using var right = new NavigationContext(_rootPath);
+
+        // act
+        var locations = PaneLocations.From(left, right, false);
+
+        // assert
+        Assert.Equal(new PaneLocations(new PaneStartup(null, _rootPath), new PaneStartup(null, _rootPath), false),
+            locations);
+    }
+
     [Fact]
     public void When_OptionsAreCreatedFromPanes_Then_ThePaneChangingVolumeProviderStartsAtItsRoot()
     {

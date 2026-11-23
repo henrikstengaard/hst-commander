@@ -6,7 +6,7 @@ The executable is published as `hst.commander.gui`, on macOS as `Hst Commander.a
 
 ## Features
 
-- Two panes, both starting in the current directory, with the same function key bar, menus and themes as the TUI.
+- Two panes, starting where they were when last quit (see [Restoring the panes](../../docs/application.md#restoring-the-panes)), with the same function key bar, menus and themes as the TUI.
 - Browsing local drives and directories, and images as if they were directories: ISO 9660 images, zip, lha and lzx archives, MBR/GPT disk images with FAT and NTFS partitions, and Amiga adf and RDB hard disk images, also inside other images.
 - Copying, moving, renaming, deleting and making directories between any locations, also into writable images (Amiga adf and RDB images), with progress dialogs, speed and ETA, a filter and overwrite confirmation.
 - Creating volumes provided by plugins, e.g. empty, formatted or bootable Amiga disk files.

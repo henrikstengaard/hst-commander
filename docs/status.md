@@ -23,6 +23,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 
 - Going to the root of the volume with Ctrl+\ or by typing `/` or `\` in both front-ends.
 - Quitting with F10, Ctrl+Q or File > Quit (and Esc in the TUI) after a confirm dialog in both front-ends.
+- Saving where the panes are when quitting and restoring them on the next start (both panes in the GUI; the right pane in the TUI, whose left pane starts in the current directory) in both front-ends.
 - Refreshing the active pane with Ctrl+R and swapping the left and right panes with Ctrl+U (Go > Refresh, Go > Swap panes) in both front-ends.
 - Showing the active pane's location in the other pane with Ctrl+D (Go > Same location in other pane), also inside images and on servers connected to, in both front-ends.
 - Changing location with Ctrl+L or by clicking the path panel (location dialog), including paths into images, and going to the home directory with Ctrl+H.

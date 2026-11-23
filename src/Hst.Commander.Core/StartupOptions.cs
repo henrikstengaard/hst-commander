@@ -26,6 +26,36 @@ public sealed record StartupOptions
     /// <summary>True when the right pane is the active pane, otherwise the left pane is.</summary>
     public bool IsRightActive { get; init; }
 
+    /// <summary>True when a pane's volume provider or location is given, e.g. when restarted as administrator.</summary>
+    public bool HasPaneOptions => !Left.IsEmpty || !Right.IsEmpty;
+
+    /// <summary>
+    ///     Options starting the panes where they were when Hst Commander was last quit (see <see cref="PaneLocations" />),
+    ///     unless panes are given (<see cref="HasPaneOptions" />, e.g. when restarted as administrator), which always
+    ///     win. The GUI restores both panes and the active pane; the TUI only the right pane, as its left pane starts in
+    ///     the current directory, where it was started in the terminal. A pane that was on a volume provider connected
+    ///     to a location (e.g. an SMB server, saved without a location as it needs the password) starts in the home
+    ///     directory. A pane with nothing saved starts in the current directory.
+    /// </summary>
+    /// <param name="saved">Pane locations saved when last quit, null when none were saved.</param>
+    /// <param name="restoreLeft">True to restore the left pane and the active pane too (GUI).</param>
+    /// <param name="homeDirectory">Home directory of the user (see <see cref="NavigationContext.HomeDirectory" />).</param>
+    public StartupOptions WithSavedPanes(PaneLocations? saved, bool restoreLeft, string? homeDirectory)
+    {
+        if (HasPaneOptions || saved == null)
+        {
+            return this;
+        }
+
+        PaneStartup Restore(PaneStartup pane) => pane.IsEmpty ? new PaneStartup(null, homeDirectory) : pane;
+        return this with
+        {
+            Left = restoreLeft ? Restore(saved.Left) : Left,
+            Right = Restore(saved.Right),
+            IsRightActive = restoreLeft && saved.IsRightActive
+        };
+    }
+
     public static StartupOptions Parse(IReadOnlyList<string> args)
     {
         ArgumentNullException.ThrowIfNull(args);
@@ -119,6 +149,10 @@ public sealed record StartupOptions
 /// <summary>Where a pane starts: a volume provider by name (null for Local) and a location in it (null for its start).</summary>
 public sealed record PaneStartup(string? VolumeProviderName, string? Path)
 {
+    /// <summary>True when neither a volume provider nor a location is given, so the pane isn't changed.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IsEmpty => VolumeProviderName == null && Path == null;
+
     /// <summary>
     ///     Where a pane is: its volume provider, unless Local, and its current path. A volume provider connected to a
     ///     location (e.g. an SMB server) isn't listed and needs the credentials entered, so the pane starts locally.
@@ -163,4 +197,18 @@ public sealed record PaneStartup(string? VolumeProviderName, string? Path)
         {
         }
     }
+}
+
+/// <summary>
+///     Where the panes were when Hst Commander was quit, saved in the settings of each front-end and restored on the
+///     next start (see <see cref="StartupOptions.WithSavedPanes" />).
+/// </summary>
+/// <param name="Left">Where the left pane was (see <see cref="PaneStartup.From" />).</param>
+/// <param name="Right">Where the right pane was.</param>
+/// <param name="IsRightActive">True when the right pane was active.</param>
+public sealed record PaneLocations(PaneStartup Left, PaneStartup Right, bool IsRightActive)
+{
+    /// <summary>Where the panes are now, to be saved when quitting.</summary>
+    public static PaneLocations From(NavigationContext left, NavigationContext right, bool isRightActive) =>
+        new(PaneStartup.From(left), PaneStartup.From(right), isRightActive);
 }

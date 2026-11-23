@@ -51,6 +51,7 @@ Copy the list into the release's pull request or an issue and tick it per OS and
 - [ ] Clicking a column header sorts, and the order is kept after a restart; Ctrl+F quick search finds entries; Ctrl+R refreshes and Ctrl+U swaps the panes.
 - [ ] Resizing and maximizing the window keeps the layout: the panes reach the bottom area and the right edge.
 - [ ] Insert/Space, Ctrl+A, `+`, `-` and `*` mark entries, and the panel above the pane summarizes them.
+- [ ] Quitting and starting again restores both panes of the GUI, and the right pane of the TUI with its left pane in the current directory.
 - [ ] The File, Mark, Go and Commands menus (and View in the GUI) run their items; Go > Same location in other pane (Ctrl+D) shows the active pane's location, also inside an archive, in the other pane.
 
 ### Images and archives

@@ -19,6 +19,9 @@ public partial class MainWindow : Window
     private SearchOptions _searchOptions = SearchOptions.Default;
     private SearchResultSort _searchSort = SearchResultSort.Default;
     private bool _quitConfirmed;
+
+    /// <summary>True when the window closes to restart Hst Commander as administrator.</summary>
+    private bool _restarting;
     private GuiSettings _editorSettings = new();
     private readonly CommandLine _commandLine = new();
 
@@ -149,6 +152,12 @@ public partial class MainWindow : Window
         Closed += (_, _) =>
         {
             cutMovedTimer.Stop();
+            // restarting as administrator, the restarted process saves the panes when it quits
+            if (!_restarting)
+            {
+                SavePaneLocations();
+            }
+
             LeftPane.NavigationContext.Dispose();
             RightPane.NavigationContext.Dispose();
         };
@@ -893,8 +902,30 @@ public partial class MainWindow : Window
         }
 
         _quitConfirmed = true;
+        _restarting = true;
         Close();
         return true;
+    }
+
+    /// <summary>
+    ///     Saves where the panes are in the settings, so they start there next time (see
+    ///     <see cref="StartupOptions.WithSavedPanes" />). Called when the window closes, also when the OS shuts down;
+    ///     a failure is only logged, as the window is gone.
+    /// </summary>
+    private void SavePaneLocations()
+    {
+        try
+        {
+            (GuiSettings.Load() with
+            {
+                Panes = PaneLocations.From(LeftPane.NavigationContext, RightPane.NavigationContext,
+                    _activePane == RightPane)
+            }).Save();
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            ErrorLog.Error("Failed to save the pane locations", exception);
+        }
     }
 
     /// <summary>
