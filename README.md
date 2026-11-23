@@ -73,6 +73,7 @@ The keys are the same in both front-ends unless noted. The File menu lists them 
 | Ctrl+\ or / | Go to the root of the volume (typing `/` or `\` works with every keyboard layout) |
 | Ctrl+PageDown | Open a file as a volume |
 | Insert / Space | Mark the entry under the cursor (also Shift+Down / Shift+Up, marking while moving; Terminal.app needs [a keyboard setting](docs/volumes.md#macos-terminal) for them) |
+| Ctrl+A | Mark all entries |
 | + / - / * | Mark / unmark a group of entries, invert the marks |
 | F1 / F2 | Choose the volume provider of the left / right pane (also Alt+F1 / Alt+F2 or Shift+F1 / Shift+F2, configurable in the settings) |
 | F3 | View |

@@ -82,6 +82,7 @@ public partial class MainWindow : Window
         SelectGroupMenuItem.Click += async (_, _) => await SelectGroupAsync(_activePane, true);
         UnselectGroupMenuItem.Click += async (_, _) => await SelectGroupAsync(_activePane, false);
         InvertSelectionMenuItem.Click += (_, _) => InvertSelection(_activePane);
+        SelectAllMenuItem.Click += (_, _) => SelectAll(_activePane);
         SearchMenuItem.Click += async (_, _) => await SearchAsync(_activePane);
         // after the menu has closed and given the focus back
         QuickSearchMenuItem.Click += (_, _) => Dispatcher.UIThread.Post(() => _activePane.StartQuickSearch());
@@ -471,6 +472,11 @@ public partial class MainWindow : Window
 
         switch (e.Key)
         {
+            // only in the panes, text boxes (e.g. the command line) keep their own select all
+            case Key.A when e.KeyModifiers == KeyModifiers.Control && IsPaneFocused():
+                e.Handled = true;
+                SelectAll(_activePane);
+                break;
             // only in the panes, text boxes keep their own clipboard keys
             case Key.C or Key.X or Key.V when e.KeyModifiers == KeyModifiers.Control && IsPaneFocused():
                 e.Handled = true;
@@ -952,6 +958,13 @@ public partial class MainWindow : Window
     private static void InvertSelection(PaneView pane)
     {
         pane.InvertMarks();
+        pane.FocusEntries();
+    }
+
+    /// <summary>Marks all entries of a pane except ".." (Ctrl+A).</summary>
+    private static void SelectAll(PaneView pane)
+    {
+        pane.MarkAll();
         pane.FocusEntries();
     }
 
@@ -1730,8 +1743,7 @@ public partial class MainWindow : Window
                 pane.FocusEntries();
                 break;
             case CommanderActions.SelectAll:
-                pane.MarkAll();
-                pane.FocusEntries();
+                SelectAll(pane);
                 break;
             case CommanderActions.SelectNone:
                 pane.UnmarkAll();
