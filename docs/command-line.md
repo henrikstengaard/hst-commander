@@ -5,7 +5,7 @@ A command line like Midnight Commander's and Total Commander's, in both front-en
 ## Behavior
 
 - **The row:** it sits between the panes and the bottom area (the function key bar or a theme's buttons). Its prompt is just `>`: the active pane's directory, where commands run, is already in the pane's path panel, so the command gets the whole row.
-- **Typing:** Ctrl+T or File > Command line focuses the row. Typing in a pane still does what it did, so `+`, `-`, `*`, Space and Insert keep selecting entries. A terminal can't tell typed text from shortcuts, which is why the row isn't focused while typing in a pane.
+- **Typing:** Ctrl+T or Commands > Command line focuses the row. Typing in a pane still does what it did, so `+`, `-`, `*`, Space and Insert keep selecting entries. A terminal can't tell typed text from shortcuts, which is why the row isn't focused while typing in a pane.
 - **Keeping the command:** the command stays in the row until it runs or is cleared. Esc and Tab go back to the active pane and keep it.
 - **Inserting entries:**
   - Ctrl+Enter inserts the name of the entry under the cursor of the active pane; `..` inserts nothing.

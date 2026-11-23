@@ -63,7 +63,7 @@ Hst Commander comes with two front-ends that have the same functionality:
 
 ## Keys
 
-The keys are the same in both front-ends unless noted. The File menu lists them too.
+The keys are the same in both front-ends unless noted. The menus list them too: File (the file operations, Settings and Quit), Mark (selecting entries), Go (volumes, locations, bookmarks and the panes) and Commands (searching and the command line), plus View in the GUI.
 
 | Key | Action |
 |---|---|

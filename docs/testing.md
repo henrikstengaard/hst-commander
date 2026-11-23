@@ -50,7 +50,8 @@ Copy the list into the release's pull request or an issue and tick it per OS and
 - [ ] Ctrl+L and clicking anywhere on the path panel (also beside the path and on the disk space) change location, also to a path inside an archive.
 - [ ] Clicking a column header sorts, and the order is kept after a restart; Ctrl+F quick search finds entries; Ctrl+R refreshes and Ctrl+U swaps the panes.
 - [ ] Resizing and maximizing the window keeps the layout: the panes reach the bottom area and the right edge.
-- [ ] Insert/Space, `+`, `-` and `*` mark entries, and the panel above the pane summarizes them.
+- [ ] Insert/Space, Ctrl+A, `+`, `-` and `*` mark entries, and the panel above the pane summarizes them.
+- [ ] The File, Mark, Go and Commands menus (and View in the GUI) run their items; Go > Same location in other pane (Ctrl+D) shows the active pane's location, also inside an archive, in the other pane.
 
 ### Images and archives
 
