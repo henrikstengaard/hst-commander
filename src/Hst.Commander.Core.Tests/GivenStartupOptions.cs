@@ -101,4 +101,18 @@ public class GivenStartupOptions : IDisposable
     [InlineData(new[] { "a\"b", "" }, @"""a\""b"" """"")]
     public void When_ArgumentsAreJoinedForWindows_Then_TheyAreQuoted(string[] arguments, string expected) =>
         Assert.Equal(expected, Elevation.JoinWindowsArguments(arguments));
+
+    [Fact]
+    public void When_AdministratorScriptIsMadeForMacOs_Then_ProgramAndArgumentsAreQuotedForShellAndAppleScript()
+    {
+        // act
+        var script = Elevation.GetAdministratorScript("/Applications/Hst Commander.app/Contents/MacOS/hst.commander.gui",
+            ["--left-path", "/Users/me/it's \"here\"", "--active", "right"]);
+
+        // assert
+        Assert.StartsWith(
+            "do shell script \"'/Applications/Hst Commander.app/Contents/MacOS/hst.commander.gui' '--left-path' " +
+            "'/Users/me/it'\\\\''s \\\"here\\\"' '--active' 'right' > /dev/null 2>&1 &\" with prompt \"", script);
+        Assert.EndsWith("\" with administrator privileges", script);
+    }
 }

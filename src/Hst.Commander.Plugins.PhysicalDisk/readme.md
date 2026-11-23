@@ -18,7 +18,7 @@ The cache is 32 MB for each disk opened by default. Change it with `CacheSize` i
 
 ## Access
 
-Choosing Physical disks when Hst Commander isn't running as administrator (root on Linux and macOS) offers to restart it as administrator with the panes where they were: with UAC on Windows, with sudo in the terminal in the TUI on Linux and macOS. The GUI on Linux and macOS says to start it as root. Both front-ends show `Administrator` or `root` in the menu bar while running with these rights.
+Choosing Physical disks when Hst Commander isn't running as administrator (root on Linux and macOS) offers to restart it as administrator with the panes where they were: with UAC on Windows, with sudo in the terminal in the TUI on Linux and macOS, with the desktop's password dialog (pkexec) in the GUI on Linux and with macOS's password dialog (osascript) in the GUI on macOS. The GUI on Linux without pkexec says to start it as root. Both front-ends show `Administrator` or `root` in the menu bar while running with these rights.
 
 - **Windows**: disks are listed by any user, but only opened as administrator. Windows doesn't allow writing to the sectors of its mounted volumes, so opening a disk for writing locks and dismounts its volumes (e.g. the FAT partition of a USB stick) until the disk is closed; when one can't be locked, e.g. the system drive or a drive with open files, the disk is opened read-only.
 - **Linux**: disks (`/dev/sd*`, `/dev/nvme*`, `/dev/mmcblk*`, `/dev/vd*`, ...) are listed from `/sys/block` and opened as root or as a member of the `disk` group. A disk with a mounted partition is opened read-only.
