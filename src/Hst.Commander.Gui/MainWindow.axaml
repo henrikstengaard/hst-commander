@@ -42,6 +42,7 @@
                     <MenuItem x:Name="AddBookmarkMenuItem" Header="Add _bookmark..." InputGesture="Ctrl+B" />
                     <MenuItem x:Name="RefreshMenuItem" Header="Re_fresh" InputGesture="Ctrl+R" />
                     <MenuItem x:Name="SwapPanesMenuItem" Header="Sw_ap panes" InputGesture="Ctrl+U" />
+                    <MenuItem x:Name="SameLocationMenuItem" Header="Same location in o_ther pane" InputGesture="Ctrl+D" />
                     <MenuItem x:Name="CommandLineMenuItem" Header="Command _line" InputGesture="Ctrl+T" />
                     <Separator />
                     <MenuItem x:Name="SettingsMenuItem" Header="_Settings..." />

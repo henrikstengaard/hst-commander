@@ -24,6 +24,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - Going to the root of the volume with Ctrl+\ or by typing `/` or `\` in both front-ends.
 - Quitting with F10, Ctrl+Q or File > Quit (and Esc in the TUI) after a confirm dialog in both front-ends.
 - Refreshing the active pane with Ctrl+R and swapping the left and right panes with Ctrl+U (File > Refresh, File > Swap panes) in both front-ends.
+- Showing the active pane's location in the other pane with Ctrl+D (File > Same location in other pane), also inside images and on servers connected to, in both front-ends.
 - Changing location with Ctrl+L or by clicking the path panel (location dialog), including paths into images, and going to the home directory with Ctrl+H.
 - Searching for entries with Ctrl+S (File > Search) in both front-ends: by name with wildcards or a regular expression, by contents (text, regular expression or hex values), from any location, in all subdirectories, the current directory or a number of levels, optionally inside images and archives, going to a result in the pane (see [Searching](file-operations.md#searching)).
 - Quick search with Ctrl+F (File > Quick search) in both front-ends: typing moves the cursor to the first entry starting with the text; Up/Down/Ctrl+F go through the matches (see [Quick search](file-operations.md#quick-search)).

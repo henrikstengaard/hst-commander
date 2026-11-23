@@ -93,6 +93,7 @@ public partial class MainWindow : Window
         AddBookmarkMenuItem.Click += async (_, _) => await AddBookmarkAsync(_activePane);
         RefreshMenuItem.Click += async (_, _) => await RefreshAsync(_activePane);
         SwapPanesMenuItem.Click += async (_, _) => await SwapPanesAsync();
+        SameLocationMenuItem.Click += async (_, _) => await ShowSameLocationInOtherPaneAsync();
         CommandLineMenuItem.Click += (_, _) => FocusCommandLine();
         LeftPane.PathClicked += async (_, _) => await ShowLocationAsync(LeftPane);
         RightPane.PathClicked += async (_, _) => await ShowLocationAsync(RightPane);
@@ -231,6 +232,19 @@ public partial class MainWindow : Window
     private static async Task RefreshAsync(PaneView pane)
     {
         await pane.RefreshEntriesAsync();
+        pane.FocusEntries();
+    }
+
+    /// <summary>
+    ///     Shows the location of the active pane in the other pane (Ctrl+D), also inside images and on servers
+    ///     connected to (see <see cref="NavigationContext.ChangeLocationAsync(NavigationContext, CancellationToken)" />).
+    ///     The active pane stays active.
+    /// </summary>
+    private async Task ShowSameLocationInOtherPaneAsync()
+    {
+        var pane = _activePane;
+        var otherPane = pane == LeftPane ? RightPane : LeftPane;
+        await otherPane.ChangeLocationAsync(pane.NavigationContext);
         pane.FocusEntries();
     }
 
@@ -551,6 +565,11 @@ public partial class MainWindow : Window
             case Key.U when e.KeyModifiers == KeyModifiers.Control:
                 e.Handled = true;
                 await SwapPanesAsync();
+                break;
+            // only in the panes, text boxes keep Ctrl+D (e.g. deleting a character on macOS)
+            case Key.D when e.KeyModifiers == KeyModifiers.Control && IsPaneFocused():
+                e.Handled = true;
+                await ShowSameLocationInOtherPaneAsync();
                 break;
             case Key.F3:
                 e.Handled = true;
@@ -1763,6 +1782,9 @@ public partial class MainWindow : Window
                 break;
             case CommanderActions.SwapPanes:
                 await SwapPanesAsync();
+                break;
+            case CommanderActions.SameLocation:
+                await ShowSameLocationInOtherPaneAsync();
                 break;
             case CommanderActions.Location:
                 await ShowLocationAsync(pane);

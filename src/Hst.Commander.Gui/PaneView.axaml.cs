@@ -465,6 +465,13 @@ public partial class PaneView : UserControl
         RunNavigationAsync(() => BookmarkOpener.OpenAsync(NavigationContext, bookmark, BookmarkStore.Default,
             askCredentials, ShowProgress, HideProgress));
 
+    /// <summary>
+    ///     Shows the location of another pane's navigation context (Ctrl+D), see
+    ///     <see cref="NavigationContext.ChangeLocationAsync(NavigationContext, CancellationToken)" />.
+    /// </summary>
+    public Task ChangeLocationAsync(NavigationContext other) =>
+        RunNavigationAsync(() => NavigationContext.ChangeLocationAsync(other));
+
     /// <summary>Changes to a location entered in the location dialog, see <see cref="NavigationContext.ChangeLocationAsync" />.</summary>
     public Task ChangeLocationAsync(string path) =>
         RunNavigationAsync(() => NavigationContext.ChangeLocationAsync(path));
