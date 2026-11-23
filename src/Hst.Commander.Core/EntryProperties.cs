@@ -30,13 +30,15 @@ public sealed record PropertyFlagGroup(string Label, IReadOnlyList<PropertyFlag>
 internal enum PropertyFlagKind
 {
     Attributes,
-    ProtectionBits
+    ProtectionBits,
+    Permissions
 }
 
 /// <summary>What the properties dialog can change of a single entry.</summary>
 /// <param name="Attributes">Attributes the volume can change (<see cref="IVolume.GetChangeableAttributes" />).</param>
 /// <param name="ProtectionBits">True when the Amiga protection bits can be changed.</param>
-internal sealed record PropertyChanges(EntryAttributes Attributes, bool ProtectionBits)
+/// <param name="Permissions">True when the Unix permissions of a local file can be changed (Linux and macOS).</param>
+internal sealed record PropertyChanges(EntryAttributes Attributes, bool ProtectionBits, bool Permissions = false)
 {
     public static PropertyChanges None { get; } = new(EntryAttributes.None, false);
 }
@@ -64,6 +66,19 @@ public sealed class EntryProperties
 
     private const EntryAttributes AllAttributes =
         EntryAttributes.ReadOnly | EntryAttributes.Hidden | EntryAttributes.System | EntryAttributes.Archive;
+
+    /// <summary>
+    ///     Unix permissions of local files on Linux and macOS shown as check boxes, a line for each class with its
+    ///     read, write and execute permissions.
+    /// </summary>
+    private static readonly (string Label, string Who, UnixFileMode Read, UnixFileMode Write, UnixFileMode Execute)[]
+        PermissionClasses =
+        [
+            ("Owner", "The owner", UnixFileMode.UserRead, UnixFileMode.UserWrite, UnixFileMode.UserExecute),
+            ("Group", "Members of the group", UnixFileMode.GroupRead, UnixFileMode.GroupWrite,
+                UnixFileMode.GroupExecute),
+            ("Others", "Everyone else", UnixFileMode.OtherRead, UnixFileMode.OtherWrite, UnixFileMode.OtherExecute)
+        ];
 
     /// <summary>Amiga protection bits shown as check boxes, bits 7 to 0.</summary>
     private static readonly string[] ProtectionBitDescriptions =
@@ -109,8 +124,9 @@ public sealed class EntryProperties
 
     /// <summary>
     ///     Lines of check boxes shown after the sections of a single entry: the attributes of entries with them (e.g.
-    ///     local files, FAT, exFAT and NTFS partitions) and the Amiga protection bits (Amiga volumes, lha/lzx archives and
-    ///     entries with UAE metadata). Empty for several entries and drives.
+    ///     local files on Windows, FAT, exFAT and NTFS partitions), the permissions of the owner, group and others of
+    ///     local files on Linux and macOS, and the Amiga protection bits (Amiga volumes, lha/lzx archives and entries
+    ///     with UAE metadata). Empty for several entries and drives.
     /// </summary>
     public IReadOnlyList<PropertyFlagGroup> FlagGroups { get; }
 
@@ -248,6 +264,25 @@ public sealed class EntryProperties
             Kind = PropertyFlagKind.Attributes
         };
 
+    /// <summary>
+    ///     Lines of check boxes of the read, write and execute permissions of the owner, group and others, e.g. of a
+    ///     local file on Linux and macOS.
+    /// </summary>
+    private static IEnumerable<PropertyFlagGroup> CreatePermissionGroups(UnixFileMode mode, bool canChange) =>
+        PermissionClasses.Select(permissionClass => new PropertyFlagGroup(permissionClass.Label,
+        [
+            CreatePermissionFlag("Read", $"{permissionClass.Who} can read", permissionClass.Read, mode),
+            CreatePermissionFlag("Write", $"{permissionClass.Who} can write", permissionClass.Write, mode),
+            CreatePermissionFlag("Execute", $"{permissionClass.Who} can run the file or open the directory",
+                permissionClass.Execute, mode)
+        ], canChange)
+        {
+            Kind = PropertyFlagKind.Permissions
+        });
+
+    private static PropertyFlag CreatePermissionFlag(string label, string description, UnixFileMode permission,
+        UnixFileMode mode) => new(label, description, mode.HasFlag(permission)) { Value = (int)permission };
+
     private static PropertyFlagGroup CreateProtectionBitsGroup(int protectionBits, bool canChange)
     {
         var letters = FormatProtectionBits(protectionBits);
@@ -297,7 +332,10 @@ public sealed class EntryProperties
         if (info != null)
         {
             // the attributes not shown as check boxes, e.g. compressed or a link
-            var otherAttributes = info.Attributes & ~(FileAttributes)LocalVolume.ChangeableAttributes;
+            // (read-only on Linux and macOS is the write permissions, shown as check boxes)
+            var otherAttributes = info.Attributes & ~(FileAttributes)(OperatingSystem.IsWindows()
+                ? LocalVolume.ChangeableAttributes
+                : EntryAttributes.ReadOnly);
             if (FileSystemDetails.FormatAttributes(otherAttributes) is var otherText && otherText != "None")
             {
                 attributeSection.Add(new Field("Other attributes", otherText));
@@ -309,15 +347,22 @@ public sealed class EntryProperties
             }
         }
 
-        if ((entry.Attributes ?? (info != null ? (EntryAttributes)info.Attributes : null)) is { } attributes)
+        // volumes that can't change attributes show those of DOS/Windows, local files those of the host OS (none on
+        // Linux and macOS, which show the permissions instead)
+        var shownAttributes = changes.Attributes != EntryAttributes.None
+            ? changes.Attributes
+            : info != null
+                ? LocalVolume.ChangeableAttributes
+                : AllAttributes;
+        if ((entry.Attributes ?? (info != null ? (EntryAttributes)info.Attributes : null)) is { } attributes &&
+            shownAttributes != EntryAttributes.None)
         {
-            // volumes that can't change attributes show those of DOS/Windows, local files those of the host OS
-            var shown = changes.Attributes != EntryAttributes.None
-                ? changes.Attributes
-                : info != null
-                    ? LocalVolume.ChangeableAttributes
-                    : AllAttributes;
-            flagGroups.Add(CreateAttributeGroup(attributes & AllAttributes, shown, changes.Attributes));
+            flagGroups.Add(CreateAttributeGroup(attributes & AllAttributes, shownAttributes, changes.Attributes));
+        }
+
+        if (info != null && !OperatingSystem.IsWindows())
+        {
+            flagGroups.AddRange(CreatePermissionGroups(info.UnixFileMode, changes.Permissions));
         }
 
         // Amiga entries and entries with UAE metadata, e.g. copied from an Amiga volume to a local directory

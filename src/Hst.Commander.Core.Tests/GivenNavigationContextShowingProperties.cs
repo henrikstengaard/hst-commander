@@ -115,8 +115,58 @@ public class GivenNavigationContextShowingProperties
     }
 
     [Fact]
+    public async Task When_PermissionsAreCheckedForLocalFile_Then_ModeOfFileIsChanged()
+    {
+        // permissions are only shown on Linux and macOS
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        // arrange
+        var rootPath = CreateTempDirectory();
+        var path = Path.Combine(rootPath, "a.sh");
+        try
+        {
+            await File.WriteAllTextAsync(path, "a");
+            File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead |
+                                       UnixFileMode.OtherRead | UnixFileMode.SetGroup);
+            using var navigationContext = new NavigationContext(rootPath);
+            var entry = (await navigationContext.ListEntriesAsync()).Single(entry => entry.Name == "a.sh");
+            var properties = await navigationContext.GetPropertiesAsync([entry]);
+
+            // act - execute for the owner and group, and no read for others
+            var changed = await navigationContext.ChangePropertiesAsync(properties,
+            [
+                [true, true, true],
+                [true, false, true],
+                [false, false, false]
+            ]);
+
+            // assert - the setgid bit not shown is kept
+            Assert.Equal(["Owner", "Group", "Others"], properties.FlagGroups.Select(group => group.Label));
+            Assert.Equal([true, true, false], properties.FlagGroups[0].Flags.Select(flag => flag.IsSet));
+            Assert.All(properties.FlagGroups, group => Assert.True(group.CanChange));
+            Assert.True(changed);
+            Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
+                         UnixFileMode.GroupRead | UnixFileMode.GroupExecute | UnixFileMode.SetGroup,
+                File.GetUnixFileMode(path));
+        }
+        finally
+        {
+            Directory.Delete(rootPath, true);
+        }
+    }
+
+    [Fact]
     public async Task When_ReadOnlyIsCheckedForLocalFile_Then_FileIsReadOnly()
     {
+        // the attributes of local files are only shown on Windows
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
         // arrange
         var rootPath = CreateTempDirectory();
         var path = Path.Combine(rootPath, "a.txt");
@@ -175,11 +225,12 @@ public class GivenNavigationContextShowingProperties
             Assert.Contains("Created", lines.Keys);
             Assert.Contains("Modified", lines.Keys);
             Assert.Contains("Accessed", lines.Keys);
-            var attributes = Assert.Single(properties.FlagGroups);
-            Assert.Equal("Attributes", attributes.Label);
-            Assert.Equal(OperatingSystem.IsWindows() ? ["Read-only", "Hidden", "System", "Archive"] : ["Read-only"],
-                attributes.Flags.Select(flag => flag.Label));
-            Assert.False(attributes.CanChange);
+            // Linux and macOS show the permissions of the owner, group and others instead of the attributes
+            Assert.Equal(OperatingSystem.IsWindows() ? ["Attributes"] : ["Owner", "Group", "Others"],
+                properties.FlagGroups.Select(group => group.Label));
+            Assert.Equal(OperatingSystem.IsWindows() ? ["Read-only", "Hidden", "System", "Archive"] : ["Read", "Write", "Execute"],
+                properties.FlagGroups[0].Flags.Select(flag => flag.Label));
+            Assert.All(properties.FlagGroups, group => Assert.False(group.CanChange));
             Assert.Equal(OperatingSystem.IsWindows(), lines.ContainsKey("Size on disk"));
             Assert.Equal(!OperatingSystem.IsWindows(), lines.ContainsKey("Permissions"));
             if (OperatingSystem.IsWindows())

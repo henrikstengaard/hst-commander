@@ -719,7 +719,9 @@ public class GivenNavigationContextWithAmigaImages : IDisposable
         Assert.Equal("-s--rwed", FormatFlags(GetProtectionBits(properties)));
         Assert.True(GetProtectionBits(properties).CanChange);
         Assert.Equal("Comment", GetTabText(properties, "Comment"));
-        Assert.Contains(properties.FlagGroups, group => group.Label == "Attributes");
+        // local files have attributes on Windows, permissions on Linux and macOS
+        Assert.Contains(properties.FlagGroups,
+            group => group.Label == (OperatingSystem.IsWindows() ? "Attributes" : "Owner"));
         Assert.DoesNotContain(plainProperties.FlagGroups, group => group.Label == "Protection bits");
     }
 
