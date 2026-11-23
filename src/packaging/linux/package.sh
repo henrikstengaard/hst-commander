@@ -53,7 +53,7 @@ write_desktop_file() {
 Type=Application
 Name=$name
 Comment=$comment
-Exec=$exe
+Exec=$exe --restore-panes
 Icon=$id
 Terminal=$terminal
 Categories=System;FileManager;

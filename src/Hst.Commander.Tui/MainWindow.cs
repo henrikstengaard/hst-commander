@@ -347,6 +347,30 @@ public sealed class MainWindow : Window
         Application.LayoutAndDraw(true);
     }
 
+    /// <summary>True when the window was stopped to restart Hst Commander as administrator.</summary>
+    public bool IsRestarting => _restarting;
+
+    /// <summary>
+    ///     Saves where the panes are in the settings, so they start there next time (see
+    ///     <see cref="StartupOptions.WithSavedPanes" />). Called when quitting; a failure isn't shown, as the TUI has
+    ///     been shut down.
+    /// </summary>
+    public void SavePaneLocations()
+    {
+        try
+        {
+            (TuiSettings.Load() with
+            {
+                Panes = PaneLocations.From(_leftPane.NavigationContext, _rightPane.NavigationContext,
+                    _activePane == _rightPane)
+            }).Save();
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            ErrorLog.Error("Failed to save the pane locations", exception);
+        }
+    }
+
     public void DisposeNavigationContexts()
     {
         _leftPane.VolumeDetection?.Cancel();

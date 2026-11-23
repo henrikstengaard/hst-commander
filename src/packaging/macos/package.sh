@@ -89,6 +89,12 @@ case $app in
   <string>public.app-category.utilities</string>
   <key>NSHighResolutionCapable</key>
   <true/>
+  <!-- Finder and the Dock pass no arguments, so this tells Hst Commander it was started from the app (StartupOptions) -->
+  <key>LSEnvironment</key>
+  <dict>
+    <key>HSTC_LAUNCHED_FROM_APP</key>
+    <string>1</string>
+  </dict>
 </dict>
 </plist>
 EOF
