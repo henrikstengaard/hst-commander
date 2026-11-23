@@ -365,6 +365,70 @@ public class GivenSmbVolume : IDisposable
     }
 
     [Fact]
+    public async Task When_ListingTimesOutOnce_Then_ItIsListedAgainOnANewConnection()
+    {
+        // arrange - e.g. a NAS spinning up its disks
+        using var volume = OpenVolume();
+        await volume.ChangeDirectory(["share"]);
+        _server.Timeouts = 1;
+
+        // act
+        var names = await ListNamesAsync(volume);
+
+        // assert - the connection that timed out is closed without logging off
+        Assert.Equal(["dir1", "file1.txt"], names);
+        Assert.Equal(2, _server.Connections.Count);
+        Assert.True(_server.Connections[0].IsAborted);
+        Assert.False(_server.Connections[1].IsDisposed);
+    }
+
+    [Fact]
+    public async Task When_ChangingDirectoryTimesOutOnce_Then_ItIsChangedOnANewConnection()
+    {
+        // arrange
+        using var volume = OpenVolume();
+        await volume.ChangeDirectory(["share"]);
+        _server.Timeouts = 1;
+
+        // act
+        await volume.ChangeDirectory(["dir1"]);
+
+        // assert
+        Assert.Equal(["share", "dir1"], volume.CurrentPathComponents);
+        Assert.Equal(2, _server.Connections.Count);
+    }
+
+    [Fact]
+    public async Task When_ListingTimesOutAgain_Then_TimeoutIsReported()
+    {
+        // arrange
+        using var volume = OpenVolume();
+        await volume.ChangeDirectory(["share"]);
+        _server.Timeouts = 2;
+
+        // act
+        var exception = await Assert.ThrowsAsync<SmbTimeoutException>(() => ListNamesAsync(volume));
+
+        // assert - an IOException with a message saying why, sent twice
+        Assert.IsAssignableFrom<IOException>(exception);
+        Assert.Contains("didn't answer in time", exception.Message);
+        Assert.Equal(2, _server.Connections.Count);
+    }
+
+    [Fact]
+    public async Task When_CreatingDirectoryTimesOut_Then_ItIsNotSentAgain()
+    {
+        // arrange - requests changing the share aren't sent again, as the first may have been done
+        using var volume = OpenVolume();
+        await volume.ChangeDirectory(["share"]);
+        _server.Timeouts = 1;
+
+        // act and assert
+        await Assert.ThrowsAsync<SmbTimeoutException>(() => volume.CreateContainer("dir2"));
+        Assert.Single(_server.Connections);
+    }
+
+    [Fact]
     public async Task When_ConnectionIsClosedByServer_Then_VolumeConnectsAgain()
     {
         // arrange

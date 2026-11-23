@@ -10,11 +10,18 @@ public sealed class SmbClientConnector : ISmbConnector
     /// <summary>Most bytes read or written with one request, so progress is reported often.</summary>
     private const int MaxTransferSize = 1024 * 1024;
 
+    /// <summary>
+    /// Milliseconds to wait for the response to a request before it fails with STATUS_IO_TIMEOUT. SMBLibrary's default
+    /// of 5 seconds is too short for servers waking up, e.g. a NAS spinning up its disks before it lists a directory,
+    /// also as it doesn't wait longer when the server says it's still working on the request (STATUS_PENDING).
+    /// </summary>
+    public const int ResponseTimeout = 30_000;
+
     public ISmbConnection Connect(string server, VolumeCredentials? credentials)
     {
         ArgumentNullException.ThrowIfNull(server);
 
-        var client = new SMB2Client();
+        var client = new SMB2Client(ResponseTimeout);
         bool connected;
         try
         {
@@ -93,6 +100,14 @@ public sealed class SmbClientConnector : ISmbConnector
             SmbStatus.ThrowIfFailed(status, $"Opening share '{share}'");
             _shares.Add(fileStore);
             return fileStore;
+        }
+
+        public void Abort()
+        {
+            if (client.IsConnected)
+            {
+                client.Disconnect();
+            }
         }
 
         public void Dispose()
