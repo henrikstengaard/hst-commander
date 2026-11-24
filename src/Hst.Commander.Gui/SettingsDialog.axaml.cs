@@ -13,7 +13,7 @@ namespace Hst.Commander.Gui;
 public partial class SettingsDialog : Window
 {
     private const double DefaultWidth = 520;
-    private const double DefaultHeight = 380;
+    private const double DefaultHeight = 430;
     private const double ButtonsWidth = 820;
     private const double ButtonsHeight = 600;
 
@@ -74,6 +74,7 @@ public partial class SettingsDialog : Window
         FontSizeUpDown.Minimum = (decimal)GuiFonts.MinimumSize;
         FontSizeUpDown.Maximum = (decimal)GuiFonts.MaximumSize;
         FontSizeUpDown.Value = settings.FontSize is { } fontSize ? (decimal)fontSize : null;
+        StartMaximizedCheckBox.IsChecked = settings.StartMaximized;
         FontSizeUpDown.ValueChanged += (_, _) => Preview();
         UpdateButtonsTab();
         VolumeProviderKeysComboBox.ItemsSource = VolumeProviderKeyBindings.All
@@ -124,6 +125,7 @@ public partial class SettingsDialog : Window
                     Theme = SelectedTheme.Id,
                     FontFamily = SelectedFontFamily,
                     FontSize = SelectedFontSize,
+                    StartMaximized = StartMaximizedCheckBox.IsChecked == true,
                     EnterFileAction = SelectedEnterFileAction,
                     DetectVolumeFiles = DetectVolumeFilesCheckBox.IsChecked == true,
                     UaeMetadata = SelectedUaeMetadata,
