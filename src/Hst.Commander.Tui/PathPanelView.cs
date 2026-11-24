@@ -1,4 +1,5 @@
 using System.Text;
+using Hst.Commander.Core;
 using TuiAttribute = Terminal.Gui.Drawing.Attribute;
 
 namespace Hst.Commander.Tui;
@@ -10,7 +11,7 @@ namespace Hst.Commander.Tui;
 /// </summary>
 public sealed class PathPanelView : View
 {
-    private const string Ellipsis = "...";
+    private const string Ellipsis = PathText.Ellipsis;
 
     /// <summary>
     ///     Rows used by the panel (top border, path line, summary line and bottom border) and the pane's top border.
@@ -117,11 +118,7 @@ public sealed class PathPanelView : View
             return;
         }
 
-        var text = Path.Length <= contentWidth
-            ? Path
-            : contentWidth <= Ellipsis.Length
-                ? Path[^contentWidth..]
-                : Ellipsis + TrimToSeparator(Path[^(contentWidth - Ellipsis.Length)..]);
+        var text = PathText.Shorten(Path, contentWidth);
 
         SetAttribute(IsActive ? ActivePathAttribute : PathAttribute);
         Move(1, 1);
@@ -166,13 +163,6 @@ public sealed class PathPanelView : View
         {
             AddRune(x, row, GetBorderGlyph(x, width));
         }
-    }
-
-    /// <summary>Drops a partial leading segment so the tail starts at a separator, unless the last segment alone doesn't fit.</summary>
-    private static string TrimToSeparator(string tail)
-    {
-        var separatorIndex = tail.IndexOfAny(['\\', '/']);
-        return separatorIndex > 0 ? tail[separatorIndex..] : tail;
     }
 
     private Rune GetBorderGlyph(int x, int width)
