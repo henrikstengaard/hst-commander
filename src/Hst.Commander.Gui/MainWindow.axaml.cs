@@ -903,9 +903,15 @@ public partial class MainWindow : Window
     ///     Starts Hst Commander as administrator or root with both panes where they are and the same pane active, from
     ///     File > Restart as administrator/root, and closes the window when started.
     /// </summary>
-    private async Task RestartElevatedAsync() =>
-        await StartAsAdministratorAndCloseAsync(StartupOptions.FromPanes(LeftPane.NavigationContext,
-            RightPane.NavigationContext, _activePane == RightPane));
+    private async Task RestartElevatedAsync()
+    {
+        if (await new ConfirmDialog(Elevation.AdministratorName, Elevation.GetRestartMenuQuestion(false), "_Restart",
+                "_Cancel").ShowDialog<bool?>(this) == true)
+        {
+            await StartAsAdministratorAndCloseAsync(StartupOptions.FromPanes(LeftPane.NavigationContext,
+                RightPane.NavigationContext, _activePane == RightPane));
+        }
+    }
 
     /// <summary>
     ///     Starts Hst Commander as administrator with the startup options and closes the window, returning false when

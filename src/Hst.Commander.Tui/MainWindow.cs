@@ -1834,9 +1834,15 @@ public sealed class MainWindow : Window
     ///     Starts Hst Commander as administrator or root with both panes where they are and the same pane active, from
     ///     File > Restart as administrator/root, and quits.
     /// </summary>
-    private void RestartElevated() =>
-        StartAsAdministratorAndQuit(StartupOptions.FromPanes(_leftPane.NavigationContext,
-            _rightPane.NavigationContext, _activePane == _rightPane));
+    private void RestartElevated()
+    {
+        if (TuiMessageBox.Query(Elevation.AdministratorName, Elevation.GetRestartMenuQuestion(), "_Restart",
+                "_Cancel") == 0)
+        {
+            StartAsAdministratorAndQuit(StartupOptions.FromPanes(_leftPane.NavigationContext,
+                _rightPane.NavigationContext, _activePane == _rightPane));
+        }
+    }
 
     /// <summary>
     ///     Starts Hst Commander as administrator with the startup options and quits: on Windows with UAC, elsewhere with
