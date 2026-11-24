@@ -53,8 +53,8 @@ public sealed class MainWindow : Window
         {
             Menus =
             [
-                new MenuBarItem("_File", new MenuItem[]
-                {
+                new MenuBarItem("_File", (MenuItem[])
+                [
                     new("Vie_w...", "F3", ViewInActivePane),
                     new("_Edit...", "F4", EditInActivePane),
                     new("_Copy...", "F5", CopyFromActivePane),
@@ -65,10 +65,14 @@ public sealed class MainWindow : Window
                     new("_Properties...", "Ctrl+P", ShowPropertiesOfActivePane),
                     new("Ope_n as volume", "Ctrl+PgDn", OpenAsVolumeInActivePane),
                     null!,
+                    // hidden when already running as administrator or root
+                    ..(Elevation.IsElevated
+                        ? []
+                        : new MenuItem[] { new(Elevation.RestartMenuText, string.Empty, RestartElevated) }),
                     new("_Settings...", string.Empty, ShowSettings),
                     null!,
                     new("_Quit", "F10/Ctrl+Q", Quit)
-                }),
+                ]),
                 new MenuBarItem("_Mark", new MenuItem[]
                 {
                     new("Select _all", "Ctrl+A", SelectAllInActivePane),
@@ -1822,8 +1826,30 @@ public sealed class MainWindow : Window
     private bool RestartAsAdministrator(Pane pane, IVolumeProvider volumeProvider, string? path = null)
     {
         var isRight = pane == _rightPane;
-        var options = StartupOptions.FromPanes(_leftPane.NavigationContext, _rightPane.NavigationContext, isRight,
-            isRight, volumeProvider, path);
+        return StartAsAdministratorAndQuit(StartupOptions.FromPanes(_leftPane.NavigationContext,
+            _rightPane.NavigationContext, isRight, isRight, volumeProvider, path));
+    }
+
+    /// <summary>
+    ///     Starts Hst Commander as administrator or root with both panes where they are and the same pane active, from
+    ///     File > Restart as administrator/root, and quits.
+    /// </summary>
+    private void RestartElevated()
+    {
+        if (TuiMessageBox.Query(Elevation.AdministratorName, Elevation.GetRestartMenuQuestion(), "_Restart",
+                "_Cancel") == 0)
+        {
+            StartAsAdministratorAndQuit(StartupOptions.FromPanes(_leftPane.NavigationContext,
+                _rightPane.NavigationContext, _activePane == _rightPane));
+        }
+    }
+
+    /// <summary>
+    ///     Starts Hst Commander as administrator with the startup options and quits: on Windows with UAC, elsewhere with
+    ///     sudo in the terminal while the TUI is shut down. Returns false when it isn't started, e.g. UAC is cancelled.
+    /// </summary>
+    private bool StartAsAdministratorAndQuit(StartupOptions options)
+    {
         if (!Elevation.CanRestartWithoutTerminal)
         {
             RequestTerminalAction(new TerminalAction.RestartAsRoot(options));

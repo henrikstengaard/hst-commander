@@ -106,6 +106,9 @@ public partial class MainWindow : Window
         CommandLineMenuItem.Click += (_, _) => FocusCommandLine();
         LeftPane.PathClicked += async (_, _) => await ShowLocationAsync(LeftPane);
         RightPane.PathClicked += async (_, _) => await ShowLocationAsync(RightPane);
+        RestartElevatedMenuItem.Header = Elevation.RestartMenuText;
+        RestartElevatedMenuItem.IsVisible = !Elevation.IsElevated && Elevation.CanStartAsAdministrator;
+        RestartElevatedMenuItem.Click += async (_, _) => await RestartElevatedAsync();
         SettingsMenuItem.Click += async (_, _) => await ShowSettingsAsync();
         QuitMenuItem.Click += (_, _) => Close();
         AboutMenuItem.Click += async (_, _) => await new AboutDialog().ShowDialog(this);
@@ -892,8 +895,30 @@ public partial class MainWindow : Window
         }
 
         var isRight = pane == RightPane;
-        var options = StartupOptions.FromPanes(LeftPane.NavigationContext, RightPane.NavigationContext, isRight,
-            isRight, volumeProvider, path);
+        return await StartAsAdministratorAndCloseAsync(StartupOptions.FromPanes(LeftPane.NavigationContext,
+            RightPane.NavigationContext, isRight, isRight, volumeProvider, path));
+    }
+
+    /// <summary>
+    ///     Starts Hst Commander as administrator or root with both panes where they are and the same pane active, from
+    ///     File > Restart as administrator/root, and closes the window when started.
+    /// </summary>
+    private async Task RestartElevatedAsync()
+    {
+        if (await new ConfirmDialog(Elevation.AdministratorName, Elevation.GetRestartMenuQuestion(false), "_Restart",
+                "_Cancel").ShowDialog<bool?>(this) == true)
+        {
+            await StartAsAdministratorAndCloseAsync(StartupOptions.FromPanes(LeftPane.NavigationContext,
+                RightPane.NavigationContext, _activePane == RightPane));
+        }
+    }
+
+    /// <summary>
+    ///     Starts Hst Commander as administrator with the startup options and closes the window, returning false when
+    ///     it isn't started (the password dialog cancelled) or fails, which is shown.
+    /// </summary>
+    private async Task<bool> StartAsAdministratorAndCloseAsync(StartupOptions options)
+    {
         try
         {
             if (!await Elevation.StartAsAdministratorAsync(options))

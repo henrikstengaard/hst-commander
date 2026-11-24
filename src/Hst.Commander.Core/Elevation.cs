@@ -59,6 +59,13 @@ public static class Elevation
         OperatingSystem.IsWindows() || (OperatingSystem.IsLinux() && FindPkexec() != null) ||
         (OperatingSystem.IsMacOS() && File.Exists(OsascriptPath));
 
+    /// <summary>
+    ///     Text of the File menu item restarting Hst Commander as administrator or root with the panes where they are,
+    ///     shown when not elevated and it can restart itself.
+    /// </summary>
+    public static string RestartMenuText =>
+        OperatingSystem.IsWindows() ? "Restart as _administrator..." : "Restart as _root...";
+
     /// <summary>True when choosing a volume provider should offer to restart as administrator.</summary>
     public static bool NeedsRestart(IVolumeProvider volumeProvider) =>
         volumeProvider.RequiresAdministrator && !IsElevated;
@@ -70,6 +77,13 @@ public static class Elevation
         OperatingSystem.IsWindows()
             ? $"{volumeProvider.Name} needs administrator rights.\n\nRestart {AppInfo.Current.Name} as administrator?"
             : $"{volumeProvider.Name} needs root rights.\n\nRestart {AppInfo.Current.Name} as root{(withSudo ? " with sudo" : string.Empty)}?";
+
+    /// <summary>Question asked by File > Restart as administrator/root before restarting.</summary>
+    /// <param name="withSudo">True when restarted as root with sudo (the TUI), false with pkexec (the GUI).</param>
+    public static string GetRestartMenuQuestion(bool withSudo = true) =>
+        OperatingSystem.IsWindows()
+            ? $"Restart {AppInfo.Current.Name} as administrator?"
+            : $"Restart {AppInfo.Current.Name} as root{(withSudo ? " with sudo" : string.Empty)}?";
 
     /// <summary>
     ///     Message shown when choosing a volume provider that needs administrator rights and Hst Commander can't restart
