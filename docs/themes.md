@@ -69,3 +69,4 @@ Download `Topaz_a1200_v1.0.ttf` from the `ttf` folder of [amigafonts](https://gi
 
 Then restart Hst Commander.
 - The user's buttons are saved in `buttons.json` in the plugin's directory (`~/.hst-commander/plugins/directoryopus`, from `IPluginHost.GetPluginDirectory`), so the TUI and GUI share them. A missing or invalid file gives the default bank.
+- The plugin's `readme.md` describes the theme, changing the buttons and getting the font for users.

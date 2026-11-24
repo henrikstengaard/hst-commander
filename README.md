@@ -182,7 +182,7 @@ Local builds include the SMB plugin. See [docs/application.md](docs/application.
 | [`Hst.Commander.Plugins.Amiga`](src/Hst.Commander.Plugins.Amiga/readme.md) | Amiga adf, RDB and partition images, `.info` icons, Workbench navigation mode, Amiga pictures, comment and tooltypes tabs (default plugin) |
 | [`Hst.Commander.Plugins.PhysicalDisk`](src/Hst.Commander.Plugins.PhysicalDisk/readme.md) | Internal and external physical disks, opened like disk images (default plugin) |
 | [`Hst.Commander.Plugins.Ftp`](src/Hst.Commander.Plugins.Ftp/readme.md) | FTP, FTPS and SFTP servers (default plugin) |
-| [`Hst.Commander.Plugins.DirectoryOpus`](docs/themes.md) | Directory Opus 4 theme with a customizable button bank (default plugin) |
+| [`Hst.Commander.Plugins.DirectoryOpus`](src/Hst.Commander.Plugins.DirectoryOpus/readme.md) | Directory Opus 4 theme with a customizable button bank (default plugin) |
 | [`Hst.Commander.Plugins.Smb`](src/Hst.Commander.Plugins.Smb/readme.md) | Windows file shares and other SMB 2/3 servers (external plugin, released separately) |
 | [`Hst.Commander.Core.Tests`](src/Hst.Commander.Core.Tests/readme.md) | Unit tests |
 
