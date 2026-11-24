@@ -11,7 +11,8 @@ publish_dir=$(realpath "$4")
 mkdir -p "$5"
 output_dir=$(realpath "$5")
 script_dir=$(cd "$(dirname "$0")" && pwd)
-icon=$script_dir/../../icon/hst-commander-512x512.png
+icon_dir=$script_dir/../../icon
+icon=$icon_dir/hst-commander-512x512.png
 
 case $app in
   tui)
@@ -21,6 +22,9 @@ case $app in
     comment="Dual-pane file manager for the terminal"
     terminal=true
     wm_class=""
+    # appstream component of the deb's metainfo, shown by software centers like ubuntu's app center
+    component_type=console-application
+    component_id=io.github.henrikstengaard.hstcommander.tui
     extra_depends=""
     ;;
   gui)
@@ -32,6 +36,8 @@ case $app in
     # the window class the gui sets (X11PlatformOptions.WmClass in Program.cs), so desktops show its window with this
     # desktop file's icon, e.g. in the Ubuntu dock
     wm_class=$id
+    component_type=desktop-application
+    component_id=io.github.henrikstengaard.hstcommander
     extra_depends=", libx11-6, libice6, libsm6, libfontconfig1"
     ;;
   *) echo "Unknown app '$app'" >&2; exit 1 ;;
@@ -85,15 +91,63 @@ if [ "$app" = tui ]; then
   tar -czf "$output_dir/hst-commander.$app.$rid.tar.gz" -C "$publish_dir" .
 fi
 
+# appstream metainfo of the deb, which software centers like ubuntu's app center read for the name, summary,
+# description and icon (the stock icon is looked up in the hicolor theme by name)
+write_metainfo() {
+  cat > "$1" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="$component_type">
+  <id>$component_id</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>$name</name>
+  <summary>$comment</summary>
+  <description>
+    <p>
+      Dual-pane file manager inspired by Norton Commander and Midnight Commander, browsing local directories,
+      images and archives (ISO 9660, Amiga adf and RDB, disk images, zip, lha, lzx, rar and 7z), physical disks and
+      FTP and SFTP servers in the same panes.
+    </p>
+  </description>
+  <developer id="io.github.henrikstengaard">
+    <name>Henrik Nørfjand Stengaard</name>
+  </developer>
+  <launchable type="desktop-id">$id.desktop</launchable>
+  <icon type="stock">$id</icon>
+  <url type="homepage">https://github.com/henrikstengaard/hst-commander</url>
+  <url type="bugtracker">https://github.com/henrikstengaard/hst-commander/issues</url>
+  <categories>
+    <category>System</category>
+    <category>FileManager</category>
+  </categories>
+  <provides>
+    <binary>$exe</binary>
+  </provides>
+  <content_rating type="oars-1.1" />
+  <releases>
+    <release version="$version" date="$(date -u +%Y-%m-%d)" />
+  </releases>
+</component>
+EOF
+}
+
 # deb, named by the runtime like the other packages (x64 rather than debian's amd64)
 root=$work/deb
-mkdir -p "$root/DEBIAN" "$root/usr/lib/$id" "$root/usr/bin" "$root/usr/share/applications" "$root/usr/share/icons/hicolor/512x512/apps"
+mkdir -p "$root/DEBIAN" "$root/usr/lib/$id" "$root/usr/bin" "$root/usr/share/applications" "$root/usr/share/metainfo"
 cp -a "$publish_dir/." "$root/usr/lib/$id/"
 chmod 755 "$root/usr/lib/$id/$exe"
 ln -s "../lib/$id/$exe" "$root/usr/bin/$exe"
 write_desktop_file "$root/usr/share/applications/$id.desktop"
-cp "$icon" "$root/usr/share/icons/hicolor/512x512/apps/$id.png"
-chmod 644 "$root/usr/share/applications/$id.desktop" "$root/usr/share/icons/hicolor/512x512/apps/$id.png"
+write_metainfo "$root/usr/share/metainfo/$component_id.metainfo.xml"
+# the icon in the sizes of the hicolor theme and as svg, as desktops and software centers pick a size of their own
+for size in 16 32 48 64 128 192 256 512; do
+  mkdir -p "$root/usr/share/icons/hicolor/${size}x${size}/apps"
+  cp "$icon_dir/hst-commander-${size}x${size}.png" "$root/usr/share/icons/hicolor/${size}x${size}/apps/$id.png"
+done
+mkdir -p "$root/usr/share/icons/hicolor/scalable/apps"
+cp "$icon_dir/hst-commander.svg" "$root/usr/share/icons/hicolor/scalable/apps/$id.svg"
+find "$root/usr/share" -type f -exec chmod 644 {} +
+find "$root/usr/share" -type d -exec chmod 755 {} +
 installed_size=$(du -sk "$root/usr" | cut -f1)
 cat > "$root/DEBIAN/control" <<EOF
 Package: $id
