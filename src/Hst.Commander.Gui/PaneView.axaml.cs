@@ -3,7 +3,9 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Templates;
 using Avalonia.Input;
+using System.Globalization;
 using Avalonia.Interactivity;
+using Avalonia.Media;
 using Hst.Commander.Core;
 using Hst.Commander.Abstractions;
 using Hst.Commander.Gui.Icons;
@@ -34,6 +36,14 @@ public partial class PaneView : UserControl
         InitializeComponent();
         UpdateColumnWidths();
         ListingCancelButton.Click += (_, _) => CancelProgress();
+        // the message is shortened to the pane's width again when it changes
+        PropertyChanged += (_, e) =>
+        {
+            if (e.Property == BoundsProperty && ListingProgress.IsVisible)
+            {
+                FitProgressMessage();
+            }
+        };
         InitializeContextMenu();
 
         _listItemTemplate = EntriesList.ItemTemplate;
@@ -304,7 +314,7 @@ public partial class PaneView : UserControl
     private void ShowProgress(string message)
     {
         _progressCancel = null;
-        ListingProgressText.Text = message;
+        SetProgressMessage(message);
         ListingProgressBar.IsIndeterminate = true;
         ListingProgressBar.ShowProgressText = false;
         ListingCancelButton.IsVisible = false;
@@ -323,6 +333,56 @@ public partial class PaneView : UserControl
         }
     }
 
+    /// <summary>Message of the progress before it's shortened to fit the pane.</summary>
+    private string _progressMessage = string.Empty;
+
+    /// <summary>Space left and right of the progress message: the progress's padding and border and a margin.</summary>
+    private const double ProgressMessageMargin = 2 * (16 + 1 + 12);
+
+    private void SetProgressMessage(string message)
+    {
+        _progressMessage = message;
+        FitProgressMessage();
+    }
+
+    /// <summary>
+    ///     Shows the progress message shortened to the pane's width, e.g. "Reading ...\games\whdload..." for a long path,
+    ///     like the path panel above the pane.
+    /// </summary>
+    private void FitProgressMessage()
+    {
+        var message = _progressMessage;
+        var maxWidth = Bounds.Width - ProgressMessageMargin;
+        if (maxWidth <= 0 || MeasureProgressText(message) <= maxWidth)
+        {
+            ListingProgressText.Text = message;
+            return;
+        }
+
+        // the longest shortened message that fits
+        var low = 0;
+        var high = message.Length - 1;
+        while (low < high)
+        {
+            var length = (low + high + 1) / 2;
+            if (MeasureProgressText(Core.PathText.ShortenMessage(message, length)) <= maxWidth)
+            {
+                low = length;
+            }
+            else
+            {
+                high = length - 1;
+            }
+        }
+
+        ListingProgressText.Text = Core.PathText.ShortenMessage(message, low);
+    }
+
+    private double MeasureProgressText(string text) =>
+        new FormattedText(text, CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
+            new Typeface(ListingProgressText.FontFamily, ListingProgressText.FontStyle, ListingProgressText.FontWeight),
+            ListingProgressText.FontSize, Brushes.Black).WidthIncludingTrailingWhitespace;
+
     /// <summary>Cancels the progress shown with a cancel button, see <see cref="PaneProgressIndicator" />.</summary>
     private Action? _progressCancel;
 
@@ -334,7 +394,7 @@ public partial class PaneView : UserControl
         }
 
         ListingCancelButton.IsEnabled = false;
-        ListingProgressText.Text = "Cancelling...";
+        SetProgressMessage("Cancelling...");
         cancel();
     }
 
@@ -347,7 +407,7 @@ public partial class PaneView : UserControl
         public void Show(string message, Action cancel)
         {
             pane._progressCancel = cancel;
-            pane.ListingProgressText.Text = message;
+            pane.SetProgressMessage(message);
             pane.ListingProgressBar.IsIndeterminate = false;
             pane.ListingProgressBar.ShowProgressText = true;
             pane.ListingProgressBar.Value = 0;
@@ -368,7 +428,7 @@ public partial class PaneView : UserControl
         {
             if (pane._progressCancel != null && pane.ListingCancelButton.IsEnabled)
             {
-                pane.ListingProgressText.Text = message;
+                pane.SetProgressMessage(message);
             }
         }
 

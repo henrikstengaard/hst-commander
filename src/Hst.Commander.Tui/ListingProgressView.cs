@@ -12,6 +12,9 @@ public sealed class ListingProgressView : View, IProgressIndicator
 {
     private const int ProgressWidth = 40;
 
+    /// <summary>Columns around the message: the border, the spinner and a space on each side.</summary>
+    private const int MessagePadding = 6;
+
     private readonly SpinnerView _spinner;
     private readonly Label _label;
     private readonly ProgressBar _progressBar;
@@ -56,7 +59,7 @@ public sealed class ListingProgressView : View, IProgressIndicator
         _progressBar.Visible = false;
         _cancelButton.Visible = false;
         Height = 3;
-        ShowMessage(message, message.Length + 6);
+        ShowMessage(message, 0);
     }
 
     public void Show(string message, Action cancel)
@@ -67,7 +70,7 @@ public sealed class ListingProgressView : View, IProgressIndicator
         _cancelButton.Visible = true;
         _cancelButton.Enabled = true;
         Height = 5;
-        ShowMessage(message, Math.Max(ProgressWidth, message.Length + 6));
+        ShowMessage(message, ProgressWidth);
         // the view can only pass the focus to the button while it can have the focus itself
         CanFocus = true;
         _cancelButton.SetFocus();
@@ -80,7 +83,7 @@ public sealed class ListingProgressView : View, IProgressIndicator
         _cancelButton.Visible = true;
         _cancelButton.Enabled = true;
         Height = 5;
-        ShowMessage(message, Math.Max(ProgressWidth, message.Length + 6));
+        ShowMessage(message, ProgressWidth);
         // the view can only pass the focus to the button while it can have the focus itself
         CanFocus = true;
         _cancelButton.SetFocus();
@@ -94,8 +97,9 @@ public sealed class ListingProgressView : View, IProgressIndicator
         }
 
         // drawn by the main loop, as the message changes often
-        _label.Text = message;
-        Width = Math.Max(Frame.Width, message.Length + 6);
+        var text = FitMessage(message);
+        _label.Text = text;
+        Width = Math.Min(Math.Max(Frame.Width, text.Length + MessagePadding), PaneWidth);
         SuperView?.SetNeedsLayout();
     }
 
@@ -128,15 +132,28 @@ public sealed class ListingProgressView : View, IProgressIndicator
         Application.LayoutAndDraw(true);
     }
 
-    private void ShowMessage(string message, int width)
+    /// <param name="message">Message, shortened to fit the pane.</param>
+    /// <param name="minWidth">Width at least, e.g. for the progress bar.</param>
+    private void ShowMessage(string message, int minWidth)
     {
-        _label.Text = message;
-        Width = width;
+        var text = FitMessage(message);
+        _label.Text = text;
+        Width = Math.Min(Math.Max(minWidth, text.Length + MessagePadding), PaneWidth);
         _spinner.AutoSpin = true;
         Visible = true;
         SuperView?.SetNeedsLayout();
         Application.LayoutAndDraw();
     }
+
+    /// <summary>Width of the pane the view is shown in, so it's never wider than the pane.</summary>
+    private int PaneWidth => SuperView is { } superView ? Math.Max(superView.Viewport.Width, MessagePadding + 1) : int.MaxValue;
+
+    /// <summary>
+    ///     The message shortened to fit the pane, e.g. "Reading ...\games\whdload..." for a long path, like the path
+    ///     panel above the pane.
+    /// </summary>
+    private string FitMessage(string message) =>
+        PaneWidth == int.MaxValue ? message : PathText.ShortenMessage(message, PaneWidth - MessagePadding);
 
     private void Cancel()
     {
