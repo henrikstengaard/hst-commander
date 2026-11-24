@@ -27,6 +27,8 @@
                     <MenuItem x:Name="PropertiesMenuItem" Header="_Properties..." InputGesture="Alt+Enter" />
                     <MenuItem x:Name="OpenAsVolumeMenuItem" Header="Ope_n as volume" InputGesture="Ctrl+PageDown" />
                     <Separator />
+                    <!-- header set by the code-behind, hidden when elevated or the GUI can't restart itself -->
+                    <MenuItem x:Name="RestartElevatedMenuItem" />
                     <MenuItem x:Name="SettingsMenuItem" Header="_Settings..." />
                     <Separator />
                     <MenuItem x:Name="QuitMenuItem" Header="_Quit" InputGesture="F10" />

@@ -59,6 +59,13 @@ public static class Elevation
         OperatingSystem.IsWindows() || (OperatingSystem.IsLinux() && FindPkexec() != null) ||
         (OperatingSystem.IsMacOS() && File.Exists(OsascriptPath));
 
+    /// <summary>
+    ///     Text of the File menu item restarting Hst Commander as administrator or root with the panes where they are,
+    ///     shown when not elevated and it can restart itself.
+    /// </summary>
+    public static string RestartMenuText =>
+        OperatingSystem.IsWindows() ? "Restart as _administrator..." : "Restart as _root...";
+
     /// <summary>True when choosing a volume provider should offer to restart as administrator.</summary>
     public static bool NeedsRestart(IVolumeProvider volumeProvider) =>
         volumeProvider.RequiresAdministrator && !IsElevated;

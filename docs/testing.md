@@ -81,6 +81,7 @@ Copy the list into the release's pull request or an issue and tick it per OS and
 - [ ] SMB: copying the plugin from `smb-plugin.zip` to `~/.hst-commander/plugins/` adds SMB to F1/F2 and its notice to Licenses; connecting to a share lists it and copies both ways.
 - [ ] SMB on Windows: `smb-plugin_windows_setup.exe` installs without administrator rights and shows the publisher; the TUI and GUI list SMB, and uninstalling it in Settings > Apps removes it. `-Smb`/`--smb` of the install scripts installs it too.
 - [ ] Ctrl+B bookmarks a local directory and a server location with its password; the bookmark opens after a restart without asking (Windows Credential Manager, macOS Keychain, Linux Secret Service).
+- [ ] File > Restart as administrator (root on Linux and macOS) restarts elevated with both panes where they were and the same pane active; the item is hidden once elevated.
 - [ ] Physical disks: choosing them when not elevated offers to restart as administrator (UAC, sudo, pkexec, macOS's password dialog in the macOS GUI); elevated, the disks are listed with their model and a USB stick opens (copy to it only on a stick that may be erased).
 
 ### Interface
