@@ -62,6 +62,72 @@ Hst Commander comes with two front-ends that have the same functionality:
 - Plugins loaded at startup from `~/.hst-commander/plugins`, adding locations, image formats, volume creators, icons, navigation modes, properties tabs and themes (see the [plugin API](docs/plugin-api.md)).
 - An error log, and unexpected errors offered to be reported as a GitHub issue the user reviews first.
 
+## Screenshots
+
+### Desktop GUI
+
+Local drives and an SMB server in the Midnight Commander theme.
+
+![GUI with local drives and an SMB server in the Midnight Commander theme](assets/hst-commander_gui_1.png)
+
+Local drives and an SMB server in the Light theme.
+
+![GUI with local drives and an SMB server in the Light theme](assets/hst-commander_gui_2.png)
+
+Local drives and an SMB server in the Dark theme.
+
+![GUI with local drives and an SMB server in the Dark theme](assets/hst-commander_gui_3.png)
+
+An Amiga Workbench disk and an RDB partition in list mode.
+
+![GUI showing an Amiga Workbench disk and an RDB partition in list mode](assets/hst-commander_gui_4.png)
+
+An Amiga Workbench disk in thumbnail mode.
+
+![GUI showing an Amiga Workbench disk in thumbnail mode](assets/hst-commander_gui_5.png)
+
+An Amiga Workbench disk in Workbench navigation mode.
+
+![GUI showing an Amiga Workbench disk in Workbench navigation mode](assets/hst-commander_gui_6.png)
+
+Amiga disk files and an RDB partition in the Directory Opus 4 theme.
+
+![GUI showing Amiga disk files and an RDB partition in the Directory Opus 4 theme](assets/hst-commander_gui_7.png)
+
+Properties of an Amiga icon, including its protection bits.
+
+![GUI properties dialog for an Amiga icon](assets/hst-commander_gui_8.png)
+
+The image viewer displaying an Amiga icon.
+
+![GUI image viewer displaying an Amiga icon](assets/hst-commander_gui_9.png)
+
+### Terminal UI
+
+Local drives and an SMB server in the Midnight Commander theme.
+
+![TUI with local drives and an SMB server in the Midnight Commander theme](assets/hst-commander_tui_1.png)
+
+Local drives and an SMB server in the Light theme.
+
+![TUI with local drives and an SMB server in the Light theme](assets/hst-commander_tui_2.png)
+
+Local drives and an SMB server in the Dark theme.
+
+![TUI with local drives and an SMB server in the Dark theme](assets/hst-commander_tui_3.png)
+
+An Amiga Workbench disk and an RDB partition in the Dark theme.
+
+![TUI showing an Amiga Workbench disk and an RDB partition in the Dark theme](assets/hst-commander_tui_4.png)
+
+Amiga disk files and an RDB partition in the Directory Opus 4 theme.
+
+![TUI showing Amiga disk files and an RDB partition in the Directory Opus 4 theme](assets/hst-commander_tui_5.png)
+
+Properties of an Amiga icon, including its protection bits.
+
+![TUI properties dialog for an Amiga icon](assets/hst-commander_tui_6.png)
+
 ## Keys
 
 The keys are the same in both front-ends unless noted. The menus list them too: File (the file operations, Settings and Quit), Mark (selecting entries), Go (volumes, locations, bookmarks and the panes) and Commands (searching and the command line), plus View in the GUI.
