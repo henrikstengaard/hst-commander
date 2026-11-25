@@ -53,7 +53,7 @@ internal static class SharedImages
         SharedImage image;
         try
         {
-            var imageVolume = await fileVolumeProvider.CreateVolume(stream, cancellationToken);
+            var imageVolume = await fileVolumeProvider.CreateVolume(name, stream, cancellationToken);
             image = new SharedImage(id, imageVolume, stream);
         }
         catch

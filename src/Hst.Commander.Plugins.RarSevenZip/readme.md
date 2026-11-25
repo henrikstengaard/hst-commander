@@ -1,10 +1,12 @@
 # Hst.Commander.Plugins.RarSevenZip
 
-The RarSevenZip plugin adds rar and 7z archives to Hst Commander. It is included with Hst Commander by default and references only `Hst.Commander.Abstractions`, using `SharpCompress` (MIT) to read the archives.
+The RarSevenZip plugin adds rar, 7z and tar archives and gzip and xz files to Hst Commander. It is included with Hst Commander by default and references only `Hst.Commander.Abstractions`, using `SharpCompress` (MIT) to read the archives and decompress xz.
 
 ## Features
 
-- **Rar archives** (rar 1.5 to 4 and rar 5) and **7z archives** are opened as volumes with Enter and browsed like directories. They are detected by their contents, regardless of the extension.
+- **Rar archives** (rar 1.5 to 4 and rar 5), **7z archives** and **tar archives** (GNU, POSIX and old v7) are opened as volumes with Enter and browsed like directories. They are detected by their contents, regardless of the extension.
+- **Gzip and xz files**: a compressed tar archive (`.tar.gz`, `.tgz`, `.tar.xz`, `.txz`) opens as the tar archive; any other compressed file opens as a volume holding the decompressed file, e.g. `disk.img` in `disk.img.gz`, which can be copied, viewed and opened in turn (e.g. as a disk image). The file is named by the name gzip stored, or else after the compressed file (xz never stores it).
+- Links in tar archives are listed as empty files that can't be read.
 - Directories are the archive's directory entries plus the directories in the file paths, so archives without directory entries are browsed as well.
 - Files can be copied out of archives, viewed with F3 and opened as images, e.g. an adf inside a 7z archive. Files of solid archives are copied in the archive's order in one pass (see below), so the solid block is decompressed once; opening a single file (e.g. with F3) still decompresses the files before it in its block, which takes long when a large file comes before it.
 - Damaged archives: files are checked against their size and CRC, and errors decompressing them are shown as "File '<name>' can't be decompressed: the archive is damaged", so a copy stops with an error instead of leaving damaged files. In a solid archive, the files after the damage in the same block can't be read either.
@@ -14,7 +16,10 @@ The RarSevenZip plugin adds rar and 7z archives to Hst Commander. It is included
 
 ## Volumes
 
-- `RarFileVolumeProvider` detects rar archives by the signature `Rar!` 1A 07 followed by 00 (rar 4) or 01 00 (rar 5), and `SevenZipFileVolumeProvider` 7z archives by `7z` BC AF 27 1C.
+- `RarFileVolumeProvider` detects rar archives by the signature `Rar!` 1A 07 followed by 00 (rar 4) or 01 00 (rar 5), `SevenZipFileVolumeProvider` 7z archives by `7z` BC AF 27 1C, and `TarFileVolumeProvider` tar archives by their first header block (`TarHeader`: a name and a valid checksum, which also covers v7 archives without the `ustar` magic).
+- `GzipFileVolumeProvider` (1F 8B 08) and `XzFileVolumeProvider` (FD `7zXZ` 00) derive from `CompressedFileVolumeProvider`, which checks whether the decompressed data starts with a tar header: a compressed tar archive is decompressed to a temporary file (`hst-commander-*.tar`, deleted when the volume is disposed), as tar archives are read at the offsets of their files; any other file is a volume with one file, decompressed as it's read, each time from the start of the compressed file (`SharedStream` gives each reader a position of its own). Hst Commander passes the file's name (`IFileVolumeProvider.CreateVolume(name, stream)`) to name the decompressed file.
+- Gzip stores the size modulo 4 GB, so it's shown but not checked. .NET's `GZipStream` checks each complete member but ends a truncated file silently, so `CheckedGzipStream` compares the CRC32 and size of all the data with the trailer at the end of the file and, when they don't match (several members, zeros after the last member or a truncated file), decompresses the file again member by member with `GzipStream` (SharpCompress' raw `DeflateStream`, whose `TotalIn` tells where each trailer is), checking each trailer. Only that check is slower: SharpCompress inflates several times slower than .NET.
+- SharpCompress' `XZStream` stops after the first stream of an xz file, so `XzFileVolumeProvider` finds the streams from the end of the file (footer, index, blocks and padding of each) and decompresses them one after another (`ConcatenatedStream`); the size of the file is the sum of the uncompressed sizes in the indexes.
 - `SharpCompressVolume` derives from `ArchiveVolume<T>` in `Hst.Commander.Abstractions` (without Amiga metadata), browsing the entries of a SharpCompress archive. It disposes the archive with the volume, leaving the stream Hst Commander owns open (`LeaveStreamOpen`).
 - `ArchiveEntryStream` wraps the stream of each file:
   - It reads synchronously, also when read asynchronously: SharpCompress decompresses much slower when read asynchronously (17 times slower for lzma in 7z archives), and Hst Commander copies with asynchronous reads, so copying from an archive took minutes instead of seconds.

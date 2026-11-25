@@ -4,7 +4,8 @@ using SharpCompress.Archives;
 namespace Hst.Commander.Plugins.RarSevenZip;
 
 /// <summary>
-/// Read-only volume browsing the entries of a rar or 7z archive read with SharpCompress. The archive is disposed with
+/// Read-only volume browsing the entries of a rar, 7z or tar archive read with SharpCompress. Links of tar archives
+/// are listed as empty files that can't be read. The archive is disposed with
 /// the volume, leaving the stream owned by Hst Commander open. Files of solid archives are read with a
 /// <see cref="SolidArchiveReader" />, so reading many of them doesn't decompress their solid block over and over.
 /// </summary>
@@ -57,6 +58,11 @@ public class SharpCompressVolume : ArchiveVolume<IArchiveEntry>, IDisposable
     protected override async Task<Stream> OpenArchiveEntry(string name, IArchiveEntry archiveEntry,
         CancellationToken cancellationToken)
     {
+        if (archiveEntry.LinkTarget is { Length: > 0 } linkTarget)
+        {
+            throw new NotSupportedException($"File '{name}' is a link to '{linkTarget}'");
+        }
+
         if (archiveEntry.IsEncrypted)
         {
             throw new NotSupportedException($"File '{name}' is encrypted");

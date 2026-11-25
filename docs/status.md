@@ -6,7 +6,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 
 **Working:**
 - The Terminal.Gui v2 TUI and Avalonia 12 GUI dual-pane browsers, with per-pane navigation and current-directory startup.
-- Local drive/directory listing, parent navigation, and read-only browsing of ISO images, zip archives (the default Zip plugin) lha/lzx archives (the default LhaLzx plugin) and rar/7z archives (the default RarSevenZip plugin) as nested volumes, detected by their magic signature, also inside other images.
+- Local drive/directory listing, parent navigation, and read-only browsing of ISO images, zip archives (the default Zip plugin) lha/lzx archives (the default LhaLzx plugin) and rar/7z/tar archives and gzip/xz files, including compressed tar archives (the default RarSevenZip plugin) as nested volumes, detected by their magic signature, also inside other images.
 - Reading and writing MBR and GPT disk images (raw, VHD, VHDX or VDI; DMG read-only) with FAT, exFAT and NTFS partitions, reading ext2/3/4, XFS, Btrfs, HFS+, SquashFS and UDF partitions, PiStorm RDB partitions (MBR type `0x76`, GPT type `3F82EEBC-87C9-4097-8165-89D6540557C0`) and hybrid MBR/RDB disks, and FAT, exFAT, NTFS (read and write) and ext2/3/4, XFS, Btrfs, HFS+, SquashFS and UDF (read) file systems without a partition table or in a virtual disk image, with the default Disk plugin, working with the Amiga plugin through `IPluginHost`.
 - Reading and writing Amiga disk files (adf, Fast File System) and the partitions (Fast File System, PFS3, SFS) of Amiga hard disk images with a rigid disk block (raw or vhd) with the default Amiga plugin, shared between panes and file operations (see [Writable images](volumes.md#writable-images)).
 - Reading and writing physical disks (internal and external, e.g. USB) with the default PhysicalDisk plugin on Windows (as administrator), Linux and macOS (as root): listed with their model in the `Physical disks` volume provider and opened like MBR, GPT and RDB disk images, shared between panes and file operations; read-only while the OS uses a volume on the disk; system disks are listed but not accessible; read and written through a block cache (32 MB per disk by default, set in the plugin's settings file) whose writes are written between file operations.
@@ -18,7 +18,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - SMB listing and other reading requests wait up to 30 seconds for the server and are sent again once on a new connection when it doesn't answer in time (e.g. a NAS spinning up its disks).
 - The properties dialog changes the read, write and execute permissions of the owner, group and others of local files on Linux and macOS.
 - Files split by 7-Zip (`name.001`, `name.002`, ...) open as the joined file, e.g. a split 7z archive; opening a large archive shows the entries read after 2 seconds and can be cancelled.
-- The volume abstraction layer and implementations: `LocalVolume`, `Iso9660Volume`, `ZipVolume`, `LhaVolume`, `LzxVolume`, `SharpCompressVolume` (rar and 7z), their base class `ArchiveVolume<T>`, `NestedVolume`, `EntryVolumeProvider`, and `NullVolume`.
+- The volume abstraction layer and implementations: `LocalVolume`, `Iso9660Volume`, `ZipVolume`, `LhaVolume`, `LzxVolume`, `SharpCompressVolume` (rar, 7z and tar), their base class `ArchiveVolume<T>`, `NestedVolume`, `EntryVolumeProvider`, and `NullVolume`.
 - All unit tests in `Hst.Commander.Core.Tests`.
 
 - Going to the root of the volume with Ctrl+\ or by typing `/` or `\` in both front-ends.
@@ -59,7 +59,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 
 **Not implemented:**
 - Other file-management operations (e.g. creating a new file with Shift+F4); changing the viewer's encoding and going to an offset; changing the editor's encoding and line breaks.
-- Writing to images other than Amiga adf, RDB and partition images and FAT, exFAT and NTFS images (also in VHD, VHDX and VDI images); ISO images and zip, lha, lzx, rar and 7z archives are read-only, as are Amiga images inside other images.
+- Writing to images other than Amiga adf, RDB and partition images and FAT, exFAT and NTFS images (also in VHD, VHDX and VDI images); ISO images, zip, lha, lzx, rar, 7z and tar archives and gzip and xz files are read-only, as are Amiga images inside other images.
 - Writing an image file to a physical disk (the physical disk list is read-only).
 - Changing RDB, MBR and GPT partitions, other Amiga file systems (e.g. SFS\2), writing ext2/3/4, XFS, Btrfs, HFS+, SquashFS and UDF, SquashFS compressed with other than gzip, zstd compressed Btrfs files, APFS, Apple partition maps, differencing VHDX and VDI images and vmdk images.
 - Unloading or reloading plugins while running, and a list of loaded plugins in the UI.

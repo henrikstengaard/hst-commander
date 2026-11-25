@@ -98,7 +98,7 @@ public sealed class PluginHost(
             }
 
             stream.Position = 0;
-            return await fileVolumeProvider.CreateVolume(stream, cancellationToken);
+            return await fileVolumeProvider.CreateVolume(name, stream, cancellationToken);
         }
 
         return null;
