@@ -11,6 +11,10 @@ public sealed class NavigationContext : IDisposable
     private readonly Stack<OpenedImage> _images = new();
 
     private readonly Dictionary<string, IEntry> _markedEntries = new(StringComparer.Ordinal);
+
+    /// <summary>Sizes of directories calculated with Space by name, null while calculating, see <see cref="CalculateDirectorySizeAsync" />.</summary>
+    private readonly Dictionary<string, long?> _directorySizes = new(StringComparer.Ordinal);
+    private CancellationTokenSource _directorySizeCancellation = new();
     private IReadOnlyList<IEntry> _listedEntries = [];
     private readonly HashSet<string> _executableNames = new(StringComparer.Ordinal);
     private readonly HashSet<string> _volumeFileNames = new(StringComparer.Ordinal);
@@ -463,7 +467,7 @@ public sealed class NavigationContext : IDisposable
         _rootVolume = volume;
         _nestedVolume = new NestedVolume(volume);
         PreviousEntryName = null;
-        _markedEntries.Clear();
+        LeaveLocation();
     }
 
     /// <summary>
@@ -479,7 +483,9 @@ public sealed class NavigationContext : IDisposable
     public IReadOnlyCollection<IEntry> MarkedEntries => _markedEntries.Values;
 
     /// <summary>Total size of the marked entries in bytes. Entries without a size, like directories, count as 0.</summary>
-    public long MarkedSize => _markedEntries.Values.Sum(entry => entry.Size ?? 0);
+    /// <remarks>Directories count with their size calculated by <see cref="CalculateDirectorySizeAsync" /> when calculated.</remarks>
+    public long MarkedSize => _markedEntries.Values.Sum(entry =>
+        entry.Size ?? (_directorySizes.TryGetValue(entry.Name, out var size) ? size ?? 0 : 0));
 
     /// <summary>
     ///     Summary of the marked entries shown below the current path, e.g. "12K in 3 selected".
@@ -520,6 +526,77 @@ public sealed class NavigationContext : IDisposable
 
         _markedEntries[entry.Name] = entry;
         return true;
+    }
+
+    /// <summary>
+    ///     Calculates the size of a directory in the current location in the background, when Space marks it. Until it
+    ///     completes <see cref="FormatEntrySize" /> shows <see cref="SizeFormatter.CalculatingSize" />, so front-ends
+    ///     redraw the row right after calling it, and afterwards the calculated size, also counted in
+    ///     <see cref="MarkedSize" />. The size is kept when the directory is unmarked, until the location changes.
+    ///     Files, "..", containers with a size of their own (e.g. drives) and directories already calculated or being
+    ///     calculated aren't calculated. Returns true when a size was calculated, false when nothing was calculated or
+    ///     the location changed meanwhile. Counted like the properties dialog (<see cref="CountContentsAsync" />), so
+    ///     the pane's volume isn't used.
+    /// </summary>
+    public async Task<bool> CalculateDirectorySizeAsync(IEntry entry)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+
+        if (entry.Type != EntryType.Container || entry.Size != null ||
+            entry.Name.Equals(Paths.Parent, StringComparison.Ordinal) || _directorySizes.ContainsKey(entry.Name))
+        {
+            return false;
+        }
+
+        _directorySizes[entry.Name] = null;
+        var cancellation = _directorySizeCancellation;
+        var cancellationToken = cancellation.Token;
+        EntryContents contents;
+        try
+        {
+            contents = await Task.Run(() => CountContentsAsync([entry], null, cancellationToken), cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return false;
+        }
+        catch
+        {
+            if (ReferenceEquals(cancellation, _directorySizeCancellation))
+            {
+                _directorySizes.Remove(entry.Name);
+            }
+
+            throw;
+        }
+
+        if (!ReferenceEquals(cancellation, _directorySizeCancellation) || cancellationToken.IsCancellationRequested)
+        {
+            return false;
+        }
+
+        _directorySizes[entry.Name] = contents.Size;
+        return true;
+    }
+
+    /// <summary>
+    ///     Size column of an entry: <see cref="SizeFormatter.CalculatingSize" /> while its directory size is calculated
+    ///     (<see cref="CalculateDirectorySizeAsync" />), then the calculated size, otherwise
+    ///     <see cref="SizeFormatter.FormatEntrySize" />.
+    /// </summary>
+    public string FormatEntrySize(IEntry entry) => _directorySizes.TryGetValue(entry.Name, out var size) &&
+                                                   entry.Type == EntryType.Container && entry.Size == null
+        ? size is { } calculatedSize ? SizeFormatter.FormatHumanized(calculatedSize) : SizeFormatter.CalculatingSize
+        : SizeFormatter.FormatEntrySize(entry);
+
+    /// <summary>Clears the marks and calculated directory sizes when the location changes, cancelling calculations.</summary>
+    private void LeaveLocation()
+    {
+        _markedEntries.Clear();
+        _directorySizes.Clear();
+        _directorySizeCancellation.Cancel();
+        _directorySizeCancellation.Dispose();
+        _directorySizeCancellation = new CancellationTokenSource();
     }
 
     /// <summary>
@@ -1189,7 +1266,7 @@ public sealed class NavigationContext : IDisposable
         {
             await _nestedVolume.ChangeDirectory([entry.Name], cancellationToken);
             PreviousEntryName = null;
-            _markedEntries.Clear();
+            LeaveLocation();
             return;
         }
 
@@ -1368,7 +1445,7 @@ public sealed class NavigationContext : IDisposable
         _nestedVolume.PushVolume(new EntryVolumeProvider(entry, image.Volume));
         _images.Push(image);
         PreviousEntryName = null;
-        _markedEntries.Clear();
+        LeaveLocation();
         return true;
     }
 
@@ -1625,7 +1702,7 @@ public sealed class NavigationContext : IDisposable
         }
 
         PreviousEntryName = previousEntryName;
-        _markedEntries.Clear();
+        LeaveLocation();
     }
 
     /// <summary>
@@ -1693,7 +1770,7 @@ public sealed class NavigationContext : IDisposable
         }
 
         PreviousEntryName = null;
-        _markedEntries.Clear();
+        LeaveLocation();
     }
 
     /// <summary>
@@ -2842,6 +2919,7 @@ public sealed class NavigationContext : IDisposable
         }
 
         _markedEntries.Remove(entry.Name);
+        _directorySizes.Remove(entry.Name);
         _newEntryName = normalName ?? newName;
     }
 
@@ -3183,6 +3261,8 @@ public sealed class NavigationContext : IDisposable
 
     public void Dispose()
     {
+        // only cancelled, as the context may be disposed more than once
+        _directorySizeCancellation.Cancel();
         CloseIconLocation();
         CloseVolumes();
     }

@@ -8,6 +8,9 @@ public static class SizeFormatter
     /// <summary>Text shown in the size column for directories.</summary>
     public const string DirectorySize = "<DIR>";
 
+    /// <summary>Text shown in the size column while the size of a directory is calculated (Space).</summary>
+    public const string CalculatingSize = "...";
+
     private static readonly string[] Units = ["B", "K", "M", "G", "T", "P", "E"];
 
     /// <summary>

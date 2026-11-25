@@ -804,10 +804,11 @@ public partial class PaneView : UserControl
                 e.Handled = true;
                 await ActivateSelectedEntryAsync();
                 break;
+            // Space also calculates the size of a directory it marks, like Total Commander
             case Key.Insert:
             case Key.Space:
                 e.Handled = true;
-                ToggleMarkAndMoveDown();
+                ToggleMarkAndMoveDown(e.Key == Key.Space);
                 break;
             case Key.Back:
                 e.Handled = true;
@@ -912,12 +913,74 @@ public partial class PaneView : UserControl
         FocusEntries();
     }
 
-    /// <summary>Toggles the mark of the entry under the cursor and moves the cursor to the next entry.</summary>
-    private void ToggleMarkAndMoveDown()
+    /// <summary>
+    ///     Toggles the mark of the entry under the cursor and moves the cursor to the next entry. With
+    ///     <paramref name="calculateSize" /> (Space) a directory it marks gets its size calculated in the background.
+    /// </summary>
+    private void ToggleMarkAndMoveDown(bool calculateSize = false)
     {
-        if (ToggleSelectedMark())
+        var item = EntriesList.SelectedItem as EntryItem;
+        if (!ToggleSelectedMark())
         {
-            MoveSelection(1);
+            return;
+        }
+
+        if (calculateSize && item is { IsMarked: true })
+        {
+            CalculateDirectorySize(item);
+        }
+
+        MoveSelection(1);
+    }
+
+    /// <summary>
+    ///     Calculates the size of a directory (see <see cref="NavigationContext.CalculateDirectorySizeAsync" />),
+    ///     showing "..." in its size column until the size is shown, and updates the summary of the marked entries.
+    ///     Errors raise <see cref="NavigationFailed" />.
+    /// </summary>
+    private async void CalculateDirectorySize(EntryItem item)
+    {
+        var navigationContext = NavigationContext;
+        try
+        {
+            var calculation = navigationContext.CalculateDirectorySizeAsync(item.Entry);
+            item.Size = navigationContext.FormatEntrySize(item.Entry);
+            if (!await calculation)
+            {
+                return;
+            }
+        }
+        catch (Exception exception)
+        {
+            UpdateSize(navigationContext, item);
+            NavigationFailed?.Invoke(this, exception);
+            return;
+        }
+
+        UpdateSize(navigationContext, item);
+        if (ReferenceEquals(navigationContext, NavigationContext))
+        {
+            UpdateSummary();
+        }
+    }
+
+    /// <summary>
+    ///     Shows the size of an entry in its item and, while the pane shows the same navigation context, in the item
+    ///     with its name, also after the entries were listed again.
+    /// </summary>
+    private void UpdateSize(NavigationContext navigationContext, EntryItem item)
+    {
+        item.Size = navigationContext.FormatEntrySize(item.Entry);
+        if (!ReferenceEquals(navigationContext, NavigationContext))
+        {
+            return;
+        }
+
+        var listedItem = (EntriesList.ItemsSource as IReadOnlyList<EntryItem> ?? [])
+            .FirstOrDefault(listed => listed.Name.Equals(item.Name, StringComparison.Ordinal));
+        if (listedItem != null && !ReferenceEquals(listedItem, item))
+        {
+            listedItem.Size = navigationContext.FormatEntrySize(listedItem.Entry);
         }
     }
 
@@ -1100,7 +1163,8 @@ public partial class PaneView : UserControl
         var navigationEntries = await Core.ListingProgress.ListEntriesAsync(NavigationContext, ShowProgress,
             HideProgress);
         var entries = navigationEntries
-            .Select(entry => new EntryItem(entry, NavigationContext.IsMarked(entry), NavigationContext.IsExecutable(entry)))
+            .Select(entry => new EntryItem(entry, NavigationContext.IsMarked(entry), NavigationContext.IsExecutable(entry),
+                NavigationContext.FormatEntrySize(entry)))
             .ToList();
         var previousPath = PathText.Text;
         DetectVolumeFiles(entries);
