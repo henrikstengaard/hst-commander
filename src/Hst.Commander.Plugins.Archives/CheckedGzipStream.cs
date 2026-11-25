@@ -1,7 +1,7 @@
 using System.Buffers.Binary;
 using System.IO.Compression;
 
-namespace Hst.Commander.Plugins.RarSevenZip;
+namespace Hst.Commander.Plugins.Archives;
 
 /// <summary>
 /// Stream decompressing a gzip file with .NET's <see cref="System.IO.Compression.GZipStream" /> (native zlib, several

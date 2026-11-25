@@ -1,4 +1,4 @@
-namespace Hst.Commander.Plugins.RarSevenZip;
+namespace Hst.Commander.Plugins.Archives;
 
 /// <summary>
 /// Read-only stream reading streams one after another, each opened when the one before it ends and disposed then,

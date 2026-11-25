@@ -1,4 +1,4 @@
-namespace Hst.Commander.Plugins.RarSevenZip;
+namespace Hst.Commander.Plugins.Archives;
 
 /// <summary>
 /// Read-only stream of a file in an archive read with SharpCompress:

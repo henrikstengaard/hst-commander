@@ -1,4 +1,4 @@
-namespace Hst.Commander.Plugins.RarSevenZip;
+namespace Hst.Commander.Plugins.Archives;
 
 /// <summary>
 /// Detects tar archives by their first header block of 512 bytes: a name and a valid checksum (the sum of the bytes of

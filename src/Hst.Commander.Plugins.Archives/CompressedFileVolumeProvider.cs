@@ -1,6 +1,6 @@
 using Hst.Commander.Abstractions;
 
-namespace Hst.Commander.Plugins.RarSevenZip;
+namespace Hst.Commander.Plugins.Archives;
 
 /// <summary>
 /// File volume provider opening a compressed file (gzip or xz), detected by the signature of its format: a compressed

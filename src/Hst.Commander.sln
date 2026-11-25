@@ -27,7 +27,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hst.Commander.Plugins.Physi
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hst.Commander.Plugins.Smb", "Hst.Commander.Plugins.Smb\Hst.Commander.Plugins.Smb.csproj", "{BB541D17-8A40-4589-8E10-65E7B51A8E29}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hst.Commander.Plugins.RarSevenZip", "Hst.Commander.Plugins.RarSevenZip\Hst.Commander.Plugins.RarSevenZip.csproj", "{918FC982-A5AA-4B6F-805B-A8AF82728984}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hst.Commander.Plugins.Archives", "Hst.Commander.Plugins.Archives\Hst.Commander.Plugins.Archives.csproj", "{918FC982-A5AA-4B6F-805B-A8AF82728984}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hst.Commander.Plugins.Ftp", "Hst.Commander.Plugins.Ftp\Hst.Commander.Plugins.Ftp.csproj", "{C3D90BB6-070B-4BFA-98DB-1E77FBEF6CA0}"
 EndProject

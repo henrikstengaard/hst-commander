@@ -3,7 +3,7 @@ using System.Text;
 using SharpCompress.Compressors;
 using SharpCompress.Compressors.Deflate;
 
-namespace Hst.Commander.Plugins.RarSevenZip;
+namespace Hst.Commander.Plugins.Archives;
 
 /// <summary>
 /// Stream decompressing a gzip file member by member, checking the CRC32 and size in the trailer of each member, so a

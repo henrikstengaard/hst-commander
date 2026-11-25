@@ -51,7 +51,7 @@ src/
   Hst.Commander.Abstractions/   Plugin API: IVolume, IEntry, IVolumeProvider, IFileVolumeProvider, IPlugin, IPluginHost, IWriteCache, ITheme, ..., Paths, the ArchiveVolume<T> base class and VolumeOpening (entries read while opening) (no external deps)
   Hst.Commander.Plugins.Zip/    Zip archives (default plugin)
   Hst.Commander.Plugins.LhaLzx/ Lha and lzx archives (default plugin)
-  Hst.Commander.Plugins.RarSevenZip/ Rar, 7z and tar archives and gzip and xz files, including compressed tar (default plugin)
+  Hst.Commander.Plugins.Archives/ Rar, 7z and tar archives and gzip and xz files, including compressed tar (default plugin)
   Hst.Commander.Plugins.Disk/   MBR/GPT disk images (raw, VHD, VHDX, VDI, DMG) with FAT/exFAT/NTFS and read-only ext/XFS/Btrfs/HFS+/SquashFS/UDF partitions, hybrid MBR/RDB disks, unpartitioned file systems and the exFAT F9 creator (default plugin)
   Hst.Commander.Plugins.Amiga/  Writable adf, RDB and partition images, .info icons, Workbench navigation mode, Amiga images, comment and tooltypes properties tabs (default plugin)
   Hst.Commander.Plugins.PhysicalDisk/ Internal and external physical disks on Windows, Linux and macOS (default plugin)
@@ -76,9 +76,9 @@ src/
         |                          [ZipPlugin, ZipFileVolumeProvider, ZipVolume]  <- Hst.Commander.Plugins.Zip
         |                          [LhaLzxPlugin, Lha/LzxFileVolumeProvider,
         |                           LhaVolume, LzxVolume]  <- Hst.Commander.Plugins.LhaLzx
-        |                          [RarSevenZipPlugin, Rar/SevenZip/TarFileVolumeProvider,
+        |                          [ArchivesPlugin, Rar/SevenZip/TarFileVolumeProvider,
         |                           Gzip/XzFileVolumeProvider,
-        |                           SharpCompressVolume]  <- Hst.Commander.Plugins.RarSevenZip
+        |                           SharpCompressVolume]  <- Hst.Commander.Plugins.Archives
         |                          [DiskPlugin, DiskFileVolumeProvider, VirtualDisks,
         |                           FileSystemFileVolumeProvider, ExFatVolumeCreator,
         |                           ExFatFormatter,
@@ -188,7 +188,7 @@ These apply across features and aren't obvious from a single file:
 - Abstractions: `Hst.Commander.Abstractions` (interfaces, `Paths`, `ArchiveVolume<T>`)
 - Zip plugin: `Hst.Commander.Plugins.Zip`
 - Lha and lzx plugin: `Hst.Commander.Plugins.LhaLzx`
-- Rar, 7z, tar, gzip and xz plugin: `Hst.Commander.Plugins.RarSevenZip`
+- Rar, 7z, tar, gzip and xz plugin: `Hst.Commander.Plugins.Archives`
 - Disk plugin: `Hst.Commander.Plugins.Disk`
 - Amiga plugin: `Hst.Commander.Plugins.Amiga`
 - Physical disk plugin: `Hst.Commander.Plugins.PhysicalDisk`
@@ -303,7 +303,7 @@ dotnet test src/Hst.Commander.Core.Tests/Hst.Commander.Core.Tests.csproj --logge
 | `SkiaSharp`, `SkiaSharp.NativeAssets.Linux` | 3.119.4 | `Hst.Commander.Core` — decoding PNG, JPEG, GIF, BMP and WebP images viewed with F3 in the GUI (the version Avalonia uses; part of the TUI too, as it references Core) |
 | `System.Linq.Async` | 6.0.1 | `Hst.Commander.Core` — async LINQ |
 | `Hst.Compression` | 1.0.104 | `Hst.Commander.Plugins.LhaLzx` — lha and lzx archive reading |
-| `SharpCompress` | 0.50.8 | `Hst.Commander.Plugins.RarSevenZip` — rar, 7z and tar archive reading, xz and deflate (checking gzip members) decompression |
+| `SharpCompress` | 0.50.8 | `Hst.Commander.Plugins.Archives` — rar, 7z and tar archive reading, xz and deflate (checking gzip members) decompression |
 | `Hst.Amiga` | 1.0.289 | `Hst.Commander.Plugins.Amiga` — Amiga rigid disk block, Fast File System, PFS3 and Smart File System reading and writing, .info icons; `Hst.Commander.Core` — UAE metadata (UAEFSDB and metafiles) |
 | `LTRData.DiscUtils.Vhd` | 1.0.90 | `Hst.Commander.Plugins.Amiga`, `Hst.Commander.Plugins.Disk` — vhd images |
 | `LTRData.DiscUtils.Core`, `.Fat`, `.ExFat`, `.Ntfs`, `.Ext`, `.Xfs`, `.Btrfs`, `.HfsPlus`, `.SquashFs`, `.Udf` | 1.0.90 | `Hst.Commander.Plugins.Disk` — MBR/GPT partition tables, FAT, exFAT and NTFS reading and writing, ext2/3/4, XFS, Btrfs (with `ZstdSharp.Port`, `lzo.net`), HFS+, SquashFS and UDF reading |

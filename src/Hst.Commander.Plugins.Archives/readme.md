@@ -1,6 +1,6 @@
-# Hst.Commander.Plugins.RarSevenZip
+# Hst.Commander.Plugins.Archives
 
-The RarSevenZip plugin adds rar, 7z and tar archives and gzip and xz files to Hst Commander. It is included with Hst Commander by default and references only `Hst.Commander.Abstractions`, using `SharpCompress` (MIT) to read the archives and decompress xz.
+The Archives plugin adds rar, 7z and tar archives and gzip and xz files to Hst Commander. It is included with Hst Commander by default and references only `Hst.Commander.Abstractions`, using `SharpCompress` (MIT) to read the archives and decompress xz.
 
 ## Features
 

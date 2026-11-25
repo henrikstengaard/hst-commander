@@ -1,7 +1,7 @@
 using System.Buffers.Binary;
 using SharpCompress.Compressors.Xz;
 
-namespace Hst.Commander.Plugins.RarSevenZip;
+namespace Hst.Commander.Plugins.Archives;
 
 /// <summary>
 /// File volume provider opening xz files (FD "7zXZ" 00 at the start), e.g. "disk.img.xz" as a volume with "disk.img",

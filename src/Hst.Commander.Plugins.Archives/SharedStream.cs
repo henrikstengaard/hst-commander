@@ -1,4 +1,4 @@
-namespace Hst.Commander.Plugins.RarSevenZip;
+namespace Hst.Commander.Plugins.Archives;
 
 /// <summary>
 /// Read-only stream of a part of a seekable stream (from <paramref name="start" />, <paramref name="length" /> bytes or

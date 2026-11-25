@@ -1,12 +1,12 @@
 using System.Text;
 using Hst.Commander.Abstractions;
-using Hst.Commander.Plugins.RarSevenZip;
+using Hst.Commander.Plugins.Archives;
 
 namespace Hst.Commander.Core.Tests;
 
 /// <summary>
 /// Tar archives and gzip and xz files of TestData/Archives made with GNU tar, gzip and xz (see
-/// TestData/Archives/make/make-archives.sh), opened by the RarSevenZip plugin.
+/// TestData/Archives/make/make-archives.sh), opened by the Archives plugin.
 /// </summary>
 public class GivenTarGzipXzArchives : IDisposable
 {

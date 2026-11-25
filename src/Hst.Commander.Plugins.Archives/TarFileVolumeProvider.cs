@@ -2,7 +2,7 @@ using Hst.Commander.Abstractions;
 using SharpCompress.Archives.Tar;
 using SharpCompress.Readers;
 
-namespace Hst.Commander.Plugins.RarSevenZip;
+namespace Hst.Commander.Plugins.Archives;
 
 /// <summary>
 /// File volume provider opening tar archives, detected by their first header block (see <see cref="TarHeader" />).

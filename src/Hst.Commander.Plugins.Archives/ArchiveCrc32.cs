@@ -1,6 +1,6 @@
 using System.Buffers.Binary;
 
-namespace Hst.Commander.Plugins.RarSevenZip;
+namespace Hst.Commander.Plugins.Archives;
 
 /// <summary>
 /// CRC32 (the polynomial of zip, gzip and rar) computed with slicing-by-8, 8 bytes per step with 8 tables, several

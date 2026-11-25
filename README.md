@@ -243,7 +243,7 @@ Local builds include the SMB plugin. See [docs/application.md](docs/application.
 | [`Hst.Commander.Gui`](src/Hst.Commander.Gui/readme.md) | Desktop GUI application |
 | [`Hst.Commander.Plugins.Zip`](src/Hst.Commander.Plugins.Zip/readme.md) | Zip archives (default plugin) |
 | [`Hst.Commander.Plugins.LhaLzx`](src/Hst.Commander.Plugins.LhaLzx/readme.md) | Lha and lzx archives (default plugin) |
-| [`Hst.Commander.Plugins.RarSevenZip`](src/Hst.Commander.Plugins.RarSevenZip/readme.md) | Rar, 7z and tar archives and gzip and xz files (default plugin) |
+| [`Hst.Commander.Plugins.Archives`](src/Hst.Commander.Plugins.Archives/readme.md) | Rar, 7z and tar archives and gzip and xz files (default plugin) |
 | [`Hst.Commander.Plugins.Disk`](src/Hst.Commander.Plugins.Disk/readme.md) | MBR/GPT and VHD/VHDX/VDI/DMG disk images with FAT, exFAT, NTFS, ext, XFS, Btrfs, HFS+, SquashFS and UDF, PiStorm and hybrid disks, and creating exFAT file systems (default plugin) |
 | [`Hst.Commander.Plugins.Amiga`](src/Hst.Commander.Plugins.Amiga/readme.md) | Amiga adf, RDB and partition images, `.info` icons, Workbench navigation mode, Amiga pictures, comment and tooltypes tabs (default plugin) |
 | [`Hst.Commander.Plugins.PhysicalDisk`](src/Hst.Commander.Plugins.PhysicalDisk/readme.md) | Internal and external physical disks, opened like disk images (default plugin) |

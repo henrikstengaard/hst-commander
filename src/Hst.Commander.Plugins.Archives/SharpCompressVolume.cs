@@ -1,7 +1,7 @@
 using Hst.Commander.Abstractions;
 using SharpCompress.Archives;
 
-namespace Hst.Commander.Plugins.RarSevenZip;
+namespace Hst.Commander.Plugins.Archives;
 
 /// <summary>
 /// Read-only volume browsing the entries of a rar, 7z or tar archive read with SharpCompress. Links of tar archives

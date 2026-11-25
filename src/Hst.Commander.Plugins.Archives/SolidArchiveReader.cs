@@ -1,7 +1,7 @@
 using SharpCompress.Archives;
 using SharpCompress.Readers;
 
-namespace Hst.Commander.Plugins.RarSevenZip;
+namespace Hst.Commander.Plugins.Archives;
 
 /// <summary>
 /// Reads the files of a solid archive in one pass. SharpCompress decompresses a solid block from its start for each
