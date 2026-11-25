@@ -24,7 +24,7 @@ Hst Commander comes with two front-ends that have the same functionality:
 - Local drives and directories, with the free and total space of the drive.
 - Images browsed like directories, detected by their contents regardless of the extension, also inside other images:
   - ISO 9660 images.
-  - Zip, lha, lzx, rar, 7z and tar archives, and gzip, xz, bzip2 and zstd files (including .tar.gz, .tar.xz, .tar.bz2 and .tar.zst).
+  - Zip, lha, lzx, rar, 7z and tar archives, and gzip, xz, bzip2, zstd and compress (.Z) files (including .tar.gz, .tar.xz, .tar.bz2, .tar.zst and .tar.Z).
   - MBR and GPT disk images (raw, VHD, VHDX, VDI or DMG) with FAT, exFAT, NTFS, ext2/3/4, XFS, Btrfs, HFS+, SquashFS and UDF partitions, PiStorm disks and hybrid MBR/RDB disks, and file systems without a partition table.
   - Amiga disk files (adf) and hard disk images with a rigid disk block (RDB), with Fast File System, PFS3 and SFS partitions.
 - Writing to Amiga adf, RDB and partition images and to FAT, exFAT and NTFS images (also in VHD, VHDX and VDI images), shared safely by both panes and file operations.
@@ -243,7 +243,7 @@ Local builds include the SMB plugin. See [docs/application.md](docs/application.
 | [`Hst.Commander.Gui`](src/Hst.Commander.Gui/readme.md) | Desktop GUI application |
 | [`Hst.Commander.Plugins.Zip`](src/Hst.Commander.Plugins.Zip/readme.md) | Zip archives (default plugin) |
 | [`Hst.Commander.Plugins.LhaLzx`](src/Hst.Commander.Plugins.LhaLzx/readme.md) | Lha and lzx archives (default plugin) |
-| [`Hst.Commander.Plugins.Archives`](src/Hst.Commander.Plugins.Archives/readme.md) | Rar, 7z and tar archives and gzip, xz, bzip2 and zstd files (default plugin) |
+| [`Hst.Commander.Plugins.Archives`](src/Hst.Commander.Plugins.Archives/readme.md) | Rar, 7z and tar archives and gzip, xz, bzip2, zstd and compress (.Z) files (default plugin) |
 | [`Hst.Commander.Plugins.Disk`](src/Hst.Commander.Plugins.Disk/readme.md) | MBR/GPT and VHD/VHDX/VDI/DMG disk images with FAT, exFAT, NTFS, ext, XFS, Btrfs, HFS+, SquashFS and UDF, PiStorm and hybrid disks, and creating exFAT file systems (default plugin) |
 | [`Hst.Commander.Plugins.Amiga`](src/Hst.Commander.Plugins.Amiga/readme.md) | Amiga adf, RDB and partition images, `.info` icons, Workbench navigation mode, Amiga pictures, comment and tooltypes tabs (default plugin) |
 | [`Hst.Commander.Plugins.PhysicalDisk`](src/Hst.Commander.Plugins.PhysicalDisk/readme.md) | Internal and external physical disks, opened like disk images (default plugin) |
@@ -259,7 +259,7 @@ See [src/agents.md](src/agents.md) for the architecture and coding conventions a
 See [docs/status.md](docs/status.md) for what works. Not implemented yet, among others:
 
 - Creating a new file (Shift+F4), and changing the encoding of the viewer and the editor.
-- Writing to ISO images, zip, lha, lzx, rar, 7z and tar archives and gzip, xz, bzip2 and zstd files, to ext partitions and to Amiga images inside other images.
+- Writing to ISO images, zip, lha, lzx, rar, 7z and tar archives and gzip, xz, bzip2, zstd and compress (.Z) files, to ext partitions and to Amiga images inside other images.
 - Changing RDB, MBR and GPT partitions, other Amiga file systems (e.g. SFS\2), writing XFS, Btrfs, HFS+, SquashFS and UDF, APFS and vmdk images.
 - SMB 1, browsing the network for servers, implicit FTPS and SFTP private keys.
 - Unloading or reloading plugins while running.
