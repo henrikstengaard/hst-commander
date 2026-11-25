@@ -66,6 +66,63 @@ public class GivenNavigationContextWithDiskImages : IDisposable
         Assert.Equal([Paths.Parent, "dir1", "file1.txt"], await ListNamesAsync(reopenedContext));
     }
 
+    [Theory]
+    [InlineData("disk.vhdx", "VHDX")]
+    [InlineData("disk.vdi", "VDI")]
+    public async Task When_VirtualDiskIsOpened_Then_FatPartitionIsWritten(string name, string format)
+    {
+        // arrange
+        await using (var content = DiskTestData.CreateMbrDisk())
+        await using (var disk = await DiskTestData.CreateVirtualDisk(format, content))
+        {
+            await DiskTestData.WriteToFile(disk, Path.Combine(_rootPath, name));
+        }
+
+        await File.WriteAllTextAsync(Path.Combine(_rootPath, "file1.txt"), "Virtual");
+
+        using (var diskContext = new NavigationContext(_rootPath))
+        using (var localContext = new NavigationContext(_rootPath))
+        {
+            // act
+            await OpenAsync(diskContext, name);
+            await OpenAsync(diskContext, "mbr");
+            await OpenAsync(diskContext, "1");
+            var localEntries = await localContext.ListEntriesAsync();
+            await localContext.CopyAsync([localEntries.First(entry => entry.Name == "file1.txt")], diskContext,
+                diskContext.CurrentPath, "*");
+
+            // assert
+            Assert.True(diskContext.IsInImage);
+            Assert.Equal(Path.Combine(_rootPath, name, "mbr", "1"), diskContext.CurrentPath);
+            Assert.Equal([Paths.Parent, "file1.txt"], await ListNamesAsync(diskContext));
+        }
+
+        // opened again, the changes are in the file
+        using var reopenedContext = new NavigationContext(_rootPath);
+        await reopenedContext.ChangeLocationAsync(Path.Combine(_rootPath, name, "mbr", "1"));
+        Assert.Equal([Paths.Parent, "file1.txt"], await ListNamesAsync(reopenedContext));
+    }
+
+    [Fact]
+    public async Task When_XfsImageIsOpened_Then_FilesAreListed()
+    {
+        // arrange
+        await using (var image = await DiskTestData.OpenGzippedImage("xfs.img.gz"))
+        {
+            await DiskTestData.WriteToFile(image, Path.Combine(_rootPath, "xfs.img"));
+        }
+
+        using var navigationContext = new NavigationContext(_rootPath);
+
+        // act
+        await OpenAsync(navigationContext, "xfs.img");
+        var names = await ListNamesAsync(navigationContext);
+
+        // assert
+        Assert.True(navigationContext.IsInImage);
+        Assert.Equal([Paths.Parent, "dir", "hello.txt"], names);
+    }
+
     [Fact]
     public async Task When_AttributesOfFatEntryAreChanged_Then_TheyAreWritten()
     {

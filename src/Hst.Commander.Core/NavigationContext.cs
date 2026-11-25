@@ -1481,7 +1481,7 @@ public sealed class NavigationContext : IDisposable
         if (!showProgress || ProgressIndicator is not { } progressIndicator)
         {
             return await Task.Run(() => VolumeOpening.RunAsync(
-                () => fileVolumeProvider.CreateVolume(stream, cancellationToken), null, cancellationToken),
+                () => fileVolumeProvider.CreateVolume(name, stream, cancellationToken), null, cancellationToken),
                 cancellationToken);
         }
 
@@ -1489,7 +1489,7 @@ public sealed class NavigationContext : IDisposable
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var entriesRead = new Progress<long>(count => progressIndicator.ReportMessage(GetOpeningMessage(name, count)));
         var createTask = Task.Run(() => VolumeOpening.RunAsync(
-            () => fileVolumeProvider.CreateVolume(stream, cancellation.Token), entriesRead, cancellation.Token),
+            () => fileVolumeProvider.CreateVolume(name, stream, cancellation.Token), entriesRead, cancellation.Token),
             cancellation.Token);
         return await ListingProgress.RunAsync(createTask, GetOpeningMessage(name, 0),
             message => progressIndicator.ShowIndeterminate(message, cancellation.Cancel), progressIndicator.Hide,

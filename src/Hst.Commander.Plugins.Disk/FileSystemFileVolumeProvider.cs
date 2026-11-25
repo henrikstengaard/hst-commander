@@ -4,9 +4,11 @@ using Hst.Commander.Abstractions;
 namespace Hst.Commander.Plugins.Disk;
 
 /// <summary>
-/// File volume provider opening FAT, exFAT, NTFS and ext2/3/4 file systems without a partition table (e.g. images of
-/// partitions or floppy disks, or exFAT file systems created with <see cref="ExFatVolumeCreator" />) as writable
-/// volumes, except ext2/3/4, which DiscUtils only reads. Detected by "NTFS    " at offset 3 of the boot sector, by a
+/// File volume provider opening FAT, exFAT, NTFS, ext2/3/4, XFS, Btrfs, HFS+, SquashFS and UDF file systems without a
+/// partition table (e.g. images of partitions or floppy disks, or exFAT file systems created with
+/// <see cref="ExFatVolumeCreator" />) as volumes, writable for FAT, exFAT and NTFS (DiscUtils only reads the others).
+/// XFS, Btrfs, HFS+, SquashFS and UDF are detected by their signatures (see
+/// <see cref="FileSystems.DetectReadOnlyFileSystem" />), the others by "NTFS    " at offset 3 of the boot sector, by a
 /// boot sector ending with 0x55 0xAA holding "EXFAT   " at offset 3 or "FAT" at 0x36 or "FAT32" at 0x52 (boot sectors
 /// <see cref="DiskFileVolumeProvider" /> doesn't match), or by an ext2/3/4 superblock (see <see cref="IsExtSuperblock" />).
 /// </summary>
@@ -16,13 +18,13 @@ public class FileSystemFileVolumeProvider : IFileVolumeProvider
     private const int FileSystemNameOffset = 3;
     private const int FatNameOffset = 0x36;
     private const int Fat32NameOffset = 0x52;
-    private const int DetectLength = 2048;
     private static readonly byte[] ExFatName = "EXFAT   "u8.ToArray();
     private static readonly byte[] NtfsName = "NTFS    "u8.ToArray();
 
     public string Name => "File system";
 
-    public string Description => "FAT, exFAT, NTFS and ext2/3/4 file systems without a partition table";
+    public string Description =>
+        "FAT, exFAT, NTFS, ext2/3/4, XFS, Btrfs, HFS+, SquashFS and UDF file systems without a partition table";
 
     public bool CanWrite => true;
 
@@ -30,14 +32,15 @@ public class FileSystemFileVolumeProvider : IFileVolumeProvider
     {
         ArgumentNullException.ThrowIfNull(stream);
 
-        var start = new byte[DetectLength];
+        var start = new byte[FileSystems.DetectLength];
         var length = await stream.ReadAtLeastAsync(start, start.Length, false, cancellationToken);
         return Detect(start.AsSpan(0, length)) != null;
     }
 
     /// <summary>
-    /// Name of the file system starting with the bytes, "FAT", "exFAT", "NTFS" or "ext"; null when none of them is
-    /// detected.
+    /// Name of the file system starting with the bytes (<see cref="FileSystems.DetectLength" /> bytes, or the whole
+    /// file system when it's smaller), "FAT", "exFAT", "NTFS", "ext" or one of
+    /// <see cref="FileSystems.DetectReadOnlyFileSystem" />; null when none of them is detected.
     /// </summary>
     internal static string? Detect(ReadOnlySpan<byte> start)
     {
@@ -62,7 +65,7 @@ public class FileSystemFileVolumeProvider : IFileVolumeProvider
             }
         }
 
-        return IsExtSuperblock(start) ? "ext" : null;
+        return IsExtSuperblock(start) ? "ext" : FileSystems.DetectReadOnlyFileSystem(start);
     }
 
     /// <summary>
@@ -94,11 +97,11 @@ public class FileSystemFileVolumeProvider : IFileVolumeProvider
     {
         ArgumentNullException.ThrowIfNull(stream);
 
-        var start = new byte[DetectLength];
+        var start = new byte[FileSystems.DetectLength];
         stream.Position = 0;
         var length = await stream.ReadAtLeastAsync(start, start.Length, false, cancellationToken);
         var fileSystemName = Detect(start.AsSpan(0, length)) ??
-                             throw new IOException("No FAT, exFAT, NTFS or ext2/3/4 file system found");
+                             throw new IOException("No file system found that can be read");
         try
         {
             return FileSystems.MountFileSystem(fileSystemName, stream) ??

@@ -161,12 +161,12 @@ public class GivenPluginLoader
         Assert.Equal(expected, PluginLoader.IsCompatible(Version.Parse(pluginApiVersion), Version.Parse(apiVersion)));
 
     [Theory]
-    [InlineData(2, 0, "was built for plugin API 1.0, this version of Hst Commander has plugin API 2.0")]
-    [InlineData(0, 9, "needs plugin API 1.0, this version of Hst Commander has plugin API 0.9")]
+    [InlineData(2, 0, "was built for plugin API 1.1, this version of Hst Commander has plugin API 2.0")]
+    [InlineData(0, 9, "needs plugin API 1.1, this version of Hst Commander has plugin API 0.9")]
     public void When_PluginIsBuiltForIncompatibleApiVersion_Then_ItIsNotLoadedAndErrorIsReported(int major, int minor,
         string expectedMessage)
     {
-        // arrange - the zip plugin is built for plugin API 1.0
+        // arrange - the zip plugin is built for plugin API 1.1
         var pluginsPath = CreateTempDirectory();
         CopyZipPlugin(Path.Combine(pluginsPath, "Zip"), "Zip.dll");
         try

@@ -2,7 +2,7 @@ using Hst.Commander.Abstractions;
 using SharpCompress.Archives.Rar;
 using SharpCompress.Readers;
 
-namespace Hst.Commander.Plugins.RarSevenZip;
+namespace Hst.Commander.Plugins.Archives;
 
 /// <summary>
 /// File volume provider opening rar archives, detected by their magic signature "Rar!" 1A 07 followed by 00 (rar 1.5

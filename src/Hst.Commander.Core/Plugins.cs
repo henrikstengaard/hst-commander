@@ -5,7 +5,7 @@ using Hst.Commander.Plugins.Disk;
 using Hst.Commander.Plugins.Ftp;
 using Hst.Commander.Plugins.LhaLzx;
 using Hst.Commander.Plugins.PhysicalDisk;
-using Hst.Commander.Plugins.RarSevenZip;
+using Hst.Commander.Plugins.Archives;
 using Hst.Commander.Plugins.Zip;
 
 namespace Hst.Commander.Core;
@@ -29,7 +29,7 @@ public static class Plugins
     ///     adds the Directory Opus 4 theme.
     /// </summary>
     public static IReadOnlyList<IPlugin> BuiltIn { get; } =
-        Initialize([new ZipPlugin(), new LhaLzxPlugin(), new RarSevenZipPlugin(),
+        Initialize([new ZipPlugin(), new LhaLzxPlugin(), new ArchivesPlugin(),
             new DiskPlugin(), new AmigaPlugin(), new PhysicalDiskPlugin(), new FtpPlugin(), new DirectoryOpusPlugin()]);
 
     private static IReadOnlyList<IPlugin> Initialize(IReadOnlyList<IPlugin> plugins)

@@ -1,6 +1,4 @@
-using System.Buffers.Binary;
-
-namespace Hst.Commander.Plugins.RarSevenZip;
+namespace Hst.Commander.Plugins.Archives;
 
 /// <summary>
 /// Read-only stream of a file in an archive read with SharpCompress:
@@ -16,11 +14,9 @@ namespace Hst.Commander.Plugins.RarSevenZip;
 /// </summary>
 internal sealed class ArchiveEntryStream : Stream
 {
-    private static readonly uint[] CrcTable = CreateCrcTable();
-
     private readonly Stream _stream;
     private readonly string _name;
-    private readonly long _size;
+    private readonly long? _size;
     private readonly uint? _crc;
     private uint _currentCrc = 0xFFFFFFFF;
     private long _position;
@@ -28,9 +24,9 @@ internal sealed class ArchiveEntryStream : Stream
 
     /// <param name="stream">Entry stream, disposed with this stream.</param>
     /// <param name="name">Name of the file, for error messages.</param>
-    /// <param name="size">Size of the file.</param>
+    /// <param name="size">Size of the file, null when it isn't known exactly (it isn't checked then).</param>
     /// <param name="crc">CRC32 of the file, 0 when the archive has none (it isn't checked then).</param>
-    public ArchiveEntryStream(Stream stream, string name, long size, long crc)
+    public ArchiveEntryStream(Stream stream, string name, long? size, long crc)
     {
         _stream = stream;
         _name = name;
@@ -108,7 +104,7 @@ internal sealed class ArchiveEntryStream : Stream
         }
 
         _verified = true;
-        if (_position != _size)
+        if (_size is { } size && _position != size)
         {
             throw new InvalidDataException(
                 $"File '{_name}' is damaged: {_position} of {_size} bytes could be decompressed");
@@ -122,58 +118,10 @@ internal sealed class ArchiveEntryStream : Stream
 
     private void UpdateCrc(ReadOnlySpan<byte> data)
     {
-        if (_crc == null)
+        if (_crc != null)
         {
-            return;
+            _currentCrc = ArchiveCrc32.Update(_currentCrc, data);
         }
-
-        // slicing-by-8: 8 bytes per step with 8 tables, several times faster than a byte per step
-        var crc = _currentCrc;
-        var table = CrcTable;
-        while (data.Length >= 8)
-        {
-            var low = crc ^ BinaryPrimitives.ReadUInt32LittleEndian(data);
-            var high = BinaryPrimitives.ReadUInt32LittleEndian(data[4..]);
-            crc = table[0x700 + (low & 0xFF)] ^ table[0x600 + ((low >> 8) & 0xFF)] ^
-                  table[0x500 + ((low >> 16) & 0xFF)] ^ table[0x400 + (low >> 24)] ^
-                  table[0x300 + (high & 0xFF)] ^ table[0x200 + ((high >> 8) & 0xFF)] ^
-                  table[0x100 + ((high >> 16) & 0xFF)] ^ table[high >> 24];
-            data = data[8..];
-        }
-
-        foreach (var value in data)
-        {
-            crc = table[(crc ^ value) & 0xFF] ^ (crc >> 8);
-        }
-
-        _currentCrc = crc;
-    }
-
-    /// <summary>CRC32 tables for slicing-by-8: table 0 for a byte, table n for a byte followed by n zero bytes.</summary>
-    private static uint[] CreateCrcTable()
-    {
-        var table = new uint[8 * 256];
-        for (uint index = 0; index < 256; index++)
-        {
-            var crc = index;
-            for (var bit = 0; bit < 8; bit++)
-            {
-                crc = (crc & 1) != 0 ? 0xEDB88320 ^ (crc >> 1) : crc >> 1;
-            }
-
-            table[index] = crc;
-        }
-
-        for (var slice = 1; slice < 8; slice++)
-        {
-            for (var index = 0; index < 256; index++)
-            {
-                var previous = table[(slice - 1) * 256 + index];
-                table[slice * 256 + index] = table[previous & 0xFF] ^ (previous >> 8);
-            }
-        }
-
-        return table;
     }
 
     public override void Flush()

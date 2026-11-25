@@ -1,10 +1,12 @@
 using System.IO.Compression;
+using System.Text;
 using DiscUtils;
 using DiscUtils.ExFat;
 using DiscUtils.ExFat.Internal;
 using DiscUtils.Fat;
 using DiscUtils.Ntfs;
 using DiscUtils.Partitions;
+using DiscUtils.SquashFs;
 using DiscUtils.Streams;
 using Hst.Commander.Plugins.Disk;
 
@@ -276,6 +278,103 @@ public static class DiskTestData
                          CompressionMode.Decompress))
         {
             await imageStream.CopyToAsync(stream);
+        }
+
+        stream.Position = 0;
+        return stream;
+    }
+
+    /// <summary>
+    /// Reads a gzipped image of TestData/Disks made with the real tools of each file system by
+    /// TestData/Disks/make/make-images.sh (in Ubuntu 24.04), each file system holding hello.txt ("Hello from" its
+    /// name, e.g. "Hello from xfs", with a line break) and dir/nested.txt ("Nested file", with a line break):
+    /// xfs.img.gz (XFSTEST), btrfs.img.gz (BTRFSTEST, also with zlib/, lzo/ and zstd/ holding compressed.txt compressed
+    /// with each), udf.img.gz (UDFTEST), hfsplus.img.gz (HFSTEST, empty, as nothing here can write HFS+),
+    /// squashfs-gzip/-xz/-zstd/-lzo.img.gz, disk-mbr.img.gz (FATTEST, NTFSTEST, EXFATTEST and EXT4TEST partitions),
+    /// disk-gpt.img.gz (FAT, NTFS, exFAT, ext4, XFS, HFS+ and SquashFS partitions) and the GPT disk as dynamic VHD,
+    /// VHDX and VDI images made by qemu-img (disk-gpt.vhd.gz, .vhdx.gz, .vdi.gz) and as a zlib compressed DMG made by
+    /// make/make-dmg.py (disk-gpt.dmg.gz). ext4.img.gz is older, see <see cref="ExtLabel" />.
+    /// </summary>
+    public static async Task<Stream> OpenGzippedImage(string fileName)
+    {
+        var stream = new MemoryStream();
+        await using (var imageStream = new GZipStream(
+                         File.OpenRead(Path.Combine(AppContext.BaseDirectory, "TestData", "Disks", fileName)),
+                         CompressionMode.Decompress))
+        {
+            await imageStream.CopyToAsync(stream);
+        }
+
+        stream.Position = 0;
+        return stream;
+    }
+
+    /// <summary>
+    /// Creates a SquashFS file system holding hello.txt ("Hello from squashfs", with a line break) and dir/nested.txt
+    /// ("Nested file", with a line break) like the images of <see cref="OpenGzippedImage" />.
+    /// </summary>
+    public static Stream CreateSquashFsImage()
+    {
+        var builder = new SquashFileSystemBuilder();
+        builder.AddFile("hello.txt", Encoding.ASCII.GetBytes("Hello from squashfs\n"));
+        builder.AddDirectory("dir");
+        builder.AddFile(@"dir\nested.txt", Encoding.ASCII.GetBytes("Nested file\n"));
+        var stream = new MemoryStream();
+        builder.Build(stream);
+        stream.Position = 0;
+        return stream;
+    }
+
+    /// <summary>
+    /// Creates a dynamic VHD, VHDX or VDI image whose disk holds a disk or file system image, skipping its blocks of
+    /// zeros so the image stays small.
+    /// </summary>
+    public static async Task<Stream> CreateVirtualDisk(string format, Stream content)
+    {
+        var stream = new MemoryStream();
+        // a VHD disk is rounded down to its geometry, so the disk is made larger than the content
+        var capacity = content.Length + 1024 * 1024;
+        using (VirtualDisk disk = format switch
+               {
+                   "VHD" => DiscUtils.Vhd.Disk.InitializeDynamic(stream, Ownership.None, capacity),
+                   "VHDX" => DiscUtils.Vhdx.Disk.InitializeDynamic(stream, Ownership.None, capacity),
+                   "VDI" => DiscUtils.Vdi.Disk.InitializeDynamic(stream, Ownership.None, capacity),
+                   _ => throw new ArgumentOutOfRangeException(nameof(format), format, null)
+               })
+        {
+            var diskStream = disk.Content;
+            var buffer = new byte[64 * 1024];
+            content.Position = 0;
+            int length;
+            while ((length = await content.ReadAtLeastAsync(buffer, buffer.Length, false)) > 0)
+            {
+                if (buffer.AsSpan(0, length).ContainsAnyExcept((byte)0))
+                {
+                    diskStream.Position = content.Position - length;
+                    await diskStream.WriteAsync(buffer.AsMemory(0, length));
+                }
+            }
+        }
+
+        stream.Position = 0;
+        return stream;
+    }
+
+    /// <summary>
+    /// Creates an MBR disk with a Linux partition (type 0x83) holding a file system image, e.g. of
+    /// <see cref="OpenGzippedImage" />.
+    /// </summary>
+    public static async Task<Stream> CreateLinuxPartitionDisk(Stream image)
+    {
+        var sectorCount = (int)(image.Length / SectorSize);
+        var stream = CreateStream((FirstSector + sectorCount + 1) * (long)SectorSize);
+        var geometry = Geometry.FromCapacity(stream.Length);
+        BiosPartitionTable.Initialize(stream, geometry).CreatePrimaryBySector(FirstSector,
+            FirstSector + sectorCount - 1, BiosPartitionTypes.LinuxNative, false);
+        await using (var partitionStream = OpenPartition(stream, FirstSector, sectorCount))
+        {
+            image.Position = 0;
+            await image.CopyToAsync(partitionStream);
         }
 
         stream.Position = 0;

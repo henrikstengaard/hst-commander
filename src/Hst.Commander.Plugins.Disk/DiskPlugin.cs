@@ -4,10 +4,11 @@ namespace Hst.Commander.Plugins.Disk;
 
 /// <summary>
 /// Plugin opening disk images with a master boot record (MBR) or a GUID partition table (GPT) as writable volumes
-/// listing their partitions, included with Hst Commander by default. Partitions with FAT, exFAT, NTFS or ext2/3/4
-/// (read-only) are mounted by the plugin, other partitions are opened by the file volume providers of Hst Commander and other plugins
-/// (<see cref="IPluginHost.OpenVolume" />), e.g. PiStorm partitions with a rigid disk block by the Amiga plugin.
-/// FAT, exFAT, NTFS and ext2/3/4 file systems without a partition table are opened too, and exFAT ones created with F9.
+/// listing their partitions, raw or in VHD, VHDX, VDI and DMG images, included with Hst Commander by default. Partitions
+/// with FAT, exFAT or NTFS, or read-only ext2/3/4, XFS, Btrfs, HFS+, SquashFS or UDF are mounted by the plugin (see
+/// <see cref="FileSystems" />), other partitions are opened by the file volume providers of Hst Commander and other
+/// plugins (<see cref="IPluginHost.OpenVolume" />), e.g. PiStorm partitions with a rigid disk block by the Amiga plugin.
+/// The file systems without a partition table are opened too, and exFAT ones created with F9.
 /// </summary>
 public class DiskPlugin : IPlugin
 {

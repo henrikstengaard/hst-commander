@@ -4,7 +4,7 @@ using ArchiveOperationException = SharpCompress.Common.ArchiveOperationException
 using IncompleteArchiveException = SharpCompress.Common.IncompleteArchiveException;
 using SharpCompress.Readers;
 
-namespace Hst.Commander.Plugins.RarSevenZip;
+namespace Hst.Commander.Plugins.Archives;
 
 /// <summary>
 /// File volume provider opening 7z archives, detected by their magic signature "7z" BC AF 27 1C.

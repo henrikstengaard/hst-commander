@@ -53,6 +53,20 @@ public abstract class ArchiveVolume<TArchiveEntry> : IVolume
     /// <param name="amigaMetadata">Amiga protection bits and comment of the entry, if the archive stores them.</param>
     /// <param name="isDirectory">True when the entry is a directory without a path separator at the end.</param>
     protected void AddEntry(string path, long size, DateTime? modifiedDate, TArchiveEntry archiveEntry,
+        AmigaMetadata? amigaMetadata = null, bool isDirectory = false) =>
+        AddEntry(path, (long?)size, modifiedDate, archiveEntry, amigaMetadata, isDirectory);
+
+    /// <summary>
+    /// Adds an archive entry like <see cref="AddEntry(string, long, DateTime?, TArchiveEntry, AmigaMetadata?, bool)" />,
+    /// for a file whose size may not be known, e.g. the decompressed file of a bzip2 file (plugin API 1.1).
+    /// </summary>
+    /// <param name="path">Path of the entry in the archive.</param>
+    /// <param name="size">Size of a file, null when it isn't known; ignored for directories.</param>
+    /// <param name="modifiedDate">Modified date of the entry, preferably in UTC.</param>
+    /// <param name="archiveEntry">Entry given to <see cref="OpenArchiveEntry" /> when the file is read.</param>
+    /// <param name="amigaMetadata">Amiga protection bits and comment of the entry, if the archive stores them.</param>
+    /// <param name="isDirectory">True when the entry is a directory without a path separator at the end.</param>
+    protected void AddEntry(string path, long? size, DateTime? modifiedDate, TArchiveEntry archiveEntry,
         AmigaMetadata? amigaMetadata = null, bool isDirectory = false)
     {
         ArgumentNullException.ThrowIfNull(path);
@@ -186,7 +200,7 @@ public abstract class ArchiveVolume<TArchiveEntry> : IVolume
     private sealed record ArchiveEntry(string Name, EntryType Type, long? Size, DateTime? ModifiedDate,
         AmigaMetadata? AmigaMetadata) : IEntry;
 
-    private sealed record ArchiveFile(long Size, DateTime? ModifiedDate, TArchiveEntry ArchiveEntry,
+    private sealed record ArchiveFile(long? Size, DateTime? ModifiedDate, TArchiveEntry ArchiveEntry,
         AmigaMetadata? AmigaMetadata, long Index);
 
     private sealed class ArchiveDirectory(string name)

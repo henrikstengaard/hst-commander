@@ -3,7 +3,6 @@ using DiscUtils;
 using DiscUtils.Partitions;
 using DiscUtils.Streams;
 using Hst.Commander.Abstractions;
-using VhdDisk = DiscUtils.Vhd.Disk;
 
 namespace Hst.Commander.Plugins.Disk;
 
@@ -14,8 +13,10 @@ namespace Hst.Commander.Plugins.Disk;
 /// sector ending with 0x55 0xAA (MBR); boot sectors of unpartitioned FAT, exFAT and NTFS volumes are not detected.
 /// Disks with sectors of 512 bytes and of 4096 bytes (4Kn, e.g. images of some USB drives) are supported: GPT by where
 /// its header is, MBR by where the partitions start (see <see cref="DetectMbrSectorSize" />). Raw disk images (e.g.
-/// .img) and fixed size VHD images are read directly, dynamic and differencing VHD images (signature "conectix" at the
-/// start) through their virtual disk. A disk where the host finds another volume on the whole disk too, e.g. an Amiga
+/// .img) and fixed size VHD images are read directly, dynamic and differencing VHD, VHDX, VDI and DMG images through
+/// their virtual disk (see <see cref="VirtualDisks" />). A virtual disk without a partition table is opened as the file
+/// system on the whole disk (see <see cref="FileSystems" />), or else, except VHD (whose Amiga disks the Amiga plugin
+/// opens), by the host's file volume providers, e.g. an Amiga rigid disk block in a VHDX image. A disk where the host finds another volume on the whole disk too, e.g. an Amiga
 /// rigid disk block after the MBR, is a hybrid disk (see <see cref="HybridDiskVolume" />).
 /// </summary>
 public class DiskFileVolumeProvider : IFileVolumeProvider
@@ -31,7 +32,6 @@ public class DiskFileVolumeProvider : IFileVolumeProvider
     private const string GptName = "GPT";
     private static readonly byte[] GptSignature = "EFI PART"u8.ToArray();
     private static readonly byte[] RdbSignature = "RDSK"u8.ToArray();
-    private static readonly byte[] VhdSignature = "conectix"u8.ToArray();
 
     /// <param name="host">Host opening partitions not mounted by the plugin and finding hybrid disks.</param>
     public DiskFileVolumeProvider(IPluginHost? host = null)
@@ -47,7 +47,8 @@ public class DiskFileVolumeProvider : IFileVolumeProvider
 
     public string Name => "Disk";
 
-    public string Description => "Disk images with master boot record or GUID partition table";
+    public string Description =>
+        "Disk images with master boot record or GUID partition table, and VHD, VHDX, VDI and DMG images";
 
     public bool CanWrite => true;
 
@@ -62,21 +63,24 @@ public class DiskFileVolumeProvider : IFileVolumeProvider
             return true;
         }
 
-        // the disk of a dynamic vhd image is read through the virtual disk, which needs a seekable stream
-        if (length < VhdSignature.Length || !sectors.AsSpan(0, VhdSignature.Length).SequenceEqual(VhdSignature) ||
-            !stream.CanSeek)
+        // the disk of a virtual disk image is read through the virtual disk, which needs a seekable stream
+        if (!stream.CanSeek ||
+            await VirtualDisks.Detect(sectors.AsMemory(0, length), stream, cancellationToken) is not { } format)
         {
             return false;
         }
 
         try
         {
-            stream.Position = 0;
-            using var disk = new VhdDisk(stream, Ownership.None);
-            var diskStream = disk.Content;
+            using var disk = VirtualDisks.Open(format, stream);
+            var diskStream = new VirtualDiskStream(disk.Content);
+            var start = new byte[FileSystems.DetectLength];
             diskStream.Position = 0;
-            length = await diskStream.ReadAtLeastAsync(sectors, sectors.Length, false, cancellationToken);
-            return GetPartitionTable(sectors.AsSpan(0, length)) != null;
+            length = await diskStream.ReadAtLeastAsync(start, start.Length, false, cancellationToken);
+            // a VHD image without a partition table or a file system DiscUtils reads is left to the other providers,
+            // e.g. an Amiga disk to the Amiga plugin
+            return format != VirtualDisks.Vhd || GetPartitionTable(start.AsSpan(0, length)) != null ||
+                   FileSystemFileVolumeProvider.Detect(start.AsSpan(0, length)) != null;
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -229,32 +233,86 @@ public class DiskFileVolumeProvider : IFileVolumeProvider
     }
 
     /// <summary>
-    /// Creates a volume listing the partitions, or the partition tables of a hybrid disk. Throws
-    /// <see cref="IOException" /> when the partition table can't be read or has no partitions.
+    /// Creates a volume listing the partitions, or the partition tables of a hybrid disk, or for a virtual disk without
+    /// a partition table the volume on the whole disk. Throws <see cref="IOException" /> when the partition table can't
+    /// be read or has no partitions, or a virtual disk has no volume that can be opened.
     /// </summary>
     public async Task<IVolume> CreateVolume(Stream stream, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(stream);
 
-        var header = new byte[VhdSignature.Length];
+        var header = new byte[VirtualDisks.HeaderLength];
+        stream.Position = 0;
         var length = await stream.ReadAtLeastAsync(header, header.Length, false, cancellationToken);
         stream.Position = 0;
 
-        var disk = length == header.Length && header.AsSpan().SequenceEqual(VhdSignature)
-            ? new VhdDisk(stream, Ownership.None)
-            : null;
+        var format = await VirtualDisks.Detect(header.AsMemory(0, length), stream, cancellationToken);
+        if (format == null)
+        {
+            return await CreateDiskVolume(stream, null, null, cancellationToken);
+        }
+
+        var disk = VirtualDisks.Open(format, stream);
         try
         {
-            return await CreateDiskVolume(disk?.Content ?? stream, disk, cancellationToken);
+            return await CreateVirtualDiskVolume(format, disk, cancellationToken);
         }
         catch
         {
-            disk?.Dispose();
+            disk.Dispose();
             throw;
         }
     }
 
-    private async Task<IVolume> CreateDiskVolume(Stream diskStream, IDisposable? resource,
+    /// <summary>
+    /// Creates the volume of the disk of a virtual disk image, disposing the virtual disk with it: its partitions, or
+    /// the file system on the whole disk, or else (except VHD) a volume opened by the host.
+    /// </summary>
+    private async Task<IVolume> CreateVirtualDiskVolume(string format, VirtualDisk disk,
+        CancellationToken cancellationToken)
+    {
+        Stream diskStream;
+        try
+        {
+            diskStream = new VirtualDiskStream(disk.Content);
+        }
+        catch (Exception exception) when (exception is not (IOException or OperationCanceledException))
+        {
+            throw new IOException($"The disk of the {format} image can't be read: {exception.Message}", exception);
+        }
+
+        var sectors = new byte[LargeSectorSize * 2];
+        diskStream.Position = 0;
+        var length = await diskStream.ReadAtLeastAsync(sectors, sectors.Length, false, cancellationToken);
+        if (GetPartitionTable(sectors.AsSpan(0, length)) != null)
+        {
+            return await CreateDiskVolume(diskStream, disk, disk.SectorSize, cancellationToken);
+        }
+
+        if (FileSystems.MountFileSystem(format, diskStream, disk) is { } fileSystemVolume)
+        {
+            return fileSystemVolume;
+        }
+
+        if (format != VirtualDisks.Vhd && Host != null)
+        {
+            diskStream.Position = 0;
+            if (await Host.OpenVolume(format, diskStream, this, cancellationToken) is { } volume)
+            {
+                return new ResourceVolume(volume, disk);
+            }
+        }
+
+        throw new IOException($"The disk of the {format} image has no partition table or file system that can be read");
+    }
+
+    /// <param name="diskStream">Stream of the disk.</param>
+    /// <param name="resource">Resource disposed with the volume, e.g. a virtual disk.</param>
+    /// <param name="diskSectorSize">
+    /// Sector size of the disk used for an MBR when known, e.g. of a virtual disk; null to detect it.
+    /// </param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    private async Task<IVolume> CreateDiskVolume(Stream diskStream, IDisposable? resource, int? diskSectorSize,
         CancellationToken cancellationToken)
     {
         var sectors = new byte[LargeSectorSize * 2];
@@ -264,7 +322,8 @@ public class DiskFileVolumeProvider : IFileVolumeProvider
         var (partitionTableName, gptSectorSize) = GetPartitionTable(sectors.AsSpan(0, length)) ??
                                                   throw new IOException(
                                                       "No master boot record or GUID partition table found");
-        var sectorSize = gptSectorSize ?? await DetectMbrSectorSize(diskStream, sectors, cancellationToken);
+        var sectorSize = gptSectorSize ?? diskSectorSize ??
+            await DetectMbrSectorSize(diskStream, sectors, cancellationToken);
         diskStream.Position = 0;
 
         List<PartitionInfo> partitions;

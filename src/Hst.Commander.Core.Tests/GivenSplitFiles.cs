@@ -1,6 +1,6 @@
 using Hst.Commander.Abstractions;
 using Hst.Commander.Core.Volumes;
-using Hst.Commander.Plugins.RarSevenZip;
+using Hst.Commander.Plugins.Archives;
 using Hst.Commander.Plugins.Zip;
 
 namespace Hst.Commander.Core.Tests;
