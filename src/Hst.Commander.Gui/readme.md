@@ -53,6 +53,7 @@ The View menu (Ctrl+1 to Ctrl+9) chooses how each pane shows its entries:
 | F9 | Create a volume |
 | F10 / Ctrl+Q | Quit |
 | Ctrl+P / Alt+Enter | Properties |
+| Ctrl+Z | Command palette: search and run any menu command (in the panes) |
 | Ctrl+L | Change location |
 | Ctrl+1 to Ctrl+9 | Choose the navigation mode |
 | F1 / F2 | Choose the volume provider of the left / right pane (also Alt+F1 / Alt+F2 or Shift+F1 / Shift+F2, configurable in the settings) |

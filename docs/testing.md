@@ -87,6 +87,7 @@ Copy the list into the release's pull request or an issue and tick it per OS and
 
 ### Interface
 
+- [ ] Ctrl+Z in a pane opens the command palette with the search box focused; typing `cop` selects Copy under File, Up/Down skip the group headers, Enter runs the command and Esc closes it.
 - [ ] Ctrl+T runs a command (e.g. `dir` or `ls`) in the active pane's directory; Ctrl+Enter inserts the entry name. (TUI) The output is shown and Ctrl+O shows it again, and the panes come back afterwards.
 - [ ] The context menu (right-click, Shift+F10, Ctrl+F10) works, and Terminal here (PowerShell and Command prompt here on Windows) opens a terminal in the directory.
 - [ ] The settings dialog changes the theme (Midnight Commander, Light, Dark, Directory Opus 4) with a preview, and Directory Opus 4's button editor saves its buttons; the settings are kept after a restart.
