@@ -1,0 +1,37 @@
+{
+  "$schema": "https://raw.githubusercontent.com/henrikstengaard/hst-commander/main/docs/theme.schema.json",
+  "id": "palenight",
+  "name": "Palenight",
+  "dark": {
+    "palette": {
+      "neutral": "#292d3e",
+      "ink": "#a6accd",
+      "primary": "#82aaff",
+      "accent": "#89ddff",
+      "success": "#c3e88d",
+      "warning": "#ffcb6b",
+      "error": "#f07178",
+      "info": "#f78c6c"
+    },
+    "overrides": {
+      "item": "#676e95",
+      "path": "#676e95"
+    }
+  },
+  "light": {
+    "palette": {
+      "neutral": "#fafafa",
+      "ink": "#292d3e",
+      "primary": "#4976eb",
+      "accent": "#00acc1",
+      "success": "#91b859",
+      "warning": "#ffb300",
+      "error": "#e53935",
+      "info": "#f4511e"
+    },
+    "overrides": {
+      "item": "#8796b0",
+      "path": "#8796b0"
+    }
+  }
+}

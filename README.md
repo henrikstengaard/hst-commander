@@ -58,7 +58,7 @@ Hst Commander comes with two front-ends that have the same functionality:
 - Starting files with their associated application.
 - Entry icons in the GUI: Amiga `.info` icons, icons contained in programs and `.ico` files, and the host OS icons.
 - GUI navigation modes: list, thumbnails and the Amiga Workbench with icons at their positions, which can be dragged and saved.
-- Themes: Midnight Commander (default), Light, Dark and Directory Opus 4, whose button bank can be changed in the settings.
+- Themes: Midnight Commander (default), Light, Dark, Directory Opus 4 (whose button bank can be changed in the settings) and 36 themes adapted from [opencode](https://github.com/anomalyco/opencode) in dark and light, e.g. Dracula, Nord, Gruvbox and Catppuccin. Add your own as JSON files in opencode's format to `~/.hst-commander/themes` (see [JSON themes](docs/themes.md#json-themes)).
 - Plugins loaded at startup from `~/.hst-commander/plugins`, adding locations, image formats, volume creators, icons, navigation modes, properties tabs and themes (see the [plugin API](docs/plugin-api.md)).
 - An error log, and unexpected errors offered to be reported as a GitHub issue the user reviews first.
 

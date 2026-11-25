@@ -1,0 +1,29 @@
+{
+  "$schema": "https://raw.githubusercontent.com/henrikstengaard/hst-commander/main/docs/theme.schema.json",
+  "id": "tokyonight",
+  "name": "Tokyonight",
+  "dark": {
+    "palette": {
+      "neutral": "#1a1b26",
+      "ink": "#c0caf5",
+      "primary": "#7aa2f7",
+      "accent": "#ff9e64",
+      "success": "#9ece6a",
+      "warning": "#e0af68",
+      "error": "#f7768e",
+      "info": "#7dcfff"
+    }
+  },
+  "light": {
+    "palette": {
+      "neutral": "#e1e2e7",
+      "ink": "#273153",
+      "primary": "#2e7de9",
+      "accent": "#b15c00",
+      "success": "#587539",
+      "warning": "#8c6c3e",
+      "error": "#c94060",
+      "info": "#007197"
+    }
+  }
+}

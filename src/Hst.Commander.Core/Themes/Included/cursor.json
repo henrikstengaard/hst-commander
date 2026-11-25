@@ -1,0 +1,39 @@
+{
+  "$schema": "https://raw.githubusercontent.com/henrikstengaard/hst-commander/main/docs/theme.schema.json",
+  "id": "cursor",
+  "name": "Cursor",
+  "dark": {
+    "palette": {
+      "neutral": "#181818",
+      "ink": "#e4e4e4",
+      "primary": "#88c0d0",
+      "accent": "#88c0d0",
+      "success": "#3fa266",
+      "warning": "#f1b467",
+      "error": "#e34671",
+      "info": "#81a1c1",
+      "interactive": "#82D2CE"
+    },
+    "overrides": {
+      "item": "#636363",
+      "path": "#636363"
+    }
+  },
+  "light": {
+    "palette": {
+      "neutral": "#fcfcfc",
+      "ink": "#141414",
+      "primary": "#6f9ba6",
+      "accent": "#6f9ba6",
+      "success": "#1f8a65",
+      "warning": "#db704b",
+      "error": "#cf2d56",
+      "info": "#3c7cab",
+      "interactive": "#206595"
+    },
+    "overrides": {
+      "item": "#5f5f5f",
+      "path": "#5f5f5f"
+    }
+  }
+}

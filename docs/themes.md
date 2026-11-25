@@ -1,17 +1,43 @@
 # Themes
 
-Built-in and plugin themes, the bottom area with its buttons, parent buttons, the button editor and the Directory Opus 4 theme.
+Built-in, JSON and plugin themes, the bottom area with its buttons, parent buttons, the button editor and the Directory Opus 4 theme.
 
 Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../src/agents.md).
 
 ## Theme Model
 
-- `Themes` (Core) lists the themes shown in Settings > Appearance: the built-in Midnight Commander, Light and Dark, then the `ITheme`s of `IPlugin.Themes` in plugin order (a theme whose `Id` is already listed is left out). Each is a `ThemeChoice(Id, Name, Plugin)`, where `Plugin` is null for a built-in theme.
-- Both settings files store the theme's `Id` as a string. The built-in ids are the names of the old `TuiTheme`/`GuiTheme` enums (`MidnightCommander`, `Light`, `Dark`), so existing settings keep their theme. `Themes.Find` falls back to Midnight Commander for an unknown id, e.g. when the theme's plugin isn't installed.
-- Built-in themes keep their hand-made colors: `TuiPalette` in the TUI, `App.axaml` ThemeDictionaries in the GUI.
-- A plugin theme gives its colors once as `ThemeColors` ("#RRGGBB" strings). The optional `MarkedContainerBackground` and `MarkedItemBackground` give marked rows a background (the row under the cursor keeps the cursor background); without them only the text of marked entries is colored.
-  - **TUI:** `TuiPalette.From` maps each color to the closest of the 16 colors (`Color.GetClosestNamedColor16`, with the RGB values from `TuiTrueColors`), so it works in every terminal.
-  - **GUI:** `ThemeManager` creates a `ThemeVariant` per plugin theme. It inherits Light or Dark depending on `ITheme.IsDark`, which colors the controls the theme doesn't, and gets a theme dictionary of brushes with the keys `App.axaml` uses. `PluginThemeStyles` is added to `Application.Styles` only while a plugin theme is applied. It uses the extra keys `CursorBackground`, `MenuBackground`, `MenuForeground`, `BottomBackground`, `ButtonBackground` and `ButtonForeground` to color the current row, the menu bar, the window background, the bottom area, its buttons and the parent buttons.
+- `Themes` (Core) lists the themes shown in Settings > Appearance: the built-in Midnight Commander, Light and Dark, then the `ITheme`s of `IPlugin.Themes` in plugin order, then the included themes adapted from opencode and the user's themes sorted by name. A user theme with the id of a built-in or included theme replaces it (so a copy of a built-in file can change it); any other theme whose `Id` is already listed is left out. Each is a `ThemeChoice` wrapping its `ITheme`. Settings > Appearance of both front-ends lists all of them sorted by name (`Themes.SortedByName`).
+- Built-in, included and user themes are JSON theme files read by `JsonTheme` (see [JSON Themes](#json-themes)). The built-in and included files are embedded in Core (`Themes/BuiltIn`, `Themes/Included`); user themes are read from `~/.hst-commander/themes/*.json` (`Themes.UserDirectory`) once, when the themes are first listed, so new and changed files are used after a restart. A file that isn't a valid theme is logged (see [Errors](application.md#errors-and-crash-reports)) and left out.
+- Both settings files store the theme's `Id` as a string. The built-in ids are the names of the old `TuiTheme`/`GuiTheme` enums (`MidnightCommander`, `Light`, `Dark`), so existing settings keep their theme. `Themes.Find` falls back to Midnight Commander for an unknown id, e.g. when the theme's plugin isn't installed or the user's file was removed.
+- Every theme gives its colors as `ThemeColors` ("#RRGGBB" strings). A JSON theme can give the TUI other colors than the GUI (`ThemeChoice.TuiColors` and `GuiColors`). The optional `MarkedContainerBackground` and `MarkedItemBackground` give marked rows a background (the row under the cursor keeps the cursor background); without them only the text of marked entries is colored. The optional colors of plugin API 1.2 (`MarkedCursorForeground`, `MenuFocus*`, `MenuHotForeground`, `Key*`, `DialogFocus*`, `ViewerSelection*`) fall back to the cursor's, the menu's or the marked color.
+  - **TUI:** `TuiPalette.From` maps each color to the closest of the 16 colors (`Color.GetClosestNamedColor16`, with the RGB values from `TuiTrueColors`), so it works in every terminal. The built-in themes give the exact `TuiTrueColors` values in `tui-` overrides, so they get the 16 colors they were made with. A marked entry under the cursor uses the cursor's text when the marked color maps to the cursor's background.
+  - **GUI:** `ThemeManager` creates a `ThemeVariant` per theme. It inherits Light or Dark depending on `ITheme.IsDark`, which colors the controls the theme doesn't, and gets a theme dictionary of brushes with the keys the views use (`PaneBackground`, `CursorBackground`, `ViewerSelectionBackground`, ...). The current row of the active pane is drawn in `CursorBackground` by a style in `App.axaml`. `ThemeChromeStyles` is added to `Application.Styles` unless the theme keeps the system look (`systemChrome` of JSON themes, set by the built-in themes): it uses `MenuBackground`, `MenuForeground`, `BottomBackground`, `ButtonBackground` and `ButtonForeground` to color the menu bar, the window background, the bottom area, its buttons and the parent buttons. Those keys are only added to the dictionary of such themes: `ButtonBackground` and `ButtonForeground` are also the keys of Fluent's buttons, so they would color every button, including those of dialogs.
+  - **Dialogs:** both front-ends draw dialogs in the theme's `DialogBackground` and `DialogForeground`. The TUI always has (`TuiPalette.DialogColorScheme`, focused controls in `DialogFocus*`). In the GUI, themes coloring the chrome also replace the Fluent resources of windows and dialog controls (`ThemeManager.AddDialogResources`): text fields, lists and drop-downs get the pane background, borders the pane border, focused fields, checked boxes and the selected tab's line the cursor color, selected list items the viewer selection colors, and buttons the button colors with hover and pressed shades. Themes keeping the system look (the built-in themes) keep Fluent's dialogs.
+
+## JSON Themes
+
+The format follows [opencode's themes](https://github.com/anomalyco/opencode/tree/dev/packages/ui/src/theme/themes), so their files work unchanged; [`theme.schema.json`](theme.schema.json) describes it for editors. Copy a file from `src/Hst.Commander.Core/Themes` to `~/.hst-commander/themes` to start from it.
+
+```json
+{
+  "$schema": "https://raw.githubusercontent.com/henrikstengaard/hst-commander/main/docs/theme.schema.json",
+  "id": "dracula",
+  "name": "Dracula",
+  "dark": {
+    "palette": { "neutral": "#1d1e28", "ink": "#f8f8f2", "primary": "#bd93f9", "accent": "#ff79c6",
+                 "success": "#50fa7b", "warning": "#ffb86c" },
+    "overrides": { "item": "#a0a0b0", "tui-header": "#F9F1A5" }
+  },
+  "light": { "palette": { "neutral": "#f8f8f2", "ink": "#1f1f2f", "primary": "#7c6bf5" } }
+}
+```
+
+- `id` (default: the file name) and `name` (default: the id). A file with both `dark` and `light` gives two themes, `<id>-dark` "Name Dark" and `<id>-light` "Name Light", the dark one first; a file with one variant keeps the id and name.
+- **`palette`:** seed colors the theme's colors are derived from (`JsonTheme.Derive`): the panes in `neutral` with directories in `ink` and files and the path in `ink` mixed with 25 % `neutral`, the cursor and the active path in `primary` with whichever of `neutral` and `ink` contrasts more (black or white when neither reaches 4.5:1), column headers in `accent` (default `primary`), executables in `success`, marked entries in `warning`, and menus, buttons and dialogs in `neutral` with 8–15 % `ink`. Missing seeds have defaults for light and dark. `error`, `info`, `interactive`, `diffAdd` and `diffDelete` aren't used.
+- **`overrides`:** colors by name replacing the derived ones, the names of `ThemeColors` in kebab case (`pane-background`, `cursor-foreground`, `key-background`, ... listed in `JsonTheme.ColorNames` and the schema). A name prefixed with `tui-` or `gui-` only applies to that front-end, after the others. opencode's `text-weak` and `border-weak-base` color files and the border; other names (e.g. its syntax and markdown colors) are ignored.
+- Colors are `#RGB`, `#RRGGBB` or `#RRGGBBAA` (drawn over `neutral`). Other values, e.g. opencode's `var(--...)` references, are ignored so the derived color is used.
+- A variant's `systemChrome: true` keeps the GUI's Fluent menu bar, bottom area and buttons (the built-in themes). Top-level `showParentButtons`, `highlightActivePathPanel`, `fontFamily` and `fontSize` work like the `ITheme` members of the same names. JSON themes show the function key bar, with left-aligned labels.
+- **Included themes:** the 36 themes of opencode's `packages/ui/src/theme/themes` (MIT, see [Licenses](application.md#licenses)), adapted: only the palette is kept, `text-weak` becomes the `item` and `path` overrides (with alpha drawn over `neutral`) and `border-weak-base` the `pane-border` override.
 
 ## Bottom Area
 

@@ -1,0 +1,29 @@
+{
+  "$schema": "https://raw.githubusercontent.com/henrikstengaard/hst-commander/main/docs/theme.schema.json",
+  "id": "ayu",
+  "name": "Ayu",
+  "dark": {
+    "palette": {
+      "neutral": "#0f1419",
+      "ink": "#d6dae0",
+      "primary": "#3fb7e3",
+      "accent": "#f2856f",
+      "success": "#78d05c",
+      "warning": "#e4a75c",
+      "error": "#f58572",
+      "info": "#66c6f1"
+    }
+  },
+  "light": {
+    "palette": {
+      "neutral": "#fdfaf4",
+      "ink": "#4f5964",
+      "primary": "#4aa8c8",
+      "accent": "#ef7d71",
+      "success": "#5fb978",
+      "warning": "#ea9f41",
+      "error": "#e6656a",
+      "info": "#2f9bce"
+    }
+  }
+}

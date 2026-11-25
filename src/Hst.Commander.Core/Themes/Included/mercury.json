@@ -1,0 +1,38 @@
+{
+  "$schema": "https://raw.githubusercontent.com/henrikstengaard/hst-commander/main/docs/theme.schema.json",
+  "id": "mercury",
+  "name": "Mercury",
+  "dark": {
+    "palette": {
+      "neutral": "#171721",
+      "ink": "#dddde5",
+      "primary": "#8da4f5",
+      "accent": "#8da4f5",
+      "success": "#77c599",
+      "warning": "#fc9b6f",
+      "error": "#fc92b4",
+      "info": "#77becf"
+    },
+    "overrides": {
+      "item": "#9d9da8",
+      "path": "#9d9da8"
+    }
+  },
+  "light": {
+    "palette": {
+      "neutral": "#ffffff",
+      "ink": "#363644",
+      "primary": "#5266eb",
+      "accent": "#8da4f5",
+      "success": "#036e43",
+      "warning": "#a44200",
+      "error": "#b0175f",
+      "info": "#007f95",
+      "interactive": "#465bd1"
+    },
+    "overrides": {
+      "item": "#70707d",
+      "path": "#70707d"
+    }
+  }
+}

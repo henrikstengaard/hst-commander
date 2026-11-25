@@ -6,7 +6,9 @@ namespace Hst.Commander.Tui;
 
 /// <summary>
 ///     Colors of the TUI for a theme (<see cref="ThemeChoice" />), using the 16 legacy colors so they work in every
-///     terminal. Themes of plugins get the closest of the 16 colors for each of their colors (<see cref="From" />).
+///     terminal: the closest of the 16 colors for each of the theme's colors (<see cref="From" />). The built-in themes
+///     give the RGB values of <see cref="TuiTrueColors" /> in their <c>tui-</c> overrides, so they get exactly the 16
+///     colors they were made with.
 /// </summary>
 public sealed record TuiPalette(
     ColorName16 PaneBackground,
@@ -28,84 +30,24 @@ public sealed record TuiPalette(
     TuiAttribute DialogFocus,
     TuiAttribute? Button = null,
     ColorName16? MarkedContainerBackground = null,
-    ColorName16? MarkedItemBackground = null)
+    ColorName16? MarkedItemBackground = null,
+    TuiAttribute? Key = null)
 {
-    /// <summary>Blue panes with directories in white, files in gray, executables in green and cyan menu and function key bars.</summary>
-    public static TuiPalette MidnightCommander { get; } = new(
-        PaneBackground: ColorName16.Blue,
-        Border: ColorName16.White,
-        Header: ColorName16.BrightYellow,
-        Container: ColorName16.White,
-        Item: ColorName16.Gray,
-        Executable: ColorName16.BrightGreen,
-        Marked: ColorName16.BrightYellow,
-        Path: ColorName16.BrightYellow,
-        Cursor: new TuiAttribute(ColorName16.Black, ColorName16.Gray),
-        MarkedCursor: new TuiAttribute(ColorName16.BrightYellow, ColorName16.Gray),
-        ActivePath: new TuiAttribute(ColorName16.Black, ColorName16.Gray),
-        Menu: new TuiAttribute(ColorName16.Black, ColorName16.Cyan),
-        MenuFocus: new TuiAttribute(ColorName16.White, ColorName16.Black),
-        MenuHot: new TuiAttribute(ColorName16.BrightYellow, ColorName16.Cyan),
-        FunctionKey: new TuiAttribute(ColorName16.White, ColorName16.Black),
-        Dialog: new TuiAttribute(ColorName16.Black, ColorName16.Gray),
-        DialogFocus: new TuiAttribute(ColorName16.Black, ColorName16.BrightCyan));
-
-    public static TuiPalette Light { get; } = new(
-        PaneBackground: ColorName16.White,
-        Border: ColorName16.DarkGray,
-        Header: ColorName16.Blue,
-        Container: ColorName16.Black,
-        Item: ColorName16.DarkGray,
-        Executable: ColorName16.Green,
-        Marked: ColorName16.Red,
-        Path: ColorName16.Black,
-        Cursor: new TuiAttribute(ColorName16.White, ColorName16.Blue),
-        MarkedCursor: new TuiAttribute(ColorName16.BrightYellow, ColorName16.Blue),
-        ActivePath: new TuiAttribute(ColorName16.White, ColorName16.Blue),
-        Menu: new TuiAttribute(ColorName16.Black, ColorName16.Gray),
-        MenuFocus: new TuiAttribute(ColorName16.White, ColorName16.Blue),
-        MenuHot: new TuiAttribute(ColorName16.Blue, ColorName16.Gray),
-        FunctionKey: new TuiAttribute(ColorName16.White, ColorName16.DarkGray),
-        Dialog: new TuiAttribute(ColorName16.Black, ColorName16.White),
-        DialogFocus: new TuiAttribute(ColorName16.White, ColorName16.Blue));
-
-    public static TuiPalette Dark { get; } = new(
-        PaneBackground: ColorName16.Black,
-        Border: ColorName16.DarkGray,
-        Header: ColorName16.Gray,
-        Container: ColorName16.White,
-        Item: ColorName16.Gray,
-        Executable: ColorName16.BrightGreen,
-        Marked: ColorName16.BrightYellow,
-        Path: ColorName16.Gray,
-        Cursor: new TuiAttribute(ColorName16.White, ColorName16.DarkGray),
-        MarkedCursor: new TuiAttribute(ColorName16.BrightYellow, ColorName16.DarkGray),
-        ActivePath: new TuiAttribute(ColorName16.Black, ColorName16.BrightCyan),
-        Menu: new TuiAttribute(ColorName16.White, ColorName16.DarkGray),
-        MenuFocus: new TuiAttribute(ColorName16.Black, ColorName16.BrightCyan),
-        MenuHot: new TuiAttribute(ColorName16.BrightCyan, ColorName16.DarkGray),
-        FunctionKey: new TuiAttribute(ColorName16.Gray, ColorName16.Black),
-        Dialog: new TuiAttribute(ColorName16.White, ColorName16.DarkGray),
-        DialogFocus: new TuiAttribute(ColorName16.Black, ColorName16.BrightCyan));
-
     public TuiAttribute PaneNormal => new(Border, PaneBackground);
 
     /// <summary>Buttons of the bottom area: the theme's buttons, or the titles of the function key bar.</summary>
     public TuiAttribute ButtonTitle => Button ?? Menu;
 
     /// <summary>Keys shown before the button labels, e.g. "F5" of the function key bar.</summary>
-    public TuiAttribute ButtonKey => Button ?? FunctionKey;
+    public TuiAttribute ButtonKey => Key ?? Button ?? FunctionKey;
 
-    public static TuiPalette For(ThemeChoice theme) => theme.Plugin is { } pluginTheme
-        ? From(pluginTheme.Colors)
-        : theme.Id switch
-        {
-            Themes.LightId => Light,
-            Themes.DarkId => Dark,
-            _ => MidnightCommander
-        };
+    /// <summary>The palette of a theme, from its TUI colors (<see cref="ThemeChoice.TuiColors" />).</summary>
+    public static TuiPalette For(ThemeChoice theme) => From(theme.TuiColors);
 
-    /// <summary>The palette of the colors of a plugin theme, the closest of the 16 colors for each.</summary>
+    /// <summary>
+    ///     The palette of the colors of a theme, the closest of the 16 colors for each. Optional colors the theme doesn't
+    ///     give fall back to the cursor's (menu and dialog focus), the menu's (key bars) and the marked entries' colors.
+    /// </summary>
     public static TuiPalette From(ThemeColors colors)
     {
         ArgumentNullException.ThrowIfNull(colors);
@@ -113,6 +55,16 @@ public sealed record TuiPalette(
         var menu = Attribute(colors.MenuForeground, colors.MenuBackground);
         var dialog = Attribute(colors.DialogForeground, colors.DialogBackground);
         var cursor = Attribute(colors.CursorForeground, colors.CursorBackground);
+        var key = colors.KeyForeground != null || colors.KeyBackground != null
+            ? Attribute(colors.KeyForeground ?? colors.ButtonForeground, colors.KeyBackground ?? colors.ButtonBackground)
+            : (TuiAttribute?)null;
+        // a marked entry under the cursor in the cursor's text when the marked color is the cursor's background here
+        var markedCursor = Closest(colors.MarkedCursorForeground ?? colors.Marked);
+        if (markedCursor == Closest(colors.CursorBackground))
+        {
+            markedCursor = Closest(colors.CursorForeground);
+        }
+
         return new TuiPalette(
             PaneBackground: paneBackground,
             Border: Closest(colors.PaneBorder),
@@ -123,17 +75,21 @@ public sealed record TuiPalette(
             Marked: Closest(colors.Marked),
             Path: Closest(colors.Path),
             Cursor: cursor,
-            MarkedCursor: new TuiAttribute(Closest(colors.Marked), Closest(colors.CursorBackground)),
+            MarkedCursor: new TuiAttribute(markedCursor, Closest(colors.CursorBackground)),
             ActivePath: Attribute(colors.ActivePathForeground, colors.ActivePathBackground),
             Menu: menu,
-            MenuFocus: cursor,
-            MenuHot: new TuiAttribute(Closest(colors.ActivePathBackground), Closest(colors.MenuBackground)),
-            FunctionKey: menu,
+            MenuFocus: Attribute(colors.MenuFocusForeground ?? colors.CursorForeground,
+                colors.MenuFocusBackground ?? colors.CursorBackground),
+            MenuHot: new TuiAttribute(Closest(colors.MenuHotForeground ?? colors.ActivePathBackground),
+                Closest(colors.MenuBackground)),
+            FunctionKey: key ?? menu,
             Dialog: dialog,
-            DialogFocus: cursor,
+            DialogFocus: Attribute(colors.DialogFocusForeground ?? colors.CursorForeground,
+                colors.DialogFocusBackground ?? colors.CursorBackground),
             Button: Attribute(colors.ButtonForeground, colors.ButtonBackground),
             MarkedContainerBackground: colors.MarkedContainerBackground == null ? null : Closest(colors.MarkedContainerBackground),
-            MarkedItemBackground: colors.MarkedItemBackground == null ? null : Closest(colors.MarkedItemBackground));
+            MarkedItemBackground: colors.MarkedItemBackground == null ? null : Closest(colors.MarkedItemBackground),
+            Key: key);
     }
 
     /// <summary>The closest of the 16 colors to a "#RRGGBB" color, gray when it is invalid.</summary>

@@ -33,6 +33,12 @@
     </ItemGroup>
 
     <ItemGroup>
+      <!-- JSON theme files of the built-in themes and the themes adapted from opencode, see Themes -->
+      <EmbeddedResource Include="Themes\BuiltIn\*.json" LogicalName="Themes.BuiltIn.%(Filename)%(Extension)" />
+      <EmbeddedResource Include="Themes\Included\*.json" LogicalName="Themes.Included.%(Filename)%(Extension)" />
+    </ItemGroup>
+
+    <ItemGroup>
       <!--
           License notices shown in Help > About > Licenses (see Licenses) and copied next to the apps, which reference
           Core: Hst Commander's license, the notices of the third-party components and the notices of the native Skia

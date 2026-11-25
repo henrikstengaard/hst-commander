@@ -1,0 +1,29 @@
+{
+  "$schema": "https://raw.githubusercontent.com/henrikstengaard/hst-commander/main/docs/theme.schema.json",
+  "id": "solarized",
+  "name": "Solarized",
+  "dark": {
+    "palette": {
+      "neutral": "#002b36",
+      "ink": "#93a1a1",
+      "primary": "#6c71c4",
+      "accent": "#d33682",
+      "success": "#859900",
+      "warning": "#b58900",
+      "error": "#dc322f",
+      "info": "#2aa198"
+    }
+  },
+  "light": {
+    "palette": {
+      "neutral": "#fdf6e3",
+      "ink": "#586e75",
+      "primary": "#268bd2",
+      "accent": "#d33682",
+      "success": "#859900",
+      "warning": "#b58900",
+      "error": "#dc322f",
+      "info": "#2aa198"
+    }
+  }
+}

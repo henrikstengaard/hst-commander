@@ -1,0 +1,37 @@
+{
+  "$schema": "https://raw.githubusercontent.com/henrikstengaard/hst-commander/main/docs/theme.schema.json",
+  "id": "one-dark",
+  "name": "One Dark",
+  "dark": {
+    "palette": {
+      "neutral": "#282c34",
+      "ink": "#abb2bf",
+      "primary": "#61afef",
+      "accent": "#56b6c2",
+      "success": "#98c379",
+      "warning": "#e5c07b",
+      "error": "#e06c75",
+      "info": "#d19a66"
+    },
+    "overrides": {
+      "item": "#5c6370",
+      "path": "#5c6370"
+    }
+  },
+  "light": {
+    "palette": {
+      "neutral": "#fafafa",
+      "ink": "#383a42",
+      "primary": "#4078f2",
+      "accent": "#0184bc",
+      "success": "#50a14f",
+      "warning": "#c18401",
+      "error": "#e45649",
+      "info": "#986801"
+    },
+    "overrides": {
+      "item": "#a0a1a7",
+      "path": "#a0a1a7"
+    }
+  }
+}

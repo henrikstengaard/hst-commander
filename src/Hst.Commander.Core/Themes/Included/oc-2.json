@@ -1,0 +1,39 @@
+{
+  "$schema": "https://raw.githubusercontent.com/henrikstengaard/hst-commander/main/docs/theme.schema.json",
+  "id": "oc-2",
+  "name": "OpenCode",
+  "dark": {
+    "palette": {
+      "neutral": "#1f1f1f",
+      "ink": "#f1ece8",
+      "primary": "#fab283",
+      "success": "#12c905",
+      "warning": "#fcd53a",
+      "error": "#fc533a",
+      "info": "#edb2f1",
+      "interactive": "#034cff"
+    },
+    "overrides": {
+      "item": "#707070",
+      "path": "#707070",
+      "pane-border": "#282828"
+    }
+  },
+  "light": {
+    "palette": {
+      "neutral": "#f7f7f7",
+      "ink": "#171311",
+      "primary": "#dcde8d",
+      "success": "#12c905",
+      "warning": "#ffdc17",
+      "error": "#fc533a",
+      "info": "#a753ae",
+      "interactive": "#034cff"
+    },
+    "overrides": {
+      "item": "#8F8F8F",
+      "path": "#8F8F8F",
+      "pane-border": "#DBDBDB"
+    }
+  }
+}

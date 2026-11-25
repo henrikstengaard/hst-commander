@@ -1,0 +1,37 @@
+{
+  "$schema": "https://raw.githubusercontent.com/henrikstengaard/hst-commander/main/docs/theme.schema.json",
+  "id": "lucent-orng",
+  "name": "Lucent Orng",
+  "dark": {
+    "palette": {
+      "neutral": "#2a1a15",
+      "ink": "#eeeeee",
+      "primary": "#EC5B2B",
+      "accent": "#FFF7F1",
+      "success": "#6ba1e6",
+      "warning": "#EC5B2B",
+      "error": "#e06c75",
+      "info": "#56b6c2"
+    },
+    "overrides": {
+      "item": "#808080",
+      "path": "#808080"
+    }
+  },
+  "light": {
+    "palette": {
+      "neutral": "#fff5f0",
+      "ink": "#1a1a1a",
+      "primary": "#EC5B2B",
+      "accent": "#c94d24",
+      "success": "#0062d1",
+      "warning": "#EC5B2B",
+      "error": "#d1383d",
+      "info": "#318795"
+    },
+    "overrides": {
+      "item": "#8a8a8a",
+      "path": "#8a8a8a"
+    }
+  }
+}

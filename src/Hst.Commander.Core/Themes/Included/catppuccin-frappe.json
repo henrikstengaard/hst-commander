@@ -1,0 +1,33 @@
+{
+  "$schema": "https://raw.githubusercontent.com/henrikstengaard/hst-commander/main/docs/theme.schema.json",
+  "id": "catppuccin-frappe",
+  "name": "Catppuccin Frappe",
+  "dark": {
+    "palette": {
+      "neutral": "#303446",
+      "ink": "#c6d0f5",
+      "primary": "#8caaee",
+      "accent": "#f4b8e4",
+      "success": "#a6d189",
+      "warning": "#e5c890",
+      "error": "#e78284",
+      "info": "#81c8be"
+    },
+    "overrides": {
+      "item": "#b5bfe2",
+      "path": "#b5bfe2"
+    }
+  },
+  "light": {
+    "palette": {
+      "neutral": "#eff1f5",
+      "ink": "#4c4f69",
+      "primary": "#7287fd",
+      "accent": "#d20f39",
+      "success": "#40a02b",
+      "warning": "#df8e1d",
+      "error": "#d20f39",
+      "info": "#04a5e5"
+    }
+  }
+}

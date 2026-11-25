@@ -51,6 +51,7 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - Starting the GUI maximized (Settings > Appearance > Start maximized).
 - GUI navigation modes (View menu, Ctrl+1 to Ctrl+9): list, thumbnails and the plugins' modes, e.g. the Amiga Workbench with icons at their `.info` positions, which can be dragged, sorted by name and saved, and def icons (`.info` or image files in `~/.hst-commander/plugins/amiga`) for entries without an icon.
 
+- JSON themes in opencode's format in both front-ends: the built-in themes, 36 themes adapted from opencode (dark and light) and the user's own in `~/.hst-commander/themes`, see [JSON themes](themes.md#json-themes).
 - Themes added by plugins in both front-ends, with their own colors, buttons in the bottom area and parent buttons at the outer side of the panes; the default DirectoryOpus plugin's Directory Opus 4 theme has a button bank the user changes in the settings (dragging buttons and columns in the GUI, with keys in the TUI), see [Themes](themes.md).
 - Choosing the font and size of the panes and the bottom area in the GUI (Settings > Appearance); themes can name a font, e.g. Topaz for Directory Opus 4 when it's installed
 - Viewing files of any size (F3) in a text view (UTF-8 or ISO-8859-1, word wrapped with F2) or hex view, with text and regular expression search and selecting and copying text or hex values, in both front-ends.

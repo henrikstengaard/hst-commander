@@ -393,7 +393,7 @@ public sealed class MainWindow : Window
         var bottomPanel = theme.GetBottomPanel();
         var bottomHeight = Math.Max(1, bottomPanel.Rows);
         _bottomPanel.Panel = bottomPanel;
-        _bottomPanel.CenterLabels = theme.Plugin != null;
+        _bottomPanel.CenterLabels = theme.CenterButtonLabels;
         _bottomPanel.Height = bottomHeight;
         _bottomPanel.Y = Pos.AnchorEnd(bottomHeight);
         _commandPrompt.Y = Pos.AnchorEnd(bottomHeight + 1);

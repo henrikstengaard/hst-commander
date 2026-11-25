@@ -58,11 +58,11 @@ public static class GuiFonts
     /// <summary>Font family and size for a theme and the font chosen in the settings (null for none).</summary>
     public static (FontFamily Family, double Size) Resolve(ThemeChoice theme, string? fontFamily, double? fontSize)
     {
-        var themeFamily = theme.Plugin?.FontFamily is { } family && !string.IsNullOrWhiteSpace(family) &&
+        var themeFamily = theme.Theme.FontFamily is { } family && !string.IsNullOrWhiteSpace(family) &&
                           IsInstalled(family)
             ? family
             : null;
-        var themeSize = themeFamily != null ? theme.Plugin?.FontSize : null;
+        var themeSize = themeFamily != null ? theme.Theme.FontSize : null;
         var chosen = !string.IsNullOrWhiteSpace(fontFamily) ? fontFamily.Trim() : themeFamily;
         var size = Math.Clamp(fontSize ?? themeSize ?? DefaultSize, MinimumSize, MaximumSize);
         var families = chosen == null ? DefaultFamily : $"{Qualify(chosen)}, {DefaultFamily}";

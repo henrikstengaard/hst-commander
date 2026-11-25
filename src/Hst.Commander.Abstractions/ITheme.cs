@@ -129,4 +129,49 @@ public sealed record ThemeColors(
 
     /// <summary>Background of marked files, null for the pane background.</summary>
     public string? MarkedItemBackground { get; init; }
+
+    /// <summary>Text of a marked entry under the cursor, null for <see cref="Marked" /> (plugin API 1.2).</summary>
+    public string? MarkedCursorForeground { get; init; }
+
+    /// <summary>Background of the open menu item in the TUI, null for <see cref="CursorBackground" /> (plugin API 1.2).</summary>
+    public string? MenuFocusBackground { get; init; }
+
+    /// <summary>Text of the open menu item in the TUI, null for <see cref="CursorForeground" /> (plugin API 1.2).</summary>
+    public string? MenuFocusForeground { get; init; }
+
+    /// <summary>
+    /// Hot keys of the menu bar in the TUI, null for <see cref="ActivePathBackground" /> (plugin API 1.2).
+    /// </summary>
+    public string? MenuHotForeground { get; init; }
+
+    /// <summary>
+    /// Background of the keys shown before button labels (e.g. "F5" of the function key bar) and of the viewer's and
+    /// editor's key bars in the TUI, null for the button's or menu's background (plugin API 1.2).
+    /// </summary>
+    public string? KeyBackground { get; init; }
+
+    /// <summary>Text of the keys shown before button labels, null for the button's or menu's text (plugin API 1.2).</summary>
+    public string? KeyForeground { get; init; }
+
+    /// <summary>
+    /// Background of focused controls of dialogs in the TUI, null for <see cref="CursorBackground" /> (plugin API 1.2).
+    /// </summary>
+    public string? DialogFocusBackground { get; init; }
+
+    /// <summary>
+    /// Text of focused controls of dialogs in the TUI, null for <see cref="CursorForeground" /> (plugin API 1.2).
+    /// </summary>
+    public string? DialogFocusForeground { get; init; }
+
+    /// <summary>
+    /// Background of selected text in the viewer and editor of the GUI, null for <see cref="CursorBackground" /> (plugin
+    /// API 1.2).
+    /// </summary>
+    public string? ViewerSelectionBackground { get; init; }
+
+    /// <summary>
+    /// Text of selected text in the viewer and editor of the GUI, null for <see cref="CursorForeground" /> (plugin API
+    /// 1.2).
+    /// </summary>
+    public string? ViewerSelectionForeground { get; init; }
 }

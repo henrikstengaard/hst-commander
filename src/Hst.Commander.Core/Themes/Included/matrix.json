@@ -1,0 +1,39 @@
+{
+  "$schema": "https://raw.githubusercontent.com/henrikstengaard/hst-commander/main/docs/theme.schema.json",
+  "id": "matrix",
+  "name": "Matrix",
+  "dark": {
+    "palette": {
+      "neutral": "#0a0e0a",
+      "ink": "#62ff94",
+      "primary": "#2eff6a",
+      "accent": "#c770ff",
+      "success": "#62ff94",
+      "warning": "#e6ff57",
+      "error": "#ff4b4b",
+      "info": "#30b3ff",
+      "interactive": "#30b3ff"
+    },
+    "overrides": {
+      "item": "#8ca391",
+      "path": "#8ca391"
+    }
+  },
+  "light": {
+    "palette": {
+      "neutral": "#eef3ea",
+      "ink": "#203022",
+      "primary": "#1cc24b",
+      "accent": "#c770ff",
+      "success": "#1cc24b",
+      "warning": "#e6ff57",
+      "error": "#ff4b4b",
+      "info": "#30b3ff",
+      "interactive": "#30b3ff"
+    },
+    "overrides": {
+      "item": "#748476",
+      "path": "#748476"
+    }
+  }
+}

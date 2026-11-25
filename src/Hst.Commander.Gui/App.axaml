@@ -1,69 +1,9 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:local="using:Hst.Commander.Gui"
              x:Class="Hst.Commander.Gui.App">
     <Application.Resources>
-        <!-- pane colors per theme, used by PaneView -->
+        <!-- the pane colors of each theme are added to ThemeDictionaries by ThemeManager -->
         <ResourceDictionary>
-            <ResourceDictionary.ThemeDictionaries>
-                <ResourceDictionary x:Key="{x:Static local:ThemeManager.MidnightCommanderVariant}">
-                    <SolidColorBrush x:Key="PaneBackground" Color="#0000AA" />
-                    <SolidColorBrush x:Key="PaneBorder" Color="#FFFFFF" />
-                    <SolidColorBrush x:Key="HeaderForeground" Color="#FFFF55" />
-                    <SolidColorBrush x:Key="ContainerForeground" Color="#FFFFFF" />
-                    <SolidColorBrush x:Key="ItemForeground" Color="#AAAAAA" />
-                    <SolidColorBrush x:Key="ExecutableForeground" Color="#55FF55" />
-                    <SolidColorBrush x:Key="PathForeground" Color="#FFFF55" />
-                    <SolidColorBrush x:Key="ActivePathBackground" Color="#AAAAAA" />
-                    <SolidColorBrush x:Key="ActivePathForeground" Color="#000000" />
-                    <SolidColorBrush x:Key="SelectedEntryForeground" Color="#000000" />
-                    <SolidColorBrush x:Key="MarkedEntryForeground" Color="#FFFF55" />
-                    <SolidColorBrush x:Key="MarkedContainerBackground" Color="Transparent" />
-                    <SolidColorBrush x:Key="MarkedItemBackground" Color="Transparent" />
-                    <SolidColorBrush x:Key="AdministratorBackground" Color="#C62828" />
-                    <SolidColorBrush x:Key="AdministratorForeground" Color="#FFFFFF" />
-                    <SolidColorBrush x:Key="ViewerSelectionBackground" Color="#00AAAA" />
-                    <SolidColorBrush x:Key="ViewerSelectionForeground" Color="#000000" />
-                </ResourceDictionary>
-                <ResourceDictionary x:Key="Light">
-                    <SolidColorBrush x:Key="PaneBackground" Color="#FFFFFF" />
-                    <SolidColorBrush x:Key="PaneBorder" Color="#D0D0D0" />
-                    <SolidColorBrush x:Key="HeaderForeground" Color="#606060" />
-                    <SolidColorBrush x:Key="ContainerForeground" Color="#000000" />
-                    <SolidColorBrush x:Key="ItemForeground" Color="#404040" />
-                    <SolidColorBrush x:Key="ExecutableForeground" Color="#008000" />
-                    <SolidColorBrush x:Key="PathForeground" Color="#404040" />
-                    <SolidColorBrush x:Key="ActivePathBackground" Color="#0067C0" />
-                    <SolidColorBrush x:Key="ActivePathForeground" Color="#FFFFFF" />
-                    <SolidColorBrush x:Key="SelectedEntryForeground" Color="#000000" />
-                    <SolidColorBrush x:Key="MarkedEntryForeground" Color="#B07800" />
-                    <SolidColorBrush x:Key="MarkedContainerBackground" Color="Transparent" />
-                    <SolidColorBrush x:Key="MarkedItemBackground" Color="Transparent" />
-                    <SolidColorBrush x:Key="AdministratorBackground" Color="#C62828" />
-                    <SolidColorBrush x:Key="AdministratorForeground" Color="#FFFFFF" />
-                    <SolidColorBrush x:Key="ViewerSelectionBackground" Color="#ADD6FF" />
-                    <SolidColorBrush x:Key="ViewerSelectionForeground" Color="#000000" />
-                </ResourceDictionary>
-                <ResourceDictionary x:Key="Dark">
-                    <SolidColorBrush x:Key="PaneBackground" Color="#202020" />
-                    <SolidColorBrush x:Key="PaneBorder" Color="#404040" />
-                    <SolidColorBrush x:Key="HeaderForeground" Color="#A0A0A0" />
-                    <SolidColorBrush x:Key="ContainerForeground" Color="#FFFFFF" />
-                    <SolidColorBrush x:Key="ItemForeground" Color="#C8C8C8" />
-                    <SolidColorBrush x:Key="ExecutableForeground" Color="#6CCB5F" />
-                    <SolidColorBrush x:Key="PathForeground" Color="#C8C8C8" />
-                    <SolidColorBrush x:Key="ActivePathBackground" Color="#4CC2FF" />
-                    <SolidColorBrush x:Key="ActivePathForeground" Color="#000000" />
-                    <SolidColorBrush x:Key="SelectedEntryForeground" Color="#FFFFFF" />
-                    <SolidColorBrush x:Key="MarkedEntryForeground" Color="#FFD700" />
-                    <SolidColorBrush x:Key="MarkedContainerBackground" Color="Transparent" />
-                    <SolidColorBrush x:Key="MarkedItemBackground" Color="Transparent" />
-                    <SolidColorBrush x:Key="AdministratorBackground" Color="#C62828" />
-                    <SolidColorBrush x:Key="AdministratorForeground" Color="#FFFFFF" />
-                    <SolidColorBrush x:Key="ViewerSelectionBackground" Color="#264F78" />
-                    <SolidColorBrush x:Key="ViewerSelectionForeground" Color="#FFFFFF" />
-                </ResourceDictionary>
-            </ResourceDictionary.ThemeDictionaries>
             <!-- tabs of dialogs (settings, properties) drawn as tabs on a panel, like the TUI's: the selected tab is joined
                  to the panel showing its contents; used with TabControl.dialogTabs -->
             <ControlTheme x:Key="DialogTabItem" TargetType="TabItem">
@@ -114,6 +54,13 @@
 
     <Application.Styles>
         <FluentTheme />
+        <!-- the current row of the active pane in the theme's cursor color, no row colored in the other pane -->
+        <Style Selector="ListBox.entries ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="ListBox.entries.active ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource CursorBackground}" />
+        </Style>
         <Style Selector="TabControl.dialogTabs /template/ ContentPresenter#PART_SelectedContentHost">
             <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundAltHighBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseMediumLowBrush}" />

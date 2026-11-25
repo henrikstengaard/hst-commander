@@ -1,0 +1,410 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/henrikstengaard/hst-commander/main/docs/theme.schema.json",
+  "title": "Hst Commander theme",
+  "description": "A theme of Hst Commander, in the format of opencode's themes. See docs/themes.md.",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string",
+      "description": "Identifier stored in the settings, unique (defaults to the file name). A file with both variants gives the themes <id>-dark and <id>-light."
+    },
+    "name": {
+      "type": "string",
+      "description": "Name shown in the settings (defaults to the id). A file with both variants gives \"<name> Dark\" and \"<name> Light\"."
+    },
+    "showParentButtons": {
+      "type": "boolean",
+      "description": "True to show a button going to the parent directory at the outer side of each pane."
+    },
+    "highlightActivePathPanel": {
+      "type": "boolean",
+      "description": "True to color the whole panel above the active pane in the active path's colors."
+    },
+    "fontFamily": {
+      "type": "string",
+      "description": "Fonts for the GUI separated by commas, the first installed one is used."
+    },
+    "fontSize": {
+      "type": "number",
+      "description": "Font size used with fontFamily."
+    },
+    "dark": {
+      "$ref": "#/$defs/variant",
+      "description": "The dark variant."
+    },
+    "light": {
+      "$ref": "#/$defs/variant",
+      "description": "The light variant."
+    }
+  },
+  "anyOf": [
+    {
+      "required": [
+        "dark"
+      ]
+    },
+    {
+      "required": [
+        "light"
+      ]
+    }
+  ],
+  "additionalProperties": true,
+  "$defs": {
+    "color": {
+      "type": "string",
+      "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$",
+      "description": "#RGB, #RRGGBB, or #RRGGBBAA drawn over the variant's neutral color."
+    },
+    "variant": {
+      "type": "object",
+      "description": "Colors of a light or dark variant.",
+      "properties": {
+        "systemChrome": {
+          "type": "boolean",
+          "description": "True to keep the system (Fluent) look of the GUI's menu bar, bottom area and buttons, like the built-in themes. The TUI still uses their colors."
+        },
+        "palette": {
+          "type": "object",
+          "description": "Seed colors the theme's colors are derived from.",
+          "properties": {
+            "neutral": {
+              "$ref": "#/$defs/color",
+              "description": "Background of the panes; menus, buttons and dialogs mix it with a little ink."
+            },
+            "ink": {
+              "$ref": "#/$defs/color",
+              "description": "Text: names of directories, and dimmed for files and the path."
+            },
+            "primary": {
+              "$ref": "#/$defs/color",
+              "description": "Background of the cursor and of the active pane's path."
+            },
+            "accent": {
+              "$ref": "#/$defs/color",
+              "description": "Column headers (defaults to primary)."
+            },
+            "success": {
+              "$ref": "#/$defs/color",
+              "description": "Names of executable files."
+            },
+            "warning": {
+              "$ref": "#/$defs/color",
+              "description": "Names of marked entries."
+            },
+            "error": {
+              "$ref": "#/$defs/color",
+              "description": "Not used yet, kept for opencode themes."
+            },
+            "info": {
+              "$ref": "#/$defs/color",
+              "description": "Not used yet, kept for opencode themes."
+            },
+            "interactive": {
+              "$ref": "#/$defs/color",
+              "description": "Not used yet, kept for opencode themes."
+            }
+          },
+          "additionalProperties": true
+        },
+        "overrides": {
+          "type": "object",
+          "description": "Colors by name replacing the derived ones. Prefix a name with tui- or gui- to set it for one front-end only. Other names (e.g. opencode's syntax colors) and values that aren't colors are ignored; text-weak and border-weak-base of opencode themes color files and the border.",
+          "properties": {
+            "pane-background": {
+              "$ref": "#/$defs/color"
+            },
+            "pane-border": {
+              "$ref": "#/$defs/color"
+            },
+            "header": {
+              "$ref": "#/$defs/color"
+            },
+            "container": {
+              "$ref": "#/$defs/color"
+            },
+            "item": {
+              "$ref": "#/$defs/color"
+            },
+            "executable": {
+              "$ref": "#/$defs/color"
+            },
+            "marked": {
+              "$ref": "#/$defs/color"
+            },
+            "path": {
+              "$ref": "#/$defs/color"
+            },
+            "active-path-background": {
+              "$ref": "#/$defs/color"
+            },
+            "active-path-foreground": {
+              "$ref": "#/$defs/color"
+            },
+            "cursor-background": {
+              "$ref": "#/$defs/color"
+            },
+            "cursor-foreground": {
+              "$ref": "#/$defs/color"
+            },
+            "menu-background": {
+              "$ref": "#/$defs/color"
+            },
+            "menu-foreground": {
+              "$ref": "#/$defs/color"
+            },
+            "bottom-background": {
+              "$ref": "#/$defs/color"
+            },
+            "button-background": {
+              "$ref": "#/$defs/color"
+            },
+            "button-foreground": {
+              "$ref": "#/$defs/color"
+            },
+            "dialog-background": {
+              "$ref": "#/$defs/color"
+            },
+            "dialog-foreground": {
+              "$ref": "#/$defs/color"
+            },
+            "marked-container-background": {
+              "$ref": "#/$defs/color"
+            },
+            "marked-item-background": {
+              "$ref": "#/$defs/color"
+            },
+            "marked-cursor-foreground": {
+              "$ref": "#/$defs/color"
+            },
+            "menu-focus-background": {
+              "$ref": "#/$defs/color"
+            },
+            "menu-focus-foreground": {
+              "$ref": "#/$defs/color"
+            },
+            "menu-hot-foreground": {
+              "$ref": "#/$defs/color"
+            },
+            "key-background": {
+              "$ref": "#/$defs/color"
+            },
+            "key-foreground": {
+              "$ref": "#/$defs/color"
+            },
+            "dialog-focus-background": {
+              "$ref": "#/$defs/color"
+            },
+            "dialog-focus-foreground": {
+              "$ref": "#/$defs/color"
+            },
+            "viewer-selection-background": {
+              "$ref": "#/$defs/color"
+            },
+            "viewer-selection-foreground": {
+              "$ref": "#/$defs/color"
+            },
+            "tui-pane-background": {
+              "$ref": "#/$defs/color"
+            },
+            "tui-pane-border": {
+              "$ref": "#/$defs/color"
+            },
+            "tui-header": {
+              "$ref": "#/$defs/color"
+            },
+            "tui-container": {
+              "$ref": "#/$defs/color"
+            },
+            "tui-item": {
+              "$ref": "#/$defs/color"
+            },
+            "tui-executable": {
+              "$ref": "#/$defs/color"
+            },
+            "tui-marked": {
+              "$ref": "#/$defs/color"
+            },
+            "tui-path": {
+              "$ref": "#/$defs/color"
+            },
+            "tui-active-path-background": {
+              "$ref": "#/$defs/color"
+            },
+            "tui-active-path-foreground": {
+              "$ref": "#/$defs/color"
+            },
+            "tui-cursor-background": {
+              "$ref": "#/$defs/color"
+            },
+            "tui-cursor-foreground": {
+              "$ref": "#/$defs/color"
+            },
+            "tui-menu-background": {
+              "$ref": "#/$defs/color"
+            },
+            "tui-menu-foreground": {
+              "$ref": "#/$defs/color"
+            },
+            "tui-bottom-background": {
+              "$ref": "#/$defs/color"
+            },
+            "tui-button-background": {
+              "$ref": "#/$defs/color"
+            },
+            "tui-button-foreground": {
+              "$ref": "#/$defs/color"
+            },
+            "tui-dialog-background": {
+              "$ref": "#/$defs/color"
+            },
+            "tui-dialog-foreground": {
+              "$ref": "#/$defs/color"
+            },
+            "tui-marked-container-background": {
+              "$ref": "#/$defs/color"
+            },
+            "tui-marked-item-background": {
+              "$ref": "#/$defs/color"
+            },
+            "tui-marked-cursor-foreground": {
+              "$ref": "#/$defs/color"
+            },
+            "tui-menu-focus-background": {
+              "$ref": "#/$defs/color"
+            },
+            "tui-menu-focus-foreground": {
+              "$ref": "#/$defs/color"
+            },
+            "tui-menu-hot-foreground": {
+              "$ref": "#/$defs/color"
+            },
+            "tui-key-background": {
+              "$ref": "#/$defs/color"
+            },
+            "tui-key-foreground": {
+              "$ref": "#/$defs/color"
+            },
+            "tui-dialog-focus-background": {
+              "$ref": "#/$defs/color"
+            },
+            "tui-dialog-focus-foreground": {
+              "$ref": "#/$defs/color"
+            },
+            "tui-viewer-selection-background": {
+              "$ref": "#/$defs/color"
+            },
+            "tui-viewer-selection-foreground": {
+              "$ref": "#/$defs/color"
+            },
+            "gui-pane-background": {
+              "$ref": "#/$defs/color"
+            },
+            "gui-pane-border": {
+              "$ref": "#/$defs/color"
+            },
+            "gui-header": {
+              "$ref": "#/$defs/color"
+            },
+            "gui-container": {
+              "$ref": "#/$defs/color"
+            },
+            "gui-item": {
+              "$ref": "#/$defs/color"
+            },
+            "gui-executable": {
+              "$ref": "#/$defs/color"
+            },
+            "gui-marked": {
+              "$ref": "#/$defs/color"
+            },
+            "gui-path": {
+              "$ref": "#/$defs/color"
+            },
+            "gui-active-path-background": {
+              "$ref": "#/$defs/color"
+            },
+            "gui-active-path-foreground": {
+              "$ref": "#/$defs/color"
+            },
+            "gui-cursor-background": {
+              "$ref": "#/$defs/color"
+            },
+            "gui-cursor-foreground": {
+              "$ref": "#/$defs/color"
+            },
+            "gui-menu-background": {
+              "$ref": "#/$defs/color"
+            },
+            "gui-menu-foreground": {
+              "$ref": "#/$defs/color"
+            },
+            "gui-bottom-background": {
+              "$ref": "#/$defs/color"
+            },
+            "gui-button-background": {
+              "$ref": "#/$defs/color"
+            },
+            "gui-button-foreground": {
+              "$ref": "#/$defs/color"
+            },
+            "gui-dialog-background": {
+              "$ref": "#/$defs/color"
+            },
+            "gui-dialog-foreground": {
+              "$ref": "#/$defs/color"
+            },
+            "gui-marked-container-background": {
+              "$ref": "#/$defs/color"
+            },
+            "gui-marked-item-background": {
+              "$ref": "#/$defs/color"
+            },
+            "gui-marked-cursor-foreground": {
+              "$ref": "#/$defs/color"
+            },
+            "gui-menu-focus-background": {
+              "$ref": "#/$defs/color"
+            },
+            "gui-menu-focus-foreground": {
+              "$ref": "#/$defs/color"
+            },
+            "gui-menu-hot-foreground": {
+              "$ref": "#/$defs/color"
+            },
+            "gui-key-background": {
+              "$ref": "#/$defs/color"
+            },
+            "gui-key-foreground": {
+              "$ref": "#/$defs/color"
+            },
+            "gui-dialog-focus-background": {
+              "$ref": "#/$defs/color"
+            },
+            "gui-dialog-focus-foreground": {
+              "$ref": "#/$defs/color"
+            },
+            "gui-viewer-selection-background": {
+              "$ref": "#/$defs/color"
+            },
+            "gui-viewer-selection-foreground": {
+              "$ref": "#/$defs/color"
+            },
+            "text-weak": {
+              "$ref": "#/$defs/color"
+            },
+            "border-weak-base": {
+              "$ref": "#/$defs/color"
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

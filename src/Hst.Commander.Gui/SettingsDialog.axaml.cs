@@ -17,7 +17,7 @@ public partial class SettingsDialog : Window
     private const double ButtonsWidth = 820;
     private const double ButtonsHeight = 600;
 
-    private readonly IReadOnlyList<ThemeChoice> _themes = Themes.All;
+    private readonly IReadOnlyList<ThemeChoice> _themes = Themes.SortedByName;
     private readonly Action<ThemeChoice, string?, double?> _preview;
 
     /// <summary>Items of the font list: the default (the theme's font or the default fonts), then the installed fonts.</summary>
@@ -173,7 +173,7 @@ public partial class SettingsDialog : Window
     /// </summary>
     private void UpdateFontDownload()
     {
-        var theme = SelectedTheme.Plugin;
+        var theme = SelectedTheme.Theme;
         var visible = theme is { FontDownloads.Count: > 0, FontFamily: { } family } &&
                       !GuiFonts.IsInstalled(family) && SelectedFontFamily == null;
         FontDownloadPanel.IsVisible = visible;
@@ -186,11 +186,7 @@ public partial class SettingsDialog : Window
     /// <summary>Downloads the theme's font after asking, then lists and uses it.</summary>
     private async Task DownloadFontAsync()
     {
-        if (SelectedTheme.Plugin is not { } theme)
-        {
-            return;
-        }
-
+        var theme = SelectedTheme.Theme;
         var downloaded = await new FontDownloadDialog(SelectedTheme.Name, theme.FontDownloads).ShowDialog<bool>(this);
         if (!downloaded)
         {
