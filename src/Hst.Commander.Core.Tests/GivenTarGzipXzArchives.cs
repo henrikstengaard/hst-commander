@@ -5,7 +5,7 @@ using Hst.Commander.Plugins.Archives;
 namespace Hst.Commander.Core.Tests;
 
 /// <summary>
-/// Tar archives and gzip and xz files of TestData/Archives made with GNU tar, gzip and xz (see
+/// Tar archives and gzip, xz, bzip2 and zstd files of TestData/Archives made with GNU tar, gzip, xz, bzip2 and zstd (see
 /// TestData/Archives/make/make-archives.sh), opened by the Archives plugin.
 /// </summary>
 public class GivenTarGzipXzArchives : IDisposable
@@ -22,9 +22,14 @@ public class GivenTarGzipXzArchives : IDisposable
     }
 
     private static IFileVolumeProvider GetProvider(string fileName) =>
-        fileName.EndsWith(".tar", StringComparison.Ordinal) ? new TarFileVolumeProvider()
-        : fileName.EndsWith(".xz", StringComparison.Ordinal) ? new XzFileVolumeProvider()
-        : new GzipFileVolumeProvider();
+        Path.GetExtension(fileName) switch
+        {
+            ".tar" => new TarFileVolumeProvider(),
+            ".xz" => new XzFileVolumeProvider(),
+            ".bz2" => new Bzip2FileVolumeProvider(),
+            ".zst" => new ZstdFileVolumeProvider(),
+            _ => new GzipFileVolumeProvider()
+        };
 
     private static Task<IVolume> CreateVolumeAsync(string fileName) =>
         GetProvider(fileName).CreateVolume(fileName, new MemoryStream(ArchiveTestData.Read(fileName)));
@@ -44,6 +49,10 @@ public class GivenTarGzipXzArchives : IDisposable
     [InlineData("hello.txt.gz", "Gzip")]
     [InlineData("dirs-files.tar.xz", "Xz")]
     [InlineData("hello.txt.xz", "Xz")]
+    [InlineData("dirs-files.tar.bz2", "Bzip2")]
+    [InlineData("hello.txt.bz2", "Bzip2")]
+    [InlineData("dirs-files.tar.zst", "Zstd")]
+    [InlineData("hello.txt.zst", "Zstd")]
     [InlineData("dirs-files.7z", null)]
     [InlineData("dirs-files.rar", null)]
     [InlineData("dirs-files.lha", null)]
@@ -51,7 +60,10 @@ public class GivenTarGzipXzArchives : IDisposable
     {
         // arrange
         IFileVolumeProvider[] providers =
-            [new TarFileVolumeProvider(), new GzipFileVolumeProvider(), new XzFileVolumeProvider()];
+        [
+            new TarFileVolumeProvider(), new GzipFileVolumeProvider(), new XzFileVolumeProvider(),
+            new Bzip2FileVolumeProvider(), new ZstdFileVolumeProvider()
+        ];
 
         // act
         var matches = new List<string>();
@@ -86,6 +98,8 @@ public class GivenTarGzipXzArchives : IDisposable
     [InlineData("dirs-files.tar.gz")]
     [InlineData("dirs-files.tgz")]
     [InlineData("dirs-files.tar.xz")]
+    [InlineData("dirs-files.tar.bz2")]
+    [InlineData("dirs-files.tar.zst")]
     public async Task When_TarArchiveIsOpened_Then_DirectoriesAndFilesAreListedAndRead(string fileName)
     {
         // arrange
@@ -126,11 +140,14 @@ public class GivenTarGzipXzArchives : IDisposable
     }
 
     [Theory]
-    [InlineData("hello.txt.gz", "hello.txt", true)]
-    [InlineData("noname.txt.gz", "noname.txt", false)]
-    [InlineData("hello.txt.xz", "hello.txt", false)]
+    [InlineData("hello.txt.gz", "hello.txt", true, 6L)]
+    [InlineData("noname.txt.gz", "noname.txt", false, 6L)]
+    [InlineData("hello.txt.xz", "hello.txt", false, 6L)]
+    [InlineData("hello.txt.bz2", "hello.txt", false, null)]
+    [InlineData("hello.txt.zst", "hello.txt", false, 6L)]
+    [InlineData("nosize.txt.zst", "nosize.txt", false, null)]
     public async Task When_CompressedFileIsOpened_Then_DecompressedFileIsListedAndRead(string fileName,
-        string expectedName, bool hasDate)
+        string expectedName, bool hasDate, long? expectedSize)
     {
         // arrange
         var volume = await CreateVolumeAsync(fileName);
@@ -143,7 +160,7 @@ public class GivenTarGzipXzArchives : IDisposable
         // assert
         Assert.Equal(expectedName, entry.Name);
         Assert.Equal(EntryType.Item, entry.Type);
-        Assert.Equal(6, entry.Size);
+        Assert.Equal(expectedSize, entry.Size);
         Assert.Equal(hasDate ? FileDate : null, entry.ModifiedDate);
         Assert.Equal("Hello\n", text);
         Assert.Equal("Hello\n", textAgain);
@@ -159,6 +176,8 @@ public class GivenTarGzipXzArchives : IDisposable
     [Theory]
     [InlineData("multi.txt.gz")]
     [InlineData("multi.txt.xz")]
+    [InlineData("multi.txt.bz2")]
+    [InlineData("multi.txt.zst")]
     public async Task When_CompressedFileHasSeveralMembers_Then_AllAreRead(string fileName)
     {
         // arrange
@@ -186,6 +205,36 @@ public class GivenTarGzipXzArchives : IDisposable
             await ReadTextAsync(volume, "hello.txt");
         });
     }
+
+    [Theory]
+    [InlineData("hello.txt.bz2")]
+    [InlineData("hello.txt.zst")]
+    [InlineData("hello.txt.xz")]
+    public async Task When_CompressedFileIsTruncated_Then_OpeningOrReadingItFails(string fileName)
+    {
+        // arrange
+        var data = ArchiveTestData.Read(fileName);
+
+        // act & assert
+        await Assert.ThrowsAsync<InvalidDataException>(async () =>
+        {
+            var volume = await GetProvider(fileName).CreateVolume(fileName, new MemoryStream(data[..^4]));
+            var entry = Assert.Single(await volume.ListEntries().ToListAsync());
+            await ReadTextAsync(volume, entry.Name);
+        });
+    }
+
+    [Theory]
+    [InlineData("backup.tbz2", "backup.tar")]
+    [InlineData("disk.img.bz2", "disk.img")]
+    public void When_Bzip2FileIsNamed_Then_DecompressedFileIsNamedAfterIt(string fileName, string expected) =>
+        Assert.Equal(expected, new Bzip2FileVolumeProvider().GetDecompressedName(fileName));
+
+    [Theory]
+    [InlineData("backup.tzst", "backup.tar")]
+    [InlineData("disk.img.zst", "disk.img")]
+    public void When_ZstdFileIsNamed_Then_DecompressedFileIsNamedAfterIt(string fileName, string expected) =>
+        Assert.Equal(expected, new ZstdFileVolumeProvider().GetDecompressedName(fileName));
 
     [Fact]
     public async Task When_LargeGzipFileIsDamaged_Then_ReadingItFails()

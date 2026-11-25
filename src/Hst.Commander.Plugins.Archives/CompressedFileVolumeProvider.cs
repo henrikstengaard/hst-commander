@@ -3,7 +3,7 @@ using Hst.Commander.Abstractions;
 namespace Hst.Commander.Plugins.Archives;
 
 /// <summary>
-/// File volume provider opening a compressed file (gzip or xz), detected by the signature of its format: a compressed
+/// File volume provider opening a compressed file (gzip, xz, bzip2 or zstd), detected by the signature of its format: a compressed
 /// tar archive (e.g. .tar.gz or .tgz) opens as the tar archive, decompressed to a temporary file deleted with the volume
 /// (tar archives are read at the offsets of their files); any other file as a volume with the decompressed file,
 /// decompressed as it's read, e.g. "disk.img" in "disk.img.gz", which can be copied, viewed and opened as an image.
@@ -18,6 +18,12 @@ public abstract class CompressedFileVolumeProvider : IFileVolumeProvider
 
     /// <summary>Signature at the start of the compressed files.</summary>
     protected abstract byte[] Signature { get; }
+
+    /// <summary>Number of bytes at the start of a file read by <see cref="IsSignature" />.</summary>
+    protected virtual int SignatureLength => Signature.Length;
+
+    /// <summary>True when a file starts with the signature (at least <see cref="SignatureLength" /> bytes).</summary>
+    protected virtual bool IsSignature(ReadOnlySpan<byte> start) => start.SequenceEqual(Signature);
 
     /// <summary>
     /// Extensions of the compressed files with the extension of the decompressed file, e.g. (".tgz", ".tar") and
@@ -38,9 +44,9 @@ public abstract class CompressedFileVolumeProvider : IFileVolumeProvider
     {
         ArgumentNullException.ThrowIfNull(stream);
 
-        var signature = new byte[Signature.Length];
+        var signature = new byte[SignatureLength];
         var length = await stream.ReadAtLeastAsync(signature, signature.Length, false, cancellationToken);
-        return length == signature.Length && signature.AsSpan().SequenceEqual(Signature);
+        return length == signature.Length && IsSignature(signature);
     }
 
     /// <summary>Creates the volume without the name of the file, whose decompressed file is named "file" unless stored.</summary>
@@ -140,7 +146,7 @@ public abstract class CompressedFileVolumeProvider : IFileVolumeProvider
             _size = info.Size;
             // a name stored in the file may have a path, only its name is used
             AddEntry(Path.GetFileName(fileName.Replace('\\', '/')) is { Length: > 0 } entryName ? entryName : "file",
-                info.Size ?? info.StoredSize ?? 0, info.ModifiedDate, info);
+                info.Size ?? info.StoredSize, info.ModifiedDate, info);
         }
 
         protected override Task<Stream> OpenArchiveEntry(string name, CompressedFileInfo archiveEntry,
