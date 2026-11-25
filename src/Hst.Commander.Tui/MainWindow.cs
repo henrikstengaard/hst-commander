@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using Hst.Commander.Core;
 using Hst.Commander.Core.Volumes;
 using Hst.Commander.Abstractions;
@@ -855,7 +855,8 @@ public sealed class MainWindow : Window
             }
             else if (key.KeyCode == KeyCode.Insert || key.KeyCode == KeyCode.Space)
             {
-                ToggleMarkAndMove(pane, 1);
+                // Space also calculates the size of a directory it marks, like Total Commander
+                ToggleMarkAndMove(pane, 1, key.KeyCode == KeyCode.Space);
                 key.Handled = true;
             }
             else if (key.AsRune.Value == '+')
@@ -2485,7 +2486,7 @@ public sealed class MainWindow : Window
 
         foreach (var entry in pane.Entries)
         {
-            var size = SizeFormatter.FormatEntrySize(entry);
+            var size = pane.NavigationContext.FormatEntrySize(entry);
             var modifiedDate = entry.ModifiedDate?.ToString("yyyy-MM-dd HH:mm") ?? string.Empty;
             table.Rows.Add(GetEntryMarker(pane, entry) + entry.DisplayName, size, modifiedDate);
         }
@@ -2679,9 +2680,10 @@ public sealed class MainWindow : Window
 
     /// <summary>
     ///     Toggles the mark of the entry under the cursor and moves the cursor by an offset: to the next entry with
-    ///     Insert, Space and Shift+Down, to the previous one with Shift+Up.
+    ///     Insert, Space and Shift+Down, to the previous one with Shift+Up. With <paramref name="calculateSize" />
+    ///     (Space) a directory it marks gets its size calculated in the background.
     /// </summary>
-    private static void ToggleMarkAndMove(Pane pane, int offset)
+    private static void ToggleMarkAndMove(Pane pane, int offset, bool calculateSize = false)
     {
         var selectedRow = pane.TableView.SelectedRow;
         if (selectedRow < 0 || selectedRow >= pane.Entries.Count)
@@ -2689,10 +2691,68 @@ public sealed class MainWindow : Window
             return;
         }
 
-        pane.NavigationContext.ToggleMark(pane.Entries[selectedRow]);
+        var entry = pane.Entries[selectedRow];
+        if (pane.NavigationContext.ToggleMark(entry) && calculateSize)
+        {
+            CalculateDirectorySize(pane, entry);
+        }
+
         pane.PathPanel.Summary = pane.NavigationContext.MarkedSummary;
         pane.PathPanel.SetNeedsDraw();
         MoveSelection(pane, offset);
+    }
+
+    /// <summary>
+    ///     Calculates the size of a directory (see <see cref="NavigationContext.CalculateDirectorySizeAsync" />),
+    ///     showing "..." in its size column until the size is shown, and updates the summary of the marked entries.
+    /// </summary>
+    private static async void CalculateDirectorySize(Pane pane, IEntry entry)
+    {
+        try
+        {
+            var calculation = pane.NavigationContext.CalculateDirectorySizeAsync(entry);
+            UpdateSizeCell(pane, entry);
+            if (!await calculation)
+            {
+                return;
+            }
+        }
+        catch (Exception exception)
+        {
+            UpdateSizeCell(pane, entry);
+            ErrorBox.Show(exception);
+            return;
+        }
+
+        UpdateSizeCell(pane, entry);
+        pane.PathPanel.Summary = pane.NavigationContext.MarkedSummary;
+        pane.PathPanel.SetNeedsDraw();
+    }
+
+    /// <summary>
+    ///     Shows the size of an entry in the row with its name, also after the entries were listed again. After the
+    ///     location changed, the row of another entry with the name shows its own size.
+    /// </summary>
+    private static void UpdateSizeCell(Pane pane, IEntry entry)
+    {
+        var rowIndex = -1;
+        for (var index = 0; index < pane.Entries.Count; index++)
+        {
+            if (pane.Entries[index].Name.Equals(entry.Name, StringComparison.Ordinal))
+            {
+                rowIndex = index;
+                entry = pane.Entries[index];
+                break;
+            }
+        }
+
+        if (pane.DataTable == null || rowIndex < 0 || rowIndex >= pane.DataTable.Rows.Count)
+        {
+            return;
+        }
+
+        pane.DataTable.Rows[rowIndex][1] = pane.NavigationContext.FormatEntrySize(entry);
+        pane.TableView.SetNeedsDraw();
     }
 
     private Scheme GetRowColorScheme(Pane pane, int rowIndex)

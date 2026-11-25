@@ -9,9 +9,11 @@ namespace Hst.Commander.Gui;
 /// <summary>
 ///     Display row for an entry in a pane.
 /// </summary>
-public sealed class EntryItem(IEntry entry, bool isMarked = false, bool isExecutable = false) : INotifyPropertyChanged
+public sealed class EntryItem(IEntry entry, bool isMarked = false, bool isExecutable = false, string? size = null)
+    : INotifyPropertyChanged
 {
     private bool _isMarked = isMarked;
+    private string _size = size ?? SizeFormatter.FormatEntrySize(entry);
     private bool _isVolumeFile;
     private IImage _icon = FileIcons.GetInitialIcon(entry);
 
@@ -87,7 +89,24 @@ public sealed class EntryItem(IEntry entry, bool isMarked = false, bool isExecut
         }
     }
 
-    public string Size => SizeFormatter.FormatEntrySize(Entry);
+    /// <summary>
+    ///     Size column, "..." while the size of a directory marked with Space is calculated and then its size (see
+    ///     <see cref="NavigationContext.FormatEntrySize" />).
+    /// </summary>
+    public string Size
+    {
+        get => _size;
+        set
+        {
+            if (_size == value)
+            {
+                return;
+            }
+
+            _size = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Size)));
+        }
+    }
 
     public string Modified => Entry.ModifiedDate?.ToString("yyyy-MM-dd HH:mm") ?? string.Empty;
 }
