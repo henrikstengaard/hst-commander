@@ -17,7 +17,7 @@ public partial class SettingsDialog : Window
     private const double ButtonsWidth = 820;
     private const double ButtonsHeight = 600;
 
-    private readonly IReadOnlyList<ThemeChoice> _themes = Themes.All;
+    private readonly IReadOnlyList<ThemeChoice> _themes = Themes.SortedByName;
     private readonly Action<ThemeChoice, string?, double?> _preview;
 
     /// <summary>Items of the font list: the default (the theme's font or the default fonts), then the installed fonts.</summary>

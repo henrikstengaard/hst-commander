@@ -16,7 +16,7 @@ public sealed class SettingsDialog : TuiDialog
     // the tabs have a bottom border
     private const int DefaultHeight = 21;
 
-    private readonly IReadOnlyList<ThemeChoice> _themes = Themes.All;
+    private readonly IReadOnlyList<ThemeChoice> _themes = Themes.SortedByName;
     private readonly Tabs _tabView;
 
     /// <summary>Editors of the buttons by theme, so changes are kept when another theme is chosen and back again.</summary>

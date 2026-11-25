@@ -73,6 +73,22 @@ public class GivenThemes
     }
 
     [Fact]
+    public void When_ThemesAreSortedByName_Then_UnknownThemeStillFallsBackToMidnightCommander()
+    {
+        // arrange
+        var plugin = new TestThemePlugin(new TestTheme("aaa"));
+
+        // act
+        var themes = Themes.SortByName(Themes.List([plugin]));
+
+        // assert
+        var names = themes.Select(theme => theme.Name).ToList();
+        Assert.Equal(names.Order(StringComparer.OrdinalIgnoreCase), names);
+        Assert.NotEqual(Themes.MidnightCommanderId, themes[0].Id);
+        Assert.Equal(Themes.MidnightCommanderId, Themes.Find(themes, "NotLoaded").Id);
+    }
+
+    [Fact]
     public void When_BuiltInPluginsAreListed_Then_DirectoryOpus4IsIncluded()
     {
         // act

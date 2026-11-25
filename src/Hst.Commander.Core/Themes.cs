@@ -112,9 +112,25 @@ public static class Themes
     /// <summary>The theme with an identifier, Midnight Commander when none has it, e.g. its plugin isn't loaded.</summary>
     public static ThemeChoice Find(string? id) => Find(All, id);
 
-    /// <summary>The theme of a list with an identifier, the first theme when none has it.</summary>
+    /// <summary>
+    ///     The theme of a list with an identifier, Midnight Commander when none has it (the first theme when the list
+    ///     doesn't have Midnight Commander either).
+    /// </summary>
     public static ThemeChoice Find(IReadOnlyList<ThemeChoice> themes, string? id) =>
-        themes.FirstOrDefault(theme => string.Equals(theme.Id, id, StringComparison.OrdinalIgnoreCase)) ?? themes[0];
+        FindById(themes, id) ?? FindById(themes, MidnightCommanderId) ?? themes[0];
+
+    /// <summary>
+    ///     All themes sorted by name, as listed in Settings > Appearance of both front-ends (the built-in and plugin
+    ///     themes among the others).
+    /// </summary>
+    public static IReadOnlyList<ThemeChoice> SortedByName => SortByName(All);
+
+    /// <summary>Themes sorted by name, ignoring case.</summary>
+    public static IReadOnlyList<ThemeChoice> SortByName(IEnumerable<ThemeChoice> themes) =>
+        themes.OrderBy(theme => theme.Name, StringComparer.OrdinalIgnoreCase).ToList();
+
+    private static ThemeChoice? FindById(IReadOnlyList<ThemeChoice> themes, string? id) =>
+        themes.FirstOrDefault(theme => string.Equals(theme.Id, id, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
     ///     Reads the JSON theme files (<c>*.json</c>) of a directory, sorted by file name. A file that can't be read or
