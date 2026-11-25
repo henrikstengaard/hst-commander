@@ -52,7 +52,7 @@ src/
   Hst.Commander.Plugins.Zip/    Zip archives (default plugin)
   Hst.Commander.Plugins.LhaLzx/ Lha and lzx archives (default plugin)
   Hst.Commander.Plugins.RarSevenZip/ Rar and 7z archives (default plugin)
-  Hst.Commander.Plugins.Disk/   MBR/GPT disk images with FAT/exFAT/NTFS/ext partitions, hybrid MBR/RDB disks, unpartitioned FAT/exFAT/NTFS/ext and the exFAT F9 creator (default plugin)
+  Hst.Commander.Plugins.Disk/   MBR/GPT disk images (raw, VHD, VHDX, VDI, DMG) with FAT/exFAT/NTFS and read-only ext/XFS/Btrfs/HFS+/SquashFS/UDF partitions, hybrid MBR/RDB disks, unpartitioned file systems and the exFAT F9 creator (default plugin)
   Hst.Commander.Plugins.Amiga/  Writable adf, RDB and partition images, .info icons, Workbench navigation mode, Amiga images, comment and tooltypes properties tabs (default plugin)
   Hst.Commander.Plugins.PhysicalDisk/ Internal and external physical disks on Windows, Linux and macOS (default plugin)
   Hst.Commander.Plugins.Ftp/    FTP, FTPS and SFTP servers (default plugin)
@@ -78,7 +78,7 @@ src/
         |                           LhaVolume, LzxVolume]  <- Hst.Commander.Plugins.LhaLzx
         |                          [RarSevenZipPlugin, Rar/SevenZipFileVolumeProvider,
         |                           SharpCompressVolume]  <- Hst.Commander.Plugins.RarSevenZip
-        |                          [DiskPlugin, DiskFileVolumeProvider,
+        |                          [DiskPlugin, DiskFileVolumeProvider, VirtualDisks,
         |                           FileSystemFileVolumeProvider, ExFatVolumeCreator,
         |                           ExFatFormatter,
         |                           PartitionTableVolume, HybridDiskVolume,
@@ -163,8 +163,8 @@ These apply across features and aren't obvious from a single file:
 - Other file-management operations (e.g. creating a new file with Shift+F4); changing the viewer's encoding and going to an offset; changing the editor's encoding and line breaks.
 - SMB 1, SMB ports other than 445 and browsing the network for servers (SMB credentials are only saved with bookmarks).
 - Implicit FTPS, SFTP private keys, confirming new server keys and writable images on FTP/SFTP servers.
-- Writing to images other than Amiga adf, RDB and partition images and FAT, exFAT and NTFS images; ISO images and zip, lha, lzx, rar and 7z archives are read-only, as are Amiga images inside other images.
-- Changing RDB, MBR and GPT partitions, other Amiga file systems (e.g. SFS\2), writing ext2/3/4, other PC file systems (btrfs, XFS, ...) and vhdx/vmdk images.
+- Writing to images other than Amiga adf, RDB and partition images and FAT, exFAT and NTFS images (also in VHD, VHDX and VDI images); ISO images and zip, lha, lzx, rar and 7z archives are read-only, as are Amiga images inside other images.
+- Changing RDB, MBR and GPT partitions, other Amiga file systems (e.g. SFS\2), writing ext2/3/4, XFS, Btrfs, HFS+, SquashFS and UDF, APFS, Apple partition maps, differencing VHDX/VDI and vmdk images.
 - Unloading or reloading plugins while running, and a list of loaded plugins in the UI.
 
 ---
@@ -305,7 +305,8 @@ dotnet test src/Hst.Commander.Core.Tests/Hst.Commander.Core.Tests.csproj --logge
 | `SharpCompress` | 0.50.8 | `Hst.Commander.Plugins.RarSevenZip` — rar and 7z archive reading |
 | `Hst.Amiga` | 1.0.289 | `Hst.Commander.Plugins.Amiga` — Amiga rigid disk block, Fast File System, PFS3 and Smart File System reading and writing, .info icons; `Hst.Commander.Core` — UAE metadata (UAEFSDB and metafiles) |
 | `LTRData.DiscUtils.Vhd` | 1.0.90 | `Hst.Commander.Plugins.Amiga`, `Hst.Commander.Plugins.Disk` — vhd images |
-| `LTRData.DiscUtils.Core`, `.Fat`, `.ExFat`, `.Ntfs`, `.Ext` | 1.0.90 | `Hst.Commander.Plugins.Disk` — MBR/GPT partition tables, FAT, exFAT and NTFS reading and writing, ext2/3/4 reading |
+| `LTRData.DiscUtils.Core`, `.Fat`, `.ExFat`, `.Ntfs`, `.Ext`, `.Xfs`, `.Btrfs`, `.HfsPlus`, `.SquashFs`, `.Udf` | 1.0.90 | `Hst.Commander.Plugins.Disk` — MBR/GPT partition tables, FAT, exFAT and NTFS reading and writing, ext2/3/4, XFS, Btrfs (with `ZstdSharp.Port`, `lzo.net`), HFS+, SquashFS and UDF reading |
+| `LTRData.DiscUtils.Vhdx`, `.Vdi`, `.Dmg` | 1.0.90 | `Hst.Commander.Plugins.Disk` — VHDX and VDI images (read and write), DMG images (read, with `LzfseSharp`) |
 | `FluentFTP` | 55.1.0 | `Hst.Commander.Plugins.Ftp` — FTP and FTPS client |
 | `SSH.NET` | 2026.0.0 | `Hst.Commander.Plugins.Ftp` — SFTP client (with `BouncyCastle.Cryptography`) |
 | `SMBLibrary` | 1.5.8.1 | `Hst.Commander.Plugins.Smb` (external plugin, not included with the apps) — SMB 2/3 client (LGPL-3.0-or-later); its version and source commit are also in the plugin's `THIRD-PARTY-NOTICES.txt` and `build-and-release.yml` |

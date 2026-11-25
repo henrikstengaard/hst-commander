@@ -11,10 +11,10 @@ namespace Hst.Commander.Plugins.Disk;
 /// table, e.g. "mbr\1". The partitions are shown with their number and volume label when they have one, or
 /// "PiStorm RDB" for PiStorm partitions (MBR type 0x76 or GPT type 3F82EEBC-87C9-4097-8165-89D6540557C0, e.g. "1 - EMU68BOOT" and "2 - PiStorm RDB", see
 /// <see cref="IEntry.DisplayName" />) and their partition details in the properties dialog
-/// (<see cref="IEntry.Details" />). Partitions with FAT, exFAT, NTFS or ext2/3/4 are
-/// mounted with DiscUtils, other partitions with the file volume providers of the host, e.g. a PiStorm partition with a
+/// (<see cref="IEntry.Details" />). Partitions with a file system DiscUtils reads (see
+/// <see cref="FileSystems" />) are mounted with DiscUtils, other partitions with the file volume providers of the host, e.g. a PiStorm partition with a
 /// rigid disk block by the Amiga plugin. The partitions can't be changed, their file systems are writable when the
-/// stream is, except ext2/3/4, which DiscUtils only reads.
+/// stream is, except those DiscUtils only reads (ext2/3/4, XFS, Btrfs, HFS+, SquashFS and UDF).
 /// </summary>
 public sealed class PartitionTableVolume : VolumeListVolume
 {
@@ -178,13 +178,12 @@ public sealed class PartitionTableVolume : VolumeListVolume
         locationSection.Add(EntryProperty.FromBytes("Partition size", partition.SectorCount * _sectorSize));
 
         var typeName = $"{Name} partition";
-        if (volume is not DiscFileSystemVolume diskVolume)
+        if (volume is not DiscFileSystemVolume { Size: { } capacity, Free: { } diskFree })
         {
             return new EntryDetails(typeName, [partitionSection, locationSection]);
         }
 
-        var capacity = diskVolume.Size;
-        var free = Math.Clamp(diskVolume.Free, 0, capacity);
+        var free = Math.Clamp(diskFree, 0, capacity);
         List<EntryProperty> spaceSection =
         [
             EntryProperty.FromBytes("Used space", capacity - free),

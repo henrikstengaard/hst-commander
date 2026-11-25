@@ -7,7 +7,8 @@ namespace Hst.Commander.Plugins.Disk;
 
 /// <summary>
 /// Volume browsing a file system read by DiscUtils, e.g. FAT, exFAT, NTFS or ext4 of a partition, writable when the file
-/// system is (mounted from a writable stream; ext2/3/4 is read-only). Names are case-insensitive like FAT, exFAT and
+/// system is (FAT, exFAT and NTFS mounted from a writable stream; ext2/3/4, XFS, Btrfs, HFS+, SquashFS and UDF are
+/// read-only). Names are case-insensitive like FAT, exFAT and
 /// NTFS, or case-sensitive like ext2/3/4 (DiscUtils lists ext names with characters Windows doesn't allow, e.g. ':',
 /// replaced by '_', and opens them by those names). Entries have their attributes, which can be changed when writable.
 /// Errors of the file system are thrown as <see cref="IOException" />.
@@ -24,6 +25,8 @@ public sealed class DiscFileSystemVolume : IVolume, IDisposable
     private readonly DiscFileSystem _fileSystem;
     private readonly bool _caseSensitive;
     private readonly string? _volumeLabel;
+    private readonly IDisposable? _resource;
+    private readonly VolumeSpace? _space;
     private List<string> _currentPathComponents = [];
 
     /// <param name="name">Name of the volume.</param>
@@ -33,8 +36,13 @@ public sealed class DiscFileSystemVolume : IVolume, IDisposable
     /// Volume label for file systems whose DiscUtils implementation doesn't read it (exFAT), null to read it from the
     /// file system.
     /// </param>
+    /// <param name="resource">Resource disposed with the volume after the file system, e.g. a virtual disk.</param>
+    /// <param name="space">
+    /// Free space and size of a read-only file system whose DiscUtils implementation doesn't tell them (XFS), null to
+    /// read them from the file system.
+    /// </param>
     public DiscFileSystemVolume(string name, DiscFileSystem fileSystem, bool caseSensitive = false,
-        string? volumeLabel = null)
+        string? volumeLabel = null, IDisposable? resource = null, VolumeSpace? space = null)
     {
         ArgumentNullException.ThrowIfNull(fileSystem);
 
@@ -42,6 +50,8 @@ public sealed class DiscFileSystemVolume : IVolume, IDisposable
         _fileSystem = fileSystem;
         _caseSensitive = caseSensitive;
         _volumeLabel = volumeLabel;
+        _resource = resource;
+        _space = space;
     }
 
     private StringComparer NameComparer => _caseSensitive ? StringComparer.Ordinal : StringComparer.OrdinalIgnoreCase;
@@ -57,18 +67,34 @@ public sealed class DiscFileSystemVolume : IVolume, IDisposable
     public string VolumeLabel => _volumeLabel ?? Run(() => _fileSystem.VolumeLabel ?? string.Empty);
 
     /// <summary>
-    /// Size of the file system in bytes. DiscUtils returns too small a size for ext2/3/4 (less than the free space), so
-    /// it's the number of blocks times the block size.
+    /// Size of the file system in bytes; null when the file system doesn't tell it. DiscUtils returns too small a size
+    /// for ext2/3/4 (less than the free space), so it's the number of blocks times the block size.
     /// </summary>
-    public long Size => Run(() => _fileSystem is ExtFileSystem extFileSystem
+    public long? Size => _space?.Total ?? RunIfSupported(() => _fileSystem is ExtFileSystem extFileSystem
         ? extFileSystem.TotalClusters * extFileSystem.ClusterSize
         : _fileSystem.Size);
 
-    /// <summary>Free space of the file system in bytes.</summary>
-    public long Free => Run(() => _fileSystem.AvailableSpace);
+    /// <summary>Free space of the file system in bytes; null when the file system doesn't tell it.</summary>
+    public long? Free => _space?.Free ?? RunIfSupported(() => _fileSystem.AvailableSpace);
 
     public Task<VolumeSpace?> GetSpace(CancellationToken cancellationToken = default) =>
-        Task.FromResult<VolumeSpace?>(new VolumeSpace(Math.Clamp(Free, 0, Size), Size));
+        Task.FromResult(Size is { } size && Free is { } free ? new VolumeSpace(Math.Clamp(free, 0, size), size) : null);
+
+    /// <summary>
+    /// Runs a file system operation like <see cref="Run{T}" />, null when the file system doesn't support it (e.g. the
+    /// size of XFS).
+    /// </summary>
+    private static long? RunIfSupported(Func<long> operation)
+    {
+        try
+        {
+            return Run(operation);
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
+    }
 
     public async IAsyncEnumerable<IEntry> ListEntries(
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -359,7 +385,11 @@ public sealed class DiscFileSystemVolume : IVolume, IDisposable
     private static bool IsFileSystemError(Exception exception) =>
         exception is not (IOException or NotSupportedException or OperationCanceledException);
 
-    public void Dispose() => _fileSystem.Dispose();
+    public void Dispose()
+    {
+        _fileSystem.Dispose();
+        _resource?.Dispose();
+    }
 
     /// <summary>Entry found in a directory, with its name as stored.</summary>
     private sealed record FoundEntry(string Name, bool IsDirectory);
