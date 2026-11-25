@@ -1,15 +1,10 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="using:Hst.Commander.Gui"
-        x:Class="Hst.Commander.Gui.PluginThemeStyles">
-    <!-- styles only applied for themes of plugins, using the brushes ThemeManager makes from the theme's colors:
-         the current row of the panes, the menu bar, the bottom area and its buttons and the parent buttons -->
-    <Style Selector="ListBox.entries ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
-        <Setter Property="Background" Value="Transparent" />
-    </Style>
-    <Style Selector="ListBox.entries.active ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
-        <Setter Property="Background" Value="{DynamicResource CursorBackground}" />
-    </Style>
+        x:Class="Hst.Commander.Gui.ThemeChromeStyles">
+    <!-- styles applied for themes coloring the window's chrome (not the built-in themes, which keep the Fluent look),
+         using the brushes ThemeManager makes from the theme's colors: the menu bar, the bottom area and its buttons
+         and the parent buttons -->
     <Style Selector="local|MainWindow">
         <Setter Property="Background" Value="{DynamicResource BottomBackground}" />
     </Style>

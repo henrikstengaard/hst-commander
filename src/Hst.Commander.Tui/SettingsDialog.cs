@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using Hst.Commander.Abstractions;
 using Hst.Commander.Core;
 
@@ -22,7 +23,7 @@ public sealed class SettingsDialog : TuiDialog
     private readonly Dictionary<ICustomizableButtonPanel, ButtonPanelEditor> _buttonEditors = [];
 
     private View? _buttonsTab;
-    private readonly OptionSelector _themeRadioGroup;
+    private readonly ListView _themeList;
     private readonly OptionSelector _volumeProviderKeysRadioGroup;
     private readonly OptionSelector _enterFileActionRadioGroup;
     private readonly TextField _temporaryCopyLimitField;
@@ -44,14 +45,19 @@ public sealed class SettingsDialog : TuiDialog
 
         // appearance
         var themeLabel = new Label { X = 1, Y = 1, Text = "Theme:" };
-        _themeRadioGroup = new OptionSelector
+        // a list, as there are many themes (the included ones, the user's and the plugins'), scrolling to the theme
+        _themeList = new ListView { X = 16, Y = 1, Width = Dim.Fill(1), Height = Dim.Fill(3) };
+        _themeList.SetSource(new ObservableCollection<string>(_themes.Select(theme => theme.Name)));
+        _themeList.SelectedItem = Math.Max(0, _themes.ToList().IndexOf(Themes.Find(_themes, settings.Theme)));
+        _themeList.ValueChanged += (_, _) => Preview(SelectedTheme);
+        var themesHelp = new Label
         {
             X = 16,
-            Y = 1,
-            Labels = _themes.Select(theme => theme.Name).ToArray(),
-            Value = Math.Max(0, _themes.ToList().IndexOf(Themes.Find(_themes, settings.Theme)))
+            Y = Pos.AnchorEnd(2),
+            Width = Dim.Fill(1),
+            Height = 2,
+            Text = $"Own themes (.json files) are read from{Environment.NewLine}~/.hst-commander/themes at start"
         };
-        _themeRadioGroup.ValueChanged += (_, _) => Preview(SelectedTheme);
 
         // panes
         var volumeProviderKeysLabel = new Label { X = 1, Y = 1, Text = "Volume keys:" };
@@ -133,7 +139,7 @@ public sealed class SettingsDialog : TuiDialog
 
         var tabView = new Tabs { X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Fill() };
         _tabView = tabView;
-        tabView.Add(CreateTab("Appearance", themeLabel, _themeRadioGroup));
+        tabView.Add(CreateTab("Appearance", themeLabel, _themeList, themesHelp));
         tabView.Add(CreateTab("Panes", volumeProviderKeysLabel, _volumeProviderKeysRadioGroup,
             enterFileActionLabel, _enterFileActionRadioGroup, temporaryCopyLimitLabel, _temporaryCopyLimitField,
             temporaryCopyLimitHelp, detectVolumeFilesLabel, _detectVolumeFilesCheckBox));
@@ -189,7 +195,11 @@ public sealed class SettingsDialog : TuiDialog
         Add(tabView);
         AddButton(okButton);
         AddButton(cancelButton);
-        Initialized += (_, _) => _themeRadioGroup.SetFocus();
+        Initialized += (_, _) =>
+        {
+            _themeList.SetFocus();
+            _themeList.EnsureSelectedItemVisible();
+        };
     }
 
     /// <summary>Settings with the chosen theme when OK was pressed, otherwise null.</summary>
@@ -202,7 +212,7 @@ public sealed class SettingsDialog : TuiDialog
     /// </summary>
     public (ICustomizableButtonPanel ButtonPanel, ButtonPanel Layout)? ChangedButtons { get; private set; }
 
-    private ThemeChoice SelectedTheme => _themes[Math.Max(0, (_themeRadioGroup.Value ?? 0))];
+    private ThemeChoice SelectedTheme => _themes[Math.Clamp(_themeList.SelectedItem ?? 0, 0, _themes.Count - 1)];
 
     private VolumeProviderKeys SelectedVolumeProviderKeys =>
         VolumeProviderKeyBindings.All[Math.Max(0, (_volumeProviderKeysRadioGroup.Value ?? 0))];

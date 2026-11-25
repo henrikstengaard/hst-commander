@@ -173,7 +173,7 @@ public partial class SettingsDialog : Window
     /// </summary>
     private void UpdateFontDownload()
     {
-        var theme = SelectedTheme.Plugin;
+        var theme = SelectedTheme.Theme;
         var visible = theme is { FontDownloads.Count: > 0, FontFamily: { } family } &&
                       !GuiFonts.IsInstalled(family) && SelectedFontFamily == null;
         FontDownloadPanel.IsVisible = visible;
@@ -186,11 +186,7 @@ public partial class SettingsDialog : Window
     /// <summary>Downloads the theme's font after asking, then lists and uses it.</summary>
     private async Task DownloadFontAsync()
     {
-        if (SelectedTheme.Plugin is not { } theme)
-        {
-            return;
-        }
-
+        var theme = SelectedTheme.Theme;
         var downloaded = await new FontDownloadDialog(SelectedTheme.Name, theme.FontDownloads).ShowDialog<bool>(this);
         if (!downloaded)
         {

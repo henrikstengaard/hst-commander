@@ -40,6 +40,7 @@ SMB_PROJECT = 'Hst.Commander.Plugins.Smb'
 
 # upstream license files copied to licenses/, downloaded again with --fetch
 LICENSE_URLS = {
+    'opencode.txt': 'https://raw.githubusercontent.com/anomalyco/opencode/dev/LICENSE',
     'avalonia.txt': 'https://raw.githubusercontent.com/AvaloniaUI/Avalonia/master/licence.md',
     'microcom.txt': 'https://raw.githubusercontent.com/kekekeks/MicroCom/master/LICENSE',
     'tmds-dbus.txt': 'https://raw.githubusercontent.com/tmds/Tmds.DBus/main/COPYING',
@@ -187,6 +188,14 @@ SECTIONS = [
           'in THIRD-PARTY-NOTICES-DOTNET.txt (dotnet/runtime).')),
 ]
 
+# components included as source files rather than packages, listed after the packages: (title, url, license, apps,
+# "Files:" line, text)
+SOURCE_SECTIONS = [
+    ('opencode themes', 'https://github.com/anomalyco/opencode', 'MIT', {'TUI', 'GUI'},
+     'the themes adapted from packages/ui/src/theme/themes in src/Hst.Commander.Core/Themes/Included',
+     lic('opencode.txt')),
+]
+
 HEADER = """THIRD-PARTY SOFTWARE NOTICES AND INFORMATION
 
 Hst Commander is licensed under the MIT license (see LICENSE.txt). It includes
@@ -296,14 +305,17 @@ def make_notices():
             print(f'Skipping "{title}": none of its packages are included with the apps', file=sys.stderr)
             continue
         apps = set().union(*(apps_by_package[package_id] for package_id in packages))
-        sections.append((title, url, license, used_by(apps, note), packages, text(package_dirs)))
+        sections.append((title, url, license, used_by(apps, note), 'Packages: ' + ', '.join(packages),
+                         text(package_dirs)))
+    for title, url, license, apps, files, text in SOURCE_SECTIONS:
+        sections.append((title, url, license, used_by(apps, None), 'Files: ' + files, text(package_dirs)))
 
     lines = [HEADER]
     lines += [f'- {title} ({license}, {apps}): {url}' for title, url, license, apps, _, _ in sections]
     lines.append('')
-    for title, url, license, apps, packages, text in sections:
+    for title, url, license, apps, contents, text in sections:
         lines += [RULE, f'# {title}', f'# {url}', f'# License: {license}. Used by: {apps}.', RULE, '',
-                  'Packages: ' + ', '.join(packages), '', text, '']
+                  contents, '', text, '']
     return '\n'.join(lines)
 
 

@@ -90,7 +90,8 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 ### ITheme
 
 - `Id` is stored in the settings, so it must never change. `Name` is shown in Settings > Appearance. `IsDark` picks the Fluent variant the GUI uses for controls the theme doesn't color.
-- `Colors` is a `ThemeColors` record of "#RRGGBB" strings. The TUI uses the closest of its 16 colors for each one. Its optional `MarkedContainerBackground` and `MarkedItemBackground` (init properties) give marked directories and files a background of their own.
+- `Colors` is a `ThemeColors` record of "#RRGGBB" strings. The TUI uses the closest of its 16 colors for each one. Its optional `MarkedContainerBackground` and `MarkedItemBackground` (init properties) give marked directories and files a background of their own. Plugin API 1.2 adds optional colors for a marked entry under the cursor, the open menu item, the menu's hot keys, the keys before button labels, focused controls of TUI dialogs and selected text in the GUI's viewer and editor (`MarkedCursorForeground`, `MenuFocusBackground`/`Foreground`, `MenuHotForeground`, `KeyBackground`/`Foreground`, `DialogFocusBackground`/`Foreground`, `ViewerSelectionBackground`/`Foreground`); without them the cursor's, menu's or marked colors are used, as before.
+- A theme needing only colors doesn't need a plugin: a JSON theme file in `~/.hst-commander/themes` does the same (see [JSON themes](themes.md#json-themes)).
 - `GetBottomPanel()` returns the buttons of the bottom area as a `ButtonPanel` of `ButtonColumn`s of `PanelButton(Label, Action, Key, Background, Foreground)`. `Action` is one of the `CommanderActions` ids. It's called again after the settings change.
 - `ShowParentButtons` (default false) shows a narrow parent button on the outer side of each pane. See [Themes](themes.md).
 - `HighlightActivePathPanel` (default false) colors the whole panel above the active pane with the active path's colors, not only the path.

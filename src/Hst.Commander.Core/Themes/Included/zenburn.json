@@ -1,0 +1,37 @@
+{
+  "$schema": "https://raw.githubusercontent.com/henrikstengaard/hst-commander/main/docs/theme.schema.json",
+  "id": "zenburn",
+  "name": "Zenburn",
+  "dark": {
+    "palette": {
+      "neutral": "#3f3f3f",
+      "ink": "#dcdccc",
+      "primary": "#8cd0d3",
+      "accent": "#93e0e3",
+      "success": "#7f9f7f",
+      "warning": "#f0dfaf",
+      "error": "#cc9393",
+      "info": "#dfaf8f"
+    },
+    "overrides": {
+      "item": "#9f9f9f",
+      "path": "#9f9f9f"
+    }
+  },
+  "light": {
+    "palette": {
+      "neutral": "#ffffef",
+      "ink": "#3f3f3f",
+      "primary": "#5f7f8f",
+      "accent": "#5f8f8f",
+      "success": "#5f8f5f",
+      "warning": "#8f8f5f",
+      "error": "#8f5f5f",
+      "info": "#8f7f5f"
+    },
+    "overrides": {
+      "item": "#6f6f6f",
+      "path": "#6f6f6f"
+    }
+  }
+}

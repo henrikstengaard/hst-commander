@@ -1,0 +1,37 @@
+{
+  "$schema": "https://raw.githubusercontent.com/henrikstengaard/hst-commander/main/docs/theme.schema.json",
+  "id": "github",
+  "name": "GitHub",
+  "dark": {
+    "palette": {
+      "neutral": "#0d1117",
+      "ink": "#c9d1d9",
+      "primary": "#58a6ff",
+      "accent": "#39c5cf",
+      "success": "#3fb950",
+      "warning": "#e3b341",
+      "error": "#f85149",
+      "info": "#d29922"
+    },
+    "overrides": {
+      "item": "#8b949e",
+      "path": "#8b949e"
+    }
+  },
+  "light": {
+    "palette": {
+      "neutral": "#ffffff",
+      "ink": "#24292f",
+      "primary": "#0969da",
+      "accent": "#1b7c83",
+      "success": "#1a7f37",
+      "warning": "#9a6700",
+      "error": "#cf222e",
+      "info": "#bc4c00"
+    },
+    "overrides": {
+      "item": "#57606a",
+      "path": "#57606a"
+    }
+  }
+}

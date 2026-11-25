@@ -1,0 +1,37 @@
+{
+  "$schema": "https://raw.githubusercontent.com/henrikstengaard/hst-commander/main/docs/theme.schema.json",
+  "id": "everforest",
+  "name": "Everforest",
+  "dark": {
+    "palette": {
+      "neutral": "#2d353b",
+      "ink": "#d3c6aa",
+      "primary": "#a7c080",
+      "accent": "#d699b6",
+      "success": "#a7c080",
+      "warning": "#e69875",
+      "error": "#e67e80",
+      "info": "#83c092"
+    },
+    "overrides": {
+      "item": "#7a8478",
+      "path": "#7a8478"
+    }
+  },
+  "light": {
+    "palette": {
+      "neutral": "#fdf6e3",
+      "ink": "#5c6a72",
+      "primary": "#8da101",
+      "accent": "#df69ba",
+      "success": "#8da101",
+      "warning": "#f57d26",
+      "error": "#f85552",
+      "info": "#35a77c"
+    },
+    "overrides": {
+      "item": "#a6b0a0",
+      "path": "#a6b0a0"
+    }
+  }
+}

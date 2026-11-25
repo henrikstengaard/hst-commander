@@ -1,0 +1,37 @@
+{
+  "$schema": "https://raw.githubusercontent.com/henrikstengaard/hst-commander/main/docs/theme.schema.json",
+  "id": "kanagawa",
+  "name": "Kanagawa",
+  "dark": {
+    "palette": {
+      "neutral": "#1F1F28",
+      "ink": "#DCD7BA",
+      "primary": "#7E9CD8",
+      "accent": "#D27E99",
+      "success": "#98BB6C",
+      "warning": "#D7A657",
+      "error": "#E82424",
+      "info": "#76946A"
+    },
+    "overrides": {
+      "item": "#727169",
+      "path": "#727169"
+    }
+  },
+  "light": {
+    "palette": {
+      "neutral": "#F2E9DE",
+      "ink": "#54433A",
+      "primary": "#2D4F67",
+      "accent": "#D27E99",
+      "success": "#6f894e",
+      "warning": "#cc6d00",
+      "error": "#E82424",
+      "info": "#4d699b"
+    },
+    "overrides": {
+      "item": "#8a8980",
+      "path": "#8a8980"
+    }
+  }
+}

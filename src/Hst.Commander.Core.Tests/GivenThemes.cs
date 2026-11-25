@@ -34,7 +34,8 @@ public class GivenThemes
 
         // assert
         Assert.Equal(id, theme.Id);
-        Assert.Null(theme.Plugin);
+        Assert.IsType<JsonTheme>(theme.Theme);
+        Assert.False(theme.CenterButtonLabels);
         Assert.Equal(FunctionKeyBar.Default, theme.GetBottomPanel());
         Assert.False(theme.ShowParentButtons);
         Assert.False(theme.HighlightActivePathPanel);
@@ -63,9 +64,11 @@ public class GivenThemes
         var themes = Themes.List([plugin]);
 
         // assert
-        Assert.Equal(["MidnightCommander", "Light", "Dark", "One", "Two"], themes.Select(theme => theme.Id));
+        Assert.Equal(["MidnightCommander", "Light", "Dark", "One", "Two"], themes.Take(5).Select(theme => theme.Id));
         Assert.Equal("Test One", themes[3].Name);
-        Assert.NotNull(themes[3].Plugin);
+        Assert.IsType<TestTheme>(themes[3].Theme);
+        Assert.True(themes[3].CenterButtonLabels);
+        Assert.Equal(themes[3].Theme.Colors, themes[3].TuiColors);
         Assert.Equal(CommanderActions.Copy, themes[3].GetBottomPanel().Columns[0].Buttons[0].Action);
     }
 

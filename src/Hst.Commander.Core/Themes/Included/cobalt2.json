@@ -1,0 +1,37 @@
+{
+  "$schema": "https://raw.githubusercontent.com/henrikstengaard/hst-commander/main/docs/theme.schema.json",
+  "id": "cobalt2",
+  "name": "Cobalt2",
+  "dark": {
+    "palette": {
+      "neutral": "#193549",
+      "ink": "#ffffff",
+      "primary": "#0088ff",
+      "accent": "#2affdf",
+      "success": "#9eff80",
+      "warning": "#ffc600",
+      "error": "#ff0088",
+      "info": "#ff9d00"
+    },
+    "overrides": {
+      "item": "#adb7c9",
+      "path": "#adb7c9"
+    }
+  },
+  "light": {
+    "palette": {
+      "neutral": "#ffffff",
+      "ink": "#193549",
+      "primary": "#0066cc",
+      "accent": "#00acc1",
+      "success": "#4caf50",
+      "warning": "#ff9800",
+      "error": "#e91e63",
+      "info": "#ff5722"
+    },
+    "overrides": {
+      "item": "#5c6b7d",
+      "path": "#5c6b7d"
+    }
+  }
+}

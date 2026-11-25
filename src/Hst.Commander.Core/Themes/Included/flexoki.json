@@ -1,0 +1,38 @@
+{
+  "$schema": "https://raw.githubusercontent.com/henrikstengaard/hst-commander/main/docs/theme.schema.json",
+  "id": "flexoki",
+  "name": "Flexoki",
+  "dark": {
+    "palette": {
+      "neutral": "#100F0F",
+      "ink": "#CECDC3",
+      "primary": "#DA702C",
+      "accent": "#8B7EC8",
+      "success": "#879A39",
+      "warning": "#DA702C",
+      "error": "#D14D41",
+      "info": "#3AA99F",
+      "interactive": "#4385BE"
+    },
+    "overrides": {
+      "item": "#6F6E69",
+      "path": "#6F6E69"
+    }
+  },
+  "light": {
+    "palette": {
+      "neutral": "#FFFCF0",
+      "ink": "#100F0F",
+      "primary": "#205EA6",
+      "accent": "#BC5215",
+      "success": "#66800B",
+      "warning": "#BC5215",
+      "error": "#AF3029",
+      "info": "#24837B"
+    },
+    "overrides": {
+      "item": "#6F6E69",
+      "path": "#6F6E69"
+    }
+  }
+}

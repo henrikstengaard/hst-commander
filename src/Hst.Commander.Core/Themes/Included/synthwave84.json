@@ -1,0 +1,37 @@
+{
+  "$schema": "https://raw.githubusercontent.com/henrikstengaard/hst-commander/main/docs/theme.schema.json",
+  "id": "synthwave84",
+  "name": "Synthwave '84",
+  "dark": {
+    "palette": {
+      "neutral": "#262335",
+      "ink": "#ffffff",
+      "primary": "#36f9f6",
+      "accent": "#b084eb",
+      "success": "#72f1b8",
+      "warning": "#fede5d",
+      "error": "#fe4450",
+      "info": "#ff8b39"
+    },
+    "overrides": {
+      "item": "#848bbd",
+      "path": "#848bbd"
+    }
+  },
+  "light": {
+    "palette": {
+      "neutral": "#fafafa",
+      "ink": "#262335",
+      "primary": "#00bcd4",
+      "accent": "#9c27b0",
+      "success": "#4caf50",
+      "warning": "#ff9800",
+      "error": "#f44336",
+      "info": "#ff5722"
+    },
+    "overrides": {
+      "item": "#5c5c8a",
+      "path": "#5c5c8a"
+    }
+  }
+}

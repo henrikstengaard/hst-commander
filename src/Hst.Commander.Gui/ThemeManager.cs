@@ -8,66 +8,50 @@ using Hst.Commander.Core;
 namespace Hst.Commander.Gui;
 
 /// <summary>
-///     Applies a theme (<see cref="ThemeChoice" />) to the application. Light and Dark use the Fluent control styling,
-///     while Midnight Commander is a custom theme variant based on Dark with additional styles. A theme of a plugin
-///     (<see cref="ITheme" />) gets a theme variant of its own based on Light or Dark, with brushes made from its colors
-///     and <see cref="PluginThemeStyles" /> coloring the current row, the menu bar and the buttons.
+///     Applies a theme (<see cref="ThemeChoice" />) to the application. Each theme gets a theme variant of its own based
+///     on Light or Dark (<see cref="ITheme.IsDark" />), which colors the controls the theme doesn't, with a theme
+///     dictionary of brushes made from its GUI colors (<see cref="ThemeChoice.GuiColors" />) under the keys the views
+///     use. Unless the theme keeps the system look (<see cref="ThemeChoice.SystemChrome" />, like the built-in themes),
+///     <see cref="ThemeChromeStyles" /> colors the menu bar, the bottom area and the buttons with them too.
 /// </summary>
 public static class ThemeManager
 {
-    public static readonly ThemeVariant MidnightCommanderVariant = new("MidnightCommander", ThemeVariant.Dark);
-
-    private static readonly Dictionary<string, ThemeVariant> PluginVariants = new(StringComparer.OrdinalIgnoreCase);
-    private static MidnightCommanderStyles? _midnightCommanderStyles;
-    private static PluginThemeStyles? _pluginThemeStyles;
+    private static readonly Dictionary<string, ThemeVariant> Variants = new(StringComparer.OrdinalIgnoreCase);
+    private static ThemeChromeStyles? _chromeStyles;
 
     public static void Apply(ThemeChoice theme)
     {
         ArgumentNullException.ThrowIfNull(theme);
         var application = Application.Current ?? throw new InvalidOperationException("Application is not initialized.");
+        application.RequestedThemeVariant = GetVariant(application, theme);
 
-        application.RequestedThemeVariant = theme.Plugin is { } pluginTheme
-            ? GetPluginVariant(application, pluginTheme)
-            : theme.Id switch
-            {
-                Themes.LightId => ThemeVariant.Light,
-                Themes.DarkId => ThemeVariant.Dark,
-                _ => MidnightCommanderVariant
-            };
-
-        SetStyles(application, _midnightCommanderStyles ??= new MidnightCommanderStyles(),
-            theme.Plugin == null && theme.Id == Themes.MidnightCommanderId);
-        SetStyles(application, _pluginThemeStyles ??= new PluginThemeStyles(), theme.Plugin != null);
-    }
-
-    private static void SetStyles(Application application, Styles styles, bool isUsed)
-    {
-        if (isUsed)
+        var chromeStyles = _chromeStyles ??= new ThemeChromeStyles();
+        if (!theme.SystemChrome)
         {
-            if (!application.Styles.Contains(styles))
+            if (!application.Styles.Contains(chromeStyles))
             {
-                application.Styles.Add(styles);
+                application.Styles.Add(chromeStyles);
             }
         }
         else
         {
-            application.Styles.Remove(styles);
+            application.Styles.Remove(chromeStyles);
         }
     }
 
     /// <summary>
-    ///     The theme variant of a plugin theme, created the first time with a theme dictionary holding the brushes of its
-    ///     colors under the keys of the built-in themes in App.axaml.
+    ///     The theme variant of a theme, created the first time with a theme dictionary holding the brushes of its
+    ///     colors.
     /// </summary>
-    private static ThemeVariant GetPluginVariant(Application application, ITheme theme)
+    private static ThemeVariant GetVariant(Application application, ThemeChoice theme)
     {
-        if (PluginVariants.TryGetValue(theme.Id, out var variant))
+        if (Variants.TryGetValue(theme.Id, out var variant))
         {
             return variant;
         }
 
-        variant = new ThemeVariant($"Plugin:{theme.Id}", theme.IsDark ? ThemeVariant.Dark : ThemeVariant.Light);
-        var colors = theme.Colors;
+        variant = new ThemeVariant($"Theme:{theme.Id}", theme.Theme.IsDark ? ThemeVariant.Dark : ThemeVariant.Light);
+        var colors = theme.GuiColors;
         var dictionary = new ResourceDictionary
         {
             ["PaneBackground"] = Brush(colors.PaneBackground),
@@ -89,17 +73,23 @@ public static class ThemeManager
                 : Brush(colors.MarkedItemBackground),
             ["AdministratorBackground"] = Brush("#C62828"),
             ["AdministratorForeground"] = Brush("#FFFFFF"),
-            ["ViewerSelectionBackground"] = Brush(colors.CursorBackground),
-            ["ViewerSelectionForeground"] = Brush(colors.CursorForeground),
-            ["CursorBackground"] = Brush(colors.CursorBackground),
-            ["MenuBackground"] = Brush(colors.MenuBackground),
-            ["MenuForeground"] = Brush(colors.MenuForeground),
-            ["BottomBackground"] = Brush(colors.BottomBackground),
-            ["ButtonBackground"] = Brush(colors.ButtonBackground),
-            ["ButtonForeground"] = Brush(colors.ButtonForeground)
+            ["ViewerSelectionBackground"] = Brush(colors.ViewerSelectionBackground ?? colors.CursorBackground),
+            ["ViewerSelectionForeground"] = Brush(colors.ViewerSelectionForeground ?? colors.CursorForeground),
+            ["CursorBackground"] = Brush(colors.CursorBackground)
         };
+        // the chrome's colors, only for themes coloring it: ButtonBackground and ButtonForeground are also the keys of
+        // Fluent's buttons, so they color all buttons, including those of dialogs
+        if (!theme.SystemChrome)
+        {
+            dictionary["MenuBackground"] = Brush(colors.MenuBackground);
+            dictionary["MenuForeground"] = Brush(colors.MenuForeground);
+            dictionary["BottomBackground"] = Brush(colors.BottomBackground);
+            dictionary["ButtonBackground"] = Brush(colors.ButtonBackground);
+            dictionary["ButtonForeground"] = Brush(colors.ButtonForeground);
+        }
+
         application.Resources.ThemeDictionaries[variant] = dictionary;
-        PluginVariants[theme.Id] = variant;
+        Variants[theme.Id] = variant;
         return variant;
     }
 

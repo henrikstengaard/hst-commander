@@ -1,0 +1,38 @@
+{
+  "$schema": "https://raw.githubusercontent.com/henrikstengaard/hst-commander/main/docs/theme.schema.json",
+  "id": "vercel",
+  "name": "Vercel",
+  "dark": {
+    "palette": {
+      "neutral": "#000000",
+      "ink": "#EDEDED",
+      "primary": "#0070F3",
+      "accent": "#8E4EC6",
+      "success": "#46A758",
+      "warning": "#FFB224",
+      "error": "#E5484D",
+      "info": "#52A8FF",
+      "interactive": "#52A8FF"
+    },
+    "overrides": {
+      "item": "#878787",
+      "path": "#878787"
+    }
+  },
+  "light": {
+    "palette": {
+      "neutral": "#FFFFFF",
+      "ink": "#171717",
+      "primary": "#0070F3",
+      "accent": "#8E4EC6",
+      "success": "#388E3C",
+      "warning": "#FF9500",
+      "error": "#DC3545",
+      "info": "#0070F3"
+    },
+    "overrides": {
+      "item": "#666666",
+      "path": "#666666"
+    }
+  }
+}

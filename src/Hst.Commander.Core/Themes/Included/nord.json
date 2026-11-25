@@ -1,0 +1,29 @@
+{
+  "$schema": "https://raw.githubusercontent.com/henrikstengaard/hst-commander/main/docs/theme.schema.json",
+  "id": "nord",
+  "name": "Nord",
+  "dark": {
+    "palette": {
+      "neutral": "#2e3440",
+      "ink": "#e5e9f0",
+      "primary": "#88c0d0",
+      "accent": "#d57780",
+      "success": "#a3be8c",
+      "warning": "#d08770",
+      "error": "#bf616a",
+      "info": "#81a1c1"
+    }
+  },
+  "light": {
+    "palette": {
+      "neutral": "#eceff4",
+      "ink": "#2e3440",
+      "primary": "#5e81ac",
+      "accent": "#bf616a",
+      "success": "#8fbcbb",
+      "warning": "#d08770",
+      "error": "#bf616a",
+      "info": "#81a1c1"
+    }
+  }
+}

@@ -1616,7 +1616,7 @@ public partial class MainWindow : Window
             TextElement.SetFontSize(control, size);
         }
 
-        BottomPanel.CenterLabels = theme.Plugin != null;
+        BottomPanel.CenterLabels = theme.CenterButtonLabels;
         BottomPanel.Panel = theme.GetBottomPanel();
         LeftPane.ParentButtonSide = theme.ShowParentButtons ? ParentButtonSide.Left : null;
         RightPane.ParentButtonSide = theme.ShowParentButtons ? ParentButtonSide.Right : null;

@@ -1,0 +1,38 @@
+{
+  "$schema": "https://raw.githubusercontent.com/henrikstengaard/hst-commander/main/docs/theme.schema.json",
+  "id": "osaka-jade",
+  "name": "Osaka Jade",
+  "dark": {
+    "palette": {
+      "neutral": "#111c18",
+      "ink": "#C1C497",
+      "primary": "#2DD5B7",
+      "accent": "#549e6a",
+      "success": "#549e6a",
+      "warning": "#E5C736",
+      "error": "#FF5345",
+      "info": "#2DD5B7",
+      "interactive": "#8CD3CB"
+    },
+    "overrides": {
+      "item": "#53685B",
+      "path": "#53685B"
+    }
+  },
+  "light": {
+    "palette": {
+      "neutral": "#F6F5DD",
+      "ink": "#111c18",
+      "primary": "#1faa90",
+      "accent": "#3d7a52",
+      "success": "#3d7a52",
+      "warning": "#b5a020",
+      "error": "#c7392d",
+      "info": "#1faa90"
+    },
+    "overrides": {
+      "item": "#53685B",
+      "path": "#53685B"
+    }
+  }
+}

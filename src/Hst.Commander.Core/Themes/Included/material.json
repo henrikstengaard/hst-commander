@@ -1,0 +1,39 @@
+{
+  "$schema": "https://raw.githubusercontent.com/henrikstengaard/hst-commander/main/docs/theme.schema.json",
+  "id": "material",
+  "name": "Material",
+  "dark": {
+    "palette": {
+      "neutral": "#263238",
+      "ink": "#eeffff",
+      "primary": "#82aaff",
+      "accent": "#89ddff",
+      "success": "#c3e88d",
+      "warning": "#ffcb6b",
+      "error": "#f07178",
+      "info": "#ffcb6b",
+      "interactive": "#89ddff"
+    },
+    "overrides": {
+      "item": "#546e7a",
+      "path": "#546e7a"
+    }
+  },
+  "light": {
+    "palette": {
+      "neutral": "#fafafa",
+      "ink": "#263238",
+      "primary": "#6182b8",
+      "accent": "#39adb5",
+      "success": "#91b859",
+      "warning": "#ffb300",
+      "error": "#e53935",
+      "info": "#f4511e",
+      "interactive": "#39adb5"
+    },
+    "overrides": {
+      "item": "#90a4ae",
+      "path": "#90a4ae"
+    }
+  }
+}
