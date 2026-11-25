@@ -104,6 +104,7 @@ public partial class MainWindow : Window
         SwapPanesMenuItem.Click += async (_, _) => await SwapPanesAsync();
         SameLocationMenuItem.Click += async (_, _) => await ShowSameLocationInOtherPaneAsync();
         CommandLineMenuItem.Click += (_, _) => FocusCommandLine();
+        CommandPaletteMenuItem.Click += async (_, _) => await ShowCommandPaletteAsync();
         LeftPane.PathClicked += async (_, _) => await ShowLocationAsync(LeftPane);
         RightPane.PathClicked += async (_, _) => await ShowLocationAsync(RightPane);
         RestartElevatedMenuItem.Header = Elevation.RestartMenuText;
@@ -111,7 +112,7 @@ public partial class MainWindow : Window
         RestartElevatedMenuItem.Click += async (_, _) => await RestartElevatedAsync();
         SettingsMenuItem.Click += async (_, _) => await ShowSettingsAsync();
         QuitMenuItem.Click += (_, _) => Close();
-        AboutMenuItem.Click += async (_, _) => await new AboutDialog().ShowDialog(this);
+        AboutMenuItem.Click += async (_, _) => await ShowAboutAsync();
 
         AddHandler(KeyDownEvent, OnWindowKeyDown, RoutingStrategies.Tunnel);
         Opened += async (_, _) =>
@@ -555,6 +556,11 @@ public partial class MainWindow : Window
             case Key.P when e.KeyModifiers == KeyModifiers.Control:
                 e.Handled = true;
                 await ShowPropertiesAsync(_activePane);
+                break;
+            // only in the panes, text boxes keep their undo
+            case Key.Z when e.KeyModifiers == KeyModifiers.Control && IsPaneFocused():
+                e.Handled = true;
+                await ShowCommandPaletteAsync();
                 break;
             case Key.L when e.KeyModifiers == KeyModifiers.Control:
                 e.Handled = true;
@@ -1866,8 +1872,75 @@ public partial class MainWindow : Window
             case CommanderActions.Quit:
                 Close();
                 break;
+            case CommanderActions.Home:
+                await GoHomeAsync(pane);
+                break;
+            case CommanderActions.CommandLine:
+                FocusCommandLine();
+                break;
+            case CommanderActions.About:
+                await ShowAboutAsync();
+                break;
+            case CommanderActions.RestartElevated:
+                if (!Elevation.IsElevated && Elevation.CanStartAsAdministrator)
+                {
+                    await RestartElevatedAsync();
+                }
+
+                break;
         }
     }
+
+    private async Task ShowAboutAsync() => await new AboutDialog().ShowDialog(this);
+
+    /// <summary>
+    ///     Shows the command palette (Ctrl+Z) with the menu commands, including the navigation modes of the View menu,
+    ///     and runs the chosen one on the active pane, see <see cref="CommandPalette" />.
+    /// </summary>
+    private async Task ShowCommandPaletteAsync()
+    {
+        var navigationModes = PaneNavigationMode.All;
+        var commands = CommandPalette.MenuCommands(RestartElevatedMenuItem.IsVisible)
+            .Select(command => command.Action switch
+            {
+                CommanderActions.LeftVolume => command with
+                {
+                    Shortcut = VolumeProviderKeyBindings.GetLeftKeyText(_volumeProviderKeys)
+                },
+                CommanderActions.RightVolume => command with
+                {
+                    Shortcut = VolumeProviderKeyBindings.GetRightKeyText(_volumeProviderKeys)
+                },
+                _ => command
+            })
+            .ToList();
+        // the View menu is before the Help menu
+        var helpIndex = commands.FindIndex(command => command.Group == CommandPalette.HelpGroup);
+        commands.InsertRange(helpIndex < 0 ? commands.Count : helpIndex, navigationModes.Select((mode, index) =>
+            new PaletteCommand(CommandPalette.ViewGroup, mode.Name, NavigationModeAction + mode.Name,
+                index < 9 ? $"Ctrl+{index + 1}" : null)));
+        var action = await new CommandPaletteDialog(commands).ShowDialog<string?>(this);
+        if (action == null)
+        {
+            return;
+        }
+
+        if (action.StartsWith(NavigationModeAction, StringComparison.Ordinal))
+        {
+            var name = action[NavigationModeAction.Length..];
+            if (navigationModes.FirstOrDefault(mode => mode.Name == name) is { } navigationMode)
+            {
+                await SetNavigationModeAsync(_activePane, navigationMode);
+            }
+
+            return;
+        }
+
+        await RunActionAsync(action);
+    }
+
+    /// <summary>Prefix of the command palette's actions choosing a navigation mode, followed by its name.</summary>
+    private const string NavigationModeAction = "NavigationMode:";
 
     private async Task ShowSettingsAsync()
     {

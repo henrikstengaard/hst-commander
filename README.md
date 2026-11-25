@@ -154,6 +154,7 @@ The keys are the same in both front-ends unless noted. The menus list them too: 
 | F10 / Ctrl+Q | Quit |
 | Ctrl+C / Ctrl+X / Ctrl+V | Copy, cut and paste entries with the clipboard (also Alt+V in the TUI, as terminals paste text with Ctrl+V) |
 | Ctrl+P / Alt+Enter | Properties |
+| Ctrl+Z | Command palette: search and run any menu command (in the panes) |
 | Ctrl+S | Search |
 | Ctrl+F | Quick search |
 | Ctrl+L | Change location |

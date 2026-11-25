@@ -33,9 +33,13 @@ public static class CommanderActions
     public const string SameLocation = "SameLocation";
     public const string Location = "Location";
     public const string AddBookmark = "AddBookmark";
+    public const string Home = "Home";
     public const string Search = "Search";
     public const string QuickSearch = "QuickSearch";
+    public const string CommandLine = "CommandLine";
     public const string Settings = "Settings";
+    public const string RestartElevated = "RestartElevated";
+    public const string About = "About";
     public const string Quit = "Quit";
 
     /// <summary>All commands with their descriptions, in the order they are listed when choosing a command.</summary>
@@ -68,9 +72,13 @@ public static class CommanderActions
         new(SameLocation, "Same location in other pane"),
         new(Location, "Location"),
         new(AddBookmark, "Add bookmark"),
+        new(Home, "Home directory"),
         new(Search, "Search"),
         new(QuickSearch, "Quick search"),
+        new(CommandLine, "Command line"),
         new(Settings, "Settings"),
+        new(RestartElevated, "Restart as administrator/root"),
+        new(About, "About"),
         new(Quit, "Quit")
     ];
 

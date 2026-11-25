@@ -1,0 +1,34 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:core="using:Hst.Commander.Core"
+        x:Class="Hst.Commander.Gui.CommandPaletteDialog"
+        Title="Commands"
+        Width="520"
+        Height="480"
+        CanResize="False"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner">
+    <Window.Styles>
+        <!-- group headers in bold, commands indented below them -->
+        <Style Selector="Grid.header > TextBlock.name">
+            <Setter Property="FontWeight" Value="Bold" />
+        </Style>
+        <Style Selector="Grid:not(.header) > TextBlock.name">
+            <Setter Property="Margin" Value="12,0,0,0" />
+        </Style>
+    </Window.Styles>
+    <DockPanel Margin="12">
+        <TextBox x:Name="SearchBox" DockPanel.Dock="Top" PlaceholderText="Search" Margin="0,0,0,8" />
+        <ListBox x:Name="CommandsList">
+            <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="core:PaletteRow">
+                    <Grid ColumnDefinitions="*,Auto" Classes.header="{Binding !IsCommand}">
+                        <TextBlock Classes="name" Text="{Binding Text}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Grid.Column="1" Text="{Binding Command.Shortcut}" Opacity="0.7"
+                                   Margin="16,0,0,0" />
+                    </Grid>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+    </DockPanel>
+</Window>

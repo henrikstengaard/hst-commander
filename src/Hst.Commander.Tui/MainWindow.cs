@@ -96,7 +96,8 @@ public sealed class MainWindow : Window
                 {
                     new("_Search...", "Ctrl+S", SearchInActivePane),
                     new("_Quick search", "Ctrl+F", QuickSearchInActivePane),
-                    new("Command _line", "Ctrl+T", FocusCommandLine)
+                    new("Command _line", "Ctrl+T", FocusCommandLine),
+                    new("Command _palette...", "Ctrl+Z", ShowCommandPalette)
                 }),
                 new MenuBarItem("_Help", new MenuItem[]
                 {
@@ -640,6 +641,45 @@ public sealed class MainWindow : Window
             case CommanderActions.Quit:
                 Quit();
                 break;
+            case CommanderActions.Home:
+                GoHomeInActivePane();
+                break;
+            case CommanderActions.CommandLine:
+                FocusCommandLine();
+                break;
+            case CommanderActions.About:
+                ShowAbout();
+                break;
+            case CommanderActions.RestartElevated:
+                if (!Elevation.IsElevated)
+                {
+                    RestartElevated();
+                }
+
+                break;
+        }
+    }
+
+    /// <summary>
+    ///     Shows the command palette (Ctrl+Z) with the menu commands and runs the chosen one on the active pane, see
+    ///     <see cref="CommandPalette" />.
+    /// </summary>
+    private void ShowCommandPalette()
+    {
+        var commands = CommandPalette.MenuCommands(!Elevation.IsElevated).Select(command => command.Action switch
+        {
+            CommanderActions.Quit => command with { Shortcut = "F10/Ctrl+Q" },
+            CommanderActions.LeftVolume => command with { Shortcut = _leftVolumeMenuItem.HelpText },
+            CommanderActions.RightVolume => command with { Shortcut = _rightVolumeMenuItem.HelpText },
+            _ => command
+        }).ToList();
+        var dialog = new CommandPaletteDialog(commands, _palette);
+        Application.Run(dialog);
+        var action = dialog.Result;
+        dialog.Dispose();
+        if (action != null)
+        {
+            RunAction(action);
         }
     }
 
@@ -888,6 +928,12 @@ public sealed class MainWindow : Window
             {
                 key.Handled = true;
                 _ = ShowPropertiesAsync(pane);
+            }
+            // only in the panes, the command line keeps ctrl+z for undo
+            else if (key == Key.Z.WithCtrl)
+            {
+                key.Handled = true;
+                ShowCommandPalette();
             }
             else if (key == Key.O.WithCtrl)
             {

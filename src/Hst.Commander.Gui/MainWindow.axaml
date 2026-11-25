@@ -55,6 +55,7 @@
                     <MenuItem x:Name="SearchMenuItem" Header="_Search..." InputGesture="Ctrl+S" />
                     <MenuItem x:Name="QuickSearchMenuItem" Header="_Quick search" InputGesture="Ctrl+F" />
                     <MenuItem x:Name="CommandLineMenuItem" Header="Command _line" InputGesture="Ctrl+T" />
+                    <MenuItem x:Name="CommandPaletteMenuItem" Header="Command _palette..." InputGesture="Ctrl+Z" />
                 </MenuItem>
                 <!-- the navigation modes of the active pane, added by the code-behind -->
                 <MenuItem x:Name="ViewMenu" Header="_View" />
