@@ -9,6 +9,7 @@
         ShowInTaskbar="False"
         WindowStartupLocation="Manual">
     <StackPanel Margin="16" Spacing="8">
+        <TextBox x:Name="SearchBox" PlaceholderText="Search" />
         <ListBox x:Name="BookmarksList" MaxHeight="400">
             <ListBox.ItemTemplate>
                 <DataTemplate x:DataType="core:VolumeChoice">
@@ -24,7 +25,7 @@
                 <Button x:Name="EditButton" Content="_Edit" MinWidth="80" HorizontalContentAlignment="Center"
                         ToolTip.Tip="Change the description, location, path, user name or password of the bookmark (F4)" />
                 <Button x:Name="DeleteButton" Content="_Delete" MinWidth="80" HorizontalContentAlignment="Center"
-                        ToolTip.Tip="Delete the bookmark (Del)" />
+                        ToolTip.Tip="Delete the bookmark (Shift+Del)" />
             </StackPanel>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
                 <Button x:Name="OkButton" Content="OK" MinWidth="80" HorizontalContentAlignment="Center"

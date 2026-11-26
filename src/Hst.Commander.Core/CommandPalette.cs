@@ -63,7 +63,7 @@ public static class CommandPalette
     public static IReadOnlyList<PaletteRow> Filter(IReadOnlyList<PaletteCommand> commands, string? query)
     {
         ArgumentNullException.ThrowIfNull(commands);
-        var words = (query ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var words = QueryWords(query);
         var rows = new List<PaletteRow>();
         // groups are listed in the order of their first command
         foreach (var group in commands.Select(command => command.Group).Distinct())
@@ -120,9 +120,16 @@ public static class CommandPalette
     /// <summary>A menu item's text without its hot key underscore and trailing dots, e.g. "Settings" for "_Settings...".</summary>
     public static string MenuText(string text) => text.Replace("_", string.Empty).TrimEnd('.');
 
+    /// <summary>The words of a typed query, separated by spaces.</summary>
+    internal static string[] QueryWords(string? query) =>
+        (query ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+    /// <summary>True when every word is part of one of the texts, case-insensitively; true for no words.</summary>
+    internal static bool MatchesWords(string[] words, params string?[] texts) =>
+        words.All(word => texts.Any(text => text != null && text.Contains(word, StringComparison.OrdinalIgnoreCase)));
+
     private static bool IsMatch(PaletteCommand command, string[] words) =>
-        words.All(word => command.Name.Contains(word, StringComparison.OrdinalIgnoreCase) ||
-                          command.Group.Contains(word, StringComparison.OrdinalIgnoreCase));
+        MatchesWords(words, command.Name, command.Group);
 }
 
 /// <summary>A command of the command palette (<see cref="CommandPalette" />).</summary>

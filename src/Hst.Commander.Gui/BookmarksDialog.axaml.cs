@@ -7,15 +7,17 @@ namespace Hst.Commander.Gui;
 
 /// <summary>
 ///     Modal list of the bookmarks, opened by choosing Bookmarks in the volume provider list and centered over the pane.
-///     The dialog returns the chosen bookmark on OK, Enter or double-click, or null when cancelled. Delete or Del
-///     deletes the selected bookmark after confirming and Edit, F4 or F2 edits it (<see cref="EditBookmarkDialog" />);
-///     the dialog closes when
-///     the last bookmark is deleted.
+///     Like the command palette, a search box above the list filters the bookmarks while typing
+///     (<see cref="VolumeChoice.Filter" />), selecting the first match, and Up and Down move between them. The dialog
+///     returns the chosen bookmark on OK, Enter or double-click, or null when cancelled. Shift+Del or Delete deletes the
+///     selected bookmark after confirming and Edit, F4 or F2 edits it (<see cref="EditBookmarkDialog" />); the dialog
+///     closes when the last bookmark is deleted.
 /// </summary>
 public partial class BookmarksDialog : Window
 {
     private readonly BookmarkStore? _bookmarkStore;
     private IReadOnlyList<Bookmark> _bookmarks;
+    private IReadOnlyList<VolumeChoice> _shown = [];
 
     public BookmarksDialog() : this([], null, null)
     {
@@ -30,34 +32,16 @@ public partial class BookmarksDialog : Window
         _bookmarks = bookmarks;
         _bookmarkStore = bookmarkStore;
         WindowStartupLocation = pane == null ? WindowStartupLocation.CenterOwner : WindowStartupLocation.Manual;
-        BookmarksList.ItemsSource = VolumeChoice.List(bookmarks);
-        BookmarksList.SelectedIndex = bookmarks.Count > 0 ? 0 : -1;
         BookmarksList.SelectionChanged += (_, _) => UpdateButtons();
         BookmarksList.DoubleTapped += (_, _) => CloseWithSelected();
-        // tunnelling, as the focused list item takes Enter before the default OK button sees it
-        BookmarksList.AddHandler(KeyDownEvent, async (_, e) =>
-        {
-            if (e.Key == Key.Enter)
-            {
-                e.Handled = true;
-                CloseWithSelected();
-            }
-            else if (e.Key == Key.Delete && e.KeyModifiers == KeyModifiers.None)
-            {
-                e.Handled = true;
-                await DeleteSelectedBookmarkAsync();
-            }
-            else if (e.Key is Key.F4 or Key.F2 && e.KeyModifiers == KeyModifiers.None)
-            {
-                e.Handled = true;
-                await EditSelectedBookmarkAsync();
-            }
-        }, RoutingStrategies.Tunnel);
+        SearchBox.TextChanged += (_, _) => ShowBookmarks(null, 0);
+        // tunnelling, before the search box, the list and the default OK button handle the keys themselves
+        AddHandler(KeyDownEvent, OnKeyDown, RoutingStrategies.Tunnel);
         EditButton.Click += async (_, _) => await EditSelectedBookmarkAsync();
         DeleteButton.Click += async (_, _) => await DeleteSelectedBookmarkAsync();
         OkButton.Click += (_, _) => CloseWithSelected();
         CancelButton.Click += (_, _) => Close(null);
-        UpdateButtons();
+        ShowBookmarks(null, 0);
         Opened += (_, _) =>
         {
             if (pane != null)
@@ -65,11 +49,80 @@ public partial class BookmarksDialog : Window
                 VolumeProviderDialog.CenterOver(this, pane);
             }
 
-            VolumeProviderDialog.FocusSelected(BookmarksList);
+            SearchBox.Focus();
         };
     }
 
     private Bookmark? SelectedBookmark => (BookmarksList.SelectedItem as VolumeChoice)?.Bookmark;
+
+    /// <summary>
+    ///     Lists the bookmarks matching the typed text, selecting a bookmark by id or else the row at an index (kept
+    ///     within the rows).
+    /// </summary>
+    private void ShowBookmarks(string? selectId, int index)
+    {
+        _shown = VolumeChoice.Filter(_bookmarks, SearchBox.Text);
+        BookmarksList.ItemsSource = _shown;
+        var selectedIndex = selectId != null
+            ? _shown.ToList().FindIndex(choice => choice.Bookmark?.Id == selectId)
+            : -1;
+        Select(_shown.Count == 0 ? -1 : selectedIndex >= 0 ? selectedIndex : Math.Clamp(index, 0, _shown.Count - 1));
+        UpdateButtons();
+    }
+
+    private void Select(int index)
+    {
+        BookmarksList.SelectedIndex = index;
+        if (index >= 0)
+        {
+            BookmarksList.ScrollIntoView(index);
+        }
+    }
+
+    /// <summary>
+    ///     Up, Down, PgUp and PgDn move between the bookmarks, Enter opens the selected one, Shift+Del deletes it and F4
+    ///     or F2 edits it.
+    /// </summary>
+    private async void OnKeyDown(object? sender, KeyEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case Key.Up:
+            case Key.Down:
+                e.Handled = true;
+                Move(e.Key == Key.Up ? -1 : 1);
+                break;
+            case Key.PageUp:
+            case Key.PageDown:
+                e.Handled = true;
+                // about a page of rows, each a name and a description
+                var rows = Math.Max(1, (int)(BookmarksList.Bounds.Height / 44) - 1);
+                Move(e.Key == Key.PageUp ? -rows : rows);
+                break;
+            case Key.Enter:
+                e.Handled = true;
+                CloseWithSelected();
+                break;
+            case Key.Delete when e.KeyModifiers == KeyModifiers.Shift:
+                e.Handled = true;
+                await DeleteSelectedBookmarkAsync();
+                break;
+            case Key.F4 or Key.F2 when e.KeyModifiers == KeyModifiers.None:
+                e.Handled = true;
+                await EditSelectedBookmarkAsync();
+                break;
+        }
+    }
+
+    private void Move(int rows)
+    {
+        if (_shown.Count == 0)
+        {
+            return;
+        }
+
+        Select(Math.Clamp(Math.Max(0, BookmarksList.SelectedIndex) + rows, 0, _shown.Count - 1));
+    }
 
     private void UpdateButtons()
     {
@@ -88,7 +141,7 @@ public partial class BookmarksDialog : Window
         if (await new ConfirmDialog("Delete bookmark", $"Delete bookmark '{bookmark.Description}'?", "_Yes", "_No")
                 .ShowDialog<bool?>(this) != true)
         {
-            VolumeProviderDialog.FocusSelected(BookmarksList);
+            SearchBox.Focus();
             return;
         }
 
@@ -106,7 +159,7 @@ public partial class BookmarksDialog : Window
             .ShowDialog<BookmarkChanges?>(this);
         if (changes == null)
         {
-            VolumeProviderDialog.FocusSelected(BookmarksList);
+            SearchBox.Focus();
             return;
         }
 
@@ -114,8 +167,8 @@ public partial class BookmarksDialog : Window
     }
 
     /// <summary>
-    ///     Changes the bookmarks and lists them again from the store, selecting a bookmark by id or the row at the same
-    ///     index, and closes the dialog when no bookmarks are left.
+    ///     Changes the bookmarks and lists them again from the store with the typed filter, selecting a bookmark by id
+    ///     or the row at the same index, and closes the dialog when no bookmarks are left.
     /// </summary>
     private async Task ChangeAndReloadAsync(Action change, string? selectId)
     {
@@ -136,11 +189,8 @@ public partial class BookmarksDialog : Window
             return;
         }
 
-        var selectedIndex = selectId != null ? _bookmarks.ToList().FindIndex(bookmark => bookmark.Id == selectId) : -1;
-        BookmarksList.ItemsSource = VolumeChoice.List(_bookmarks);
-        BookmarksList.SelectedIndex = selectedIndex >= 0 ? selectedIndex : Math.Clamp(index, 0, _bookmarks.Count - 1);
-        UpdateButtons();
-        VolumeProviderDialog.FocusSelected(BookmarksList);
+        ShowBookmarks(selectId, index);
+        SearchBox.Focus();
     }
 
     private void CloseWithSelected()
