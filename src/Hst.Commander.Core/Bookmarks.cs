@@ -512,8 +512,18 @@ public sealed record VolumeChoice(IVolumeProvider? VolumeProvider, Bookmark? Boo
     public static IReadOnlyList<VolumeChoice> Filter(IEnumerable<Bookmark> bookmarks, string? query)
     {
         ArgumentNullException.ThrowIfNull(bookmarks);
+        return Filter(List(bookmarks), query);
+    }
+
+    /// <summary>
+    ///     The items of the volume provider or bookmark list matching a typed query, in their order: an item matches when
+    ///     every word of the query is part of its <see cref="Name" /> or <see cref="Description" />, case-insensitively;
+    ///     an empty query matches every item.
+    /// </summary>
+    public static IReadOnlyList<VolumeChoice> Filter(IEnumerable<VolumeChoice> choices, string? query)
+    {
+        ArgumentNullException.ThrowIfNull(choices);
         var words = CommandPalette.QueryWords(query);
-        return List(bookmarks.Where(bookmark =>
-            CommandPalette.MatchesWords(words, bookmark.Description, bookmark.Path)));
+        return [..choices.Where(choice => CommandPalette.MatchesWords(words, choice.Name, choice.Description))];
     }
 }

@@ -9,6 +9,7 @@
         ShowInTaskbar="False"
         WindowStartupLocation="Manual">
     <StackPanel Margin="16" Spacing="8">
+        <TextBox x:Name="SearchBox" PlaceholderText="Search" />
         <ListBox x:Name="VolumeProvidersList" MaxHeight="400">
             <ListBox.ItemTemplate>
                 <DataTemplate x:DataType="core:VolumeChoice">
