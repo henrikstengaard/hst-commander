@@ -9,6 +9,7 @@
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner">
     <StackPanel Margin="16" Spacing="8">
+        <TextBox x:Name="SearchBox" PlaceholderText="Search" />
         <ListBox x:Name="CreatorsList" MaxHeight="320">
             <ListBox.ItemTemplate>
                 <DataTemplate x:DataType="abstractions:IVolumeCreator">

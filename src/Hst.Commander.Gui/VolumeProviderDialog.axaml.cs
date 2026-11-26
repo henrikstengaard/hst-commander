@@ -9,7 +9,9 @@ namespace Hst.Commander.Gui;
 
 /// <summary>
 ///     Modal list of Bookmarks followed by the volume providers a pane can show, opened with Alt+F1 (left pane) or
-///     Alt+F2 (right pane) and centered over the pane with Bookmarks selected. The dialog returns the chosen volume
+///     Alt+F2 (right pane) and centered over the pane with Bookmarks selected. Like the command palette, a search box
+///     above the list filters the items while typing, selecting the first match, and Up and Down move between them.
+///     The dialog returns the chosen volume
 ///     provider or bookmark on OK, Enter or double-click, or null when cancelled. Choosing Bookmarks opens the bookmark list
 ///     (<see cref="BookmarksDialog" />), or says there are no bookmarks; cancelling it goes back to this list.
 /// </summary>
@@ -17,6 +19,7 @@ public partial class VolumeProviderDialog : Window
 {
     private readonly BookmarkStore? _bookmarkStore;
     private readonly Control? _pane;
+    private readonly IReadOnlyList<VolumeChoice> _choices;
 
     public VolumeProviderDialog() : this("Volume", [], null, null)
     {
@@ -34,22 +37,27 @@ public partial class VolumeProviderDialog : Window
         _pane = pane;
         Title = title;
         WindowStartupLocation = pane == null ? WindowStartupLocation.CenterOwner : WindowStartupLocation.Manual;
-        var choices = VolumeChoice.List(volumeProviders);
-        VolumeProvidersList.ItemsSource = choices;
-        // Bookmarks, the first item, is selected
-        VolumeProvidersList.SelectedIndex = 0;
+        _choices = VolumeChoice.List(volumeProviders);
         VolumeProvidersList.DoubleTapped += async (_, _) => await ChooseSelectedAsync();
-        // tunnelling, as the focused list item takes Enter before the default OK button sees it
-        VolumeProvidersList.AddHandler(KeyDownEvent, async (_, e) =>
+        VolumeProvidersList.SelectionChanged += (_, _) => OkButton.IsEnabled = VolumeProvidersList.SelectedIndex >= 0;
+        SearchBox.TextChanged += (_, _) =>
+            ShowFiltered(VolumeProvidersList, VolumeChoice.Filter(_choices, SearchBox.Text));
+        // tunnelling, before the search box, the list and the default OK button handle the keys themselves
+        AddHandler(KeyDownEvent, async (_, e) =>
         {
             if (e.Key == Key.Enter)
             {
                 e.Handled = true;
                 await ChooseSelectedAsync();
+                return;
             }
+
+            HandleMoveKey(VolumeProvidersList, e);
         }, RoutingStrategies.Tunnel);
         OkButton.Click += async (_, _) => await ChooseSelectedAsync();
         CancelButton.Click += (_, _) => Close(null);
+        // Bookmarks, the first item, is selected
+        ShowFiltered(VolumeProvidersList, _choices);
         Opened += (_, _) =>
         {
             if (pane != null)
@@ -57,7 +65,7 @@ public partial class VolumeProviderDialog : Window
                 CenterOver(this, pane);
             }
 
-            FocusSelected(VolumeProvidersList);
+            SearchBox.Focus();
         };
     }
 
@@ -73,7 +81,7 @@ public partial class VolumeProviderDialog : Window
         {
             if (await ChooseBookmarkAsync() is not { } bookmark)
             {
-                FocusSelected(VolumeProvidersList);
+                SearchBox.Focus();
                 return;
             }
 
@@ -108,16 +116,50 @@ public partial class VolumeProviderDialog : Window
             paneTopLeft.Y + Math.Max(0, (paneBottomRight.Y - paneTopLeft.Y - height) / 3));
     }
 
-    /// <summary>Focuses the selected item of a list, or the list when nothing is selected.</summary>
-    internal static void FocusSelected(ListBox listBox)
+    /// <summary>
+    ///     Shows the items of a list filtered by a search box, selecting the first. Used by the lists with a search box
+    ///     above them (the volume provider and create volume lists).
+    /// </summary>
+    internal static void ShowFiltered<T>(ListBox listBox, IReadOnlyList<T> items)
     {
-        if (listBox.SelectedIndex < 0)
+        listBox.ItemsSource = items;
+        listBox.SelectedIndex = items.Count > 0 ? 0 : -1;
+        if (items.Count > 0)
         {
-            listBox.Focus(NavigationMethod.Tab);
+            listBox.ScrollIntoView(0);
+        }
+    }
+
+    /// <summary>
+    ///     Up, Down, PgUp and PgDn move the selection of a list filtered by a search box, which keeps the focus.
+    /// </summary>
+    internal static void HandleMoveKey(ListBox listBox, KeyEventArgs e)
+    {
+        int rows;
+        switch (e.Key)
+        {
+            case Key.Up:
+            case Key.Down:
+                rows = e.Key == Key.Up ? -1 : 1;
+                break;
+            case Key.PageUp:
+            case Key.PageDown:
+                // about a page of rows, each a name and a description
+                var page = Math.Max(1, (int)(listBox.Bounds.Height / 44) - 1);
+                rows = e.Key == Key.PageUp ? -page : page;
+                break;
+            default:
+                return;
+        }
+
+        e.Handled = true;
+        if (listBox.ItemCount == 0)
+        {
             return;
         }
 
-        listBox.UpdateLayout();
-        listBox.ContainerFromIndex(listBox.SelectedIndex)?.Focus(NavigationMethod.Tab);
+        var index = Math.Clamp(Math.Max(0, listBox.SelectedIndex) + rows, 0, listBox.ItemCount - 1);
+        listBox.SelectedIndex = index;
+        listBox.ScrollIntoView(index);
     }
 }

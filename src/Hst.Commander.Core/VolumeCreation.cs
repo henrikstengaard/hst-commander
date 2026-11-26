@@ -38,6 +38,18 @@ public static class VolumeCreation
     private static SizeUnit DefaultSizeUnit => SizeUnits[^1];
 
     /// <summary>
+    ///     The volume creators of the create list (F9) matching a typed query, in their order: a creator matches when
+    ///     every word of the query is part of its name or description, case-insensitively; an empty query matches every
+    ///     creator.
+    /// </summary>
+    public static IReadOnlyList<IVolumeCreator> Filter(IEnumerable<IVolumeCreator> creators, string? query)
+    {
+        ArgumentNullException.ThrowIfNull(creators);
+        var words = CommandPalette.QueryWords(query);
+        return [..creators.Where(creator => CommandPalette.MatchesWords(words, creator.Name, creator.Description))];
+    }
+
+    /// <summary>
     ///     File name of the volume created: the trimmed name with the creator's file extension added when it doesn't end
     ///     with it (case-insensitive), e.g. "disk" becomes "disk.adf".
     /// </summary>
