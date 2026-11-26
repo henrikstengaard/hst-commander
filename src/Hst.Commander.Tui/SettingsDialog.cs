@@ -24,6 +24,9 @@ public sealed class SettingsDialog : TuiDialog
 
     private View? _buttonsTab;
     private readonly ListView _themeList;
+    private readonly ChoiceField _colorModeField;
+    private readonly Label _colorModeHelp;
+    private static readonly TuiColorMode[] ColorModes = Enum.GetValues<TuiColorMode>();
     private readonly OptionSelector _volumeProviderKeysRadioGroup;
     private readonly OptionSelector _enterFileActionRadioGroup;
     private readonly TextField _temporaryCopyLimitField;
@@ -32,9 +35,9 @@ public sealed class SettingsDialog : TuiDialog
     private readonly OptionSelector _editorRadioGroup;
     private readonly TextField _editorCommandField;
     private readonly TuiSettings _settings;
-    private readonly Action<ThemeChoice> _preview;
+    private readonly Action<ThemeChoice, TuiColorMode> _preview;
 
-    public SettingsDialog(TuiSettings settings, Action<ThemeChoice> preview, TuiPalette palette)
+    public SettingsDialog(TuiSettings settings, Action<ThemeChoice, TuiColorMode> preview, TuiPalette palette)
     {
         _settings = settings;
         _preview = preview;
@@ -46,10 +49,22 @@ public sealed class SettingsDialog : TuiDialog
         // appearance
         var themeLabel = new Label { X = 1, Y = 1, Text = "Theme:" };
         // a list, as there are many themes (the included ones, the user's and the plugins'), scrolling to the theme
-        _themeList = new ListView { X = 16, Y = 1, Width = Dim.Fill(1), Height = Dim.Fill(3) };
+        _themeList = new ListView { X = 16, Y = 1, Width = Dim.Fill(1), Height = Dim.Fill(6) };
         _themeList.SetSource(new ObservableCollection<string>(_themes.Select(theme => theme.Name)));
         _themeList.SelectedItem = Math.Max(0, _themes.ToList().IndexOf(Themes.Find(_themes, settings.Theme)));
-        _themeList.ValueChanged += (_, _) => Preview(SelectedTheme);
+        var colorModeLabel = new Label { X = 1, Y = Pos.AnchorEnd(5), Text = "Colors:" };
+        _colorModeField = new ChoiceField(ColorModes.Select(TuiColors.GetName).ToArray(),
+            Math.Max(0, Array.IndexOf(ColorModes, settings.ColorMode)))
+        {
+            X = 16,
+            Y = Pos.AnchorEnd(5),
+            Width = Dim.Fill(1)
+        };
+        _colorModeHelp = new Label
+        {
+            X = 16, Y = Pos.AnchorEnd(4), Width = Dim.Fill(1), Height = 2,
+            Text = ColorModeHelp
+        };
         var themesHelp = new Label
         {
             X = 16,
@@ -139,7 +154,8 @@ public sealed class SettingsDialog : TuiDialog
 
         var tabView = new Tabs { X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Fill() };
         _tabView = tabView;
-        tabView.Add(CreateTab("Appearance", themeLabel, _themeList, themesHelp));
+        tabView.Add(CreateTab("Appearance", themeLabel, _themeList, colorModeLabel, _colorModeField,
+            _colorModeHelp, themesHelp));
         tabView.Add(CreateTab("Panes", volumeProviderKeysLabel, _volumeProviderKeysRadioGroup,
             enterFileActionLabel, _enterFileActionRadioGroup, temporaryCopyLimitLabel, _temporaryCopyLimitField,
             temporaryCopyLimitHelp, detectVolumeFilesLabel, _detectVolumeFilesCheckBox));
@@ -147,6 +163,8 @@ public sealed class SettingsDialog : TuiDialog
         tabView.Add(CreateTab("Editor", editorLabel, _editorRadioGroup, editorCommandLabel, _editorCommandField,
             editorCommandHelp));
         UpdateButtonsTab(palette);
+        _themeList.ValueChanged += (_, _) => Preview(SelectedTheme);
+        _colorModeField.SelectedIndexChanged += (_, _) => Preview(SelectedTheme);
 
         var okButton = new Button { Text = "OK", IsDefault = true };
         okButton.Accepting += (_, e) =>
@@ -173,6 +191,7 @@ public sealed class SettingsDialog : TuiDialog
             Result = (_settings with
                 {
                     Theme = SelectedTheme.Id,
+                    ColorMode = SelectedColorMode,
                     EnterFileAction = SelectedEnterFileAction,
                     DetectVolumeFiles = _detectVolumeFilesCheckBox.Value == CheckState.Checked,
                     UaeMetadata = SelectedUaeMetadata,
@@ -214,6 +233,11 @@ public sealed class SettingsDialog : TuiDialog
 
     private ThemeChoice SelectedTheme => _themes[Math.Clamp(_themeList.SelectedItem ?? 0, 0, _themes.Count - 1)];
 
+    private TuiColorMode SelectedColorMode => ColorModes[_colorModeField.SelectedIndex];
+
+    private static string ColorModeHelp => TuiColors.Notice ??
+        $"Using {TuiColors.GetName(TuiColors.EffectiveMode)}.\nForced modes need terminal support.";
+
     private VolumeProviderKeys SelectedVolumeProviderKeys =>
         VolumeProviderKeyBindings.All[Math.Max(0, (_volumeProviderKeysRadioGroup.Value ?? 0))];
 
@@ -244,9 +268,10 @@ public sealed class SettingsDialog : TuiDialog
 
     private void Preview(ThemeChoice theme)
     {
-        _preview(theme);
+        _preview(theme, SelectedColorMode);
         var palette = TuiPalette.For(theme);
         SetScheme(palette.DialogColorScheme);
+        _colorModeHelp.Text = ColorModeHelp;
         UpdateButtonsTab(palette);
         SetNeedsDraw();
     }

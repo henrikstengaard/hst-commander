@@ -40,6 +40,8 @@ public sealed record TuiSettings
     /// </summary>
     public string Theme { get; init; } = Themes.MidnightCommanderId;
 
+    public TuiColorMode ColorMode { get; init; } = TuiColorMode.Auto;
+
     /// <summary>
     ///     Keys opening the volume provider list of the left and right pane, null for the default
     ///     (see <see cref="VolumeProviderKeyBindings.Default" />).
@@ -102,12 +104,13 @@ public sealed record TuiSettings
     };
 
     /// <summary>Loads the settings, falling back to defaults when the file is missing or invalid.</summary>
-    public static TuiSettings Load()
+    public static TuiSettings Load(string? filePath = null)
     {
+        filePath ??= FilePath;
         try
         {
-            return File.Exists(FilePath)
-                ? JsonSerializer.Deserialize<TuiSettings>(File.ReadAllText(FilePath), JsonOptions) ?? new TuiSettings()
+            return File.Exists(filePath)
+                ? JsonSerializer.Deserialize<TuiSettings>(File.ReadAllText(filePath), JsonOptions) ?? new TuiSettings()
                 : new TuiSettings();
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)
@@ -116,9 +119,14 @@ public sealed record TuiSettings
         }
     }
 
-    public void Save()
+    public void Save(string? filePath = null)
     {
-        Directory.CreateDirectory(SettingsPaths.Directory);
-        File.WriteAllText(FilePath, JsonSerializer.Serialize(this with { Version = CurrentVersion }, JsonOptions));
+        filePath = Path.GetFullPath(filePath ?? FilePath);
+        if (Path.GetDirectoryName(filePath) is { } directory)
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        File.WriteAllText(filePath, JsonSerializer.Serialize(this with { Version = CurrentVersion }, JsonOptions));
     }
 }
