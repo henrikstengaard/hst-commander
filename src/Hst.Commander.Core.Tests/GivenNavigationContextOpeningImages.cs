@@ -44,7 +44,7 @@ public class GivenNavigationContextOpeningImages
             Assert.Equal([Paths.Parent, "dir1", "dir2", "file1.txt"], rootNames);
             Assert.Equal([Paths.Parent, "file2.txt"], dirNames);
             Assert.Equal(Path.Combine(rootPath, "archive.zip", "dir1"), navigationContext.CurrentPath);
-            Assert.NotNull(navigationContext.CreateDirectoryNotSupportedMessage);
+            Assert.Null(navigationContext.CreateDirectoryNotSupportedMessage);
         }
         finally
         {
@@ -226,7 +226,7 @@ public class GivenNavigationContextOpeningImages
             Assert.Equal([Paths.Parent, "dir1", "dir2", "file1.txt"], rootNames);
             Assert.Equal([Paths.Parent, "file2.txt"], dirNames);
             Assert.Equal(Path.Combine(rootPath, "archive.dat", "dir1"), navigationContext.CurrentPath);
-            Assert.NotNull(navigationContext.CreateDirectoryNotSupportedMessage);
+            Assert.Null(navigationContext.CreateDirectoryNotSupportedMessage);
         }
         finally
         {

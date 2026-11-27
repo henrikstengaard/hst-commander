@@ -61,23 +61,45 @@ public class GivenNavigationContextEditing : IDisposable
     }
 
     [Fact]
-    public async Task When_EditingFileInZip_Then_ItIsReadOnly()
+    public async Task When_EditingFileIn7z_Then_ItIsReadOnly()
+    {
+        // arrange - 7z archives are read-only
+        await File.WriteAllBytesAsync(Path.Combine(_rootPath, "archive.7z"), ArchiveTestData.Read("dirs-files.7z"));
+        using var navigationContext = new NavigationContext(_rootPath);
+        await OpenAsync(navigationContext, "archive.7z");
+        await OpenAsync(navigationContext, "dir1");
+        var entry = await FindAsync(navigationContext, "file1.txt");
+
+        // act
+        using var session = await navigationContext.OpenEditorAsync(entry);
+
+        // assert
+        Assert.Equal("a", session.Document.Text);
+        Assert.True(session.IsReadOnly);
+        await Assert.ThrowsAsync<NotSupportedException>(() => session.SaveAsync("changed"));
+        await Assert.ThrowsAsync<NotSupportedException>(() => navigationContext.OpenExternalEditAsync(entry));
+    }
+
+    [Fact]
+    public async Task When_EditingFileInZip_Then_SavedTextIsWrittenToZip()
     {
         // arrange
         await File.WriteAllBytesAsync(Path.Combine(_rootPath, "archive.zip"),
             ZipTestData.CreateZip(("file.txt", "zipped")));
         using var navigationContext = new NavigationContext(_rootPath);
         await OpenAsync(navigationContext, "archive.zip");
-        var entry = await FindAsync(navigationContext, "file.txt");
 
         // act
-        using var session = await navigationContext.OpenEditorAsync(entry);
+        using (var session = await navigationContext.OpenEditorAsync(await FindAsync(navigationContext, "file.txt")))
+        {
+            Assert.Equal("zipped", session.Document.Text);
+            Assert.False(session.IsReadOnly);
+            await session.SaveAsync("changed");
+        }
 
         // assert
-        Assert.Equal("zipped", session.Document.Text);
-        Assert.True(session.IsReadOnly);
-        await Assert.ThrowsAsync<NotSupportedException>(() => session.SaveAsync("changed"));
-        await Assert.ThrowsAsync<NotSupportedException>(() => navigationContext.OpenExternalEditAsync(entry));
+        using var viewer = await navigationContext.OpenViewerAsync(await FindAsync(navigationContext, "file.txt"));
+        Assert.Equal("changed", viewer.Document.ReadText(0, (int)viewer.Document.Length));
     }
 
     [Fact]

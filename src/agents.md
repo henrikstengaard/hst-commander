@@ -50,7 +50,7 @@ src/
   publish/                      Local publish scripts for testing, PowerShell and bash per platform (output in publish/ at the root, ignored)
   icon/                         App icon sources, rendered sizes and make scripts
   Hst.Commander.Abstractions/   Plugin API: IVolume, IEntry, IVolumeProvider, IFileVolumeProvider, IPlugin, IPluginHost, IWriteCache, ITheme, ..., Paths, the ArchiveVolume<T> base class and VolumeOpening (entries read while opening) (no external deps)
-  Hst.Commander.Plugins.Zip/    Zip archives (default plugin)
+  Hst.Commander.Plugins.Zip/    Zip archives, writable zip archives and the zip F9 creator (default plugin)
   Hst.Commander.Plugins.LhaLzx/ Lha and lzx archives, writable lha archives and the lha F9 creator (default plugin)
   Hst.Commander.Plugins.Archives/ Rar, 7z and tar archives and gzip, xz, bzip2, zstd and compress (.Z) files, including compressed tar (default plugin)
   Hst.Commander.Plugins.Disk/   MBR/GPT disk images (raw, VHD, VHDX, VDI, DMG) with FAT/exFAT/NTFS and read-only ext/XFS/Btrfs/HFS+/SquashFS/UDF partitions, hybrid MBR/RDB disks, unpartitioned file systems and the exFAT F9 creator (default plugin)
@@ -74,7 +74,8 @@ src/
 ```
 [IVolumeProvider / IFileVolumeProvider / IPlugin / IVolume / IEntry / Paths / ArchiveVolume<T>]  <- Hst.Commander.Abstractions
         |                                    \
-        |                          [ZipPlugin, ZipFileVolumeProvider, ZipVolume]  <- Hst.Commander.Plugins.Zip
+        |                          [ZipPlugin, ZipFileVolumeProvider, ZipVolume,
+        |                           ZipVolumeCreator]  <- Hst.Commander.Plugins.Zip
         |                          [LhaLzxPlugin, Lha/LzxFileVolumeProvider,
         |                           LhaVolume, LzxVolume,
         |                           LhaVolumeCreator]  <- Hst.Commander.Plugins.LhaLzx
@@ -167,7 +168,7 @@ These apply across features and aren't obvious from a single file:
 - Other file-management operations (e.g. creating a new file with Shift+F4); changing the viewer's encoding and going to an offset; changing the editor's encoding and line breaks.
 - SMB 1, SMB ports other than 445 and browsing the network for servers (SMB credentials are only saved with bookmarks).
 - Implicit FTPS, SFTP private keys, confirming new server keys and writable images on FTP/SFTP servers.
-- Writing to images other than Amiga adf, RDB and partition images, FAT, exFAT and NTFS images (also in VHD, VHDX and VDI images) and lha archives; ISO images, zip, lzx, rar, 7z and tar archives and gzip, xz, bzip2, zstd and compress (.Z) files are read-only, as are Amiga images inside other images.
+- Writing to images other than Amiga adf, RDB and partition images, FAT, exFAT and NTFS images (also in VHD, VHDX and VDI images) and zip and lha archives; ISO images, lzx, rar, 7z and tar archives and gzip, xz, bzip2, zstd and compress (.Z) files are read-only, as are Amiga images inside other images.
 - Changing RDB, MBR and GPT partitions, other Amiga file systems (e.g. SFS\2), writing ext2/3/4, XFS, Btrfs, HFS+, SquashFS and UDF, APFS, Apple partition maps, differencing VHDX/VDI and vmdk images.
 - Unloading or reloading plugins while running, and a list of loaded plugins in the UI.
 
@@ -218,7 +219,7 @@ These apply across features and aren't obvious from a single file:
 3. **Handle `Paths.Root` and `Paths.Parent`** in `ChangeDirectory` — both are case-insensitive string comparisons.
 4. **Add unit tests** in `Hst.Commander.Core.Tests/` using the `Given<YourVolume>` naming pattern.
 5. **To make it selectable with F1/F2**, implement `IVolumeProvider` (see `LocalVolumeProvider`) and add it to `VolumeProviders.All`. To ask for a location (e.g. a server path) and credentials when chosen, implement `ILocationVolumeProvider` instead (see `SmbVolumeProvider` and [`docs/plugin-api.md`](../docs/plugin-api.md#ilocationvolumeprovider)).
-6. **Or open files as the volume** (images): implement `IFileVolumeProvider` with `IsMatch` checking the file's magic signature (see `Iso9660FileVolumeProvider` and `ZipFileVolumeProvider`; for a read-only archive, derive the volume from `ArchiveVolume<T>` like `ZipVolume`) and add it to `VolumeProviders.Files`, or return it from `IPlugin.FileVolumeProviders` of a plugin. `NavigationContext` then opens matching files as images (see [Images](../docs/volumes.md#images)). Return true from `CanWrite` when the volume can write to the file (see [Writable images](../docs/volumes.md#writable-images) and `AdfFileVolumeProvider`).
+6. **Or open files as the volume** (images): implement `IFileVolumeProvider` with `IsMatch` checking the file's magic signature (see `Iso9660FileVolumeProvider` and `ZipFileVolumeProvider`; for an archive, derive the volume from `ArchiveVolume<T>` like `SharpCompressVolume`, overriding its write members for a writable one like `ZipVolume`) and add it to `VolumeProviders.Files`, or return it from `IPlugin.FileVolumeProviders` of a plugin. `NavigationContext` then opens matching files as images (see [Images](../docs/volumes.md#images)). Return true from `CanWrite` when the volume can write to the file (see [Writable images](../docs/volumes.md#writable-images) and `AdfFileVolumeProvider`).
 
 7. **To create new volumes as files with F9**, implement `IVolumeCreator` (see `AdfVolumeCreator`) with its input fields and return it from `IPlugin.VolumeCreators` (see [Creating volumes](../docs/file-operations.md#creating-volumes)).
 

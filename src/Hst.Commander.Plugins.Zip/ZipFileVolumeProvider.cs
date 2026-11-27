@@ -1,11 +1,11 @@
-using System.IO.Compression;
 using Hst.Commander.Abstractions;
 
 namespace Hst.Commander.Plugins.Zip;
 
 /// <summary>
 /// File volume provider opening zip archives, detected by their magic signature: "PK" followed by a local file header,
-/// an end of central directory record (empty archive) or a spanned archive marker.
+/// an end of central directory record (empty archive, e.g. created with <see cref="ZipVolumeCreator" />) or a spanned
+/// archive marker. An empty file is detected by its extension, ".zip". Archives are writable images.
 /// </summary>
 public class ZipFileVolumeProvider : IFileVolumeProvider
 {
@@ -20,12 +20,19 @@ public class ZipFileVolumeProvider : IFileVolumeProvider
 
     public string Description => "Zip archives";
 
+    public bool CanWrite => true;
+
     public async Task<bool> IsMatch(string name, Stream stream, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(stream);
 
         var signature = new byte[4];
         var length = await stream.ReadAtLeastAsync(signature, signature.Length, false, cancellationToken);
+        if (length == 0)
+        {
+            return name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase);
+        }
+
         return length == signature.Length &&
                Signatures.Any(zipSignature => signature.AsSpan().SequenceEqual(zipSignature));
     }
@@ -34,6 +41,6 @@ public class ZipFileVolumeProvider : IFileVolumeProvider
     {
         ArgumentNullException.ThrowIfNull(stream);
 
-        return Task.FromResult<IVolume>(new ZipVolume(new ZipArchive(stream, ZipArchiveMode.Read, true)));
+        return Task.FromResult<IVolume>(ZipVolume.Create(stream));
     }
 }

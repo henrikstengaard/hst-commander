@@ -59,7 +59,7 @@ Copy the list into the release's pull request or an issue and tick it per OS and
 ### Images and archives
 
 - [ ] Enter opens `dirs-files.zip` (make one), `.lha`, `.lzx`, `.7z` and `.rar` from the test data and an ISO image; Backspace at their root goes back. Ctrl+PageDown opens a file as a volume.
-- [ ] F9 creates an Amiga disk file (formatted) and an exFAT image; both open, files copied into them are listed after leaving and opening them again, and the other pane sees the same contents.
+- [ ] F9 creates an Amiga disk file (formatted), an exFAT image and zip and lha archives; all open, files copied into them are listed after leaving and opening them again, and the other pane sees the same contents.
 - [ ] `special_chars.lha` copied to a local directory keeps the Amiga names, protection bits and comments as UAE metadata (Properties shows them), and copied into the adf they're kept as they are.
 
 ### File operations
