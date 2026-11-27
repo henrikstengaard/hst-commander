@@ -89,11 +89,7 @@ public sealed class ButtonPanelView : View
         var drawnWidth = CenterLabels && width > 1 ? width - 1 : width;
         text = text.PadRight(drawnWidth)[..drawnWidth];
         var keyLength = Math.Min(key.Length, drawnWidth);
-        var title = button.Background != null || button.Foreground != null
-            ? new TuiAttribute(
-                button.Foreground != null ? TuiPalette.Closest(button.Foreground) : TitleAttribute.Foreground,
-                button.Background != null ? TuiPalette.Closest(button.Background) : TitleAttribute.Background)
-            : TitleAttribute;
+        var title = TuiColors.ButtonAttribute(button, TitleAttribute);
 
         Move(start, row);
         SetAttribute(string.IsNullOrEmpty(button.Key) ? title : KeyAttribute);

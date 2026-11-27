@@ -32,10 +32,19 @@ public sealed class ChoiceField : View
         get => _selectedIndex;
         set
         {
-            _selectedIndex = _choices.Count == 0 ? -1 : Math.Clamp(value, 0, _choices.Count - 1);
+            var selected = _choices.Count == 0 ? -1 : Math.Clamp(value, 0, _choices.Count - 1);
+            if (_selectedIndex == selected)
+            {
+                return;
+            }
+
+            _selectedIndex = selected;
             SetNeedsDraw();
+            SelectedIndexChanged?.Invoke(this, EventArgs.Empty);
         }
     }
+
+    public event EventHandler? SelectedIndexChanged;
 
     protected override bool OnKeyDown(Key key)
     {

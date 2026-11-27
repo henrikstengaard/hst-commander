@@ -5,20 +5,17 @@ using TuiAttribute = Terminal.Gui.Drawing.Attribute;
 namespace Hst.Commander.Tui;
 
 /// <summary>
-///     Colors of the TUI for a theme (<see cref="ThemeChoice" />), using the 16 legacy colors so they work in every
-///     terminal: the closest of the 16 colors for each of the theme's colors (<see cref="From" />). The built-in themes
-///     give the RGB values of <see cref="TuiTrueColors" /> in their <c>tui-</c> overrides, so they get exactly the 16
-///     colors they were made with.
+///     Colors of a theme converted for the terminal's effective color mode.
 /// </summary>
 public sealed record TuiPalette(
-    ColorName16 PaneBackground,
-    ColorName16 Border,
-    ColorName16 Header,
-    ColorName16 Container,
-    ColorName16 Item,
-    ColorName16 Executable,
-    ColorName16 Marked,
-    ColorName16 Path,
+    Color PaneBackground,
+    Color Border,
+    Color Header,
+    Color Container,
+    Color Item,
+    Color Executable,
+    Color Marked,
+    Color Path,
     TuiAttribute Cursor,
     TuiAttribute MarkedCursor,
     TuiAttribute ActivePath,
@@ -29,8 +26,8 @@ public sealed record TuiPalette(
     TuiAttribute Dialog,
     TuiAttribute DialogFocus,
     TuiAttribute? Button = null,
-    ColorName16? MarkedContainerBackground = null,
-    ColorName16? MarkedItemBackground = null,
+    Color? MarkedContainerBackground = null,
+    Color? MarkedItemBackground = null,
     TuiAttribute? Key = null)
 {
     public TuiAttribute PaneNormal => new(Border, PaneBackground);
@@ -45,13 +42,15 @@ public sealed record TuiPalette(
     public static TuiPalette For(ThemeChoice theme) => From(theme.TuiColors);
 
     /// <summary>
-    ///     The palette of the colors of a theme, the closest of the 16 colors for each. Optional colors the theme doesn't
+    ///     The palette of the colors of a theme in the effective mode. Optional colors the theme doesn't
     ///     give fall back to the cursor's (menu and dialog focus), the menu's (key bars) and the marked entries' colors.
     /// </summary>
-    public static TuiPalette From(ThemeColors colors)
+    public static TuiPalette From(ThemeColors colors, TuiColorMode? mode = null)
     {
         ArgumentNullException.ThrowIfNull(colors);
-        var paneBackground = Closest(colors.PaneBackground);
+        Color ConvertColor(string? color) => TuiColors.Parse(color, mode);
+        TuiAttribute Attribute(string? foreground, string? background) => new(ConvertColor(foreground), ConvertColor(background));
+        var paneBackground = ConvertColor(colors.PaneBackground);
         var menu = Attribute(colors.MenuForeground, colors.MenuBackground);
         var dialog = Attribute(colors.DialogForeground, colors.DialogBackground);
         var cursor = Attribute(colors.CursorForeground, colors.CursorBackground);
@@ -59,48 +58,38 @@ public sealed record TuiPalette(
             ? Attribute(colors.KeyForeground ?? colors.ButtonForeground, colors.KeyBackground ?? colors.ButtonBackground)
             : (TuiAttribute?)null;
         // a marked entry under the cursor in the cursor's text when the marked color is the cursor's background here
-        var markedCursor = Closest(colors.MarkedCursorForeground ?? colors.Marked);
-        if (markedCursor == Closest(colors.CursorBackground))
+        var markedCursor = ConvertColor(colors.MarkedCursorForeground ?? colors.Marked);
+        if (markedCursor == ConvertColor(colors.CursorBackground))
         {
-            markedCursor = Closest(colors.CursorForeground);
+            markedCursor = ConvertColor(colors.CursorForeground);
         }
 
         return new TuiPalette(
             PaneBackground: paneBackground,
-            Border: Closest(colors.PaneBorder),
-            Header: Closest(colors.Header),
-            Container: Closest(colors.Container),
-            Item: Closest(colors.Item),
-            Executable: Closest(colors.Executable),
-            Marked: Closest(colors.Marked),
-            Path: Closest(colors.Path),
+            Border: ConvertColor(colors.PaneBorder),
+            Header: ConvertColor(colors.Header),
+            Container: ConvertColor(colors.Container),
+            Item: ConvertColor(colors.Item),
+            Executable: ConvertColor(colors.Executable),
+            Marked: ConvertColor(colors.Marked),
+            Path: ConvertColor(colors.Path),
             Cursor: cursor,
-            MarkedCursor: new TuiAttribute(markedCursor, Closest(colors.CursorBackground)),
+            MarkedCursor: new TuiAttribute(markedCursor, ConvertColor(colors.CursorBackground)),
             ActivePath: Attribute(colors.ActivePathForeground, colors.ActivePathBackground),
             Menu: menu,
             MenuFocus: Attribute(colors.MenuFocusForeground ?? colors.CursorForeground,
                 colors.MenuFocusBackground ?? colors.CursorBackground),
-            MenuHot: new TuiAttribute(Closest(colors.MenuHotForeground ?? colors.ActivePathBackground),
-                Closest(colors.MenuBackground)),
+            MenuHot: new TuiAttribute(ConvertColor(colors.MenuHotForeground ?? colors.ActivePathBackground),
+                ConvertColor(colors.MenuBackground)),
             FunctionKey: key ?? menu,
             Dialog: dialog,
             DialogFocus: Attribute(colors.DialogFocusForeground ?? colors.CursorForeground,
                 colors.DialogFocusBackground ?? colors.CursorBackground),
             Button: Attribute(colors.ButtonForeground, colors.ButtonBackground),
-            MarkedContainerBackground: colors.MarkedContainerBackground == null ? null : Closest(colors.MarkedContainerBackground),
-            MarkedItemBackground: colors.MarkedItemBackground == null ? null : Closest(colors.MarkedItemBackground),
+            MarkedContainerBackground: colors.MarkedContainerBackground == null ? null : ConvertColor(colors.MarkedContainerBackground),
+            MarkedItemBackground: colors.MarkedItemBackground == null ? null : ConvertColor(colors.MarkedItemBackground),
             Key: key);
     }
-
-    /// <summary>The closest of the 16 colors to a "#RRGGBB" color, gray when it is invalid.</summary>
-    public static ColorName16 Closest(string? color) =>
-        color != null && Color.TryParse(color, out Color? parsed) && parsed is { } value
-            ? value.GetClosestNamedColor16()
-            : ColorName16.Gray;
-
-    /// <summary>An attribute of the closest of the 16 colors to "#RRGGBB" colors.</summary>
-    public static TuiAttribute Attribute(string? foreground, string? background) =>
-        new(Closest(foreground), Closest(background));
 
     /// <summary>
     ///     Creates a scheme with all the roles Terminal.Gui v2 draws with, so none are derived from the others. Like
