@@ -61,6 +61,12 @@ public static class VolumeProviders
     /// </summary>
     public static IReadOnlyList<IPropertiesTabProvider> PropertiesTabs => GetLists().PropertiesTabs;
 
+    /// <summary>
+    ///     Columns of the plugins the user can add to the panes, e.g. the Amiga protection bits, in plugin order (see
+    ///     <see cref="Core.EntryColumns" />).
+    /// </summary>
+    public static IReadOnlyList<IEntryColumn> EntryColumns => GetLists().EntryColumns;
+
     private static Lists GetLists()
     {
         var plugins = Plugins.All;
@@ -76,7 +82,8 @@ public static class VolumeProviders
             [..plugins.SelectMany(plugin => plugin.IconProviders)],
             [..plugins.SelectMany(plugin => plugin.NavigationModes)],
             [..plugins.SelectMany(plugin => plugin.ImageProviders), WindowsIcons, StandardImages],
-            [..plugins.SelectMany(plugin => plugin.PropertiesTabProviders)]);
+            [..plugins.SelectMany(plugin => plugin.PropertiesTabProviders)],
+            [..plugins.SelectMany(plugin => plugin.EntryColumns)]);
         _lists = lists;
         return lists;
     }
@@ -89,5 +96,6 @@ public static class VolumeProviders
         IReadOnlyList<IIconProvider> Icons,
         IReadOnlyList<INavigationMode> NavigationModes,
         IReadOnlyList<IImageProvider> Images,
-        IReadOnlyList<IPropertiesTabProvider> PropertiesTabs);
+        IReadOnlyList<IPropertiesTabProvider> PropertiesTabs,
+        IReadOnlyList<IEntryColumn> EntryColumns);
 }

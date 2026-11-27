@@ -5,7 +5,7 @@ using Hst.Commander.Core;
 namespace Hst.Commander.Gui;
 
 /// <summary>
-///     Modal settings view with the settings grouped in tabs: appearance, panes, copying and the editor, and the buttons
+///     Modal settings view with the settings grouped in tabs: appearance, panes, columns, copying and the editor, and the buttons
 ///     of a theme the user can change (<see cref="ICustomizableButtonPanel" />) while it is chosen. Theme changes are
 ///     previewed immediately and reverted on cancel; the dialog returns the changed settings on OK or null on cancel,
 ///     with the changed buttons in <see cref="ChangedButtons" />.
@@ -27,6 +27,11 @@ public partial class SettingsDialog : Window
     private readonly Dictionary<ICustomizableButtonPanel, ButtonPanelEditorView> _buttonEditors = [];
 
     private TabItem? _buttonsTab;
+
+    /// <summary>Columns of the left and right pane edited in the Columns tab.</summary>
+    private readonly ColumnListEditor _leftColumns;
+
+    private readonly ColumnListEditor _rightColumns;
 
     public SettingsDialog() : this(new GuiSettings())
     {
@@ -89,6 +94,29 @@ public partial class SettingsDialog : Window
             Math.Max(0, EnterFileActions.All.ToList().IndexOf(settings.EnterFileAction));
         TemporaryCopyLimitUpDown.Value = settings.TemporaryCopyLimit;
         DetectVolumeFilesCheckBox.IsChecked = settings.DetectVolumeFiles;
+        _leftColumns = new ColumnListEditor(settings.LeftColumns);
+        _rightColumns = new ColumnListEditor(settings.RightColumns);
+        ColumnsPaneComboBox.ItemsSource = new[] { "Left", "Right" };
+        ColumnsPaneComboBox.SelectedIndex = 0;
+        ColumnsPaneComboBox.SelectionChanged += (_, _) => ShowColumns(0);
+        MoveColumnUpButton.Click += (_, _) => MoveSelectedColumn(-1);
+        MoveColumnDownButton.Click += (_, _) => MoveSelectedColumn(1);
+        ResetColumnsButton.Click += (_, _) =>
+        {
+            SelectedColumns.Reset(null);
+            ShowColumns(0);
+        };
+        ColumnsListBox.KeyDown += (_, e) =>
+        {
+            // ctrl+up and ctrl+down move the column, like the TUI
+            if (e.KeyModifiers == Avalonia.Input.KeyModifiers.Control &&
+                e.Key is Avalonia.Input.Key.Up or Avalonia.Input.Key.Down)
+            {
+                e.Handled = true;
+                MoveSelectedColumn(e.Key == Avalonia.Input.Key.Up ? -1 : 1);
+            }
+        };
+        ShowColumns(0);
         UaeMetadataComboBox.ItemsSource = UaeMetadataFormats.All.Select(UaeMetadataFormats.GetName).ToList();
         UaeMetadataComboBox.SelectedIndex = Math.Max(0, UaeMetadataFormats.All.ToList().IndexOf(settings.UaeMetadata));
         EditorComboBox.ItemsSource = EditorKinds.All.Select(kind => EditorKinds.GetName(kind, false)).ToList();
@@ -129,6 +157,8 @@ public partial class SettingsDialog : Window
                     EnterFileAction = SelectedEnterFileAction,
                     DetectVolumeFiles = DetectVolumeFilesCheckBox.IsChecked == true,
                     UaeMetadata = SelectedUaeMetadata,
+                    LeftColumns = GetColumnIds(_leftColumns, settings.LeftColumns),
+                    RightColumns = GetColumnIds(_rightColumns, settings.RightColumns),
                     TemporaryCopyLimit = (long)Math.Max(0, TemporaryCopyLimitUpDown.Value ?? 0),
                     Editor = SelectedEditor,
                     EditorCommand = string.IsNullOrEmpty(command) ? null : command
@@ -144,6 +174,53 @@ public partial class SettingsDialog : Window
             }
         };
         Opened += (_, _) => ThemeComboBox.Focus();
+    }
+
+    /// <summary>Columns of the pane chosen in the Columns tab.</summary>
+    private ColumnListEditor SelectedColumns => ColumnsPaneComboBox.SelectedIndex == 1 ? _rightColumns : _leftColumns;
+
+    /// <summary>
+    ///     Ids of the shown columns to save, the ids of the settings when unchanged (null for the default stays null,
+    ///     and a column of a plugin that isn't loaded is kept).
+    /// </summary>
+    private static IReadOnlyList<string>? GetColumnIds(ColumnListEditor editor, IReadOnlyList<string>? ids) =>
+        editor.ShownIds.SequenceEqual(new ColumnListEditor(ids).ShownIds) ? ids : editor.ShownIds;
+
+    /// <summary>Shows the columns of the chosen pane as check boxes, checked when shown, selecting one.</summary>
+    private void ShowColumns(int selectedIndex)
+    {
+        var editor = SelectedColumns;
+        var items = new List<CheckBox>();
+        for (var index = 0; index < editor.Items.Count; index++)
+        {
+            var item = editor.Items[index];
+            var itemIndex = index;
+            var checkBox = new CheckBox
+            {
+                Content = item.Column.Title,
+                IsChecked = item.IsShown,
+                // Name is always shown, as the panes need it
+                IsEnabled = item.CanHide
+            };
+            checkBox.IsCheckedChanged += (_, _) =>
+            {
+                if (editor.Items[itemIndex].IsShown != (checkBox.IsChecked == true))
+                {
+                    editor.Toggle(itemIndex);
+                }
+            };
+            items.Add(checkBox);
+        }
+
+        ColumnsListBox.ItemsSource = items;
+        ColumnsListBox.SelectedIndex = Math.Clamp(selectedIndex, 0, Math.Max(0, items.Count - 1));
+    }
+
+    private void MoveSelectedColumn(int offset)
+    {
+        var index = Math.Max(0, ColumnsListBox.SelectedIndex);
+        ShowColumns(SelectedColumns.Move(index, index + offset));
+        ColumnsListBox.Focus();
     }
 
     /// <summary>

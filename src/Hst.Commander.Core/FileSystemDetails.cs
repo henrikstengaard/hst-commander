@@ -75,16 +75,21 @@ public static class FileSystemDetails
     /// <summary>Unix permissions like "ls -l" with the octal mode, e.g. "rwxr-xr-x (755)".</summary>
     public static string FormatUnixMode(UnixFileMode mode)
     {
+        var octal = Convert.ToString((int)mode & 0xfff, 8).PadLeft(3, '0');
+        return $"{FormatUnixPermissions(mode)} ({octal})";
+    }
+
+    /// <summary>Permissions of a local file on Linux and macOS as letters, e.g. "rwxr-xr-x".</summary>
+    public static string FormatUnixPermissions(UnixFileMode mode)
+    {
         var permissions = new[]
         {
             (UnixFileMode.UserRead, 'r'), (UnixFileMode.UserWrite, 'w'), (UnixFileMode.UserExecute, 'x'),
             (UnixFileMode.GroupRead, 'r'), (UnixFileMode.GroupWrite, 'w'), (UnixFileMode.GroupExecute, 'x'),
             (UnixFileMode.OtherRead, 'r'), (UnixFileMode.OtherWrite, 'w'), (UnixFileMode.OtherExecute, 'x')
         };
-        var text = new string(permissions.Select(permission => mode.HasFlag(permission.Item1) ? permission.Item2 : '-')
+        return new string(permissions.Select(permission => mode.HasFlag(permission.Item1) ? permission.Item2 : '-')
             .ToArray());
-        var octal = Convert.ToString((int)mode & 0xfff, 8).PadLeft(3, '0');
-        return $"{text} ({octal})";
     }
 
     /// <summary>Name of the type of a drive, e.g. "Local Disk" or "CD Drive".</summary>

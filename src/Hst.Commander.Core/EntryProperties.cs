@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using Hst.Commander.Core.Volumes;
 using Hst.Commander.Abstractions;
 
@@ -365,7 +365,8 @@ public sealed class EntryProperties
             : info != null
                 ? LocalVolume.ChangeableAttributes
                 : AllAttributes;
-        if ((entry.Attributes ?? (info != null ? (EntryAttributes)info.Attributes : null)) is { } attributes &&
+        // local files are read again, as the listed entry can be older
+        if ((info != null ? (EntryAttributes)info.Attributes : entry.Attributes) is { } attributes &&
             shownAttributes != EntryAttributes.None)
         {
             flagGroups.Add(CreateAttributeGroup(attributes & AllAttributes, shownAttributes, changes.Attributes));

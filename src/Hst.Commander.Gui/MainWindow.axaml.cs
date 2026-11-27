@@ -23,6 +23,14 @@ public partial class MainWindow : Window
     /// <summary>True when the window closes to restart Hst Commander as administrator.</summary>
     private bool _restarting;
     private GuiSettings _editorSettings = new();
+
+    /// <summary>
+    ///     Ids of the columns of the left and right pane from the settings (null for the default), swapped with the
+    ///     panes and saved again for their sides, keeping columns of plugins that aren't loaded.
+    /// </summary>
+    private IReadOnlyList<string>? _leftColumnIds;
+
+    private IReadOnlyList<string>? _rightColumnIds;
     private readonly CommandLine _commandLine = new();
 
     public MainWindow() : this(Environment.CurrentDirectory)
@@ -123,6 +131,9 @@ public partial class MainWindow : Window
             var startPane = StartupOptions.IsRightActive ? RightPane : LeftPane;
             LeftPane.NavigationContext.Sort = settings.LeftSort ?? EntrySort.Default;
             RightPane.NavigationContext.Sort = settings.RightSort ?? EntrySort.Default;
+            (_leftColumnIds, _rightColumnIds) = (settings.LeftColumns, settings.RightColumns);
+            LeftPane.Columns = EntryColumns.Resolve(_leftColumnIds);
+            RightPane.Columns = EntryColumns.Resolve(_rightColumnIds);
 
             // setting the navigation modes lists the entries, at the same time so a pane listing slowly, e.g. a
             // sleeping physical disk waking up, doesn't keep the other empty
@@ -275,6 +286,7 @@ public partial class MainWindow : Window
     private async Task SwapPanesAsync()
     {
         await LeftPane.SwapWithAsync(RightPane);
+        (_leftColumnIds, _rightColumnIds) = (_rightColumnIds, _leftColumnIds);
         var activePane = _activePane == LeftPane ? RightPane : LeftPane;
         SetActivePane(activePane);
         activePane.FocusEntries();
@@ -285,7 +297,9 @@ public partial class MainWindow : Window
                 LeftNavigationMode = LeftPane.NavigationMode.Name,
                 RightNavigationMode = RightPane.NavigationMode.Name,
                 LeftSort = LeftPane.NavigationContext.Sort,
-                RightSort = RightPane.NavigationContext.Sort
+                RightSort = RightPane.NavigationContext.Sort,
+                LeftColumns = _leftColumnIds,
+                RightColumns = _rightColumnIds
             }).Save();
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
@@ -303,7 +317,9 @@ public partial class MainWindow : Window
             (GuiSettings.Load() with
             {
                 LeftSort = LeftPane.NavigationContext.Sort,
-                RightSort = RightPane.NavigationContext.Sort
+                RightSort = RightPane.NavigationContext.Sort,
+                LeftColumns = _leftColumnIds,
+                RightColumns = _rightColumnIds
             }).Save();
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
@@ -699,6 +715,22 @@ public partial class MainWindow : Window
         {
             await LeftPane.RefreshEntriesAsync();
             await RightPane.RefreshEntriesAsync();
+            _activePane.FocusEntries();
+        }
+    }
+
+    /// <summary>
+    ///     Shows the columns of the settings in a pane, listing it again when they changed (also when the UAE metadata
+    ///     format changed while a column shows Amiga metadata), as UAE metadata is only read for those columns.
+    /// </summary>
+    private async Task ApplyColumnsAsync(PaneView pane, IReadOnlyList<string>? ids, bool uaeMetadataChanged)
+    {
+        var columns = EntryColumns.Resolve(ids);
+        var changed = !columns.SequenceEqual(pane.Columns);
+        pane.Columns = columns;
+        if (changed || (uaeMetadataChanged && columns.Any(column => column.UsesAmigaMetadata)))
+        {
+            await pane.RefreshEntriesAsync();
             _activePane.FocusEntries();
         }
     }
@@ -1944,7 +1976,8 @@ public partial class MainWindow : Window
 
     private async Task ShowSettingsAsync()
     {
-        var dialog = new SettingsDialog(GuiSettings.Load(), ApplyAppearance);
+        var previousSettings = GuiSettings.Load();
+        var dialog = new SettingsDialog(previousSettings, ApplyAppearance);
         var settings = await dialog.ShowDialog<GuiSettings?>(this);
         if (settings == null)
         {
@@ -1968,6 +2001,10 @@ public partial class MainWindow : Window
         ApplyEnterFileAction(settings.EnterFileAction);
         await ApplyDetectVolumeFilesAsync(settings.DetectVolumeFiles);
         ApplyUaeMetadata(settings.UaeMetadata);
+        var uaeMetadataChanged = settings.UaeMetadata != previousSettings.UaeMetadata;
+        (_leftColumnIds, _rightColumnIds) = (settings.LeftColumns, settings.RightColumns);
+        await ApplyColumnsAsync(LeftPane, settings.LeftColumns, uaeMetadataChanged);
+        await ApplyColumnsAsync(RightPane, settings.RightColumns, uaeMetadataChanged);
         ApplyTemporaryCopyLimit(settings.TemporaryCopyLimitBytes);
         _editorSettings = settings;
         try

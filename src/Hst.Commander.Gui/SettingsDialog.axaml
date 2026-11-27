@@ -52,6 +52,20 @@
                               Content="Detect images and archives (shown with an arrow)" />
                 </Grid>
             </TabItem>
+            <TabItem Header="Columns">
+                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,*,Auto" RowSpacing="12">
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Pane:" VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <ComboBox x:Name="ColumnsPaneComboBox" Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch" />
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Columns:" VerticalAlignment="Top" Margin="0,4,12,0" />
+                    <!-- the columns of the chosen pane: checked ones are shown, in the order of the list -->
+                    <ListBox x:Name="ColumnsListBox" Grid.Row="1" Grid.Column="1" SelectionMode="Single" />
+                    <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                        <Button x:Name="MoveColumnUpButton" Content="Move up" />
+                        <Button x:Name="MoveColumnDownButton" Content="Move down" />
+                        <Button x:Name="ResetColumnsButton" Content="Reset" />
+                    </StackPanel>
+                </Grid>
+            </TabItem>
             <TabItem Header="Copying">
                 <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto" RowSpacing="12" VerticalAlignment="Top">
                     <TextBlock Grid.Row="0" Grid.Column="0" Text="UAE metadata:" VerticalAlignment="Center" Margin="0,0,12,0" />

@@ -292,10 +292,45 @@ public class LocalVolume(string path) : IVolume
 
     /// <summary>Directory without a size, shown as "&lt;DIR&gt;".</summary>
     private static IEntry CreateEntry(DirectoryInfo directoryInfo) =>
-        new Entry(directoryInfo.Name, EntryType.Container, null, directoryInfo.LastWriteTimeUtc);
+        new Entry(directoryInfo.Name, EntryType.Container, null, directoryInfo.LastWriteTimeUtc)
+        {
+            Attributes = GetAttributes(directoryInfo),
+            UnixMode = GetUnixMode(directoryInfo)
+        };
 
-    private static IEntry CreateEntry(FileInfo fileInfo) => 
-        new Entry(fileInfo.Name, EntryType.Item, fileInfo.Length, fileInfo.LastWriteTimeUtc);
+    private static IEntry CreateEntry(FileInfo fileInfo) =>
+        new Entry(fileInfo.Name, EntryType.Item, fileInfo.Length, fileInfo.LastWriteTimeUtc)
+        {
+            Attributes = GetAttributes(fileInfo),
+            UnixMode = GetUnixMode(fileInfo)
+        };
+
+    /// <summary>
+    /// DOS/Windows attributes of a local entry on Windows, shown in the Attributes column (read while listing, so
+    /// they're cheap), null on Linux and macOS, which have permissions instead.
+    /// </summary>
+    private static EntryAttributes? GetAttributes(FileSystemInfo info) => OperatingSystem.IsWindows()
+        ? (EntryAttributes)info.Attributes & (EntryAttributes.ReadOnly | EntryAttributes.Hidden |
+                                              EntryAttributes.System | EntryAttributes.Archive)
+        : null;
+
+    /// <summary>Permissions of a local entry on Linux and macOS, null on Windows.</summary>
+    private static UnixFileMode? GetUnixMode(FileSystemInfo info)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return null;
+        }
+
+        try
+        {
+            return info.UnixFileMode;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
 
     private void SetCurrentPath(string? path)
     {

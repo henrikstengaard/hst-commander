@@ -139,34 +139,12 @@
         <Border x:Name="EntriesBorder" Grid.Row="1" Grid.Column="1" Background="{DynamicResource PaneBackground}"
                 BorderBrush="{DynamicResource PaneBorder}" BorderThickness="1" Margin="2">
             <Grid RowDefinitions="Auto,*,Auto">
-                <!-- column dividers continue below the last entry -->
-                <Grid x:Name="DividersGrid" Grid.RowSpan="2" IsHitTestVisible="False">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="{DynamicResource SizeColumnWidth}" />
-                        <ColumnDefinition Width="{DynamicResource ModifiedColumnWidth}" />
-                    </Grid.ColumnDefinitions>
-                    <Border Grid.Column="1" BorderBrush="{DynamicResource PaneBorder}" BorderThickness="1,0,0,0" />
-                    <Border Grid.Column="2" BorderBrush="{DynamicResource PaneBorder}" BorderThickness="1,0,0,0" />
-                </Grid>
+                <!-- column dividers continue below the last entry; the columns of the pane (NavigationContext.Columns)
+                     are added by PaneView.UpdateColumns -->
+                <Grid x:Name="DividersGrid" Grid.RowSpan="2" IsHitTestVisible="False" />
 
-                <Grid x:Name="HeaderGrid" Grid.Row="0" Classes="header">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="{DynamicResource SizeColumnWidth}" />
-                        <ColumnDefinition Width="{DynamicResource ModifiedColumnWidth}" />
-                    </Grid.ColumnDefinitions>
-                    <!-- clicking a header sorts the entries by its column, clicking it again reverses the order -->
-                    <Border x:Name="NameHeader" Grid.Column="0" Background="Transparent" Cursor="Hand">
-                        <TextBlock x:Name="NameHeaderText" Text="Name" />
-                    </Border>
-                    <Border x:Name="SizeHeader" Grid.Column="1" Background="Transparent" Cursor="Hand">
-                        <TextBlock x:Name="SizeHeaderText" Text="Size" />
-                    </Border>
-                    <Border x:Name="ModifiedHeader" Grid.Column="2" Background="Transparent" Cursor="Hand">
-                        <TextBlock x:Name="ModifiedHeaderText" Text="Modified" />
-                    </Border>
-                </Grid>
+                <!-- clicking a header sorts the entries by its column, clicking it again reverses the order -->
+                <Grid x:Name="HeaderGrid" Grid.Row="0" Classes="header" />
 
                 <ListBox x:Name="EntriesList" Grid.Row="1" Classes="entries" SelectionMode="Single">
                     <ListBox.ItemTemplate>
@@ -174,18 +152,15 @@
                             <Grid Classes="row" Classes.container="{Binding IsContainer}"
                                   Classes.executable="{Binding IsExecutable}"
                                   Classes.marked="{Binding IsMarked}">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="{DynamicResource SizeColumnWidth}" />
-                                    <ColumnDefinition Width="{DynamicResource ModifiedColumnWidth}" />
-                                </Grid.ColumnDefinitions>
-                                <DockPanel Grid.Column="0">
-                                    <Image DockPanel.Dock="Left" Width="16" Height="16" Margin="4,0,0,0"
-                                           Source="{Binding Icon}" RenderOptions.BitmapInterpolationMode="HighQuality" />
-                                    <TextBlock Text="{Binding DisplayName}" />
-                                </DockPanel>
-                                <TextBlock Grid.Column="1" Text="{Binding Size}" TextAlignment="Right" />
-                                <TextBlock Grid.Column="2" Text="{Binding Modified}" />
+                                <!-- the columns of the entry's pane, the name with the icon in the Name column -->
+                                <local:EntryRowCells>
+                                    <DockPanel>
+                                        <Image DockPanel.Dock="Left" Width="16" Height="16" Margin="4,0,0,0"
+                                               Source="{Binding Icon}"
+                                               RenderOptions.BitmapInterpolationMode="HighQuality" />
+                                        <TextBlock Text="{Binding DisplayName}" />
+                                    </DockPanel>
+                                </local:EntryRowCells>
                             </Grid>
                         </DataTemplate>
                     </ListBox.ItemTemplate>

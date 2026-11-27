@@ -8,10 +8,6 @@ namespace Hst.Commander.Tui;
 
 public sealed class MainWindow : Window
 {
-    private const int SizeColumnWidth = 8;
-    private const int ModifiedColumnWidth = 16;
-    private const int ColumnCount = 3;
-
     private readonly MenuBar _menuBar;
     private readonly Label? _administratorLabel;
     private readonly ButtonPanelView _bottomPanel;
@@ -126,6 +122,8 @@ public sealed class MainWindow : Window
         _activePane = _leftPane;
         _leftPane.NavigationContext.Sort = settings.LeftSort ?? EntrySort.Default;
         _rightPane.NavigationContext.Sort = settings.RightSort ?? EntrySort.Default;
+        SetPaneColumns(_leftPane, settings.LeftColumns);
+        SetPaneColumns(_rightPane, settings.RightColumns);
 
         Add(_menuBar, _leftPane.View, _rightPane.View, _commandPrompt, _commandField, _bottomPanel);
 
@@ -468,8 +466,8 @@ public sealed class MainWindow : Window
         _rightPane.NavigationContext.DetectVolumeFiles = detect;
         if (changed)
         {
-            _ = RunNavigationAsync(_leftPane, () => Task.CompletedTask);
-            _ = RunNavigationAsync(_rightPane, () => Task.CompletedTask);
+            _ = RefreshAndDrawPaneAsync(_leftPane);
+            _ = RefreshAndDrawPaneAsync(_rightPane);
         }
     }
 
@@ -478,6 +476,31 @@ public sealed class MainWindow : Window
     {
         _leftPane.NavigationContext.UaeMetadata = format;
         _rightPane.NavigationContext.UaeMetadata = format;
+    }
+
+    /// <summary>
+    ///     Shows the columns of the settings in a pane, listing it again when they changed (also when the UAE metadata
+    ///     format changed while a column shows Amiga metadata), as UAE metadata is only read for those columns.
+    /// </summary>
+    private void ApplyColumns(Pane pane, IReadOnlyList<string>? ids, bool uaeMetadataChanged)
+    {
+        var columns = EntryColumns.Resolve(ids);
+        var changed = !columns.SequenceEqual(pane.NavigationContext.Columns);
+        SetPaneColumns(pane, ids);
+        if (changed || (uaeMetadataChanged && columns.Any(column => column.UsesAmigaMetadata)))
+        {
+            _ = RefreshAndDrawPaneAsync(pane);
+        }
+    }
+
+    /// <summary>
+    ///     Lists a pane again after the settings changed. The window was drawn when the settings dialog closed, before
+    ///     the pane was listed, and isn't drawn again by itself, so the new columns only showed after the next key.
+    /// </summary>
+    private async Task RefreshAndDrawPaneAsync(Pane pane)
+    {
+        await RunNavigationAsync(pane, () => Task.CompletedTask);
+        Application.LayoutAndDraw(true);
     }
 
     /// <summary>Sets the largest file both panes copy to a temporary file to open it.</summary>
@@ -722,7 +745,10 @@ public sealed class MainWindow : Window
         ApplyVolumeProviderKeys(result.EffectiveVolumeProviderKeys);
         ApplyEnterFileAction(result.EnterFileAction);
         ApplyDetectVolumeFiles(result.DetectVolumeFiles);
+        var uaeMetadataChanged = result.UaeMetadata != settings.UaeMetadata;
         ApplyUaeMetadata(result.UaeMetadata);
+        ApplyColumns(_leftPane, result.LeftColumns, uaeMetadataChanged);
+        ApplyColumns(_rightPane, result.RightColumns, uaeMetadataChanged);
         ApplyTemporaryCopyLimit(result.TemporaryCopyLimitBytes);
         _editorSettings = result;
         try
@@ -1335,7 +1361,7 @@ public sealed class MainWindow : Window
         SaveSorts();
     }
 
-    /// <summary>Remembers the order of the entries of both panes in the settings, for their sides.</summary>
+    /// <summary>Remembers the order of the entries and the columns of both panes in the settings, for their sides.</summary>
     private void SaveSorts()
     {
         try
@@ -1343,7 +1369,9 @@ public sealed class MainWindow : Window
             (TuiSettings.Load() with
             {
                 LeftSort = _leftPane.NavigationContext.Sort,
-                RightSort = _rightPane.NavigationContext.Sort
+                RightSort = _rightPane.NavigationContext.Sort,
+                LeftColumns = _leftPane.ColumnIds,
+                RightColumns = _rightPane.ColumnIds
             }).Save();
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
@@ -2507,7 +2535,8 @@ public sealed class MainWindow : Window
     /// </summary>
     private void SortPane(Pane pane, int column)
     {
-        if (column < 0 || column >= EntrySort.Columns.Count)
+        var columns = pane.NavigationContext.Columns;
+        if (column < 0 || column >= columns.Count)
         {
             return;
         }
@@ -2515,26 +2544,46 @@ public sealed class MainWindow : Window
         var selectedRow = pane.TableView.SelectedRow;
         var selectedEntry = selectedRow >= 0 && selectedRow < pane.Entries.Count ? pane.Entries[selectedRow] : null;
         pane.VolumeDetection?.Cancel();
-        pane.Entries = pane.NavigationContext.ToggleSort(EntrySort.Columns[column]);
+        pane.Entries = pane.NavigationContext.ToggleSort(columns[column].Id);
         ShowEntries(pane, selectedEntry == null ? 0 : Math.Max(0, IndexOfEntry(pane.Entries, selectedEntry)));
         SaveSorts();
+    }
+
+    /// <summary>
+    ///     Sets the columns of a pane from ids of the settings (null for the default), kept to save them again for the
+    ///     pane's side when the panes are swapped.
+    /// </summary>
+    private static void SetPaneColumns(Pane pane, IReadOnlyList<string>? ids)
+    {
+        pane.ColumnIds = ids;
+        pane.NavigationContext.Columns = EntryColumns.Resolve(ids);
     }
 
     /// <summary>Shows the entries of a pane in its table, with the sorting in the column headers.</summary>
     private static void ShowEntries(Pane pane, int selectedRow)
     {
         var table = new DataTable();
-        var sort = pane.NavigationContext.Sort;
-        foreach (var column in EntrySort.Columns)
+        var context = pane.NavigationContext;
+        var columns = context.Columns;
+        // a DataTable needs unique names, so a header shared by two columns gets the column's number
+        var headers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        for (var index = 0; index < columns.Count; index++)
         {
-            table.Columns.Add(sort.GetHeader(column), typeof(string));
+            var header = context.Sort.GetHeader(columns[index]);
+            table.Columns.Add(headers.Add(header) ? header : $"{header} {index + 1}", typeof(string));
         }
 
         foreach (var entry in pane.Entries)
         {
-            var size = pane.NavigationContext.FormatEntrySize(entry);
-            var modifiedDate = entry.ModifiedDate?.ToString("yyyy-MM-dd HH:mm") ?? string.Empty;
-            table.Rows.Add(GetEntryMarker(pane, entry) + entry.DisplayName, size, modifiedDate);
+            var row = new object[columns.Count];
+            for (var index = 0; index < columns.Count; index++)
+            {
+                row[index] = columns[index] == EntryColumns.Name
+                    ? GetEntryMarker(pane, entry) + entry.DisplayName
+                    : context.GetColumnText(columns[index], entry);
+            }
+
+            table.Rows.Add(row);
         }
 
         pane.TableView.Table = new DataTableSource(table);
@@ -2565,8 +2614,9 @@ public sealed class MainWindow : Window
                 return;
             }
 
-            pane.DataTable.Rows[rowIndex][0] = FormatEntryName(pane, entry, GetColumnWidths(
-                pane.TableView.Viewport.Width).Name);
+            var nameIndex = GetColumnIndex(pane, EntryColumns.Name);
+            pane.DataTable.Rows[rowIndex][nameIndex] = FormatEntryName(pane, entry, GetColumnWidths(
+                pane.NavigationContext.Columns, pane.TableView.Viewport.Width)[nameIndex]);
             pane.TableView.SetNeedsDraw();
         }, cancellation.Token);
     }
@@ -2600,14 +2650,26 @@ public sealed class MainWindow : Window
     {
         var paneWidth = pane.TableView.Viewport.Width;
         pane.TableView.SeparatorSymbol = paneWidth < 5 ? '\0' : ' ';
-        var widths = GetColumnWidths(paneWidth);
-        pane.TableView.Style.ColumnStyles = new Dictionary<int, ColumnStyle>
+        var columns = pane.NavigationContext.Columns;
+        var widths = GetColumnWidths(columns, paneWidth);
+        var columnStyles = new Dictionary<int, ColumnStyle>();
+        for (var index = 0; index < columns.Count; index++)
         {
-            [0] = new() { MinWidth = widths.Name, MaxWidth = widths.Name },
-            [1] = new() { MinWidth = widths.Size, MaxWidth = widths.Size, Alignment = Alignment.End },
-            [2] = new() { MinWidth = widths.Modified, MaxWidth = widths.Modified }
-        };
-        pane.TableView.ColumnWidths = [widths.Name, widths.Size, widths.Modified];
+            columnStyles[index] = new ColumnStyle
+            {
+                MinWidth = widths[index],
+                MaxWidth = widths[index],
+                Alignment = columns[index].AlignEnd ? Alignment.End : Alignment.Start
+            };
+        }
+
+        pane.TableView.Style.ColumnStyles = columnStyles;
+        pane.TableView.ColumnWidths = widths;
+        // the table view calculates its content size when its table is set, with the styles it had then, so after
+        // removing a column the name column only got its new width when the next location was shown
+        pane.TableView.RefreshContentSize();
+        pane.TableView.Update();
+        var nameIndex = GetColumnIndex(pane, EntryColumns.Name);
         pane.BottomLine.Text = CreateBottomLine(pane.TableView);
         pane.PathPanel.Dividers = pane.TableView.GetDividerPositions();
         pane.PathPanel.SetNeedsDraw();
@@ -2619,7 +2681,7 @@ public sealed class MainWindow : Window
 
         for (var rowIndex = 0; rowIndex < pane.Entries.Count; rowIndex++)
         {
-            pane.DataTable.Rows[rowIndex][0] = FormatEntryName(pane, pane.Entries[rowIndex], widths.Name);
+            pane.DataTable.Rows[rowIndex][nameIndex] = FormatEntryName(pane, pane.Entries[rowIndex], widths[nameIndex]);
         }
         pane.TableView.SetNeedsDraw();
     }
@@ -2650,16 +2712,40 @@ public sealed class MainWindow : Window
         return new string(line);
     }
 
-    private static (int Name, int Size, int Modified) GetColumnWidths(int paneWidth)
+    /// <summary>
+    ///     Widths of the columns of a pane: each column but Name gets its width (<see cref="EntryColumns.GetWidth" />),
+    ///     the last ones first when the pane is narrow, and Name the rest, at least one cell each.
+    /// </summary>
+    private static int[] GetColumnWidths(IReadOnlyList<IEntryColumn> columns, int paneWidth)
     {
         // TableView reserves one leading cell for header lines and adds one cell of padding after every column
-        var availableWidth = Math.Max(3, paneWidth - 1 - ColumnCount);
-        var modifiedWidth = Math.Min(ModifiedColumnWidth, availableWidth - 2);
-        var sizeWidth = Math.Min(SizeColumnWidth, availableWidth - modifiedWidth - 1);
-        var nameWidth = Math.Max(1, availableWidth - sizeWidth - modifiedWidth);
+        var remaining = Math.Max(columns.Count, paneWidth - 1 - columns.Count);
+        var widths = new int[columns.Count];
+        var unassigned = columns.Count;
+        for (var index = columns.Count - 1; index >= 0; index--)
+        {
+            if (columns[index] == EntryColumns.Name)
+            {
+                continue;
+            }
 
-        return (nameWidth, sizeWidth, modifiedWidth);
+            unassigned--;
+            widths[index] = Math.Max(1, Math.Min(EntryColumns.GetWidth(columns[index]), remaining - unassigned));
+            remaining -= widths[index];
+        }
+
+        var nameIndex = EntryColumns.IndexOf(columns, EntryColumns.Name);
+        if (nameIndex >= 0)
+        {
+            widths[nameIndex] = Math.Max(1, remaining);
+        }
+
+        return widths;
     }
+
+    /// <summary>Index of a column in the table of a pane, 0 when not shown.</summary>
+    private static int GetColumnIndex(Pane pane, IEntryColumn column) =>
+        Math.Max(0, EntryColumns.IndexOf(pane.NavigationContext.Columns, column));
 
     /// <summary>Name of an entry shown in a pane column, its marker followed by its name shortened to fit.</summary>
     private static string FormatEntryName(Pane pane, IEntry entry, int columnWidth) =>
@@ -2797,7 +2883,13 @@ public sealed class MainWindow : Window
             return;
         }
 
-        pane.DataTable.Rows[rowIndex][1] = pane.NavigationContext.FormatEntrySize(entry);
+        var sizeIndex = EntryColumns.IndexOf(pane.NavigationContext.Columns, EntryColumns.Size);
+        if (sizeIndex < 0)
+        {
+            return;
+        }
+
+        pane.DataTable.Rows[rowIndex][sizeIndex] = pane.NavigationContext.FormatEntrySize(entry);
         pane.TableView.SetNeedsDraw();
     }
 
@@ -2899,6 +2991,9 @@ public sealed class MainWindow : Window
         public ListingProgressView Progress { get; } = progress;
         public IReadOnlyList<IEntry> Entries { get; set; } = [];
         public DataTable? DataTable { get; set; }
+
+        /// <summary>Ids of the columns from the settings, null for the default (see <see cref="EntryColumns.Resolve" />).</summary>
+        public IReadOnlyList<string>? ColumnIds { get; set; }
 
         /// <summary>Cancels detecting the files that can be opened as volumes, e.g. when listed again.</summary>
         public CancellationTokenSource? VolumeDetection { get; set; }
