@@ -458,7 +458,8 @@ jobs:
           }
           Get-ChildItem -Filter "$($env:RELEASE_VERSION)_*" -name
 
-      # the release text, saying whether it's a prerelease, with the files to download for each platform
+      # the release text, saying whether it's a prerelease, with a link to the installation in the README; the changes
+      # since the last release are added to the draft by hand
       - name: Write release notes
         shell: pwsh
         env:
@@ -469,51 +470,21 @@ jobs:
           } else {
             "Hst Commander $($env:RELEASE_TAG)."
           }
-          # a prerelease isn't the latest release, so its install commands name its tag
-          $base = 'https://github.com/${{ github.repository }}/releases'
+          $installation = 'See [Installation](https://github.com/${{ github.repository }}#installation) in the README for which file to download for the GUI and the TUI, installing the TUI with one command and the SMB plugin.'
+          # a prerelease isn't the latest release, so the install command needs its version
           if ($env:PRERELEASE -eq 'true') {
-            $scripts = "$base/download/$($env:RELEASE_TAG)"
-            $versionPs = " -Version $($env:RELEASE_TAG)"
-            $versionSh = " -s -- --version $($env:RELEASE_TAG)"
-          } else {
-            $scripts = "$base/latest/download"
-            $versionPs = ''
-            $versionSh = ''
-          }
-          $installPs = if ($versionPs) {
-            "& ([scriptblock]::Create((irm $scripts/install.ps1)))$versionPs"
-          } else {
-            "irm $scripts/install.ps1 | iex"
+            $installation += " As this is a prerelease, add ``-Version $($env:RELEASE_TAG)`` (PowerShell) or ``--version $($env:RELEASE_TAG)`` (bash) to the install command."
           }
           @(
             $intro
             ''
-            '## Install the TUI with one command'
+            "## Changes since <last release>"
             ''
-            'Windows (PowerShell):'
+            '- '
             ''
-            '```powershell'
-            $installPs
-            '```'
+            '## Installation'
             ''
-            'macOS and Linux:'
-            ''
-            '```sh'
-            "curl -fsSL $scripts/install.sh | bash$versionSh"
-            '```'
-            ''
-            'This installs the TUI for the current user and adds `hst.commander` to the path. Add `-Smb` (PowerShell) or `--smb` (bash) to install the SMB plugin too, `-SmbOnly` or `--smb-only` to install only the plugin.'
-            ''
-            '## Downloads'
-            ''
-            'The terminal UI (`tui`) and the desktop GUI (`gui`) are packaged separately:'
-            ''
-            '- **Windows**: `_setup.exe` installs the app, `_portable.zip` runs without installing.'
-            '- **macOS**: `.dmg` for Intel (`x64`) or Apple silicon (`arm64`).'
-            '- **Linux**: for `x64` (Intel and AMD), `arm64` and `arm` (32-bit, e.g. Raspberry Pi OS); there is no 32-bit `x86` build, as .NET does not run on it on Linux. `.deb` installs on Debian and Ubuntu, `.AppImage` runs without installing, `.tar.gz` (TUI) holds the files to run. A downloaded AppImage must be made executable first, as browsers save downloads without the execute permission: `chmod +x hst-commander_*.AppImage`, or Properties > Executable as Program in Files. It needs FUSE 2: `sudo apt install libfuse2t64` on Ubuntu 24.04 and later, `libfuse2` before.'
-            '- **SMB plugin** (Windows file shares): `_smb-plugin_windows_setup.exe` installs it on Windows for both apps. On every platform, `_smb-plugin.zip` holds its `Hst.Commander.Plugins.Smb` directory to copy to `~/.hst-commander/plugins/`.'
-            ''
-            'Third-party notices are included with the apps and shown in Help > About > Licenses.'
+            $installation
           ) | Set-Content -Path release-notes.md -Encoding utf8
           Get-Content release-notes.md
 
