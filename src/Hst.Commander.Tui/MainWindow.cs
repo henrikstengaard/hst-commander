@@ -25,6 +25,8 @@ public sealed class MainWindow : Window
     private PopoverMenu? _entryMenu;
     private VolumeProviderKeys _volumeProviderKeys;
     private TuiPalette _palette;
+    private ThemeChoice _theme;
+    private string? _shownColorNotice;
     private Pane _activePane;
     private TerminalAction? _pendingTerminalAction;
     private string? _pendingError;
@@ -38,6 +40,8 @@ public sealed class MainWindow : Window
     public MainWindow(string initialPath, TuiSettings settings)
     {
         var theme = Themes.Find(settings.Theme);
+        _theme = theme;
+        TuiColors.Apply(settings.ColorMode, Application.Driver?.GetOutput());
         BorderStyle = LineStyle.None;
         X = 0;
         Y = 0;
@@ -390,6 +394,7 @@ public sealed class MainWindow : Window
     /// </summary>
     public void ApplyTheme(ThemeChoice theme)
     {
+        _theme = theme;
         _palette = TuiPalette.For(theme);
         var bottomPanel = theme.GetBottomPanel();
         var bottomHeight = Math.Max(1, bottomPanel.Rows);
@@ -426,6 +431,23 @@ public sealed class MainWindow : Window
 
         ApplyMessageBoxColors();
         SetNeedsDraw();
+    }
+
+    public void ApplyTerminalColors()
+    {
+        ApplyAppearance(_theme, TuiColors.RequestedMode);
+        if (TuiColors.Notice is { } notice && notice != _shownColorNotice)
+        {
+            _shownColorNotice = notice;
+            UiThread.Post(() => ErrorBox.ShowNotice(notice));
+        }
+    }
+
+    private void ApplyAppearance(ThemeChoice theme, TuiColorMode colorMode)
+    {
+        TuiColors.Apply(colorMode, Application.Driver?.GetOutput());
+        Application.Driver?.ClearContents();
+        ApplyTheme(theme);
     }
 
     /// <summary>
@@ -694,7 +716,10 @@ public sealed class MainWindow : Window
     private void ShowSettings()
     {
         var settings = TuiSettings.Load();
-        var dialog = new SettingsDialog(settings, ApplyTheme, _palette);
+        var originalTheme = _theme;
+        var originalMode = TuiColors.RequestedMode;
+        var dialog = new SettingsDialog(settings with { Theme = originalTheme.Id, ColorMode = originalMode },
+            ApplyAppearance, _palette);
         Application.Run(dialog);
         var result = dialog.Result;
         var changedButtons = dialog.ChangedButtons;
@@ -702,7 +727,7 @@ public sealed class MainWindow : Window
 
         if (result == null)
         {
-            ApplyTheme(Themes.Find(settings.Theme));
+            ApplyAppearance(originalTheme, originalMode);
             return;
         }
 
@@ -718,7 +743,7 @@ public sealed class MainWindow : Window
             }
         }
 
-        ApplyTheme(Themes.Find(result.Theme));
+        ApplyAppearance(Themes.Find(result.Theme), result.ColorMode);
         ApplyVolumeProviderKeys(result.EffectiveVolumeProviderKeys);
         ApplyEnterFileAction(result.EnterFileAction);
         ApplyDetectVolumeFiles(result.DetectVolumeFiles);

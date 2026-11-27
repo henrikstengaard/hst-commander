@@ -221,11 +221,7 @@ public sealed class ButtonPanelEditorView : View
                 var button = buttons[row];
                 var attribute = isSelectedColumn && row == _row
                     ? cursor
-                    : button.Background != null || button.Foreground != null
-                        ? new TuiAttribute(
-                            button.Foreground != null ? TuiPalette.Closest(button.Foreground) : normal.Foreground,
-                            button.Background != null ? TuiPalette.Closest(button.Background) : normal.Background)
-                        : normal;
+                    : TuiColors.ButtonAttribute(button, normal);
                 DrawCell(x, row + 1, button.Label, attribute);
             }
         }
