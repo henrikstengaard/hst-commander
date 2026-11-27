@@ -207,14 +207,13 @@ public class GivenEntryClipboard : IDisposable
     }
 
     [Fact]
-    public async Task When_CutEntriesInZip_Then_NotSupportedIsThrown()
+    public async Task When_CutEntriesIn7z_Then_NotSupportedIsThrown()
     {
-        // arrange
-        await File.WriteAllBytesAsync(Path.Combine(sourcePath, "archive.zip"),
-            ZipTestData.CreateZipWithDirectoriesAndFiles());
+        // arrange - 7z archives are read-only
+        await File.WriteAllBytesAsync(Path.Combine(sourcePath, "archive.7z"), ArchiveTestData.Read("dirs-files.7z"));
         using var source = new NavigationContext(sourcePath);
-        await source.OpenEntryAsync(await GetEntryAsync(source, "archive.zip"));
-        var entry = await GetEntryAsync(source, "file1.txt");
+        await source.OpenEntryAsync(await GetEntryAsync(source, "archive.7z"));
+        var entry = await GetEntryAsync(source, "dir1");
 
         // act & assert
         await Assert.ThrowsAsync<NotSupportedException>(() => EntryClipboard.SetAsync(source, [entry], true));

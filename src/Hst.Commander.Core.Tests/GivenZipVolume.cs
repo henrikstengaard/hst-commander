@@ -97,12 +97,13 @@ public class GivenZipVolume
     }
 
     [Fact]
-    public async Task When_Write_Then_NotSupportedExceptionIsThrown()
+    public async Task When_WriteToReadOnlyStream_Then_NotSupportedExceptionIsThrown()
     {
         // arrange
-        var zipVolume = await CreateZipVolumeAsync(ZipTestData.CreateZipWithDirectoriesAndFiles());
+        var zipVolume = await new ZipFileVolumeProvider().CreateVolume(
+            new MemoryStream(ZipTestData.CreateZipWithDirectoriesAndFiles(), false));
 
-        // act & assert - zip archives are read-only
+        // act & assert - zip archives are read-only when their stream is
         await Assert.ThrowsAsync<NotSupportedException>(() => zipVolume.OpenWrite("new.txt"));
         await Assert.ThrowsAsync<NotSupportedException>(() => zipVolume.CreateContainer("new"));
         await Assert.ThrowsAsync<NotSupportedException>(() => zipVolume.Delete("file1.txt"));
