@@ -16,6 +16,7 @@ public sealed class NavigationContext : IDisposable
     private readonly Dictionary<string, long?> _directorySizes = new(StringComparer.Ordinal);
     private CancellationTokenSource _directorySizeCancellation = new();
     private IReadOnlyList<IEntry> _listedEntries = [];
+    private readonly PaneColumnContext _columnContext;
     private readonly HashSet<string> _executableNames = new(StringComparer.Ordinal);
     private readonly HashSet<string> _volumeFileNames = new(StringComparer.Ordinal);
     private readonly Action<string> _startFile;
@@ -51,6 +52,7 @@ public sealed class NavigationContext : IDisposable
         IReadOnlyList<IFileVolumeProvider>? fileVolumeProviders = null,
         IReadOnlyList<IIconProvider>? iconProviders = null)
     {
+        _columnContext = new PaneColumnContext(this);
         _startFile = startFile ?? FileStarter.StartWithShell;
         _fileVolumeProviders = fileVolumeProviders ?? VolumeProviders.Files;
         _iconProviders = iconProviders ?? VolumeProviders.Icons;
@@ -881,13 +883,47 @@ public sealed class NavigationContext : IDisposable
     public EntrySort Sort { get; set; } = EntrySort.Default;
 
     /// <summary>
-    ///     Sorts the entries last listed by a column clicked in the header (<see cref="EntrySort.Toggle" />) and
-    ///     returns them in the new order, without listing them again.
+    ///     Columns the pane shows, in order (see <see cref="EntryColumns.Resolve" />), set by the front-ends from the
+    ///     settings. The UAE metadata of the listed directory is read when one of them uses Amiga metadata
+    ///     (<see cref="IEntryColumn.UsesAmigaMetadata" />), so list the entries again after changing them.
     /// </summary>
-    public IReadOnlyList<IEntry> ToggleSort(EntryColumn column)
+    public IReadOnlyList<IEntryColumn> Columns { get; set; } = EntryColumns.Resolve(null);
+
+    /// <summary>The location of the listed entries given to the columns, see <see cref="GetColumnText" />.</summary>
+    public IEntryColumnContext ColumnContext => _columnContext;
+
+    /// <summary>
+    ///     Text of a column for a listed entry, empty for ".." (except its name) and when a plugin's column fails.
+    /// </summary>
+    public string GetColumnText(IEntryColumn column, IEntry entry)
+    {
+        ArgumentNullException.ThrowIfNull(column);
+        ArgumentNullException.ThrowIfNull(entry);
+
+        if (entry.Name == Paths.Parent && column != EntryColumns.Name && column != EntryColumns.Size)
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            return column.GetText(entry, _columnContext);
+        }
+        catch (Exception)
+        {
+            // a plugin's column failing just shows nothing
+            return string.Empty;
+        }
+    }
+
+    /// <summary>
+    ///     Sorts the entries last listed by a column clicked in the header (<see cref="EntrySort.Toggle" />, given the
+    ///     column's id) and returns them in the new order, without listing them again.
+    /// </summary>
+    public IReadOnlyList<IEntry> ToggleSort(string column)
     {
         Sort = Sort.Toggle(column);
-        return Sort.Sort(_listedEntries);
+        return Sort.Sort(_listedEntries, _columnContext);
     }
 
     /// <summary>Lists the entries of the current location, with ".." first when it has a parent, in <see cref="Sort" /> order.</summary>
@@ -906,6 +942,7 @@ public sealed class NavigationContext : IDisposable
         }
 
         _volumeSpace = await GetVolumeSpaceAsync(cancellationToken);
+        await UpdateColumnContextAsync(entries, cancellationToken);
         _volumeFileNames.Clear();
         UpdateExecutableNames(entries);
         UpdateIconFiles(entries);
@@ -919,7 +956,47 @@ public sealed class NavigationContext : IDisposable
         }
 
         _listedEntries = entries;
-        return Sort.Sort(entries);
+        return Sort.Sort(entries, _columnContext);
+    }
+
+    /// <summary>
+    ///     Updates the location given to the columns after listing: whether it stores Amiga metadata and, while a column
+    ///     uses Amiga metadata, the UAE metadata of the listed directory (not with <see cref="UaeMetadataFormat.None" />).
+    ///     Unreadable metadata is none, as the listing shouldn't fail for a column.
+    /// </summary>
+    private async Task UpdateColumnContextAsync(IReadOnlyCollection<IEntry> entries,
+        CancellationToken cancellationToken)
+    {
+        var supportsAmigaMetadata = await _nestedVolume.SupportsAmigaMetadata(cancellationToken);
+        _columnContext.SupportsAmigaMetadata = supportsAmigaMetadata;
+        var uaeMetadata = new Dictionary<string, AmigaMetadata>(StringComparer.Ordinal);
+        if (!supportsAmigaMetadata && UaeMetadata != UaeMetadataFormat.None && !IsDriveList &&
+            Columns.Any(column => column.UsesAmigaMetadata))
+        {
+            try
+            {
+                var localDirectory = !IsInImage ? LocalPath : null;
+                var listed = entries.Where(entry => entry.Name != Paths.Parent).ToList();
+                var metadata = await UaeMetadataReader.ReadAsync(_nestedVolume, listed, localDirectory != null,
+                    cancellationToken, localDirectory);
+                foreach (var node in metadata.Nodes)
+                {
+                    uaeMetadata.TryAdd(node.NormalName, node.Metadata);
+                }
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                // listed without UAE metadata
+            }
+        }
+
+        _columnContext.SetUaeMetadata(uaeMetadata);
+    }
+
+    /// <summary>The column context of a pane, showing the calculated sizes of directories in the Size column.</summary>
+    private sealed class PaneColumnContext(NavigationContext navigationContext) : EntryColumnContext
+    {
+        public override string FormatEntrySize(IEntry entry) => navigationContext.FormatEntrySize(entry);
     }
 
     private void UpdateExecutableNames(IEnumerable<IEntry> entries)

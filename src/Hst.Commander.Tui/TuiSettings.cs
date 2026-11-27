@@ -85,6 +85,15 @@ public sealed record TuiSettings
     public EntrySort? RightSort { get; init; }
 
     /// <summary>
+    ///     Ids of the columns of the left pane in order (see <see cref="EntryColumns.Resolve" />), null for the default
+    ///     Name, Size and Modified.
+    /// </summary>
+    public IReadOnlyList<string>? LeftColumns { get; init; }
+
+    /// <summary>Ids of the columns of the right pane in order, null for the default Name, Size and Modified.</summary>
+    public IReadOnlyList<string>? RightColumns { get; init; }
+
+    /// <summary>
     ///     Where the panes were when last quit, restored on the next start (see
     ///     <see cref="StartupOptions.WithSavedPanes" />); null when never saved.
     /// </summary>

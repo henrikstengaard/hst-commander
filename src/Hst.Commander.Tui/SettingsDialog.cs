@@ -5,7 +5,7 @@ using Hst.Commander.Core;
 namespace Hst.Commander.Tui;
 
 /// <summary>
-///     Modal settings view with the settings grouped in tabs: appearance, panes, copying and the editor, and the buttons
+///     Modal settings view with the settings grouped in tabs: appearance, panes, columns, copying and the editor, and the buttons
 ///     of a theme the user can change (<see cref="ICustomizableButtonPanel" />) while it is chosen. Theme changes are
 ///     previewed immediately through the preview action; <see cref="Result" /> holds the changed settings on OK or null
 ///     on cancel, in which case the caller reverts the preview, and <see cref="ChangedButtons" /> the changed buttons.
@@ -31,6 +31,10 @@ public sealed class SettingsDialog : TuiDialog
     private readonly OptionSelector _enterFileActionRadioGroup;
     private readonly TextField _temporaryCopyLimitField;
     private readonly CheckBox _detectVolumeFilesCheckBox;
+    private readonly ColumnListEditor _leftColumns;
+    private readonly ColumnListEditor _rightColumns;
+    private readonly OptionSelector _columnsPaneSelector;
+    private readonly ListView _columnList;
     private readonly OptionSelector _uaeMetadataRadioGroup;
     private readonly OptionSelector _editorRadioGroup;
     private readonly TextField _editorCommandField;
@@ -118,6 +122,56 @@ public sealed class SettingsDialog : TuiDialog
             Value = settings.DetectVolumeFiles ? CheckState.Checked : CheckState.UnChecked
         };
 
+        // columns of the left and right pane, each edited in its own list
+        _leftColumns = new ColumnListEditor(settings.LeftColumns);
+        _rightColumns = new ColumnListEditor(settings.RightColumns);
+        var columnsPaneLabel = new Label { X = 1, Y = 1, Text = "Pane:" };
+        _columnsPaneSelector = new OptionSelector
+        {
+            X = 16,
+            Y = 1,
+            Orientation = Orientation.Horizontal,
+            Labels = ["Left", "Right"],
+            Value = 0
+        };
+        var columnsLabel = new Label { X = 1, Y = 3, Text = "Columns:" };
+        _columnList = new ListView { X = 16, Y = 3, Width = Dim.Fill(1), Height = Dim.Fill(5) };
+        _columnList.KeyDown += (_, key) => HandleColumnKey(key);
+        _columnsPaneSelector.ValueChanged += (_, _) => ShowColumns(0);
+        var columnsHelp = new Label
+        {
+            X = 16,
+            Y = Pos.AnchorEnd(4),
+            Width = Dim.Fill(1),
+            Text = "Space show/hide, Ctrl+Up/Down move"
+        };
+        var showColumnButton = new Button { X = 16, Y = Pos.AnchorEnd(2), Text = "Show/hide" };
+        showColumnButton.Accepting += (_, e) =>
+        {
+            e.Handled = true;
+            ToggleSelectedColumn();
+        };
+        var moveUpButton = new Button { X = Pos.Right(showColumnButton) + 1, Y = Pos.AnchorEnd(2), Text = "Up" };
+        moveUpButton.Accepting += (_, e) =>
+        {
+            e.Handled = true;
+            MoveSelectedColumn(-1);
+        };
+        var moveDownButton = new Button { X = Pos.Right(moveUpButton) + 1, Y = Pos.AnchorEnd(2), Text = "Down" };
+        moveDownButton.Accepting += (_, e) =>
+        {
+            e.Handled = true;
+            MoveSelectedColumn(1);
+        };
+        var resetColumnsButton = new Button { X = Pos.Right(moveDownButton) + 1, Y = Pos.AnchorEnd(2), Text = "Reset" };
+        resetColumnsButton.Accepting += (_, e) =>
+        {
+            e.Handled = true;
+            SelectedColumns.Reset(null);
+            ShowColumns(0);
+        };
+        ShowColumns(0);
+
         // copying
         var uaeMetadataLabel = new Label { X = 1, Y = 1, Text = "UAE metadata:" };
         _uaeMetadataRadioGroup = new OptionSelector
@@ -159,6 +213,8 @@ public sealed class SettingsDialog : TuiDialog
         tabView.Add(CreateTab("Panes", volumeProviderKeysLabel, _volumeProviderKeysRadioGroup,
             enterFileActionLabel, _enterFileActionRadioGroup, temporaryCopyLimitLabel, _temporaryCopyLimitField,
             temporaryCopyLimitHelp, detectVolumeFilesLabel, _detectVolumeFilesCheckBox));
+        tabView.Add(CreateTab("Columns", columnsPaneLabel, _columnsPaneSelector, columnsLabel, _columnList,
+            columnsHelp, showColumnButton, moveUpButton, moveDownButton, resetColumnsButton));
         tabView.Add(CreateTab("Copying", uaeMetadataLabel, _uaeMetadataRadioGroup));
         tabView.Add(CreateTab("Editor", editorLabel, _editorRadioGroup, editorCommandLabel, _editorCommandField,
             editorCommandHelp));
@@ -195,6 +251,8 @@ public sealed class SettingsDialog : TuiDialog
                     EnterFileAction = SelectedEnterFileAction,
                     DetectVolumeFiles = _detectVolumeFilesCheckBox.Value == CheckState.Checked,
                     UaeMetadata = SelectedUaeMetadata,
+                    LeftColumns = GetColumnIds(_leftColumns, _settings.LeftColumns),
+                    RightColumns = GetColumnIds(_rightColumns, _settings.RightColumns),
                     TemporaryCopyLimit = temporaryCopyLimit,
                     Editor = SelectedEditor,
                     EditorCommand = string.IsNullOrWhiteSpace(_editorCommandField.Text)
@@ -248,6 +306,59 @@ public sealed class SettingsDialog : TuiDialog
         UaeMetadataFormats.All[Math.Max(0, (_uaeMetadataRadioGroup.Value ?? 0))];
 
     private EditorKind SelectedEditor => EditorKinds.All[Math.Max(0, (_editorRadioGroup.Value ?? 0))];
+
+    /// <summary>Columns of the pane chosen in the Columns tab.</summary>
+    private ColumnListEditor SelectedColumns => _columnsPaneSelector.Value == 1 ? _rightColumns : _leftColumns;
+
+    /// <summary>
+    ///     Ids of the shown columns to save, the ids of the settings when unchanged (null for the default stays null,
+    ///     and a column of a plugin that isn't loaded is kept).
+    /// </summary>
+    private static IReadOnlyList<string>? GetColumnIds(ColumnListEditor editor, IReadOnlyList<string>? ids) =>
+        editor.ShownIds.SequenceEqual(new ColumnListEditor(ids).ShownIds) ? ids : editor.ShownIds;
+
+    /// <summary>Shows the columns of the chosen pane, "[x]" for shown ones, with the cursor on a column.</summary>
+    private void ShowColumns(int selectedIndex)
+    {
+        var items = SelectedColumns.Items;
+        _columnList.SetSource(new ObservableCollection<string>(items.Select(item =>
+            $"[{(item.IsShown ? 'x' : ' ')}] {item.Column.Title}")));
+        _columnList.SelectedItem = Math.Clamp(selectedIndex, 0, Math.Max(0, items.Count - 1));
+        _columnList.SetNeedsDraw();
+    }
+
+    private void HandleColumnKey(Key key)
+    {
+        if (key == Key.Space)
+        {
+            key.Handled = true;
+            ToggleSelectedColumn();
+        }
+        else if (key == Key.CursorUp.WithCtrl || key == Key.CursorDown.WithCtrl)
+        {
+            key.Handled = true;
+            MoveSelectedColumn(key == Key.CursorUp.WithCtrl ? -1 : 1);
+        }
+    }
+
+    private void ToggleSelectedColumn()
+    {
+        var index = _columnList.SelectedItem ?? 0;
+        if (!SelectedColumns.Toggle(index))
+        {
+            ErrorBox.ShowNotice("The Name column is always shown");
+        }
+
+        ShowColumns(index);
+        _columnList.SetFocus();
+    }
+
+    private void MoveSelectedColumn(int offset)
+    {
+        var index = _columnList.SelectedItem ?? 0;
+        ShowColumns(SelectedColumns.Move(index, index + offset));
+        _columnList.SetFocus();
+    }
 
     /// <summary>The command can only be entered for the custom editor.</summary>
     private void UpdateEditorCommand() => _editorCommandField.Enabled = SelectedEditor == EditorKind.Custom;

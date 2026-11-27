@@ -7,19 +7,46 @@ using Hst.Commander.Abstractions;
 namespace Hst.Commander.Gui;
 
 /// <summary>
-///     Display row for an entry in a pane.
+///     Display row for an entry in a pane, with the texts of the pane's columns (see <see cref="EntryRowCells" />).
 /// </summary>
-public sealed class EntryItem(IEntry entry, bool isMarked = false, bool isExecutable = false, string? size = null)
-    : INotifyPropertyChanged
+public sealed class EntryItem : INotifyPropertyChanged
 {
-    private bool _isMarked = isMarked;
-    private string _size = size ?? SizeFormatter.FormatEntrySize(entry);
+    private bool _isMarked;
+    private string _size;
     private bool _isVolumeFile;
-    private IImage _icon = FileIcons.GetInitialIcon(entry);
+    private IImage _icon;
+
+    /// <param name="entry">The entry.</param>
+    /// <param name="isMarked">True when the entry is marked.</param>
+    /// <param name="isExecutable">True when the entry is an executable file.</param>
+    /// <param name="columns">Columns of the pane, by default <see cref="EntryColumns.Default" />.</param>
+    /// <param name="getText">Text of a column for the entry, by default without a pane's location.</param>
+    public EntryItem(IEntry entry, bool isMarked = false, bool isExecutable = false,
+        IReadOnlyList<IEntryColumn>? columns = null, Func<IEntryColumn, IEntry, string>? getText = null)
+    {
+        Entry = entry;
+        _icon = FileIcons.GetInitialIcon(entry);
+        _isMarked = isMarked;
+        IsExecutable = isExecutable;
+        Columns = columns ?? EntryColumns.Resolve(null);
+        var context = new EntryColumnContext();
+        getText ??= (column, listedEntry) => column.GetText(listedEntry, context);
+        Texts = Columns.Select(column => column == EntryColumns.Name ? string.Empty : getText(column, entry))
+            .ToArray();
+        _size = EntryColumns.IndexOf(Columns, EntryColumns.Size) is var sizeIndex and >= 0
+            ? Texts[sizeIndex]
+            : SizeFormatter.FormatEntrySize(entry);
+    }
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    public IEntry Entry { get; } = entry;
+    public IEntry Entry { get; }
+
+    /// <summary>Columns of the pane the entry is shown in, shared by its rows.</summary>
+    public IReadOnlyList<IEntryColumn> Columns { get; }
+
+    /// <summary>Texts of the columns, empty for the Name column, which shows the icon and <see cref="DisplayName" />.</summary>
+    public IReadOnlyList<string> Texts { get; private set; }
 
     public string Name => Entry.Name;
 
@@ -33,7 +60,7 @@ public sealed class EntryItem(IEntry entry, bool isMarked = false, bool isExecut
     public bool IsContainer => Entry.Type == EntryType.Container;
 
     /// <summary>True when the entry is an executable file, shown in the executable color.</summary>
-    public bool IsExecutable { get; } = isExecutable;
+    public bool IsExecutable { get; }
 
     /// <summary>True when the entry is selected (marked) by the user, shown in the marked entry color.</summary>
     public bool IsMarked
@@ -105,8 +132,13 @@ public sealed class EntryItem(IEntry entry, bool isMarked = false, bool isExecut
 
             _size = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Size)));
+            if (EntryColumns.IndexOf(Columns, EntryColumns.Size) is var sizeIndex and >= 0)
+            {
+                var texts = Texts.ToArray();
+                texts[sizeIndex] = value;
+                Texts = texts;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Texts)));
+            }
         }
     }
-
-    public string Modified => Entry.ModifiedDate?.ToString("yyyy-MM-dd HH:mm") ?? string.Empty;
 }

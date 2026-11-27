@@ -7,7 +7,7 @@ namespace Hst.Commander.Plugins.Amiga;
 /// one (e.g. UAE hardfiles) as writable volumes and
 /// creating new adfs (F9), showing the icons of .info files, showing directories like the Workbench in the GUI and
 /// viewing Amiga icons and IFF ILBM pictures (F3) and adding the Comment and Tooltypes tabs to the properties
-/// dialog, included with Hst Commander by default. The Workbench shows def
+/// dialog and the Protection and Amiga attributes columns to the panes, included with Hst Commander by default. The Workbench shows def
 /// icons from the plugin's directory (<see cref="IPluginHost.GetPluginDirectory" />) for entries without a .info file.
 /// </summary>
 public class AmigaPlugin : IPlugin
@@ -35,6 +35,8 @@ public class AmigaPlugin : IPlugin
     public IEnumerable<IImageProvider> ImageProviders { get; } = [new AmigaImageProvider()];
 
     public IEnumerable<IPropertiesTabProvider> PropertiesTabProviders { get; } = [new AmigaPropertiesTabProvider()];
+
+    public IEnumerable<IEntryColumn> EntryColumns => AmigaEntryColumns.All;
 
     public void Initialize(IPluginHost host)
     {

@@ -34,7 +34,7 @@ public partial class PaneView : UserControl
     public PaneView()
     {
         InitializeComponent();
-        UpdateColumnWidths();
+        UpdateColumns();
         ListingCancelButton.Click += (_, _) => CancelProgress();
         // the message is shortened to the pane's width again when it changes
         PropertyChanged += (_, e) =>
@@ -56,9 +56,6 @@ public partial class PaneView : UserControl
         EntriesList.SelectionChanged += (_, _) => UpdateIconSelection();
         // anywhere in the panel, not only on the path, as the path is often short
         PathPanel.Tapped += (_, _) => PathClicked?.Invoke(this, EventArgs.Empty);
-        NameHeader.Tapped += (_, _) => SortBy(EntryColumn.Name);
-        SizeHeader.Tapped += (_, _) => SortBy(EntryColumn.Size);
-        ModifiedHeader.Tapped += (_, _) => SortBy(EntryColumn.Modified);
         EntriesList.PropertyChanged += (_, e) =>
         {
             if (e.Property == IsKeyboardFocusWithinProperty)
@@ -225,6 +222,87 @@ public partial class PaneView : UserControl
 
     private const double ModifiedColumnWidth = 150;
 
+    /// <summary>Width of a character of other columns at the default font size, and the padding of a column.</summary>
+    private const double CharacterWidth = 9;
+
+    private const double ColumnPadding = 18;
+
+    /// <summary>Columns the header, the dividers and <see cref="UpdateColumnWidths" /> were made for.</summary>
+    private IReadOnlyList<IEntryColumn> _columns = [];
+
+    private readonly List<TextBlock> _headerTexts = [];
+
+    /// <summary>Key of the resource with the width of a column of the pane by index (not used for Name).</summary>
+    public static string GetColumnWidthKey(int index) => $"EntryColumnWidth{index}";
+
+    /// <summary>
+    ///     Columns shown in the list (<see cref="NavigationContext.Columns" />), set from the settings. List the entries
+    ///     again after changing them.
+    /// </summary>
+    public IReadOnlyList<IEntryColumn> Columns
+    {
+        get => NavigationContext.Columns;
+        set
+        {
+            NavigationContext.Columns = value;
+            UpdateColumns();
+        }
+    }
+
+    /// <summary>
+    ///     Creates the header and the dividers for the columns of the navigation context, the rows follow their entries
+    ///     (<see cref="EntryRowCells" />).
+    /// </summary>
+    private void UpdateColumns()
+    {
+        var columns = _navigationContext?.Columns ?? EntryColumns.Resolve(null);
+        if (_columns.SequenceEqual(columns))
+        {
+            return;
+        }
+
+        _columns = columns;
+        HeaderGrid.Children.Clear();
+        HeaderGrid.ColumnDefinitions.Clear();
+        DividersGrid.Children.Clear();
+        DividersGrid.ColumnDefinitions.Clear();
+        _headerTexts.Clear();
+        for (var index = 0; index < columns.Count; index++)
+        {
+            var column = columns[index];
+            foreach (var grid in new[] { HeaderGrid, DividersGrid })
+            {
+                var definition = new ColumnDefinition(new GridLength(1, GridUnitType.Star));
+                if (column != EntryColumns.Name)
+                {
+                    definition.Bind(ColumnDefinition.WidthProperty, grid.GetResourceObservable(GetColumnWidthKey(index)));
+                }
+
+                grid.ColumnDefinitions.Add(definition);
+            }
+
+            var text = new TextBlock { Text = column.Header };
+            var header = new Border { Background = Brushes.Transparent, Cursor = new Cursor(StandardCursorType.Hand), Child = text };
+            Grid.SetColumn(header, index);
+            header.Tapped += (_, _) => SortBy(column.Id);
+            HeaderGrid.Children.Add(header);
+            _headerTexts.Add(text);
+            if (index > 0)
+            {
+                var divider = new Border { BorderThickness = new Thickness(1, 0, 0, 0) };
+                divider.Bind(Border.BorderBrushProperty, divider.GetResourceObservable("PaneBorder"));
+                Grid.SetColumn(divider, index);
+                DividersGrid.Children.Add(divider);
+            }
+        }
+
+        UpdateColumnWidths();
+        if (_navigationContext != null)
+        {
+            UpdateHeaders();
+        }
+    }
+
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
@@ -235,14 +313,22 @@ public partial class PaneView : UserControl
     }
 
     /// <summary>
-    ///     Sets the widths of the size and modified columns (the resources SizeColumnWidth and ModifiedColumnWidth used
-    ///     by the header, the dividers and the rows) for the font size.
+    ///     Sets the widths of the columns but Name (the resources of <see cref="GetColumnWidthKey" /> used by the header,
+    ///     the dividers and the rows) for the font size.
     /// </summary>
     private void UpdateColumnWidths()
     {
         var scale = FontSize / GuiFonts.DefaultSize;
-        Resources["SizeColumnWidth"] = new GridLength(Math.Round(SizeColumnWidth * scale));
-        Resources["ModifiedColumnWidth"] = new GridLength(Math.Round(ModifiedColumnWidth * scale));
+        for (var index = 0; index < _columns.Count; index++)
+        {
+            var column = _columns[index];
+            var width = column == EntryColumns.Size
+                ? SizeColumnWidth
+                : column == EntryColumns.Modified
+                    ? ModifiedColumnWidth
+                    : EntryColumns.GetWidth(column) * CharacterWidth + ColumnPadding;
+            Resources[GetColumnWidthKey(index)] = new GridLength(Math.Round(width * scale));
+        }
     }
 
     private void UpdatePathBadge()
@@ -307,6 +393,7 @@ public partial class PaneView : UserControl
         {
             _navigationContext = value;
             value.ProgressIndicator = new PaneProgressIndicator(this);
+            UpdateColumns();
         }
     }
 
@@ -1123,7 +1210,7 @@ public partial class PaneView : UserControl
     ///     Sorts the entries by a column whose header was clicked (ascending, or reversed when already sorted by it),
     ///     keeping the entry under the cursor and the icons read.
     /// </summary>
-    private void SortBy(EntryColumn column)
+    private void SortBy(string column)
     {
         var items = (EntriesList.ItemsSource as IReadOnlyList<EntryItem> ?? [])
             .ToDictionary<EntryItem, IEntry>(item => item.Entry, ReferenceEqualityComparer.Instance);
@@ -1149,9 +1236,10 @@ public partial class PaneView : UserControl
     private void UpdateHeaders()
     {
         var sort = NavigationContext.Sort;
-        NameHeaderText.Text = sort.GetHeader(EntryColumn.Name);
-        SizeHeaderText.Text = sort.GetHeader(EntryColumn.Size);
-        ModifiedHeaderText.Text = sort.GetHeader(EntryColumn.Modified);
+        for (var index = 0; index < _columns.Count && index < _headerTexts.Count; index++)
+        {
+            _headerTexts[index].Text = sort.GetHeader(_columns[index]);
+        }
     }
 
     private async Task RefreshAsync()
@@ -1162,9 +1250,11 @@ public partial class PaneView : UserControl
         _volumeFilesCancellation?.Cancel();
         var navigationEntries = await Core.ListingProgress.ListEntriesAsync(NavigationContext, ShowProgress,
             HideProgress);
+        UpdateColumns();
+        var columns = NavigationContext.Columns;
         var entries = navigationEntries
             .Select(entry => new EntryItem(entry, NavigationContext.IsMarked(entry), NavigationContext.IsExecutable(entry),
-                NavigationContext.FormatEntrySize(entry)))
+                columns, NavigationContext.GetColumnText))
             .ToList();
         var previousPath = PathText.Text;
         DetectVolumeFiles(entries);

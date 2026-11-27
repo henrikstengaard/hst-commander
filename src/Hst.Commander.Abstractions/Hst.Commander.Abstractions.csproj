@@ -11,7 +11,7 @@
             additions plugins built for an older version keep working with, and the major version (resetting the
             minor version) for any other change.
         -->
-        <AssemblyVersion>1.3.0.0</AssemblyVersion>
+        <AssemblyVersion>1.4.0.0</AssemblyVersion>
     </PropertyGroup>
 
 </Project>

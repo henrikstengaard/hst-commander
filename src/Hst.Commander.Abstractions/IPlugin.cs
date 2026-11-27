@@ -59,6 +59,12 @@ public interface IPlugin
     IEnumerable<ITheme> Themes => [];
 
     /// <summary>
+    /// Columns the user can add to the panes in the settings after the built-in ones, e.g. the Amiga protection bits.
+    /// Added in plugin API 1.4.
+    /// </summary>
+    IEnumerable<IEntryColumn> EntryColumns => [];
+
+    /// <summary>
     /// Notices of the third-party components the plugin uses, e.g. their copyright notices and licenses, shown in the
     /// Licenses section of the About dialog while the plugin is loaded, as some licenses require (e.g. the LGPL).
     /// Defaults to null (none).

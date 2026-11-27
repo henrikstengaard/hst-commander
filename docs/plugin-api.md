@@ -103,9 +103,16 @@ Paths are relative to `src/`. Part of the agent docs, see [`src/agents.md`](../s
 - A theme implementing it gets a settings tab (`SettingsTitle`) with the button editor, starting from `Layout`. Reset restores `DefaultLayout`.
 - `SaveLayout(layout)` is called after OK. The plugin stores it itself (e.g. JSON in `IPluginHost.GetPluginDirectory`), so both front-ends use it. See [Button editor](themes.md#button-editor).
 
+### IEntryColumn
+
+- A column the user can add to the panes in the settings (plugin API 1.4, `IPlugin.EntryColumns`, `VolumeProviders.EntryColumns`), listed after the built-in Name, Size, Modified and Attributes columns. See [Pane columns](file-operations.md#pane-columns).
+- `Id` is saved in the settings, unique among all columns, prefixed with the plugin's name (e.g. `Amiga.ProtectionBits`). `Title` names it in the settings, `Header` (default `Title`) in the panes' headers. `Width` is the width of its texts in characters (widened for the header with the sort arrow), `AlignEnd` (default false) aligns them to the right.
+- `GetText(entry, context)` returns the text of an entry, called on the UI thread for every listed entry, so it must be quick; an exception shows nothing. `Compare(x, y, context)` (default: the texts, ordinal) sorts by the column when its header is clicked.
+- `IEntryColumnContext` gives `SupportsAmigaMetadata` of the location, `GetAmigaMetadata(entry)` (the entry's own, or its UAE metadata, which is only read while a shown column has `UsesAmigaMetadata`) and `GetAttributesText(entry)`, the text of the built-in Attributes column.
+
 ### IPlugin
 
-- Returns the plugin's volume providers, file volume providers, volume creators, icon providers, navigation modes, image providers, properties tab providers and themes; each defaults to none. `Initialize(host)` is called once before the plugin is used.
+- Returns the plugin's volume providers, file volume providers, volume creators, icon providers, navigation modes, image providers, properties tab providers, themes and pane columns; each defaults to none. `Initialize(host)` is called once before the plugin is used.
 - A plugin references only Abstractions. Plugins can't use each other's types, because each loads in its own load context, so they work together through `IPluginHost`.
 - `ThirdPartyNotices` (optional, default null): the copyright notices and licenses of the third-party components the plugin uses, shown in Help > About > Licenses while it's loaded, e.g. the SMB plugin returns SMBLibrary's notice with the LGPL and GPL texts (an embedded resource). A plugin throwing from it is left out of the list.
 

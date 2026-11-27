@@ -1268,4 +1268,111 @@ public class GivenNavigationContextWithAmigaImages : IDisposable
         // assert
         Assert.DoesNotContain(properties.Tabs, tab => tab.Title == "Tooltypes");
     }
+
+    private static readonly IReadOnlyList<string> AmigaColumnIds =
+        [EntryColumns.NameId, "Amiga.ProtectionBits", "Amiga.Attributes", EntryColumns.AttributesId];
+
+    private static string GetText(NavigationContext context, IEntry entry, string columnId) =>
+        context.GetColumnText(Assert.Single(context.Columns, column => column.Id == columnId), entry);
+
+    [Fact]
+    public async Task When_AmigaColumnsAreShownInAdf_Then_ProtectionBitsAreShown()
+    {
+        // arrange
+        await CreateAdfWithItemAsync(Path.Combine(_rootPath, "disk.adf"));
+        using var context = new NavigationContext(_rootPath) { Columns = EntryColumns.Resolve(AmigaColumnIds) };
+        await OpenAsync(context, "disk.adf");
+
+        // act
+        var entry = (await context.ListEntriesAsync()).Single(listed => listed.Name == "file*1");
+
+        // assert - the Amiga attributes show the protection bits in Amiga volumes, which have no DOS attributes
+        Assert.Equal("-s--rwed", GetText(context, entry, "Amiga.ProtectionBits"));
+        Assert.Equal("-s--rwed", GetText(context, entry, "Amiga.Attributes"));
+        Assert.Equal(string.Empty, GetText(context, entry, EntryColumns.AttributesId));
+    }
+
+    [Theory]
+    [InlineData(UaeMetadataFormat.UaeFsDb)]
+    [InlineData(UaeMetadataFormat.UaeMetafile)]
+    public async Task When_AmigaColumnsAreShownForLocalEntries_Then_UaeMetadataOrRegularAttributesAreShown(
+        UaeMetadataFormat format)
+    {
+        // arrange - an Amiga item copied to a local directory with UAE metadata, and a local file without
+        await CreateAdfWithItemAsync(Path.Combine(_rootPath, "disk.adf"));
+        var localPath = Directory.CreateDirectory(Path.Combine(_rootPath, "local")).FullName;
+        await File.WriteAllTextAsync(Path.Combine(localPath, "plain.txt"), "plain");
+        using var adfContext = new NavigationContext(_rootPath) { UaeMetadata = format };
+        using var localContext = new NavigationContext(localPath) { Columns = EntryColumns.Resolve(AmigaColumnIds) };
+        await OpenAsync(adfContext, "disk.adf");
+        await adfContext.CopyAsync([(await adfContext.ListEntriesAsync()).First(entry => entry.Name == "file*1")],
+            localContext, localContext.CurrentPath, "*");
+
+        // act
+        var entries = await localContext.ListEntriesAsync();
+
+        // assert
+        var copied = entries.Single(entry => entry.Name != Paths.Parent && entry.Name != "plain.txt" &&
+                                             entry.Name != "_UAEFSDB.___" && !entry.Name.EndsWith(".uaem"));
+        var plain = entries.Single(entry => entry.Name == "plain.txt");
+        Assert.Equal("-s--rwed", GetText(localContext, copied, "Amiga.ProtectionBits"));
+        Assert.Equal("-s--rwed", GetText(localContext, copied, "Amiga.Attributes"));
+        Assert.Equal(string.Empty, GetText(localContext, plain, "Amiga.ProtectionBits"));
+        var attributes = GetText(localContext, plain, EntryColumns.AttributesId);
+        Assert.NotEqual(string.Empty, attributes);
+        Assert.Equal(attributes, GetText(localContext, plain, "Amiga.Attributes"));
+    }
+
+    [Fact]
+    public async Task When_UaeMetadataIsOff_Then_AmigaAttributesShowRegularAttributes()
+    {
+        // arrange
+        await CreateAdfWithItemAsync(Path.Combine(_rootPath, "disk.adf"));
+        var localPath = Directory.CreateDirectory(Path.Combine(_rootPath, "local")).FullName;
+        using var adfContext = new NavigationContext(_rootPath);
+        using var localContext = new NavigationContext(localPath)
+        {
+            Columns = EntryColumns.Resolve(AmigaColumnIds), UaeMetadata = UaeMetadataFormat.None
+        };
+        await OpenAsync(adfContext, "disk.adf");
+        await adfContext.CopyAsync([(await adfContext.ListEntriesAsync()).First(entry => entry.Name == "file*1")],
+            localContext, localContext.CurrentPath, "*");
+
+        // act
+        var copied = (await localContext.ListEntriesAsync()).Single(entry => entry.Name != Paths.Parent &&
+            entry.Name != "_UAEFSDB.___" && !entry.Name.EndsWith(".uaem"));
+
+        // assert
+        Assert.Equal(string.Empty, GetText(localContext, copied, "Amiga.ProtectionBits"));
+        Assert.Equal(GetText(localContext, copied, EntryColumns.AttributesId),
+            GetText(localContext, copied, "Amiga.Attributes"));
+    }
+
+    [Fact]
+    public async Task When_SortedByProtectionBits_Then_EntriesAreOrderedByTheirText()
+    {
+        // arrange
+        await CreateAdfWithItemAsync(Path.Combine(_rootPath, "disk.adf"));
+        await using (var stream = File.Open(Path.Combine(_rootPath, "disk.adf"), FileMode.Open, FileAccess.ReadWrite))
+        using (var volume = await Hst.Commander.Plugins.Amiga.AmigaFileSystems.MountAdf(stream))
+        {
+            await using (var itemStream = await volume.OpenWrite("a-file"))
+            {
+                await itemStream.WriteAsync("Amiga"u8.ToArray());
+            }
+
+            await volume.SetAmigaMetadata("a-file", new AmigaMetadata(0x80, string.Empty));
+        }
+
+        using var context = new NavigationContext(_rootPath) { Columns = EntryColumns.Resolve(AmigaColumnIds) };
+        await OpenAsync(context, "disk.adf");
+        await context.ListEntriesAsync();
+
+        // act - "-s--rwed" before "h---rwed"
+        var sorted = context.ToggleSort("Amiga.ProtectionBits").Where(entry => entry.Name != Paths.Parent)
+            .Select(entry => entry.Name).ToList();
+
+        // assert
+        Assert.Equal(["file*1", "a-file"], sorted);
+    }
 }

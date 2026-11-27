@@ -249,8 +249,9 @@ public class GivenTuiColors : IDisposable
         dialog.BeginInit();
         dialog.EndInit();
         dialog.Layout(new System.Drawing.Size(80, 24));
-        var themeList = Descendants(dialog).OfType<ListView>().Single();
-        var selector = Descendants(dialog).OfType<ChoiceField>().Single();
+        var appearance = Descendants(dialog).Single(view => view.Title == "Appearance" && view.SubViews.Count > 0);
+        var themeList = Descendants(appearance).OfType<ListView>().Single();
+        var selector = Descendants(appearance).OfType<ChoiceField>().Single();
         Assert.True(themeList.Frame.Height >= 3, $"Theme list height: {themeList.Frame.Height}");
         Assert.True(themeList.Frame.Bottom <= selector.Frame.Y,
             $"Theme list {themeList.Frame} overlaps color selector {selector.Frame}");
