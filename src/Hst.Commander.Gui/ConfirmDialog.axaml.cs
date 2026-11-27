@@ -28,6 +28,6 @@ public partial class ConfirmDialog : Window
         QuestionIcon.IsVisible = noText != null;
         YesButton.Click += (_, _) => Close(true);
         NoButton.Click += (_, _) => Close(false);
-        Opened += (_, _) => YesButton.Focus();
+        Opened += (_, _) => DialogButtons.Focus(YesButton);
     }
 }

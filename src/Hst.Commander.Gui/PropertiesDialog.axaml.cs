@@ -52,7 +52,7 @@ public partial class PropertiesDialog : Window
             _cancellationTokenSource.Cancel();
             _cancellationTokenSource.Dispose();
         };
-        Opened += (_, _) => OkButton.Focus();
+        Opened += (_, _) => DialogButtons.Focus(OkButton);
     }
 
     /// <param name="properties">Properties to show.</param>

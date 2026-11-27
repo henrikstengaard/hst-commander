@@ -46,7 +46,7 @@ public partial class CopyProgressDialog : Window
         Closed += (_, _) => _cancellationTokenSource.Dispose();
         Opened += async (_, _) =>
         {
-            CancelButton.Focus();
+            DialogButtons.Focus(CancelButton);
             _taskbar = TaskbarProgress.Create(Owner as TopLevel ?? this);
             _taskbar.Start();
 

@@ -20,6 +20,6 @@ public partial class OverwriteDialog : Window
         YesButton.Click += (_, _) => Close(OverwriteAnswer.Yes);
         NoButton.Click += (_, _) => Close(OverwriteAnswer.No);
         AllButton.Click += (_, _) => Close(OverwriteAnswer.All);
-        Opened += (_, _) => YesButton.Focus();
+        Opened += (_, _) => DialogButtons.Focus(YesButton);
     }
 }

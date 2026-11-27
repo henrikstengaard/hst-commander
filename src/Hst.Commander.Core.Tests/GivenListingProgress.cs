@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace Hst.Commander.Core.Tests;
 
 public class GivenListingProgress
@@ -28,7 +30,13 @@ public class GivenListingProgress
         // act
         var listing = ListingProgress.RunAsync(completion.Task, "Reading Physical disks...",
             message => shownMessage = message, () => hidden = true, TimeSpan.FromMilliseconds(10));
-        await Task.Delay(200);
+        // waits for the progress instead of a fixed time, as a busy CI runner can run the delay's continuation late
+        var waited = Stopwatch.StartNew();
+        while (Volatile.Read(ref shownMessage) == null && waited.Elapsed < TimeSpan.FromSeconds(10))
+        {
+            await Task.Delay(10);
+        }
+
         var shownWhileRunning = shownMessage;
         var hiddenWhileRunning = hidden;
         completion.SetResult(2);

@@ -27,6 +27,7 @@ public partial class App : Application
         };
 
         AddContextMenuKeys();
+        DialogButtons.Register();
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {

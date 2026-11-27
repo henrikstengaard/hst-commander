@@ -72,7 +72,7 @@ internal sealed class PropertiesTabView : StackPanel
         _deleteButton.Click += (_, _) =>
         {
             ShowText(false);
-            _addButton.Focus();
+            DialogButtons.Focus(_addButton);
         };
 
         // the message without a text takes the place of the text, the buttons are right below them
