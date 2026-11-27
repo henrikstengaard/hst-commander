@@ -1,5 +1,6 @@
 using Hst.Amiga.RigidDiskBlocks;
 using Hst.Commander.Abstractions;
+using Hst.Commander.Plugins.LhaLzx;
 
 namespace Hst.Commander.Core.Tests;
 
@@ -33,6 +34,47 @@ public class GivenNavigationContextWithAmigaImages : IDisposable
         {
             return false;
         }
+    }
+
+    [Fact]
+    public async Task When_LhaArchiveIsCreatedAndChanged_Then_ChangesAreWrittenToTheFile()
+    {
+        // arrange
+        var archivePath = Path.Combine(_rootPath, "archive.lha");
+        await File.WriteAllTextAsync(Path.Combine(_rootPath, "file1.txt"), "Amiga");
+        var startedFiles = new List<string>();
+        Assert.Contains(VolumeProviders.Creators, creator => creator is LhaVolumeCreator);
+
+        using (var lhaContext = new NavigationContext(_rootPath, startedFiles.Add))
+        using (var localContext = new NavigationContext(_rootPath))
+        {
+            // act - create an empty archive with F9 and open it
+            await lhaContext.CreateVolumeAsync(new LhaVolumeCreator(), "archive", new Dictionary<string, object?>());
+            await OpenAsync(lhaContext, "archive.lha");
+            Assert.Null(lhaContext.CreateDirectoryNotSupportedMessage);
+            await lhaContext.CreateDirectoryAsync("dir1");
+            var localEntries = await localContext.ListEntriesAsync();
+            await localContext.CopyAsync([localEntries.First(entry => entry.Name == "file1.txt")], lhaContext,
+                lhaContext.CurrentPath, "*");
+            var entries = await lhaContext.ListEntriesAsync();
+            await lhaContext.RenameAsync(entries.First(entry => entry.Name == "dir1"), "Dir2");
+            var names = await ListNamesAsync(lhaContext);
+
+            // assert
+            Assert.Empty(startedFiles);
+            Assert.True(lhaContext.IsInImage);
+            Assert.Equal([Paths.Parent, "Dir2", "file1.txt"], names);
+            var copiedEntry = (await lhaContext.ListEntriesAsync()).First(entry => entry.Name == "file1.txt");
+            Assert.Equal(5, copiedEntry.Size);
+            Assert.Equal(File.GetLastWriteTimeUtc(Path.Combine(_rootPath, "file1.txt")),
+                copiedEntry.ModifiedDate!.Value, TimeSpan.FromSeconds(1));
+            Assert.False(IsClosed(archivePath));
+        }
+
+        Assert.True(IsClosed(archivePath));
+        await using var stream = File.OpenRead(archivePath);
+        var volume = await new LhaFileVolumeProvider().CreateVolume(stream);
+        Assert.Equal(["Dir2", "file1.txt"], await volume.ListEntries().Select(entry => entry.Name).ToListAsync());
     }
 
     [Fact]
@@ -671,20 +713,59 @@ public class GivenNavigationContextWithAmigaImages : IDisposable
     }
 
     [Fact]
-    public async Task When_PropertiesOfLhaEntryAreShown_Then_ProtectionBitsCantBeChanged()
+    public async Task When_PropertiesOfLhaEntryInReadOnlyFileAreShown_Then_ProtectionBitsCantBeChanged()
     {
         // arrange
-        File.Copy(ArchiveTestData.GetPath("special_chars.lha"), Path.Combine(_rootPath, "special_chars.lha"));
-        using var navigationContext = new NavigationContext(_rootPath);
-        await OpenAsync(navigationContext, "special_chars.lha");
-        var entry = (await navigationContext.ListEntriesAsync()).First(entry => entry.Name != Paths.Parent);
+        var path = Path.Combine(_rootPath, "special_chars.lha");
+        File.Copy(ArchiveTestData.GetPath("special_chars.lha"), path);
+        File.SetAttributes(path, FileAttributes.ReadOnly);
+        try
+        {
+            using var navigationContext = new NavigationContext(_rootPath);
+            await OpenAsync(navigationContext, "special_chars.lha");
+            var entry = (await navigationContext.ListEntriesAsync()).First(entry => entry.Name != Paths.Parent);
 
-        // act
-        var properties = await navigationContext.GetPropertiesAsync([entry]);
+            // act
+            var properties = await navigationContext.GetPropertiesAsync([entry]);
 
-        // assert
-        Assert.False(GetProtectionBits(properties).CanChange);
-        Assert.False(properties.CanChangeFlags);
+            // assert
+            Assert.False(GetProtectionBits(properties).CanChange);
+            Assert.False(properties.CanChangeFlags);
+            Assert.NotNull(navigationContext.CreateDirectoryNotSupportedMessage);
+        }
+        finally
+        {
+            File.SetAttributes(path, FileAttributes.Normal);
+        }
+    }
+
+    [Fact]
+    public async Task When_ProtectionBitsOfLhaEntryAreChanged_Then_TheyAreWrittenToTheArchiveWithTheComment()
+    {
+        // arrange
+        var path = Path.Combine(_rootPath, "special_chars.lha");
+        File.Copy(ArchiveTestData.GetPath("special_chars.lha"), path);
+        using (var navigationContext = new NavigationContext(_rootPath))
+        {
+            await OpenAsync(navigationContext, "special_chars.lha");
+            var properties = await navigationContext.GetPropertiesAsync([await GetEntryAsync(navigationContext, "file2<")]);
+            Assert.True(GetProtectionBits(properties).CanChange);
+
+            // act
+            var changed = await navigationContext.ChangePropertiesAsync(properties,
+                CheckProtectionBits(properties, "-sp-rwe-"));
+
+            // assert
+            Assert.True(changed);
+            Assert.Equal(new AmigaMetadata(0x61, "comment on file2"),
+                (await GetEntryAsync(navigationContext, "file2<")).AmigaMetadata);
+        }
+
+        // assert - the archive file is changed
+        await using var stream = File.OpenRead(path);
+        var volume = await new LhaFileVolumeProvider().CreateVolume(stream);
+        var entry = await volume.ListEntries().FirstAsync(entry => entry.Name == "file2<");
+        Assert.Equal(new AmigaMetadata(0x61, "comment on file2"), entry.AmigaMetadata);
     }
 
     [Theory]
@@ -927,21 +1008,52 @@ public class GivenNavigationContextWithAmigaImages : IDisposable
     }
 
     [Fact]
-    public async Task When_PropertiesOfLhaEntryAreShown_Then_CommentTabCantBeChanged()
+    public async Task When_PropertiesOfLhaEntryInReadOnlyFileAreShown_Then_CommentTabCantBeChanged()
+    {
+        // arrange
+        var path = Path.Combine(_rootPath, "special_chars.lha");
+        File.Copy(ArchiveTestData.GetPath("special_chars.lha"), path);
+        File.SetAttributes(path, FileAttributes.ReadOnly);
+        try
+        {
+            using var navigationContext = new NavigationContext(_rootPath);
+            await OpenAsync(navigationContext, "special_chars.lha");
+
+            // act
+            var properties =
+                await navigationContext.GetPropertiesAsync([await GetEntryAsync(navigationContext, "file2<")]);
+
+            // assert
+            var tab = GetTab(properties, "Comment");
+            Assert.Equal("comment on file2", tab.Text);
+            Assert.False(tab.CanChange);
+            Assert.False(properties.CanChange);
+        }
+        finally
+        {
+            File.SetAttributes(path, FileAttributes.Normal);
+        }
+    }
+
+    [Fact]
+    public async Task When_CommentOfLhaEntryIsChanged_Then_ItIsWrittenToTheArchiveWithTheProtectionBits()
     {
         // arrange
         File.Copy(ArchiveTestData.GetPath("special_chars.lha"), Path.Combine(_rootPath, "special_chars.lha"));
         using var navigationContext = new NavigationContext(_rootPath);
         await OpenAsync(navigationContext, "special_chars.lha");
+        var entry = await GetEntryAsync(navigationContext, "file2<");
+        var properties = await navigationContext.GetPropertiesAsync([entry]);
+        Assert.True(GetTab(properties, "Comment").CanChange);
 
         // act
-        var properties = await navigationContext.GetPropertiesAsync([await GetEntryAsync(navigationContext, "file2<")]);
+        var changed = await navigationContext.ChangePropertiesAsync(properties, GetFlags(properties),
+            ChangeTabText(properties, "Comment", "New comment"));
 
         // assert
-        var tab = GetTab(properties, "Comment");
-        Assert.Equal("comment on file2", tab.Text);
-        Assert.False(tab.CanChange);
-        Assert.False(properties.CanChange);
+        Assert.True(changed);
+        Assert.Equal(entry.AmigaMetadata! with { Comment = "New comment" },
+            (await GetEntryAsync(navigationContext, "file2<")).AmigaMetadata);
     }
 
     [Fact]

@@ -51,7 +51,7 @@ src/
   icon/                         App icon sources, rendered sizes and make scripts
   Hst.Commander.Abstractions/   Plugin API: IVolume, IEntry, IVolumeProvider, IFileVolumeProvider, IPlugin, IPluginHost, IWriteCache, ITheme, ..., Paths, the ArchiveVolume<T> base class and VolumeOpening (entries read while opening) (no external deps)
   Hst.Commander.Plugins.Zip/    Zip archives (default plugin)
-  Hst.Commander.Plugins.LhaLzx/ Lha and lzx archives (default plugin)
+  Hst.Commander.Plugins.LhaLzx/ Lha and lzx archives, writable lha archives and the lha F9 creator (default plugin)
   Hst.Commander.Plugins.Archives/ Rar, 7z and tar archives and gzip, xz, bzip2, zstd and compress (.Z) files, including compressed tar (default plugin)
   Hst.Commander.Plugins.Disk/   MBR/GPT disk images (raw, VHD, VHDX, VDI, DMG) with FAT/exFAT/NTFS and read-only ext/XFS/Btrfs/HFS+/SquashFS/UDF partitions, hybrid MBR/RDB disks, unpartitioned file systems and the exFAT F9 creator (default plugin)
   Hst.Commander.Plugins.Amiga/  Writable adf, RDB and partition images, .info icons, Workbench navigation mode, Amiga images, comment and tooltypes properties tabs, protection bits and Amiga attributes pane columns (default plugin)
@@ -76,7 +76,8 @@ src/
         |                                    \
         |                          [ZipPlugin, ZipFileVolumeProvider, ZipVolume]  <- Hst.Commander.Plugins.Zip
         |                          [LhaLzxPlugin, Lha/LzxFileVolumeProvider,
-        |                           LhaVolume, LzxVolume]  <- Hst.Commander.Plugins.LhaLzx
+        |                           LhaVolume, LzxVolume,
+        |                           LhaVolumeCreator]  <- Hst.Commander.Plugins.LhaLzx
         |                          [ArchivesPlugin, Rar/SevenZip/TarFileVolumeProvider,
         |                           Gzip/Xz/Bzip2/Zstd/CompressFileVolumeProvider,
         |                           SharpCompressVolume]  <- Hst.Commander.Plugins.Archives
@@ -166,7 +167,7 @@ These apply across features and aren't obvious from a single file:
 - Other file-management operations (e.g. creating a new file with Shift+F4); changing the viewer's encoding and going to an offset; changing the editor's encoding and line breaks.
 - SMB 1, SMB ports other than 445 and browsing the network for servers (SMB credentials are only saved with bookmarks).
 - Implicit FTPS, SFTP private keys, confirming new server keys and writable images on FTP/SFTP servers.
-- Writing to images other than Amiga adf, RDB and partition images and FAT, exFAT and NTFS images (also in VHD, VHDX and VDI images); ISO images, zip, lha, lzx, rar, 7z and tar archives and gzip, xz, bzip2, zstd and compress (.Z) files are read-only, as are Amiga images inside other images.
+- Writing to images other than Amiga adf, RDB and partition images, FAT, exFAT and NTFS images (also in VHD, VHDX and VDI images) and lha archives; ISO images, zip, lzx, rar, 7z and tar archives and gzip, xz, bzip2, zstd and compress (.Z) files are read-only, as are Amiga images inside other images.
 - Changing RDB, MBR and GPT partitions, other Amiga file systems (e.g. SFS\2), writing ext2/3/4, XFS, Btrfs, HFS+, SquashFS and UDF, APFS, Apple partition maps, differencing VHDX/VDI and vmdk images.
 - Unloading or reloading plugins while running, and a list of loaded plugins in the UI.
 
@@ -307,7 +308,7 @@ dotnet test src/Hst.Commander.Core.Tests/Hst.Commander.Core.Tests.csproj --logge
 | `LTRData.DiscUtils.Iso9660` | 1.0.90 | `Hst.Commander.Core` — ISO 9660 reading |
 | `SkiaSharp`, `SkiaSharp.NativeAssets.Linux` | 3.119.4 | `Hst.Commander.Core` — decoding PNG, JPEG, GIF, BMP and WebP images viewed with F3 in the GUI (the version Avalonia uses; part of the TUI too, as it references Core) |
 | `System.Linq.Async` | 6.0.1 | `Hst.Commander.Core` — async LINQ |
-| `Hst.Compression` | 1.0.104 | `Hst.Commander.Plugins.LhaLzx` — lha and lzx archive reading |
+| `Hst.Compression` | 1.0.105 | `Hst.Commander.Plugins.LhaLzx` — lha and lzx archive reading, lha archive writing (Amiga entries) |
 | `SharpCompress` | 0.50.8 | `Hst.Commander.Plugins.Archives` — rar, 7z and tar archive reading, xz, bzip2, zstd, LZW (.Z) and deflate (checking gzip members) decompression |
 | `Hst.Amiga` | 1.0.289 | `Hst.Commander.Plugins.Amiga` — Amiga rigid disk block, Fast File System, PFS3 and Smart File System reading and writing, .info icons; `Hst.Commander.Core` — UAE metadata (UAEFSDB and metafiles) |
 | `LTRData.DiscUtils.Vhd` | 1.0.90 | `Hst.Commander.Plugins.Amiga`, `Hst.Commander.Plugins.Disk` — vhd images |

@@ -5,8 +5,9 @@ namespace Hst.Commander.Core.Tests;
 
 public class GivenLhaVolume
 {
+    // read-only streams, as the volume can write to a writable stream
     private static async Task<IVolume> CreateLhaVolumeAsync(string fileName) =>
-        await new LhaFileVolumeProvider().CreateVolume(new MemoryStream(ArchiveTestData.Read(fileName)));
+        await new LhaFileVolumeProvider().CreateVolume(new MemoryStream(ArchiveTestData.Read(fileName), false));
 
     [Theory]
     [InlineData("dirs-files.lha")]

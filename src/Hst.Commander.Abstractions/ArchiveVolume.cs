@@ -3,18 +3,21 @@ using System.Runtime.CompilerServices;
 namespace Hst.Commander.Abstractions;
 
 /// <summary>
-/// Base class for read-only volumes browsing the entries of an archive (e.g. zip, lha, rar). A derived class adds the
-/// archive's entries with <see cref="AddEntry" /> and opens them with <see cref="OpenArchiveEntry" />. Directories are
-/// the directory entries of the archive and the directories in the paths of its files, as archives don't need to
-/// contain entries for directories. Names are case-sensitive like in the archive, but found case-insensitive when no
-/// name matches exactly.
+/// Base class for volumes browsing the entries of an archive (e.g. zip, lha, rar). A derived class adds the archive's
+/// entries with <see cref="AddEntry" /> and opens them with <see cref="OpenArchiveEntry" />. Directories are the
+/// directory entries of the archive and the directories in the paths of its files, as archives don't need to contain
+/// entries for directories. Names are case-sensitive like in the archive, but found case-insensitive when no name
+/// matches exactly. The volume is read-only: the write members throw <see cref="NotSupportedException" />, unless a
+/// derived class overrides them (plugin API 1.5) and adds the entries again after changing the archive, see
+/// <see cref="ClearEntries" />.
 /// </summary>
 /// <typeparam name="TArchiveEntry">Entry of the archive, read with <see cref="OpenArchiveEntry" />.</typeparam>
 public abstract class ArchiveVolume<TArchiveEntry> : IVolume
 {
     private readonly bool _supportsAmigaMetadata;
-    private readonly ArchiveDirectory _root = new(string.Empty);
+    private ArchiveDirectory _root = new(string.Empty);
     private List<ArchiveDirectory> _currentDirectories = [];
+    private List<string>? _clearedPath;
     private long _fileCount;
 
     /// <param name="name">Name of the volume, e.g. "Zip", also used in the read-only messages.</param>
@@ -30,9 +33,42 @@ public abstract class ArchiveVolume<TArchiveEntry> : IVolume
 
     public string Name { get; }
 
-    public IReadOnlyList<string> CurrentPathComponents => _currentDirectories.Select(directory => directory.Name).ToList();
+    public IReadOnlyList<string> CurrentPathComponents => CurrentDirectories.Select(directory => directory.Name).ToList();
 
-    private ArchiveDirectory CurrentDirectory => _currentDirectories.Count > 0 ? _currentDirectories[^1] : _root;
+    private ArchiveDirectory CurrentDirectory => CurrentDirectories is { Count: > 0 } directories ? directories[^1] : _root;
+
+    /// <summary>
+    /// Directories of the current path. After <see cref="ClearEntries" /> they are found again by name in the entries
+    /// added since, up to the first that no longer exists, so the current directory becomes its nearest existing
+    /// parent.
+    /// </summary>
+    private List<ArchiveDirectory> CurrentDirectories
+    {
+        get
+        {
+            if (_clearedPath == null)
+            {
+                return _currentDirectories;
+            }
+
+            var directories = new List<ArchiveDirectory>();
+            var directory = _root;
+            foreach (var name in _clearedPath)
+            {
+                if (!directory.Directories.TryGetValue(name, out var subDirectory))
+                {
+                    break;
+                }
+
+                directories.Add(subDirectory);
+                directory = subDirectory;
+            }
+
+            _currentDirectories = directories;
+            _clearedPath = null;
+            return directories;
+        }
+    }
 
     /// <summary>
     /// True when files are read faster in the order they are added with <see cref="AddEntry" /> (the archive's order),
@@ -103,6 +139,42 @@ public abstract class ArchiveVolume<TArchiveEntry> : IVolume
     }
 
     /// <summary>
+    /// Removes all entries, so a writable archive can add its entries again with <see cref="AddEntry" /> after it's
+    /// changed (plugin API 1.5). Add all entries before using the volume again: the current directory is found again
+    /// by name when the volume is used, and becomes its nearest parent that exists when it no longer does.
+    /// </summary>
+    protected void ClearEntries()
+    {
+        _clearedPath ??= _currentDirectories.Select(directory => directory.Name).ToList();
+        _currentDirectories = [];
+        _root = new ArchiveDirectory(string.Empty);
+        _fileCount = 0;
+    }
+
+    /// <summary>
+    /// Finds a file in the current directory by name, exactly or else case-insensitive (plugin API 1.5).
+    /// </summary>
+    /// <param name="name">Name of the file.</param>
+    /// <returns>Name of the file as in the archive and its archive entry, null when not found.</returns>
+    protected (string Name, TArchiveEntry ArchiveEntry)? FindFile(string name) =>
+        CurrentDirectory.FindFile(name) is var (fileName, file) ? (fileName, file.ArchiveEntry) : null;
+
+    /// <summary>
+    /// Finds a directory in the current directory by name, exactly or else case-insensitive (plugin API 1.5).
+    /// </summary>
+    /// <param name="name">Name of the directory.</param>
+    /// <returns>Name of the directory as in the archive, null when not found.</returns>
+    protected string? FindDirectory(string name) => CurrentDirectory.FindDirectory(name)?.Name;
+
+    /// <summary>
+    /// True when a directory in the current directory has no files or directories (plugin API 1.5).
+    /// </summary>
+    /// <param name="name">Name of the directory as in the archive.</param>
+    protected bool IsDirectoryEmpty(string name) =>
+        CurrentDirectory.Directories.TryGetValue(name, out var directory) &&
+        directory.Directories.Count == 0 && directory.Files.Count == 0;
+
+    /// <summary>
     /// Opens an archive entry for reading, decompressing it as it's read. Throw <see cref="NotSupportedException" />
     /// when the entry can't be read, e.g. when it's encrypted.
     /// </summary>
@@ -141,7 +213,7 @@ public abstract class ArchiveVolume<TArchiveEntry> : IVolume
     {
         ArgumentNullException.ThrowIfNull(pathComponents);
 
-        var directories = _currentDirectories.ToList();
+        var directories = CurrentDirectories.ToList();
         foreach (var pathComponent in pathComponents)
         {
             if (pathComponent.Equals(Paths.Root, StringComparison.OrdinalIgnoreCase))
@@ -176,25 +248,32 @@ public abstract class ArchiveVolume<TArchiveEntry> : IVolume
     public long? GetReadOrder(string name) =>
         ReadsInArchiveOrder && CurrentDirectory.FindFile(name) is var (_, file) ? file.Index : null;
 
-    public Task<Stream> OpenWrite(string name, CancellationToken cancellationToken = default) =>
+    public virtual Task<Stream> OpenWrite(string name, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException($"{Name} archives are read-only");
 
-    public Task CreateContainer(string name, CancellationToken cancellationToken = default) =>
+    public virtual Task CreateContainer(string name, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException($"{Name} archives are read-only");
 
-    public Task Delete(string name, CancellationToken cancellationToken = default) =>
+    public virtual Task Delete(string name, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException($"{Name} archives are read-only");
 
-    public Task Rename(string name, string newName, CancellationToken cancellationToken = default) =>
+    public virtual Task Rename(string name, string newName, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException($"{Name} archives are read-only");
 
-    public Task SetModifiedDate(string name, DateTime modifiedDate, CancellationToken cancellationToken = default) =>
+    public virtual Task SetModifiedDate(string name, DateTime modifiedDate, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException($"{Name} archives are read-only");
 
     public Task<bool> SupportsAmigaMetadata(CancellationToken cancellationToken = default) =>
         Task.FromResult(_supportsAmigaMetadata);
 
-    public Task SetAmigaMetadata(string name, AmigaMetadata metadata, CancellationToken cancellationToken = default) =>
+    /// <summary>
+    /// True when <see cref="SetAmigaMetadata" /> can change the protection bits and comments, false by default
+    /// (plugin API 1.5).
+    /// </summary>
+    public virtual Task<bool> CanSetAmigaMetadata(CancellationToken cancellationToken = default) =>
+        Task.FromResult(false);
+
+    public virtual Task SetAmigaMetadata(string name, AmigaMetadata metadata, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException($"{Name} archives are read-only");
 
     private sealed record ArchiveEntry(string Name, EntryType Type, long? Size, DateTime? ModifiedDate,
