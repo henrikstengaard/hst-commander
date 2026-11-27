@@ -30,7 +30,7 @@ Hst Commander comes with two front-ends that have the same functionality:
 - Writing to Amiga adf, RDB and partition images, to FAT, exFAT and NTFS images (also in VHD, VHDX and VDI images) and to zip and lha archives, shared safely by both panes and file operations.
 - Physical disks, internal and external (e.g. USB), read and written like disk images through a block cache (as administrator or root; Hst Commander offers to restart elevated).
 - FTP, FTPS (explicit TLS) and SFTP servers, entered in a connection dialog.
-- Windows file shares and other SMB 2/3 servers with the SMB plugin, installed separately (see [Download](#download)), entered as `\\server\share` or `smb://server/share`.
+- Windows file shares and other SMB 2/3 servers with the SMB plugin, installed separately (see [SMB plugin](#smb-plugin)), entered as `\\server\share` or `smb://server/share`.
 - Bookmarks of any location, with passwords stored in Windows Credential Manager, the macOS Keychain or the Linux Secret Service.
 - Changing location by typing a path, including paths into images, or clicking the path above a pane.
 - The panes start where they were when last quit (in the TUI the right pane, as the left pane starts in the current directory).
@@ -170,9 +170,21 @@ The keys are the same in both front-ends unless noted. The menus list them too: 
 
 The viewer and the editor have their own keys; see the [viewer](docs/viewer.md) and the [editor](docs/editor.md).
 
-## Download
+## Installation
 
-The TUI can be installed with one command, which downloads the latest release, installs it for the current user and adds `hst.commander` to the path.
+Releases are published on the [GitHub releases page](https://github.com/henrikstengaard/hst-commander/releases). The desktop GUI (`gui`) and the terminal UI (`tui`) are packaged separately, named `hst-commander_v<version>_<app>_<os>_<architecture>`: choose `x64` for Intel and AMD processors, `arm64` for ARM processors such as Apple silicon, Snapdragon and 64-bit Raspberry Pi OS, `arm` for 32-bit Raspberry Pi OS and `x86` for 32-bit Windows.
+
+Settings, bookmarks and the error log are stored in `~/.hst-commander` (`%USERPROFILE%\.hst-commander` on Windows), so they're kept when Hst Commander is updated or uninstalled.
+
+### Desktop GUI
+
+- **Windows** (x64, x86, arm64): `_gui_windows_<arch>_setup.exe` installs the GUI with a Start menu shortcut. `_gui_windows_<arch>_portable.zip` runs without installing: unzip it and start `hst.commander.gui.exe`.
+- **macOS** (x64, arm64): open `_gui_macos_<arch>.dmg` and drag Hst Commander to Applications.
+- **Linux** (x64, arm64, arm): install `_gui_linux_<arch>.deb` on Debian, Ubuntu and Raspberry Pi OS with `sudo apt install ./hst-commander_v<version>_gui_linux_<arch>.deb`, which adds Hst Commander to the applications menu and `hst.commander.gui` to the path. `_gui_linux_<arch>.AppImage` runs without installing; see [AppImages](#appimages).
+
+### Terminal UI
+
+The TUI can be installed with one command, which downloads the latest release, installs it for the current user without administrator rights and adds `hst.commander` to the path.
 
 Windows (PowerShell):
 
@@ -186,7 +198,7 @@ macOS and Linux:
 curl -fsSL https://github.com/henrikstengaard/hst-commander/releases/latest/download/install.sh | bash
 ```
 
-To install the SMB plugin too, pass `-Smb` or `--smb`:
+Running the command again updates the TUI. Options are passed like this:
 
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/henrikstengaard/hst-commander/releases/latest/download/install.ps1))) -Smb
@@ -196,16 +208,30 @@ To install the SMB plugin too, pass `-Smb` or `--smb`:
 curl -fsSL https://github.com/henrikstengaard/hst-commander/releases/latest/download/install.sh | bash -s -- --smb
 ```
 
-`-SmbOnly`/`--smb-only` installs only the SMB plugin, `-Uninstall`/`--uninstall` removes the TUI. See [Install scripts](docs/application.md#install-scripts).
+- `-Smb`/`--smb` installs the [SMB plugin](#smb-plugin) too, `-SmbOnly`/`--smb-only` installs only the SMB plugin (e.g. for the GUI).
+- `-Version <version>`/`--version <version>` installs a given release, e.g. a prerelease, which the latest release doesn't include.
+- `-Uninstall`/`--uninstall` removes the TUI.
 
-Releases are published on the [GitHub releases page](https://github.com/henrikstengaard/hst-commander/releases), with the TUI and GUI packaged separately:
+See [Install scripts](docs/application.md#install-scripts) for where the files go.
 
-- **Windows** (x64, x86, arm64): setup installer and portable zip.
-- **macOS** (x64, arm64): dmg.
-- **Linux** (x64, arm, arm64; there's no 32-bit x86 build, as .NET doesn't support it on Linux): AppImage and deb package, and a tar.gz of the TUI. Make a downloaded AppImage executable before running it (`chmod +x hst-commander_*.AppImage`); it needs FUSE 2 (`libfuse2t64` on Ubuntu 24.04 and later, `libfuse2` before).
-- **SMB plugin**: released separately as it uses the LGPL licensed [SMBLibrary](https://github.com/TalAloni/SMBLibrary). On Windows, `smb-plugin_windows_setup.exe` installs it for both apps. On every platform, `smb-plugin.zip` holds its `Hst.Commander.Plugins.Smb` directory to copy to `~/.hst-commander/plugins/` (see the [SMB plugin](src/Hst.Commander.Plugins.Smb/readme.md)).
+The TUI can also be installed from the release's files:
 
-Settings, bookmarks and the error log are stored in `~/.hst-commander` (`%USERPROFILE%\.hst-commander` on Windows).
+- **Windows** (x64, x86, arm64): `_tui_windows_<arch>_setup.exe` installs the TUI with a Start menu shortcut (without adding `hst.commander` to the path, which the install command does). `_tui_windows_<arch>_portable.zip` runs without installing: unzip it and run `hst.commander.exe`.
+- **macOS** (x64, arm64): `_tui_macos_<arch>.dmg` holds `hst.commander` to copy to a directory on the path.
+- **Linux** (x64, arm64, arm): `_tui_linux_<arch>.deb` installs on Debian, Ubuntu and Raspberry Pi OS (`sudo apt install ./hst-commander_v<version>_tui_linux_<arch>.deb`) and adds `hst.commander` to the path, `_tui_linux_<arch>.tar.gz` holds the files to run, and `_tui_linux_<arch>.AppImage` runs without installing; see [AppImages](#appimages).
+
+### AppImages
+
+A downloaded AppImage must be made executable before running it, as browsers save downloads without the execute permission: `chmod +x hst-commander_*.AppImage`, or Properties > Executable as Program in Files. It needs FUSE 2: `sudo apt install libfuse2t64` on Ubuntu 24.04 and later, `libfuse2` before. There's no 32-bit x86 build for Linux, as .NET doesn't support it.
+
+### SMB plugin
+
+The SMB plugin adds Windows file shares and other SMB 2/3 servers to both apps. It's released separately, as it uses the LGPL licensed [SMBLibrary](https://github.com/TalAloni/SMBLibrary):
+
+- On Windows, `_smb-plugin_windows_setup.exe` installs it for both apps.
+- On every platform, `_smb-plugin.zip` holds its `Hst.Commander.Plugins.Smb` directory to copy to `~/.hst-commander/plugins/`, or the TUI's install command installs it with `-Smb`/`--smb` or `-SmbOnly`/`--smb-only`.
+
+See the [SMB plugin](src/Hst.Commander.Plugins.Smb/readme.md) for details.
 
 ## Code signing
 

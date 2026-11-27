@@ -8,7 +8,7 @@ It is an **external plugin**, not included with Hst Commander: SMBLibrary is lic
 
 On Windows, download and run `hst-commander_v<version>_smb-plugin_windows_setup.exe` from the Hst Commander release. It installs the plugin for the current user in `%USERPROFILE%\.hst-commander\plugins\Hst.Commander.Plugins.Smb`, where the TUI and the GUI load it, and is uninstalled in Settings > Apps.
 
-The install scripts install it on every platform, with the TUI (`-Smb`, `--smb`) or alone (`-SmbOnly`, `--smb-only`), see the [README](../../README.md#download).
+The install scripts install it on every platform, with the TUI (`-Smb`, `--smb`) or alone (`-SmbOnly`, `--smb-only`), see the [README](../../README.md#terminal-ui).
 
 Or install it by hand:
 
