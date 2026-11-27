@@ -308,7 +308,7 @@ dotnet test src/Hst.Commander.Core.Tests/Hst.Commander.Core.Tests.csproj --logge
 | `LTRData.DiscUtils.Iso9660` | 1.0.90 | `Hst.Commander.Core` — ISO 9660 reading |
 | `SkiaSharp`, `SkiaSharp.NativeAssets.Linux` | 3.119.4 | `Hst.Commander.Core` — decoding PNG, JPEG, GIF, BMP and WebP images viewed with F3 in the GUI (the version Avalonia uses; part of the TUI too, as it references Core) |
 | `System.Linq.Async` | 6.0.1 | `Hst.Commander.Core` — async LINQ |
-| `Hst.Compression` | 1.0.105-prerelease | `Hst.Commander.Plugins.LhaLzx` — lha and lzx archive reading, lha archive writing (Amiga entries) |
+| `Hst.Compression` | 1.0.105 | `Hst.Commander.Plugins.LhaLzx` — lha and lzx archive reading, lha archive writing (Amiga entries) |
 | `SharpCompress` | 0.50.8 | `Hst.Commander.Plugins.Archives` — rar, 7z and tar archive reading, xz, bzip2, zstd, LZW (.Z) and deflate (checking gzip members) decompression |
 | `Hst.Amiga` | 1.0.289 | `Hst.Commander.Plugins.Amiga` — Amiga rigid disk block, Fast File System, PFS3 and Smart File System reading and writing, .info icons; `Hst.Commander.Core` — UAE metadata (UAEFSDB and metafiles) |
 | `LTRData.DiscUtils.Vhd` | 1.0.90 | `Hst.Commander.Plugins.Amiga`, `Hst.Commander.Plugins.Disk` — vhd images |
