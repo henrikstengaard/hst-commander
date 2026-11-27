@@ -28,7 +28,7 @@ public partial class AboutDialog : Window
         LicensesList.DoubleTapped += async (_, _) => await ViewLicenseAsync();
         ViewLicenseButton.Click += async (_, _) => await ViewLicenseAsync();
         OkButton.Click += (_, _) => Close();
-        Opened += (_, _) => OkButton.Focus();
+        Opened += (_, _) => DialogButtons.Focus(OkButton);
     }
 
     private async Task ViewLicenseAsync()

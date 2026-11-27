@@ -56,7 +56,7 @@ public partial class FontDownloadDialog : Window
         };
         CancelButton.Click += (_, _) => Close(false);
         Closed += (_, _) => _cancellation?.Cancel();
-        Opened += (_, _) => DownloadButton.Focus();
+        Opened += (_, _) => DialogButtons.Focus(DownloadButton);
     }
 
     /// <summary>Name, license and project of a file, the project as a link.</summary>

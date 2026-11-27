@@ -43,7 +43,8 @@ public static class TuiMessageBox
             dialog.AddButton(button);
         }
 
-        dialog.Initialized += (_, _) => dialog.Buttons.FirstOrDefault()?.SetFocus();
+        // the default (first) button has the focus, so Enter answers with it and Left/Right move to the others
+        dialog.Initialized += (_, _) => dialog.Buttons.FirstOrDefault(b => b.IsDefault)?.SetFocus();
         Application.Run(dialog);
         return result;
     }

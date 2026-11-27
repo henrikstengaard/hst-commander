@@ -43,7 +43,7 @@ public partial class UnexpectedErrorDialog : Window
             }
         };
         CloseButton.Click += (_, _) => Close();
-        Opened += (_, _) => ReportButton.Focus();
+        Opened += (_, _) => DialogButtons.Focus(ReportButton);
     }
 
     /// <summary>Dialog of an unhandled exception.</summary>

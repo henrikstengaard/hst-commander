@@ -19,6 +19,6 @@ public partial class SaveChangesDialog : Window
         SaveButton.Click += (_, _) => Close(true);
         DiscardButton.Click += (_, _) => Close(false);
         CancelButton.Click += (_, _) => Close();
-        Opened += (_, _) => SaveButton.Focus();
+        Opened += (_, _) => DialogButtons.Focus(SaveButton);
     }
 }

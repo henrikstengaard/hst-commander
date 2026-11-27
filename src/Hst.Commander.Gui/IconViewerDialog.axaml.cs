@@ -58,7 +58,7 @@ public partial class IconViewerDialog : Window
             _cancellationTokenSource.Cancel();
             _cancellationTokenSource.Dispose();
         };
-        Opened += (_, _) => OkButton.Focus();
+        Opened += (_, _) => DialogButtons.Focus(OkButton);
     }
 
     /// <param name="name">Name of the entry, shown in the title.</param>

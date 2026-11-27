@@ -18,6 +18,6 @@ public partial class DeleteDialog : Window
         MessageText.Text = message;
         YesButton.Click += (_, _) => Close(true);
         NoButton.Click += (_, _) => Close(false);
-        Opened += (_, _) => YesButton.Focus();
+        Opened += (_, _) => DialogButtons.Focus(YesButton);
     }
 }

@@ -15,6 +15,6 @@ public partial class QuitDialog : Window
         MessageText.Text = AppInfo.Current.QuitQuestion;
         YesButton.Click += (_, _) => Close(true);
         NoButton.Click += (_, _) => Close(false);
-        Opened += (_, _) => YesButton.Focus();
+        Opened += (_, _) => DialogButtons.Focus(YesButton);
     }
 }

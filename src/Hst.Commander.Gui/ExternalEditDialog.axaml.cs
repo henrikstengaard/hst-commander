@@ -30,7 +30,7 @@ public partial class ExternalEditDialog : Window
         Closed += (_, _) => _cancellation.Cancel();
         Opened += async (_, _) =>
         {
-            DoneButton.Focus();
+            DialogButtons.Focus(DoneButton);
             if (process == null)
             {
                 return;

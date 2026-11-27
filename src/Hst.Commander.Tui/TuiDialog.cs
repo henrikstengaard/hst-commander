@@ -29,6 +29,7 @@ public class TuiDialog : Dialog
         }
 
         base.AddButton(button);
+        button.KeyDown += (_, key) => MoveButtonFocus(button, key);
 
         // the buttons are on the first row of the button area instead of below an empty row
         button.Y = 0;
@@ -40,6 +41,29 @@ public class TuiDialog : Dialog
         }
 
         DefaultAcceptView = _defaultButton;
+    }
+
+    /// <summary>
+    ///     Left and Right move the focus between the buttons (e.g. Yes, No and All), wrapping around. Handled on the
+    ///     buttons, so text fields and lists keep their arrow keys.
+    /// </summary>
+    private void MoveButtonFocus(Button button, Key key)
+    {
+        if (key != Key.CursorLeft && key != Key.CursorRight)
+        {
+            return;
+        }
+
+        var buttons = Buttons.Where(b => b == button || (b.Visible && b.Enabled && b.CanFocus)).ToList();
+        if (buttons.Count < 2)
+        {
+            return;
+        }
+
+        var step = key == Key.CursorRight ? 1 : -1;
+        var index = (buttons.IndexOf(button) + step + buttons.Count) % buttons.Count;
+        buttons[index].SetFocus();
+        key.Handled = true;
     }
 
     /// <summary>

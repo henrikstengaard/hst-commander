@@ -25,7 +25,7 @@ public partial class ErrorDialog : Window
 
         MessageText.Text = message;
         OkButton.Click += (_, _) => Close();
-        Opened += (_, _) => OkButton.Focus();
+        Opened += (_, _) => DialogButtons.Focus(OkButton);
     }
 
     /// <summary>
